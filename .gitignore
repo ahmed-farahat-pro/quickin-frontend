@@ -1,5 +1,8 @@
 node_modules
 .next
-.env*
+# Local env files (keep .env.example tracked)
+.env
+.env.local
+.env.*.local
 *.log
 .DS_Store
