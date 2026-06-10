@@ -1,0 +1,123 @@
+/* =============================================================================
+   QUICKIN DESIGN SYSTEM (frontend UI-only build)
+   =============================================================================
+   Warm boutique booking-platform aesthetic.
+   The pages style themselves with inline styles + the literal font-family names
+   "DM Sans" / "Playfair Display" / "Geist Mono", which next/font/google exposes
+   via the CSS variables wired up in layout.tsx. This stylesheet keeps the design
+   tokens, base resets, scrollbar styling and Leaflet popup overrides — without
+   pulling in the Tailwind build pipeline (the UI doesn't use Tailwind classes).
+   ============================================================================= */
+
+:root {
+  /* QuickIn palette */
+  --background: #f6f1e6;
+  --background-secondary: #efe6d8;
+  --foreground: #2b2b2b;
+  --card: #ffffff;
+  --primary: #5b0f16;
+  --primary-foreground: #f6f1e6;
+  --secondary: #efe6d8;
+  --muted: #efe6d8;
+  --muted-foreground: #7a746a;
+  --border: #e2d8c8;
+  --ring: #5b0f16;
+
+  /* Typography — next/font/google sets these vars in layout.tsx. The fallbacks
+     also expose the literal family names used by the pages' inline styles. */
+  --font-sans: var(--font-dm-sans), 'DM Sans', ui-sans-serif, system-ui,
+    -apple-system, sans-serif;
+  --font-serif: var(--font-playfair), 'Playfair Display', Georgia, serif;
+  --font-mono: var(--font-geist-mono), 'Geist Mono', ui-monospace, monospace;
+
+  /* Radius tokens */
+  --radius-card: 1.75rem;
+  --radius-button: 1.25rem;
+  --radius-input: 1.125rem;
+  --radius-modal: 2rem;
+}
+
+/* -----------------------------------------------------------------------------
+   BASE STYLES
+   ----------------------------------------------------------------------------- */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #f6f1e6;
+  color: #2b2b2b;
+  font-family: var(--font-sans);
+}
+
+body {
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'rlig' 1, 'calt' 1;
+}
+
+.antialiased {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Proper cursors for interactive elements */
+button,
+[role='button'],
+[type='button'],
+[type='submit'],
+[type='reset'],
+a[href],
+select,
+[tabindex]:not([tabindex='-1']) {
+  cursor: pointer;
+}
+
+button:disabled,
+[role='button'][aria-disabled='true'],
+[disabled] {
+  cursor: not-allowed;
+}
+
+/* -----------------------------------------------------------------------------
+   SCROLLBAR — custom QuickIn styling
+   ----------------------------------------------------------------------------- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #e2d8c8;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #7a746a;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #e2d8c8 transparent;
+}
+
+/* -----------------------------------------------------------------------------
+   LEAFLET MAP OVERRIDES
+   ----------------------------------------------------------------------------- */
+.listing-popup-card .leaflet-popup-content-wrapper,
+.listing-popup-card .leaflet-popup-tip {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.listing-popup-card .leaflet-popup-content {
+  margin: 0 !important;
+}
