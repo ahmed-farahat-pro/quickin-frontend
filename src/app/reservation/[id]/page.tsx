@@ -404,7 +404,7 @@ function ReservationCard({
           {reservation.status === 'confirmed' ? (
             <>
               <a
-                href={`${API_URL}/api/wallet/pass/${id}`}
+                href={`${API_URL}/api/wallet/pass/${reservation.id}`}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
