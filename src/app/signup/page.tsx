@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Script from 'next/script'
 import { API_URL } from '@/lib/api'
 import { signInWithApple, APPLE_SERVICES_ID, APPLE_JS_SRC } from '@/lib/apple'
+import { EyeIcon, EyeOffIcon, eyeButtonStyle } from '@/app/_components/password-eye'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -53,6 +54,7 @@ export default function SignupPage() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [role, setRole] = useState<Role>('user')
   const [step, setStep] = useState<'form' | 'otp'>('form')
   const [code, setCode] = useState('')
@@ -111,6 +113,9 @@ export default function SignupPage() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) { setError(data?.error || 'Unable to create account. Please try again.'); setLoading(false); return }
+      // Existing guest who registered "as a host": the backend added the host role
+      // and returned a token — log straight in, no OTP needed.
+      if (data?.token) { persistAuthAndGo(data); return }
       // OTP sent — move to the verification step.
       setStep('otp')
       setNotice(
@@ -244,7 +249,12 @@ export default function SignupPage() {
               </label>
               <label style={{ display: 'block', marginBottom: 22 }}>
                 <span style={labelStyle}>Password</span>
-                <input type="password" required minLength={6} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" style={inputStyle} />
+                <div style={{ position: 'relative' }}>
+                  <input type={showPassword ? 'text' : 'password'} required minLength={6} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" style={{ ...inputStyle, paddingRight: 44 }} />
+                  <button type="button" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? 'Hide password' : 'Show password'} style={eyeButtonStyle}>
+                    {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                  </button>
+                </div>
               </label>
               <button type="submit" disabled={loading} style={primaryButtonStyle(loading)}>
                 {loading ? 'Sending code…' : `Create ${role === 'host' ? 'host' : 'guest'} account`}

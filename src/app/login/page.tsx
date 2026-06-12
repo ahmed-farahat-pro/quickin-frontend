@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Script from 'next/script'
 import { API_URL } from '@/lib/api'
 import { signInWithApple, APPLE_SERVICES_ID, APPLE_JS_SRC } from '@/lib/apple'
+import { EyeIcon, EyeOffIcon, eyeButtonStyle } from '@/app/_components/password-eye'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -52,6 +53,7 @@ function AppleGlyph() {
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [step, setStep] = useState<'form' | 'otp'>('form')
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -226,7 +228,12 @@ export default function LoginPage() {
               </label>
               <label style={{ display: 'block', marginBottom: 22 }}>
                 <span style={labelStyle}>Password</span>
-                <input type="password" required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" style={inputStyle} />
+                <div style={{ position: 'relative' }}>
+                  <input type={showPassword ? 'text' : 'password'} required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" style={{ ...inputStyle, paddingRight: 44 }} />
+                  <button type="button" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? 'Hide password' : 'Show password'} style={eyeButtonStyle}>
+                    {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                  </button>
+                </div>
               </label>
               <button type="submit" disabled={loading} style={primaryButtonStyle(loading)}>
                 {loading ? 'Signing in…' : 'Sign in'}
