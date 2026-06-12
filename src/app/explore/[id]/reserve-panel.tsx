@@ -25,6 +25,7 @@ const labelStyle: React.CSSProperties = {
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
+  minWidth: 0,
   boxSizing: 'border-box',
   padding: '10px 12px',
   fontSize: 14,
@@ -143,8 +144,9 @@ export default function ReservePanel({
         Prices in {currency}
       </p>
 
-      {/* Date inputs */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      {/* Date inputs — wrap to one column when the card is too narrow for two
+          native date fields side by side (prevents overflow on tablet widths). */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: 12 }}>
         <div>
           <label htmlFor="rp-checkin" style={labelStyle}>
             Check-in

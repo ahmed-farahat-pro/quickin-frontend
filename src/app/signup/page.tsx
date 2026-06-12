@@ -223,11 +223,11 @@ export default function SignupPage() {
               <span style={labelStyle}>I want to join as</span>
               <div style={{ display: 'flex', gap: 10 }}>
                 <button type="button" onClick={() => setRole('user')} style={roleBtnStyle(role === 'user')}>
-                  <span style={{ fontSize: 15, fontWeight: 700 }}>🧳 Guest</span>
+                  <span style={{ fontSize: 15, fontWeight: 700 }}>Guest</span>
                   <span style={{ fontSize: 12, color: COLORS.muted }}>Book stays</span>
                 </button>
                 <button type="button" onClick={() => setRole('host')} style={roleBtnStyle(role === 'host')}>
-                  <span style={{ fontSize: 15, fontWeight: 700 }}>🏠 Host</span>
+                  <span style={{ fontSize: 15, fontWeight: 700 }}>Host</span>
                   <span style={{ fontSize: 12, color: COLORS.muted }}>List your place</span>
                 </button>
               </div>
