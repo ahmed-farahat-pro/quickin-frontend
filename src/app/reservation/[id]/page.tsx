@@ -392,7 +392,7 @@ function ReservationCard({
           </div>
         </div>
 
-        {/* Apple Wallet (disabled — backend endpoint comes later) */}
+        {/* Apple Wallet — live once the reservation is confirmed */}
         <div
           style={{
             padding: '0 26px 26px',
@@ -401,33 +401,37 @@ function ReservationCard({
             paddingTop: 20,
           }}
         >
-          <button
-            type="button"
-            disabled
-            aria-disabled="true"
-            title="Apple Wallet passes are coming soon"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 10,
-              padding: '12px 22px',
-              fontSize: 15,
-              fontWeight: 600,
-              fontFamily: FONT,
-              color: '#fff',
-              background: '#000',
-              border: 'none',
-              borderRadius: 14,
-              cursor: 'not-allowed',
-              opacity: 0.45,
-            }}
-          >
-            <AppleGlyph /> Add to Apple Wallet
-          </button>
-          <p style={{ margin: '8px 0 0', fontSize: 12, color: COLORS.muted }}>
-            Available soon.
-          </p>
+          {reservation.status === 'confirmed' ? (
+            <>
+              <a
+                href={`${API_URL}/api/wallet/pass/${id}`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 10,
+                  padding: '12px 22px',
+                  fontSize: 15,
+                  fontWeight: 600,
+                  fontFamily: FONT,
+                  color: '#fff',
+                  background: '#000',
+                  border: 'none',
+                  borderRadius: 14,
+                  textDecoration: 'none',
+                }}
+              >
+                <AppleGlyph /> Add to Apple Wallet
+              </a>
+              <p style={{ margin: '8px 0 0', fontSize: 12, color: COLORS.muted }}>
+                On iPhone this opens in Wallet; on Mac it downloads a .pkpass you can add to Wallet.
+              </p>
+            </>
+          ) : (
+            <p style={{ margin: 0, fontSize: 13, color: COLORS.muted }}>
+              Add to Apple Wallet becomes available once the host confirms your reservation.
+            </p>
+          )}
         </div>
       </div>
     </>
