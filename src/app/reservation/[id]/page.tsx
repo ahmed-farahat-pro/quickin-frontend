@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import QRCode from 'qrcode'
 import { API_URL, getToken, type Reservation } from '@/lib/api'
+import BookingChat from '@/app/_components/booking-chat'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -212,10 +213,49 @@ export default function ReservationDetailPage() {
         )}
 
         {state.kind === 'ready' && (
-          <ReservationCard
-            reservation={state.reservation}
-            qrDataUrl={qrDataUrl}
-          />
+          <>
+            <ReservationCard
+              reservation={state.reservation}
+              qrDataUrl={qrDataUrl}
+            />
+
+            {/* Messages — per-booking thread with the host. */}
+            <div
+              style={{
+                marginTop: 24,
+                background: '#fff',
+                borderRadius: 24,
+                border: '1px solid rgba(42,34,32,0.06)',
+                boxShadow: '0 10px 36px rgba(42,34,32,0.10)',
+                overflow: 'hidden',
+              }}
+            >
+              <div
+                style={{
+                  padding: '18px 26px',
+                  borderBottom: '1px solid rgba(42,34,32,0.08)',
+                }}
+              >
+                <h2
+                  style={{
+                    margin: 0,
+                    fontFamily: '"Playfair Display", Georgia, serif',
+                    fontSize: 20,
+                    fontWeight: 700,
+                    color: COLORS.burgundy,
+                  }}
+                >
+                  Messages
+                </h2>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: COLORS.muted }}>
+                  Chat with your host about this stay.
+                </p>
+              </div>
+              <div style={{ padding: '20px 26px 26px' }}>
+                <BookingChat bookingId={state.reservation.id} />
+              </div>
+            </div>
+          </>
         )}
       </section>
     </main>

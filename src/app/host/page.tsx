@@ -14,6 +14,7 @@ import {
   type Listing,
   type HostBooking,
 } from '@/lib/api'
+import BookingChat from '@/app/_components/booking-chat'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -168,6 +169,8 @@ export default function HostPage() {
   const [bookingsError, setBookingsError] = useState(false)
   // ids currently being confirmed/rejected (disable their buttons)
   const [actingId, setActingId] = useState<string | null>(null)
+  // booking id whose "Message guest" chat panel is currently expanded
+  const [openChatId, setOpenChatId] = useState<string | null>(null)
 
   const loadListings = useCallback(async () => {
     const token = getToken()
@@ -748,12 +751,7 @@ export default function HostPage() {
               return (
                 <article
                   key={b.id}
-                  className="qk-host-req-card"
                   style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr auto',
-                    gap: 16,
-                    alignItems: 'center',
                     background: '#fff',
                     borderRadius: 16,
                     border: '1px solid rgba(42,34,32,0.06)',
@@ -761,7 +759,16 @@ export default function HostPage() {
                     padding: '16px 18px',
                   }}
                 >
-                  <div style={{ minWidth: 0 }}>
+                  <div
+                    className="qk-host-req-card"
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr auto',
+                      gap: 16,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
                     <div
                       style={{
                         display: 'flex',
@@ -829,53 +836,90 @@ export default function HostPage() {
                     )}
                   </div>
 
-                  {isPending && (
                     <div
                       className="qk-host-req-actions"
                       style={{
                         display: 'flex',
                         gap: 10,
                         justifyContent: 'flex-end',
+                        flexWrap: 'wrap',
                       }}
                     >
+                      {isPending && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => act(b.id, 'confirm')}
+                            disabled={busy}
+                            style={{
+                              padding: '9px 18px',
+                              fontSize: 14,
+                              fontWeight: 700,
+                              fontFamily: FONT,
+                              color: '#fff',
+                              background: '#0f5132',
+                              border: 'none',
+                              borderRadius: 12,
+                              cursor: busy ? 'not-allowed' : 'pointer',
+                              opacity: busy ? 0.6 : 1,
+                            }}
+                          >
+                            {busy ? '…' : 'Confirm'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => act(b.id, 'reject')}
+                            disabled={busy}
+                            style={{
+                              padding: '9px 18px',
+                              fontSize: 14,
+                              fontWeight: 700,
+                              fontFamily: FONT,
+                              color: COLORS.burgundy,
+                              background: '#fff',
+                              border: `1px solid ${COLORS.burgundy}`,
+                              borderRadius: 12,
+                              cursor: busy ? 'not-allowed' : 'pointer',
+                              opacity: busy ? 0.6 : 1,
+                            }}
+                          >
+                            {busy ? '…' : 'Reject'}
+                          </button>
+                        </>
+                      )}
                       <button
                         type="button"
-                        onClick={() => act(b.id, 'confirm')}
-                        disabled={busy}
+                        onClick={() =>
+                          setOpenChatId((cur) => (cur === b.id ? null : b.id))
+                        }
+                        aria-expanded={openChatId === b.id}
                         style={{
                           padding: '9px 18px',
                           fontSize: 14,
                           fontWeight: 700,
                           fontFamily: FONT,
-                          color: '#fff',
-                          background: '#0f5132',
-                          border: 'none',
-                          borderRadius: 12,
-                          cursor: busy ? 'not-allowed' : 'pointer',
-                          opacity: busy ? 0.6 : 1,
-                        }}
-                      >
-                        {busy ? '…' : 'Confirm'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => act(b.id, 'reject')}
-                        disabled={busy}
-                        style={{
-                          padding: '9px 18px',
-                          fontSize: 14,
-                          fontWeight: 700,
-                          fontFamily: FONT,
-                          color: COLORS.burgundy,
-                          background: '#fff',
+                          color: openChatId === b.id ? '#fff' : COLORS.burgundy,
+                          background:
+                            openChatId === b.id ? COLORS.burgundy : COLORS.tan,
                           border: `1px solid ${COLORS.burgundy}`,
                           borderRadius: 12,
-                          cursor: busy ? 'not-allowed' : 'pointer',
-                          opacity: busy ? 0.6 : 1,
+                          cursor: 'pointer',
                         }}
                       >
-                        {busy ? '…' : 'Reject'}
+                        {openChatId === b.id ? 'Hide chat' : 'Message guest'}
                       </button>
+                    </div>
+                  </div>
+
+                  {openChatId === b.id && (
+                    <div
+                      style={{
+                        marginTop: 16,
+                        paddingTop: 16,
+                        borderTop: '1px solid rgba(42,34,32,0.08)',
+                      }}
+                    >
+                      <BookingChat bookingId={b.id} />
                     </div>
                   )}
                 </article>
