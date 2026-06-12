@@ -73,6 +73,50 @@ export interface Reservation {
   total_price: number
 }
 
+// A standalone experience a host offers (jet ski, diving, yacht…). Browsed
+// publicly at /services and subscribed to like a booking. Mirrors the backend
+// GET /api/local/services JSON.
+export interface Service {
+  id: string
+  host_id: string
+  host_name: string | null
+  title: string
+  description: string | null
+  category: string | null
+  location: string | null
+  price: number
+  currency: string
+  image_url: string | null
+  lat: number | null
+  lng: number | null
+  is_published: boolean
+  created_at: string
+}
+
+// One subscription (request) to a service — the user-facing equivalent of a
+// booking. Returned by GET /api/local/service-requests (user) and
+// GET /api/local/host/service-requests (host inbox); both share this shape.
+export interface ServiceRequest {
+  id: string
+  service_id: string
+  user_id: string
+  status: 'pending' | 'confirmed' | 'rejected' | string
+  preferred_date: string | null
+  note: string | null
+  request_code: string | null
+  created_at: string
+  service_title: string
+  service_category: string | null
+  service_image: string | null
+  service_price: number
+  service_currency: string
+  service_location: string | null
+  host_id: string
+  host_name: string | null
+  requester_name: string | null
+  requester_email: string | null
+}
+
 // The shape persisted in localStorage 'qk_user' after login/signup.
 export interface StoredUser {
   id?: string

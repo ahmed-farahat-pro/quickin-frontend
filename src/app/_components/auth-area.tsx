@@ -79,6 +79,18 @@ export default function AuthArea() {
     return (
       <>
         {hostLink}
+        <a
+          href="/reservations"
+          style={{ color: COLORS.ink, textDecoration: 'none', fontWeight: 600 }}
+        >
+          Reservations
+        </a>
+        <a
+          href="/subscriptions"
+          style={{ color: COLORS.ink, textDecoration: 'none', fontWeight: 600 }}
+        >
+          Subscriptions
+        </a>
         <span style={{ color: COLORS.ink, fontWeight: 600 }}>
           Hi, {firstName}
         </span>

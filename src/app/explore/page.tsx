@@ -147,6 +147,12 @@ export default async function ExplorePage({
               fontSize: 14,
             }}
           >
+            <a
+              href="/services"
+              style={{ color: COLORS.ink, textDecoration: 'none', fontWeight: 600 }}
+            >
+              Services
+            </a>
             <AuthArea />
           </nav>
         </div>

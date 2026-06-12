@@ -14,6 +14,8 @@ import {
   getToken,
   type Listing,
   type HostBooking,
+  type Service,
+  type ServiceRequest,
 } from '@/lib/api'
 import BookingChat from '@/app/_components/booking-chat'
 
@@ -153,6 +155,35 @@ const EMPTY_FORM: FormState = {
   image3: '',
 }
 
+const SERVICE_CATEGORIES = [
+  'Water sports',
+  'Diving',
+  'Boat & yacht',
+  'Tours',
+  'Wellness',
+  'Food & drink',
+  'Adventure',
+  'Other',
+]
+
+interface ServiceFormState {
+  title: string
+  category: string
+  description: string
+  location: string
+  price: string
+  image_url: string
+}
+
+const EMPTY_SERVICE_FORM: ServiceFormState = {
+  title: '',
+  category: 'Water sports',
+  description: '',
+  location: '',
+  price: '',
+  image_url: '',
+}
+
 type Gate =
   | { kind: 'checking' }
   | { kind: 'anon' }
@@ -196,6 +227,24 @@ export default function HostPage() {
   // booking id whose "Message guest" chat panel is currently expanded
   const [openChatId, setOpenChatId] = useState<string | null>(null)
 
+  // Services — add-service form
+  const [svcForm, setSvcForm] = useState<ServiceFormState>(EMPTY_SERVICE_FORM)
+  const [svcSubmitting, setSvcSubmitting] = useState(false)
+  const [svcFormError, setSvcFormError] = useState<string | null>(null)
+  const [svcFormOk, setSvcFormOk] = useState<string | null>(null)
+
+  // Services — the host's own services list
+  const [services, setServices] = useState<Service[]>([])
+  const [servicesLoading, setServicesLoading] = useState(true)
+  const [servicesError, setServicesError] = useState(false)
+
+  // Services — request inbox
+  const [svcRequests, setSvcRequests] = useState<ServiceRequest[]>([])
+  const [svcRequestsLoading, setSvcRequestsLoading] = useState(true)
+  const [svcRequestsError, setSvcRequestsError] = useState(false)
+  // service-request ids currently being confirmed/rejected (disable buttons)
+  const [svcActingId, setSvcActingId] = useState<string | null>(null)
+
   const loadListings = useCallback(async () => {
     const token = getToken()
     if (!token) return
@@ -234,6 +283,44 @@ export default function HostPage() {
     }
   }, [])
 
+  const loadServices = useCallback(async () => {
+    const token = getToken()
+    if (!token) return
+    setServicesLoading(true)
+    setServicesError(false)
+    try {
+      const res = await fetch(`${API_URL}/api/local/host/services`, {
+        headers: { Authorization: 'Bearer ' + token },
+      })
+      if (!res.ok) throw new Error(`Request failed: ${res.status}`)
+      const data = await res.json()
+      setServices(Array.isArray(data) ? data : [])
+    } catch {
+      setServicesError(true)
+    } finally {
+      setServicesLoading(false)
+    }
+  }, [])
+
+  const loadServiceRequests = useCallback(async () => {
+    const token = getToken()
+    if (!token) return
+    setSvcRequestsLoading(true)
+    setSvcRequestsError(false)
+    try {
+      const res = await fetch(`${API_URL}/api/local/host/service-requests`, {
+        headers: { Authorization: 'Bearer ' + token },
+      })
+      if (!res.ok) throw new Error(`Request failed: ${res.status}`)
+      const data = await res.json()
+      setSvcRequests(Array.isArray(data) ? data : [])
+    } catch {
+      setSvcRequestsError(true)
+    } finally {
+      setSvcRequestsLoading(false)
+    }
+  }, [])
+
   // Gate on mount, then load data if allowed.
   useEffect(() => {
     const token = getToken()
@@ -254,7 +341,9 @@ export default function HostPage() {
     setGate({ kind: 'ok', firstName: raw ? raw.split(' ')[0] : 'Host' })
     loadListings()
     loadBookings()
-  }, [loadListings, loadBookings])
+    loadServices()
+    loadServiceRequests()
+  }, [loadListings, loadBookings, loadServices, loadServiceRequests])
 
   function patch(p: Partial<FormState>) {
     setForm((prev) => ({ ...prev, ...p }))
@@ -369,6 +458,108 @@ export default function HostPage() {
     }
   }
 
+  function patchSvc(p: Partial<ServiceFormState>) {
+    setSvcForm((prev) => ({ ...prev, ...p }))
+    setSvcFormError(null)
+    setSvcFormOk(null)
+  }
+
+  async function handleCreateService(e: React.FormEvent) {
+    e.preventDefault()
+    setSvcFormError(null)
+    setSvcFormOk(null)
+
+    const token = getToken()
+    if (!token) {
+      setGate({ kind: 'anon' })
+      return
+    }
+
+    const price = Number(svcForm.price)
+    if (!svcForm.title.trim() || !(price > 0)) {
+      setSvcFormError('Title and a price greater than 0 are required.')
+      return
+    }
+
+    setSvcSubmitting(true)
+    try {
+      const res = await fetch(`${API_URL}/api/local/services`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + token,
+        },
+        body: JSON.stringify({
+          title: svcForm.title.trim(),
+          description: svcForm.description.trim() || undefined,
+          category: svcForm.category || undefined,
+          location: svcForm.location.trim() || undefined,
+          price,
+          image_url: svcForm.image_url.trim() || undefined,
+        }),
+      })
+
+      if (res.status === 401) {
+        setGate({ kind: 'anon' })
+        return
+      }
+      if (res.status === 403) {
+        setSvcFormError('Your account is not allowed to create services.')
+        return
+      }
+
+      const data = await res.json().catch(() => ({}))
+      if (res.status !== 201) {
+        setSvcFormError(
+          (data && data.error) || 'Could not create the service. Please try again.'
+        )
+        return
+      }
+
+      setSvcForm(EMPTY_SERVICE_FORM)
+      setSvcFormOk('Service published. It now appears in “Your services” below.')
+      loadServices()
+    } catch {
+      setSvcFormError('Network error. Please try again.')
+    } finally {
+      setSvcSubmitting(false)
+    }
+  }
+
+  async function actService(id: string, action: 'confirm' | 'reject') {
+    const token = getToken()
+    if (!token) {
+      setGate({ kind: 'anon' })
+      return
+    }
+    setSvcActingId(id)
+    setSvcRequestsError(false)
+    try {
+      const res = await fetch(`${API_URL}/api/local/service-requests/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + token,
+        },
+        body: JSON.stringify({ status: action }),
+      })
+      if (!res.ok) throw new Error(`Request failed: ${res.status}`)
+      const updated = await res.json().catch(() => null)
+      const nextStatus = action === 'confirm' ? 'confirmed' : 'rejected'
+      setSvcRequests((prev) =>
+        prev.map((r) =>
+          r.id === id
+            ? { ...r, status: (updated && updated.status) || nextStatus }
+            : r
+        )
+      )
+    } catch {
+      setSvcRequestsError(true)
+    } finally {
+      setSvcActingId(null)
+    }
+  }
+
   // ---- Gate screens --------------------------------------------------------
 
   if (gate.kind === 'checking') {
@@ -421,6 +612,13 @@ export default function HostPage() {
   )
   const decided = bookings.filter(
     (b) => (b.status || '').toLowerCase() !== 'pending'
+  )
+
+  const svcPending = svcRequests.filter(
+    (r) => (r.status || '').toLowerCase() === 'pending'
+  )
+  const svcDecided = svcRequests.filter(
+    (r) => (r.status || '').toLowerCase() !== 'pending'
   )
 
   return (
@@ -994,6 +1192,419 @@ export default function HostPage() {
                       <BookingChat bookingId={b.id} />
                     </div>
                   )}
+                </article>
+              )
+            })}
+          </div>
+        )}
+      </Section>
+
+      {/* d) Add a service ----------------------------------------------------- */}
+      <Section title="Add a service">
+        <p style={{ margin: '0 0 18px', fontSize: 14, color: COLORS.muted }}>
+          Offer a standalone experience — a jet ski rental, a diving trip, a
+          yacht charter. Guests subscribe and you confirm each request below.
+        </p>
+        <form onSubmit={handleCreateService}>
+          <div
+            className="qk-host-form-grid"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: 16,
+            }}
+          >
+            <Field className="qk-host-form-full" label="Title">
+              <input
+                style={inputStyle}
+                value={svcForm.title}
+                onChange={(e) => patchSvc({ title: e.target.value })}
+                placeholder="Sunset jet ski rental"
+                required
+              />
+            </Field>
+
+            <Field className="qk-host-form-full" label="Description">
+              <textarea
+                style={{ ...inputStyle, minHeight: 84, resize: 'vertical' }}
+                value={svcForm.description}
+                onChange={(e) => patchSvc({ description: e.target.value })}
+                placeholder="What does the experience include?"
+              />
+            </Field>
+
+            <Field label="Category">
+              <select
+                style={{ ...inputStyle, appearance: 'auto' }}
+                value={svcForm.category}
+                onChange={(e) => patchSvc({ category: e.target.value })}
+              >
+                {SERVICE_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Location">
+              <input
+                style={inputStyle}
+                value={svcForm.location}
+                onChange={(e) => patchSvc({ location: e.target.value })}
+                placeholder="Marina Bay"
+              />
+            </Field>
+            <Field label="Price (USD)">
+              <input
+                style={inputStyle}
+                type="number"
+                min={1}
+                value={svcForm.price}
+                onChange={(e) => patchSvc({ price: e.target.value })}
+                placeholder="120"
+                required
+              />
+            </Field>
+
+            <Field className="qk-host-form-full" label="Image URL">
+              <input
+                style={inputStyle}
+                value={svcForm.image_url}
+                onChange={(e) => patchSvc({ image_url: e.target.value })}
+                placeholder="https://…/photo.jpg"
+                inputMode="url"
+              />
+            </Field>
+          </div>
+
+          {svcFormError && (
+            <div
+              style={{
+                marginTop: 16,
+                padding: '11px 14px',
+                borderRadius: 12,
+                background: 'rgba(91,15,22,0.08)',
+                border: '1px solid rgba(91,15,22,0.2)',
+                fontSize: 14,
+                color: COLORS.burgundy,
+                fontWeight: 600,
+              }}
+            >
+              {svcFormError}
+            </div>
+          )}
+          {svcFormOk && (
+            <div
+              style={{
+                marginTop: 16,
+                padding: '11px 14px',
+                borderRadius: 12,
+                background: 'rgba(15,81,50,0.10)',
+                border: '1px solid rgba(15,81,50,0.25)',
+                fontSize: 14,
+                color: '#0f5132',
+                fontWeight: 600,
+              }}
+            >
+              {svcFormOk}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={svcSubmitting}
+            style={{
+              marginTop: 18,
+              padding: '13px 28px',
+              fontSize: 15,
+              fontWeight: 700,
+              fontFamily: FONT,
+              color: '#fff',
+              background: COLORS.burgundy,
+              border: 'none',
+              borderRadius: 14,
+              cursor: svcSubmitting ? 'not-allowed' : 'pointer',
+              opacity: svcSubmitting ? 0.6 : 1,
+            }}
+          >
+            {svcSubmitting ? 'Publishing…' : 'Publish service'}
+          </button>
+        </form>
+      </Section>
+
+      {/* e) Your services ----------------------------------------------------- */}
+      <Section title="Your services">
+        {servicesLoading ? (
+          <Muted>Loading your services…</Muted>
+        ) : servicesError ? (
+          <RetryRow label="Couldn’t load your services." onRetry={loadServices} />
+        ) : services.length === 0 ? (
+          <Muted>You haven’t published any services yet. Add one above.</Muted>
+        ) : (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+              gap: 18,
+            }}
+          >
+            {services.map((s) => {
+              const cover = s.image_url || FALLBACK_IMG
+              return (
+                <a
+                  key={s.id}
+                  href={`/services/${s.id}`}
+                  style={{
+                    display: 'block',
+                    background: '#fff',
+                    borderRadius: 18,
+                    overflow: 'hidden',
+                    textDecoration: 'none',
+                    color: 'inherit',
+                    border: '1px solid rgba(42,34,32,0.06)',
+                    boxShadow: '0 4px 18px rgba(42,34,32,0.07)',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '100%',
+                      aspectRatio: '4 / 3',
+                      background: COLORS.tan,
+                    }}
+                  >
+                    <img
+                      src={cover}
+                      alt={s.title}
+                      loading="lazy"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        display: 'block',
+                      }}
+                    />
+                  </div>
+                  <div style={{ padding: '12px 14px 16px' }}>
+                    {s.category && (
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          background: COLORS.tan,
+                          color: COLORS.burgundy,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: '3px 10px',
+                          borderRadius: 999,
+                          marginBottom: 8,
+                        }}
+                      >
+                        {s.category}
+                      </span>
+                    )}
+                    <h3
+                      style={{
+                        margin: 0,
+                        fontSize: 15,
+                        fontWeight: 700,
+                        color: COLORS.ink,
+                        lineHeight: 1.3,
+                      }}
+                    >
+                      {s.title}
+                    </h3>
+                    {s.location && (
+                      <p
+                        style={{
+                          margin: '4px 0 0',
+                          fontSize: 13,
+                          color: COLORS.muted,
+                        }}
+                      >
+                        {s.location}
+                      </p>
+                    )}
+                    <p style={{ margin: '10px 0 0', fontSize: 14 }}>
+                      <span style={{ fontWeight: 700, color: COLORS.burgundy }}>
+                        ${s.price}
+                      </span>
+                    </p>
+                  </div>
+                </a>
+              )
+            })}
+          </div>
+        )}
+      </Section>
+
+      {/* f) Service requests -------------------------------------------------- */}
+      <Section title="Service requests">
+        {svcRequestsLoading ? (
+          <Muted>Loading service requests…</Muted>
+        ) : svcRequestsError ? (
+          <RetryRow
+            label="Couldn’t load service requests."
+            onRetry={loadServiceRequests}
+          />
+        ) : svcRequests.length === 0 ? (
+          <Muted>No service requests yet.</Muted>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* Pending first (actionable), then decided ones. */}
+            {[...svcPending, ...svcDecided].map((r) => {
+              const isPending = (r.status || '').toLowerCase() === 'pending'
+              const busy = svcActingId === r.id
+              const prefDate = r.preferred_date ? fmtDate(r.preferred_date) : null
+              return (
+                <article
+                  key={r.id}
+                  style={{
+                    background: '#fff',
+                    borderRadius: 16,
+                    border: '1px solid rgba(42,34,32,0.06)',
+                    boxShadow: '0 4px 18px rgba(42,34,32,0.06)',
+                    padding: '16px 18px',
+                  }}
+                >
+                  <div
+                    className="qk-host-req-card"
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr auto',
+                      gap: 16,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <h3
+                          style={{
+                            margin: 0,
+                            fontSize: 16,
+                            fontWeight: 700,
+                            color: COLORS.ink,
+                          }}
+                        >
+                          {r.service_title}
+                        </h3>
+                        <StatusBadge status={r.status} />
+                      </div>
+                      <p
+                        style={{
+                          margin: '3px 0 0',
+                          fontSize: 13,
+                          color: COLORS.muted,
+                        }}
+                      >
+                        {r.requester_name || r.requester_email || 'A guest'}
+                        {r.service_location ? ` · ${r.service_location}` : ''}
+                      </p>
+                      <p
+                        style={{
+                          margin: '8px 0 0',
+                          fontSize: 14,
+                          color: COLORS.ink,
+                        }}
+                      >
+                        {prefDate ? `${prefDate} · ` : ''}
+                        <span style={{ fontWeight: 700, color: COLORS.burgundy }}>
+                          ${r.service_price}
+                        </span>
+                      </p>
+                      {r.note && (
+                        <p
+                          style={{
+                            margin: '6px 0 0',
+                            fontSize: 13,
+                            color: COLORS.muted,
+                            fontStyle: 'italic',
+                          }}
+                        >
+                          “{r.note}”
+                        </p>
+                      )}
+                      {r.request_code && (
+                        <p
+                          style={{
+                            margin: '4px 0 0',
+                            fontSize: 12,
+                            color: COLORS.muted,
+                          }}
+                        >
+                          Code{' '}
+                          <span
+                            style={{
+                              fontFamily:
+                                '"Geist Mono", ui-monospace, SFMono-Regular, monospace',
+                              fontWeight: 600,
+                              color: COLORS.ink,
+                            }}
+                          >
+                            {r.request_code}
+                          </span>
+                        </p>
+                      )}
+                    </div>
+
+                    <div
+                      className="qk-host-req-actions"
+                      style={{
+                        display: 'flex',
+                        gap: 10,
+                        justifyContent: 'flex-end',
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      {isPending && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => actService(r.id, 'confirm')}
+                            disabled={busy}
+                            style={{
+                              padding: '9px 18px',
+                              fontSize: 14,
+                              fontWeight: 700,
+                              fontFamily: FONT,
+                              color: '#fff',
+                              background: '#0f5132',
+                              border: 'none',
+                              borderRadius: 12,
+                              cursor: busy ? 'not-allowed' : 'pointer',
+                              opacity: busy ? 0.6 : 1,
+                            }}
+                          >
+                            {busy ? '…' : 'Accept'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => actService(r.id, 'reject')}
+                            disabled={busy}
+                            style={{
+                              padding: '9px 18px',
+                              fontSize: 14,
+                              fontWeight: 700,
+                              fontFamily: FONT,
+                              color: COLORS.burgundy,
+                              background: '#fff',
+                              border: `1px solid ${COLORS.burgundy}`,
+                              borderRadius: 12,
+                              cursor: busy ? 'not-allowed' : 'pointer',
+                              opacity: busy ? 0.6 : 1,
+                            }}
+                          >
+                            {busy ? '…' : 'Reject'}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </article>
               )
             })}
