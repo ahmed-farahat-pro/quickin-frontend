@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Script from 'next/script'
 import { API_URL } from '@/lib/api'
+import { signInWithApple, APPLE_SERVICES_ID, APPLE_JS_SRC } from '@/lib/apple'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -62,6 +63,7 @@ export default function SignupPage() {
   const googleBtnRef = useRef<HTMLDivElement | null>(null)
 
   const googleEnabled = Boolean(GOOGLE_CLIENT_ID)
+  const appleEnabled = Boolean(APPLE_SERVICES_ID)
 
   async function onGoogleCredential(credential: string) {
     setError(null); setNotice(null); setLoading(true)
@@ -158,19 +160,25 @@ export default function SignupPage() {
   async function handleAppleClick() {
     setError(null); setNotice(null); setLoading(true)
     try {
+      const { id_token, full_name } = await signInWithApple()
       const res = await fetch(`${API_URL}/api/auth/apple`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role }),
+        body: JSON.stringify({ identityToken: id_token, full_name, role }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) { setError(data?.error || 'Apple sign-in is not available right now.'); setLoading(false); return }
+      if (!res.ok) { setError(data?.error || 'Apple sign-in failed. Please try again.'); setLoading(false); return }
       persistAuthAndGo(data)
-    } catch { setError('Network error. Please try again.'); setLoading(false) }
+    } catch (e) {
+      const msg = (e as Error)?.message || ''
+      if (/popup|cancel|closed/i.test(msg)) { setLoading(false); return } // user closed the popup
+      setError(msg || 'Apple sign-in failed. Please try again.'); setLoading(false)
+    }
   }
 
   return (
     <main style={{ minHeight: '100vh', background: COLORS.cream, color: COLORS.ink, fontFamily: FONT, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px' }}>
       <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" onReady={initGis} />
+      {appleEnabled && <Script src={APPLE_JS_SRC} strategy="afterInteractive" />}
       <div style={{ width: '100%', maxWidth: 420, background: '#fff', borderRadius: 28, boxShadow: '0 12px 48px rgba(42,34,32,0.12)', border: '1px solid rgba(42,34,32,0.06)', padding: '40px 36px 36px' }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <img src="/logo.png" alt="QuickIn" style={{ height: 54, width: 'auto', margin: '0 auto', display: 'block' }} />
@@ -249,9 +257,11 @@ export default function SignupPage() {
               <span style={{ flex: 1, height: 1, background: 'rgba(42,34,32,0.12)' }} />
             </div>
 
-            <button type="button" onClick={handleAppleClick} style={appleButtonStyle(loading)}>
-              <AppleGlyph /> Continue with Apple
-            </button>
+            {appleEnabled && (
+              <button type="button" onClick={handleAppleClick} style={appleButtonStyle(loading)}>
+                <AppleGlyph /> Continue with Apple
+              </button>
+            )}
 
             {googleEnabled ? (
               <>
