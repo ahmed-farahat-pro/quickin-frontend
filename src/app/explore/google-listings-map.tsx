@@ -31,7 +31,9 @@ type GMarkerLike = QkGMarkerLike
 
 // Load the Maps JS API exactly once per page. Subsequent calls reuse the same
 // promise (so flipping List/Map or re-rendering never injects a second script).
-function loadGoogleMaps(apiKey: string): Promise<GMapsApi> {
+// Exported so the host add-listing pin-picker (host/location-picker.tsx) shares
+// the identical single-script loader instead of injecting a second one.
+export function loadGoogleMaps(apiKey: string): Promise<GMapsApi> {
   if (typeof window === 'undefined') {
     return Promise.reject(new Error('Google Maps can only load in the browser'))
   }

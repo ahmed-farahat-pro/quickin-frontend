@@ -21,6 +21,14 @@ interface QkGMap {
   fitBounds(bounds: QkGLatLngBounds, padding?: number): void
   setCenter(p: { lat: number; lng: number }): void
   setZoom(z: number): void
+  // Map clicks carry the clicked coordinate in `latLng`; used by the host
+  // add-listing pin-picker (host/location-picker.tsx).
+  addListener(event: string, handler: (e: QkGMapMouseEvent) => void): void
+}
+// A Maps mouse event. `latLng` is optional because some map events fire without
+// a coordinate (e.g. clicks on UI controls).
+interface QkGMapMouseEvent {
+  latLng?: QkGLatLng | null
 }
 interface QkGInfoWindow {
   setContent(content: string | Node): void
@@ -30,6 +38,12 @@ interface QkGInfoWindow {
 interface QkGMarkerLike {
   setMap(map: QkGMap | null): void
   addListener(event: string, handler: () => void): void
+  // Reposition an existing marker. Classic Markers accept a {lat,lng}; the
+  // AdvancedMarkerElement exposes `position` as a settable property. The
+  // host pin-picker prefers `setPosition` when present and falls back to
+  // assigning `position`.
+  setPosition?: (p: { lat: number; lng: number }) => void
+  position?: { lat: number; lng: number } | null
 }
 interface QkGMapsApi {
   Map: new (el: HTMLElement, opts: Record<string, unknown>) => QkGMap

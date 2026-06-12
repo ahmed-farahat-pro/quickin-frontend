@@ -7,6 +7,7 @@
 //   b) Your listings  -> GET  /api/local/host/listings
 //   c) Reservation requests -> GET /api/local/host/bookings  (+ confirm/reject)
 import { useCallback, useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
 import {
   API_URL,
   getStoredUser,
@@ -15,6 +16,15 @@ import {
   type HostBooking,
 } from '@/lib/api'
 import BookingChat from '@/app/_components/booking-chat'
+
+// Inlined at build time by Next. When set, the add-listing form shows a Google
+// Maps pin-picker; when empty we silently fall back to the manual lat/lng
+// inputs only. Client-only (touches window) -> dynamic import with ssr:false,
+// mirroring how the explore page loads its map.
+const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ''
+const LocationPicker = dynamic(() => import('./location-picker'), {
+  ssr: false,
+})
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -157,6 +167,20 @@ export default function HostPage() {
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [formOk, setFormOk] = useState<string | null>(null)
+
+  // Parsed coordinate for the map pin-picker, derived from the lat/lng text
+  // inputs so the marker, the "Selected:" caption and the POST body stay in
+  // sync whether the host clicks the map or types coordinates by hand. `null`
+  // until both are valid finite numbers.
+  const latNum = Number(form.lat)
+  const lngNum = Number(form.lng)
+  const pickedCoords =
+    form.lat.trim() !== '' &&
+    form.lng.trim() !== '' &&
+    Number.isFinite(latNum) &&
+    Number.isFinite(lngNum)
+      ? { lat: latNum, lng: lngNum }
+      : null
 
   // Listings
   const [listings, setListings] = useState<Listing[]>([])
@@ -557,6 +581,54 @@ export default function HostPage() {
                 inputMode="decimal"
               />
             </Field>
+
+            {GOOGLE_MAPS_API_KEY && (
+              <div className="qk-host-form-full">
+                <span style={labelStyle}>Pin the location</span>
+                <p
+                  style={{
+                    margin: '0 0 8px',
+                    fontSize: 13,
+                    color: COLORS.muted,
+                  }}
+                >
+                  Click the map to drop a marker on the exact spot. Click again
+                  to move it — the coordinates above update automatically.
+                </p>
+                <LocationPicker
+                  apiKey={GOOGLE_MAPS_API_KEY}
+                  value={pickedCoords}
+                  onPick={(lat, lng) =>
+                    patch({ lat: lat.toFixed(6), lng: lng.toFixed(6) })
+                  }
+                />
+                <p
+                  style={{
+                    margin: '8px 0 0',
+                    fontSize: 13,
+                    color: pickedCoords ? COLORS.ink : COLORS.muted,
+                  }}
+                >
+                  {pickedCoords ? (
+                    <>
+                      Selected:{' '}
+                      <span
+                        style={{
+                          fontFamily:
+                            '"Geist Mono", ui-monospace, SFMono-Regular, monospace',
+                          fontWeight: 600,
+                          color: COLORS.burgundy,
+                        }}
+                      >
+                        {pickedCoords.lat.toFixed(6)}, {pickedCoords.lng.toFixed(6)}
+                      </span>
+                    </>
+                  ) : (
+                    'No location pinned yet.'
+                  )}
+                </p>
+              </div>
+            )}
 
             <Field className="qk-host-form-full" label="Image URL 1">
               <input
