@@ -41,7 +41,7 @@ type Status =
   | { kind: 'loading' }
   | { kind: 'needsLogin' }
   | { kind: 'error'; message: string }
-  | { kind: 'success'; nights: number; total: number }
+  | { kind: 'success'; nights: number; total: number; reservationId: string | null }
 
 function nightsBetween(checkIn: string, checkOut: string): number {
   if (!checkIn || !checkOut) return 0
@@ -111,6 +111,7 @@ export default function ReservePanel({
               ? Math.round(data.total_price / pricePerNight)
               : nights,
           total: typeof data.total_price === 'number' ? data.total_price : total,
+          reservationId: typeof data.id === 'string' ? data.id : null,
         })
         return
       }
@@ -319,15 +320,24 @@ export default function ReservePanel({
           }}
         >
           <strong style={{ display: 'block', marginBottom: 4 }}>
-            Reserved! 🎉
+            Request sent — waiting for the host to confirm ⏳
           </strong>
           {status.nights} {status.nights === 1 ? 'night' : 'nights'} · $
           {status.total} total.{' '}
+          {status.reservationId && (
+            <a
+              href={`/reservation/${status.reservationId}`}
+              style={{ color: '#fff', fontWeight: 700, textDecoration: 'underline' }}
+            >
+              View reservation
+            </a>
+          )}
+          {status.reservationId && ' · '}
           <a
             href="/reservations"
             style={{ color: '#fff', fontWeight: 700, textDecoration: 'underline' }}
           >
-            View my reservations
+            All reservations
           </a>
         </div>
       )}

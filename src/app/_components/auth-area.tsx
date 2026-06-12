@@ -16,6 +16,7 @@ interface StoredUser {
   full_name?: string | null
   name?: string | null
   email?: string | null
+  role?: string | null
 }
 
 function firstNameOf(user: StoredUser | null): string | null {
@@ -54,11 +55,30 @@ export default function AuthArea() {
   }
 
   const firstName = firstNameOf(user)
+  const role = (user?.role || '').toLowerCase()
+  const isHost = role === 'host' || role === 'admin'
+
+  // Role-aware nav link: signed-in hosts/admins get a "Host" link to the
+  // dashboard; everyone else gets "Become a host" → signup. Only shown once
+  // mounted, so the initial server/client markup stays stable.
+  const hostLink = ready ? (
+    <a
+      href={isHost ? '/host' : '/signup'}
+      style={{
+        color: COLORS.ink,
+        textDecoration: 'none',
+        fontWeight: 600,
+      }}
+    >
+      {isHost ? 'Host' : 'Become a host'}
+    </a>
+  ) : null
 
   // Until mounted, render the logged-out links so the markup is stable.
   if (ready && firstName) {
     return (
       <>
+        {hostLink}
         <span style={{ color: COLORS.ink, fontWeight: 600 }}>
           Hi, {firstName}
         </span>
@@ -85,6 +105,7 @@ export default function AuthArea() {
 
   return (
     <>
+      {hostLink}
       <a
         href="/login"
         style={{

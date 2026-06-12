@@ -44,6 +44,36 @@ function fmtDate(d: string): string {
   })
 }
 
+// Booking status → badge colors (shared look with /host + /reservation/[id]).
+function statusStyle(status: string): { bg: string; fg: string; label: string } {
+  const s = (status || '').toLowerCase()
+  if (s === 'confirmed')
+    return { bg: 'rgba(15,81,50,0.12)', fg: '#0f5132', label: 'Confirmed' }
+  if (s === 'rejected')
+    return { bg: 'rgba(91,15,22,0.10)', fg: COLORS.burgundy, label: 'Rejected' }
+  return { bg: 'rgba(176,122,0,0.14)', fg: '#8a5a00', label: 'Pending' }
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const s = statusStyle(status)
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        background: s.bg,
+        color: s.fg,
+        fontSize: 12,
+        fontWeight: 700,
+        padding: '4px 12px',
+        borderRadius: 999,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {s.label}
+    </span>
+  )
+}
+
 function Header() {
   return (
     <header
@@ -327,8 +357,9 @@ function ReservationsList({
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           {bookings.map((b) => (
-            <article
+            <a
               key={b.id}
+              href={`/reservation/${b.id}`}
               className="qk-res-card"
               style={{
                 display: 'grid',
@@ -340,6 +371,9 @@ function ReservationsList({
                 boxShadow: '0 6px 24px rgba(42,34,32,0.07)',
                 overflow: 'hidden',
                 alignItems: 'stretch',
+                textDecoration: 'none',
+                color: 'inherit',
+                cursor: 'pointer',
               }}
             >
               <div
@@ -363,16 +397,26 @@ function ReservationsList({
               </div>
 
               <div className="qk-res-body" style={{ padding: '18px 0', minWidth: 0 }}>
-                <h2
+                <div
                   style={{
-                    margin: 0,
-                    fontSize: 18,
-                    fontWeight: 700,
-                    color: COLORS.ink,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    flexWrap: 'wrap',
                   }}
                 >
-                  {b.title}
-                </h2>
+                  <h2
+                    style={{
+                      margin: 0,
+                      fontSize: 18,
+                      fontWeight: 700,
+                      color: COLORS.ink,
+                    }}
+                  >
+                    {b.title}
+                  </h2>
+                  <StatusBadge status={b.status} />
+                </div>
                 {b.location && (
                   <p
                     style={{
@@ -401,7 +445,6 @@ function ReservationsList({
                   }}
                 >
                   {b.guests} {b.guests === 1 ? 'guest' : 'guests'}
-                  {b.status ? ` · ${b.status}` : ''}
                 </p>
               </div>
 
@@ -424,7 +467,7 @@ function ReservationsList({
                 </div>
                 <div style={{ fontSize: 13, color: COLORS.muted }}>total</div>
               </div>
-            </article>
+            </a>
           ))}
         </div>
       )}

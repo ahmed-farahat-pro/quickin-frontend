@@ -43,4 +43,63 @@ export interface Booking {
   title: string
   location: string | null
   image: string | null
+  reservation_code?: string | null
+}
+
+// One row of the host's "Reservation requests" list (GET /host/bookings).
+export interface HostBooking {
+  id: string
+  reservation_code: string | null
+  title: string
+  location: string | null
+  check_in: string
+  check_out: string
+  guests: number
+  total_price: number
+  status: 'pending' | 'confirmed' | 'rejected' | string
+  user_id: string
+}
+
+// A single reservation (GET /bookings/:id) — owner or host view.
+export interface Reservation {
+  id: string
+  reservation_code: string | null
+  status: 'pending' | 'confirmed' | 'rejected' | string
+  title: string
+  location: string | null
+  check_in: string
+  check_out: string
+  guests: number
+  total_price: number
+}
+
+// The shape persisted in localStorage 'qk_user' after login/signup.
+export interface StoredUser {
+  id?: string
+  email?: string | null
+  full_name?: string | null
+  name?: string | null
+  role?: string | null
+}
+
+// Read + parse the signed-in user from localStorage. Safe on the server (SSR)
+// and against malformed JSON — returns null in either case.
+export function getStoredUser(): StoredUser | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = localStorage.getItem('qk_user')
+    return raw ? (JSON.parse(raw) as StoredUser) : null
+  } catch {
+    return null
+  }
+}
+
+// The bearer token persisted after login/signup. null on the server / when absent.
+export function getToken(): string | null {
+  if (typeof window === 'undefined') return null
+  try {
+    return localStorage.getItem('qk_token')
+  } catch {
+    return null
+  }
 }

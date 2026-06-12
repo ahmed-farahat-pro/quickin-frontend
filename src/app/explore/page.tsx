@@ -137,7 +137,8 @@ export default async function ExplorePage({
             />
           </a>
 
-          {/* Right side: become a host + auth */}
+          {/* Right side: role-aware host link + auth (rendered client-side by
+              AuthArea, which reads the persisted user/role from localStorage). */}
           <nav
             style={{
               display: 'flex',
@@ -146,16 +147,6 @@ export default async function ExplorePage({
               fontSize: 14,
             }}
           >
-            <a
-              href="/host"
-              style={{
-                color: COLORS.ink,
-                textDecoration: 'none',
-                fontWeight: 600,
-              }}
-            >
-              Become a host
-            </a>
             <AuthArea />
           </nav>
         </div>
