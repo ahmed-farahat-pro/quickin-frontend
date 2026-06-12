@@ -53,9 +53,27 @@ export function loadGoogleMaps(apiKey: string): Promise<GMapsApi> {
     script.src = `https://maps.googleapis.com/maps/api/js?${params.toString()}`
     script.async = true
     script.defer = true
-    script.onload = () => {
-      if (window.google?.maps) resolve(window.google.maps)
-      else reject(new Error('Google Maps loaded but window.google.maps is missing'))
+    script.onload = async () => {
+      const maps = window.google?.maps
+      if (!maps) {
+        reject(new Error('Google Maps loaded but window.google.maps is missing'))
+        return
+      }
+      try {
+        // With loading=async the classes (Map, Marker, …) are lazy-loaded. Import
+        // the libraries we use so `google.maps.Map` etc. exist before first use —
+        // otherwise `new google.maps.Map()` throws "Map is not a constructor".
+        const importLibrary = (maps as unknown as {
+          importLibrary?: (name: string) => Promise<unknown>
+        }).importLibrary
+        if (typeof importLibrary === 'function') {
+          await importLibrary('maps')
+          await importLibrary('marker')
+        }
+        resolve(maps)
+      } catch (e) {
+        reject(e instanceof Error ? e : new Error('Google Maps failed to import libraries'))
+      }
     }
     script.onerror = () => reject(new Error('Failed to load Google Maps JS API'))
     document.head.appendChild(script)
