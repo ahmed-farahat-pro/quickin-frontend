@@ -5,6 +5,7 @@
 // signed in, otherwise Log in / Sign up links. No cookies — the token lives in
 // localStorage so the UI can talk to a backend on another domain.
 import { useEffect, useState } from 'react'
+import NotificationBell from './notification-bell'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -91,6 +92,7 @@ export default function AuthArea() {
         >
           Subscriptions
         </a>
+        <NotificationBell />
         <span style={{ color: COLORS.ink, fontWeight: 600 }}>
           Hi, {firstName}
         </span>
