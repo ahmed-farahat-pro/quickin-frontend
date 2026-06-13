@@ -13,6 +13,8 @@
 // it as the single child of their header <nav>.
 import { useEffect, useState } from 'react'
 import NotificationBell from './notification-bell'
+import LanguageToggle from './language-toggle'
+import { useLanguage } from '@/lib/i18n/language-provider'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -49,6 +51,7 @@ function linkStyle(active = false): React.CSSProperties {
 }
 
 export default function AuthArea() {
+  const { t } = useLanguage()
   // Start null so server + first client render match; fill in after mount.
   const [user, setUser] = useState<StoredUser | null>(null)
   const [ready, setReady] = useState(false)
@@ -89,20 +92,20 @@ export default function AuthArea() {
       // requests + services in one page, so these deep-link to its sections.
       <>
         <a href="/host#listings" style={linkStyle(true)}>
-          Listings
+          {t('nav.listings')}
         </a>
         <a href="/host#reservations" style={linkStyle()}>
-          Reservations
+          {t('nav.reservations')}
         </a>
         <a href="/host#services" style={linkStyle()}>
-          Services
+          {t('nav.services')}
         </a>
         <a href="/account" style={linkStyle()}>
-          Profile
+          {t('nav.profile')}
         </a>
         {isAdmin && (
           <a href="/admin" style={linkStyle()}>
-            Admin
+            {t('nav.admin')}
           </a>
         )}
       </>
@@ -110,31 +113,31 @@ export default function AuthArea() {
       // GUEST (signed-in 'user' or anonymous): the public browse/trip nav.
       <>
         <a href="/explore" style={linkStyle()}>
-          Explore
+          {t('nav.explore')}
         </a>
         <a href="/services" style={linkStyle()}>
-          Services
+          {t('nav.services')}
         </a>
         {signedIn && (
           <a href="/reservations" style={linkStyle()}>
-            Trips
+            {t('nav.trips')}
           </a>
         )}
         {signedIn && (
           <a href="/subscriptions" style={linkStyle()}>
-            Subscriptions
+            {t('nav.subscriptions')}
           </a>
         )}
         {signedIn && (
           <a href="/account" style={linkStyle()}>
-            Account
+            {t('nav.account')}
           </a>
         )}
         {/* Guests get the conversion CTA; only shown once mounted so the
             initial markup is stable. */}
         {ready && (
           <a href="/signup" style={{ ...linkStyle(), fontWeight: 600 }}>
-            Become a host
+            {t('nav.becomeHost')}
           </a>
         )}
       </>
@@ -147,7 +150,7 @@ export default function AuthArea() {
         {primaryLinks}
         <NotificationBell />
         <span style={{ color: COLORS.ink, fontWeight: 600 }}>
-          Hi, {firstName}
+          {t('nav.greeting', { name: firstName ?? '' })}
         </span>
         <button
           type="button"
@@ -164,8 +167,9 @@ export default function AuthArea() {
             padding: 0,
           }}
         >
-          Logout
+          {t('nav.logout')}
         </button>
+        <LanguageToggle />
       </>
     )
   }
@@ -174,7 +178,7 @@ export default function AuthArea() {
     <>
       {primaryLinks}
       <a href="/login" style={linkStyle()}>
-        Log in
+        {t('nav.login')}
       </a>
       <a
         href="/signup"
@@ -187,8 +191,9 @@ export default function AuthArea() {
           borderRadius: 999,
         }}
       >
-        Sign up
+        {t('nav.signup')}
       </a>
+      <LanguageToggle />
     </>
   )
 }

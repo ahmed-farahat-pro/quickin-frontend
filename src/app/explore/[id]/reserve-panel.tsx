@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { API_URL } from '@/lib/api'
 import DatePickerField from '../../_components/date-picker-field'
+import { useLanguage } from '@/lib/i18n/language-provider'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -65,6 +66,7 @@ export default function ReservePanel({
   currency: string
   maxGuests: number | null
 }) {
+  const { t } = useLanguage()
   const [checkIn, setCheckIn] = useState('')
   const [checkOut, setCheckOut] = useState('')
   const [guests, setGuests] = useState(1)
@@ -121,12 +123,12 @@ export default function ReservePanel({
       // 400 and anything else → surface the server error message.
       setStatus({
         kind: 'error',
-        message: data.error || 'Something went wrong. Please try again.',
+        message: data.error || t('reserve.genericError'),
       })
     } catch {
       setStatus({
         kind: 'error',
-        message: 'Network error. Please try again.',
+        message: t('reserve.networkError'),
       })
     }
   }
@@ -139,19 +141,21 @@ export default function ReservePanel({
         <span style={{ fontSize: 30, fontWeight: 800, color: COLORS.burgundy }}>
           EGP {pricePerNight}
         </span>
-        <span style={{ fontSize: 15, color: COLORS.muted }}>/ night</span>
+        <span style={{ fontSize: 15, color: COLORS.muted }}>
+          {t('listing.perNight')}
+        </span>
       </div>
       <p style={{ margin: '6px 0 18px', fontSize: 13, color: COLORS.muted }}>
-        Prices in EGP
+        {t('reserve.pricesInEgp')}
       </p>
 
       {/* Date pickers — a custom themed calendar popover (replaces the native
           date inputs). Wrap to one column when the card is too narrow. */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: 12 }}>
         <DatePickerField
-          label="Check-in"
+          label={t('reserve.checkIn')}
           value={checkIn}
-          ariaLabel="Check-in date"
+          ariaLabel={t('reserve.checkIn')}
           compact
           onChange={(iso) => {
             setCheckIn(iso)
@@ -161,9 +165,9 @@ export default function ReservePanel({
           }}
         />
         <DatePickerField
-          label="Check-out"
+          label={t('reserve.checkOut')}
           value={checkOut}
-          ariaLabel="Check-out date"
+          ariaLabel={t('reserve.checkOut')}
           compact
           min={checkIn || undefined}
           onChange={(iso) => {
@@ -175,7 +179,7 @@ export default function ReservePanel({
 
       <div style={{ marginTop: 12 }}>
         <label htmlFor="rp-guests" style={labelStyle}>
-          Guests
+          {t('reserve.guests')}
         </label>
         <input
           id="rp-guests"
@@ -208,7 +212,8 @@ export default function ReservePanel({
           }}
         >
           <span>
-            EGP {pricePerNight} × {nights} {nights === 1 ? 'night' : 'nights'}
+            EGP {pricePerNight} × {nights}{' '}
+            {nights === 1 ? t('reserve.night') : t('reserve.nights')}
           </span>
           <span style={{ fontWeight: 700 }}>EGP {total}</span>
         </div>
@@ -224,7 +229,7 @@ export default function ReservePanel({
             color: COLORS.burgundy,
           }}
         >
-          <span>Total</span>
+          <span>{t('reserve.total')}</span>
           <span>EGP {total}</span>
         </div>
       </div>
@@ -248,7 +253,7 @@ export default function ReservePanel({
           opacity: canReserve ? 1 : 0.55,
         }}
       >
-        {status.kind === 'loading' ? 'Reserving…' : 'Reserve'}
+        {status.kind === 'loading' ? t('reserve.reserving') : t('reserve.reserve')}
       </button>
 
       {nights === 0 && status.kind === 'idle' && (
@@ -260,7 +265,7 @@ export default function ReservePanel({
             textAlign: 'center',
           }}
         >
-          Pick your dates to see the total.
+          {t('reserve.pickDates')}
         </p>
       )}
 
@@ -276,12 +281,12 @@ export default function ReservePanel({
             color: COLORS.ink,
           }}
         >
-          Please sign in to reserve.{' '}
+          {t('reserve.pleaseSignIn')}{' '}
           <a
             href="/login"
             style={{ color: COLORS.burgundy, fontWeight: 700, textDecoration: 'none' }}
           >
-            Log in
+            {t('reserve.logIn')}
           </a>
         </div>
       )}
@@ -307,7 +312,7 @@ export default function ReservePanel({
           <div
             role="dialog"
             aria-modal="true"
-            aria-label="Reservation request sent"
+            aria-label={t('reserve.requestSent')}
             onClick={() => setStatus({ kind: 'idle' })}
             style={{
               position: 'fixed',
@@ -340,7 +345,7 @@ export default function ReservePanel({
             >
               <button
                 type="button"
-                aria-label="Close"
+                aria-label={t('explore.dismiss')}
                 onClick={() => setStatus({ kind: 'idle' })}
                 style={{
                   position: 'absolute',
@@ -391,11 +396,14 @@ export default function ReservePanel({
               </div>
 
               <h2 style={{ margin: '0 0 8px', fontSize: 22, fontWeight: 800, color: COLORS.ink }}>
-                Request sent
+                {t('reserve.requestSent')}
               </h2>
               <p style={{ margin: '0 0 18px', fontSize: 15, color: COLORS.muted, lineHeight: 1.45 }}>
-                Waiting for the host to confirm your {status.nights}{' '}
-                {status.nights === 1 ? 'night' : 'nights'} stay.
+                {t('reserve.waitingHost', {
+                  nights: `${status.nights} ${
+                    status.nights === 1 ? t('reserve.night') : t('reserve.nights')
+                  }`,
+                })}
               </p>
 
               {/* Summary */}
@@ -409,9 +417,12 @@ export default function ReservePanel({
                   }}
                 >
                   <span>
-                    {status.nights} {status.nights === 1 ? 'night' : 'nights'}
+                    {status.nights}{' '}
+                    {status.nights === 1 ? t('reserve.night') : t('reserve.nights')}
                   </span>
-                  <span>EGP {pricePerNight} / night</span>
+                  <span>
+                    EGP {pricePerNight} {t('listing.perNight')}
+                  </span>
                 </div>
                 <div style={{ height: 1, background: 'rgba(42,34,32,0.10)', margin: '10px 0' }} />
                 <div
@@ -421,7 +432,9 @@ export default function ReservePanel({
                     alignItems: 'baseline',
                   }}
                 >
-                  <span style={{ fontSize: 14, color: COLORS.muted }}>Total</span>
+                  <span style={{ fontSize: 14, color: COLORS.muted }}>
+                    {t('reserve.total')}
+                  </span>
                   <span style={{ fontSize: 18, fontWeight: 800, color: COLORS.burgundy }}>
                     EGP {status.total}
                   </span>
@@ -444,7 +457,7 @@ export default function ReservePanel({
                       textDecoration: 'none',
                     }}
                   >
-                    View reservation
+                    {t('reserve.viewReservation')}
                   </a>
                 ) : (
                   <button
@@ -462,7 +475,7 @@ export default function ReservePanel({
                       fontFamily: FONT,
                     }}
                   >
-                    Done
+                    {t('reserve.done')}
                   </button>
                 )}
                 <a
@@ -476,7 +489,7 @@ export default function ReservePanel({
                     textDecoration: 'none',
                   }}
                 >
-                  All reservations
+                  {t('reserve.allReservations')}
                 </a>
               </div>
             </div>

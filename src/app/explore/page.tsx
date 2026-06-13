@@ -6,6 +6,7 @@ import type { Metadata } from 'next'
 import { API_URL, type Listing } from '@/lib/api'
 import AuthArea from '../_components/auth-area'
 import ExploreClient from './explore-client'
+import SiteFooter from '../_components/site-footer'
 
 export const dynamic = 'force-dynamic'
 
@@ -189,107 +190,8 @@ export default async function ExplorePage({
         }}
       />
 
-      {/* Footer */}
-      <footer
-        style={{
-          background: COLORS.burgundy,
-          color: COLORS.cream,
-          padding: '48px 24px 32px',
-        }}
-      >
-        <div
-          className="qk-footer-grid"
-          style={{
-            maxWidth: 1200,
-            margin: '0 auto',
-            display: 'grid',
-            gridTemplateColumns: 'minmax(220px, 1.4fr) repeat(3, 1fr)',
-            gap: 32,
-          }}
-        >
-          <div>
-            <img
-              src="/logo.png"
-              alt="QuickIn"
-              height={36}
-              style={{
-                height: 36,
-                width: 'auto',
-                display: 'block',
-                marginBottom: 14,
-                filter: 'brightness(0) invert(1)',
-              }}
-            />
-            <p
-              style={{
-                margin: 0,
-                fontSize: 14,
-                lineHeight: 1.6,
-                color: 'rgba(246,241,230,0.78)',
-                maxWidth: 280,
-              }}
-            >
-              QuickIn — boutique stays for travelers who love the details.
-            </p>
-          </div>
-
-          <FooterColumn
-            title="Support"
-            links={['Help center', 'Cancellation options', 'Safety info']}
-          />
-          <FooterColumn
-            title="Hosting"
-            links={['Become a host', 'Host resources', 'Community forum']}
-          />
-          <FooterColumn title="About" links={['Our story', 'Careers', 'Press']} />
-        </div>
-
-        <div
-          style={{
-            maxWidth: 1200,
-            margin: '32px auto 0',
-            paddingTop: 22,
-            borderTop: '1px solid rgba(246,241,230,0.18)',
-            fontSize: 13,
-            color: 'rgba(246,241,230,0.7)',
-          }}
-        >
-          © 2026 QuickIn. Crafted for the curious traveler.
-        </div>
-      </footer>
+      {/* Footer (localized client component) */}
+      <SiteFooter />
     </main>
-  )
-}
-
-function FooterColumn({ title, links }: { title: string; links: string[] }) {
-  return (
-    <div>
-      <h3
-        style={{
-          margin: '0 0 12px',
-          fontSize: 14,
-          fontWeight: 700,
-          color: COLORS.cream,
-        }}
-      >
-        {title}
-      </h3>
-      <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-        {links.map((link) => (
-          <li key={link} style={{ marginBottom: 8 }}>
-            <a
-              href="#"
-              style={{
-                fontSize: 14,
-                color: 'rgba(246,241,230,0.78)',
-                textDecoration: 'none',
-              }}
-            >
-              {link}
-            </a>
-          </li>
-        ))}
-      </ul>
-    </div>
   )
 }

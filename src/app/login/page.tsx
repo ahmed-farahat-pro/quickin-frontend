@@ -5,6 +5,7 @@ import Script from 'next/script'
 import { API_URL } from '@/lib/api'
 import { signInWithApple, APPLE_SERVICES_ID, APPLE_JS_SRC } from '@/lib/apple'
 import { EyeIcon, EyeOffIcon, eyeButtonStyle } from '@/app/_components/password-eye'
+import { useLanguage } from '@/lib/i18n/language-provider'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -51,6 +52,7 @@ function AppleGlyph() {
 }
 
 export default function LoginPage() {
+  const { t } = useLanguage()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -224,12 +226,12 @@ export default function LoginPage() {
           <img src="/logo.png" alt="QuickIn" style={{ height: 54, width: 'auto', margin: '0 auto', display: 'block' }} />
           <p style={{ margin: '14px 0 0', fontSize: 15, color: COLORS.muted }}>
             {step === 'otp'
-              ? 'Verify your email to continue'
+              ? t('login.verifyEmail')
               : step === 'forgot'
-                ? 'Reset your password'
+                ? t('login.resetPassword')
                 : step === 'reset'
-                  ? 'Enter the code and a new password'
-                  : 'Welcome back — sign in to continue'}
+                  ? t('login.enterCodeAndPassword')
+                  : t('login.welcome')}
           </p>
         </div>
 
@@ -244,7 +246,7 @@ export default function LoginPage() {
           /* ---- OTP verification step (unverified login) ---- */
           <form onSubmit={handleVerify}>
             <label style={{ display: 'block', marginBottom: 18 }}>
-              <span style={labelStyle}>Verification code</span>
+              <span style={labelStyle}>{t('auth.verificationCode')}</span>
               <input
                 type="text" inputMode="numeric" autoComplete="one-time-code" required
                 maxLength={6} value={code}
@@ -254,32 +256,32 @@ export default function LoginPage() {
               />
             </label>
             <button type="submit" disabled={loading || code.length < 6} style={primaryButtonStyle(loading || code.length < 6)}>
-              {loading ? 'Verifying…' : 'Verify & continue'}
+              {loading ? t('login.verifying') : t('login.verifyContinue')}
             </button>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16, fontSize: 13.5 }}>
-              <button type="button" onClick={() => { setStep('form'); setError(null); setNotice(null) }} style={linkBtnStyle}>← Back to sign in</button>
-              <button type="button" onClick={handleResend} disabled={loading} style={linkBtnStyle}>Resend code</button>
+              <button type="button" onClick={() => { setStep('form'); setError(null); setNotice(null) }} style={linkBtnStyle}>{t('login.backToSignIn')}</button>
+              <button type="button" onClick={handleResend} disabled={loading} style={linkBtnStyle}>{t('auth.resendCode')}</button>
             </div>
           </form>
         ) : step === 'forgot' ? (
           /* ---- Forgot password: request a reset code ---- */
           <form onSubmit={handleForgot}>
             <label style={{ display: 'block', marginBottom: 22 }}>
-              <span style={labelStyle}>Email</span>
+              <span style={labelStyle}>{t('auth.email')}</span>
               <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="layla@email.com" style={inputStyle} />
             </label>
             <button type="submit" disabled={loading || !email.trim()} style={primaryButtonStyle(loading || !email.trim())}>
-              {loading ? 'Sending…' : 'Send reset code'}
+              {loading ? t('login.sending') : t('login.sendResetCode')}
             </button>
             <div style={{ marginTop: 16, fontSize: 13.5 }}>
-              <button type="button" onClick={() => { setStep('form'); setError(null); setNotice(null) }} style={linkBtnStyle}>← Back to sign in</button>
+              <button type="button" onClick={() => { setStep('form'); setError(null); setNotice(null) }} style={linkBtnStyle}>{t('login.backToSignIn')}</button>
             </div>
           </form>
         ) : step === 'reset' ? (
           /* ---- Reset password: enter the emailed code + a new password ---- */
           <form onSubmit={handleReset}>
             <label style={{ display: 'block', marginBottom: 18 }}>
-              <span style={labelStyle}>Verification code</span>
+              <span style={labelStyle}>{t('auth.verificationCode')}</span>
               <input
                 type="text" inputMode="numeric" autoComplete="one-time-code" required
                 maxLength={6} value={code}
@@ -289,20 +291,20 @@ export default function LoginPage() {
               />
             </label>
             <label style={{ display: 'block', marginBottom: 22 }}>
-              <span style={labelStyle}>New password</span>
+              <span style={labelStyle}>{t('auth.newPassword')}</span>
               <div style={{ position: 'relative' }}>
-                <input type={showNewPassword ? 'text' : 'password'} required minLength={6} autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="At least 6 characters" style={{ ...inputStyle, paddingRight: 44 }} />
-                <button type="button" onClick={() => setShowNewPassword((v) => !v)} aria-label={showNewPassword ? 'Hide password' : 'Show password'} style={eyeButtonStyle}>
+                <input type={showNewPassword ? 'text' : 'password'} required minLength={6} autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={t('auth.passwordMin')} style={{ ...inputStyle, paddingRight: 44 }} />
+                <button type="button" onClick={() => setShowNewPassword((v) => !v)} aria-label={showNewPassword ? t('auth.hidePassword') : t('auth.showPassword')} style={eyeButtonStyle}>
                   {showNewPassword ? <EyeOffIcon /> : <EyeIcon />}
                 </button>
               </div>
             </label>
             <button type="submit" disabled={loading || code.length < 6 || newPassword.length < 6} style={primaryButtonStyle(loading || code.length < 6 || newPassword.length < 6)}>
-              {loading ? 'Resetting…' : 'Reset password'}
+              {loading ? t('login.resetting') : t('login.resetPasswordBtn')}
             </button>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16, fontSize: 13.5 }}>
-              <button type="button" onClick={() => { setStep('form'); setError(null); setNotice(null) }} style={linkBtnStyle}>← Back to sign in</button>
-              <button type="button" onClick={() => { setStep('forgot'); setError(null); setNotice(null) }} disabled={loading} style={linkBtnStyle}>Resend code</button>
+              <button type="button" onClick={() => { setStep('form'); setError(null); setNotice(null) }} style={linkBtnStyle}>{t('login.backToSignIn')}</button>
+              <button type="button" onClick={() => { setStep('forgot'); setError(null); setNotice(null) }} disabled={loading} style={linkBtnStyle}>{t('auth.resendCode')}</button>
             </div>
           </form>
         ) : (
@@ -310,42 +312,42 @@ export default function LoginPage() {
           <>
             <form onSubmit={handleSubmit}>
               <div style={{ marginBottom: 18 }}>
-                <span style={labelStyle}>Sign in as</span>
+                <span style={labelStyle}>{t('login.signInAs')}</span>
                 <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                  <button type="button" onClick={() => setRole('user')} style={{ flex: 1, padding: '11px', borderRadius: 12, fontFamily: 'inherit', fontWeight: 700, fontSize: 14, cursor: 'pointer', border: role === 'user' ? '1px solid #5B0F16' : '1px solid rgba(42,34,32,0.14)', background: role === 'user' ? '#5B0F16' : '#fff', color: role === 'user' ? '#fff' : '#2A2220' }}>Guest</button>
-                  <button type="button" onClick={() => setRole('host')} style={{ flex: 1, padding: '11px', borderRadius: 12, fontFamily: 'inherit', fontWeight: 700, fontSize: 14, cursor: 'pointer', border: role === 'host' ? '1px solid #5B0F16' : '1px solid rgba(42,34,32,0.14)', background: role === 'host' ? '#5B0F16' : '#fff', color: role === 'host' ? '#fff' : '#2A2220' }}>Host</button>
+                  <button type="button" onClick={() => setRole('user')} style={{ flex: 1, padding: '11px', borderRadius: 12, fontFamily: 'inherit', fontWeight: 700, fontSize: 14, cursor: 'pointer', border: role === 'user' ? '1px solid #5B0F16' : '1px solid rgba(42,34,32,0.14)', background: role === 'user' ? '#5B0F16' : '#fff', color: role === 'user' ? '#fff' : '#2A2220' }}>{t('auth.roleGuest')}</button>
+                  <button type="button" onClick={() => setRole('host')} style={{ flex: 1, padding: '11px', borderRadius: 12, fontFamily: 'inherit', fontWeight: 700, fontSize: 14, cursor: 'pointer', border: role === 'host' ? '1px solid #5B0F16' : '1px solid rgba(42,34,32,0.14)', background: role === 'host' ? '#5B0F16' : '#fff', color: role === 'host' ? '#fff' : '#2A2220' }}>{t('auth.roleHost')}</button>
                 </div>
               </div>
               <label style={{ display: 'block', marginBottom: 16 }}>
-                <span style={labelStyle}>Email or username</span>
+                <span style={labelStyle}>{t('login.emailOrUsername')}</span>
                 <input type="text" required autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="layla@email.com" style={inputStyle} />
               </label>
               <label style={{ display: 'block', marginBottom: 22 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={labelStyle}>Password</span>
-                  <button type="button" onClick={() => { setStep('forgot'); setError(null); setNotice(null) }} style={{ ...linkBtnStyle, marginBottom: 6 }}>Forgot password?</button>
+                  <span style={labelStyle}>{t('auth.password')}</span>
+                  <button type="button" onClick={() => { setStep('forgot'); setError(null); setNotice(null) }} style={{ ...linkBtnStyle, marginBottom: 6 }}>{t('login.forgotPassword')}</button>
                 </div>
                 <div style={{ position: 'relative' }}>
                   <input type={showPassword ? 'text' : 'password'} required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" style={{ ...inputStyle, paddingRight: 44 }} />
-                  <button type="button" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? 'Hide password' : 'Show password'} style={eyeButtonStyle}>
+                  <button type="button" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')} style={eyeButtonStyle}>
                     {showPassword ? <EyeOffIcon /> : <EyeIcon />}
                   </button>
                 </div>
               </label>
               <button type="submit" disabled={loading} style={primaryButtonStyle(loading)}>
-                {loading ? 'Signing in…' : 'Sign in'}
+                {loading ? t('login.signingIn') : t('login.signIn')}
               </button>
             </form>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '24px 0' }}>
               <span style={{ flex: 1, height: 1, background: 'rgba(42,34,32,0.12)' }} />
-              <span style={{ fontSize: 12, color: COLORS.muted }}>or</span>
+              <span style={{ fontSize: 12, color: COLORS.muted }}>{t('auth.or')}</span>
               <span style={{ flex: 1, height: 1, background: 'rgba(42,34,32,0.12)' }} />
             </div>
 
             {appleEnabled && (
               <button type="button" onClick={handleAppleClick} style={appleButtonStyle(loading)}>
-                <AppleGlyph /> Continue with Apple
+                <AppleGlyph /> {t('auth.continueWithApple')}
               </button>
             )}
 
@@ -354,22 +356,22 @@ export default function LoginPage() {
                 <div ref={googleBtnRef} style={{ display: 'flex', justifyContent: 'center', minHeight: 44 }} />
                 {!gisReady && (
                   <button type="button" onClick={handleGoogleClick} disabled={loading} style={googleButtonStyle(loading)}>
-                    <GoogleG /> Continue with Google
+                    <GoogleG /> {t('auth.continueWithGoogle')}
                   </button>
                 )}
               </>
             ) : (
               <>
-                <button type="button" disabled aria-disabled="true" title="Add NEXT_PUBLIC_GOOGLE_CLIENT_ID to enable Google sign-in" style={googleButtonStyle(true)}>
-                  <GoogleG /> Continue with Google
+                <button type="button" disabled aria-disabled="true" title={t('auth.googleHint')} style={googleButtonStyle(true)}>
+                  <GoogleG /> {t('auth.continueWithGoogle')}
                 </button>
-                <p style={{ margin: '8px 0 0', fontSize: 12, color: COLORS.muted, textAlign: 'center' }}>Add NEXT_PUBLIC_GOOGLE_CLIENT_ID to enable Google sign-in</p>
+                <p style={{ margin: '8px 0 0', fontSize: 12, color: COLORS.muted, textAlign: 'center' }}>{t('auth.googleHint')}</p>
               </>
             )}
 
             <p style={{ margin: '26px 0 0', textAlign: 'center', fontSize: 14, color: COLORS.muted }}>
-              New here?{' '}
-              <a href="/signup" style={{ color: COLORS.burgundy, fontWeight: 600, textDecoration: 'none' }}>Create an account</a>
+              {t('login.newHere')}{' '}
+              <a href="/signup" style={{ color: COLORS.burgundy, fontWeight: 600, textDecoration: 'none' }}>{t('login.createAccount')}</a>
             </p>
           </>
         )}

@@ -7,6 +7,7 @@ import ReservePanel from './reserve-panel'
 import ImagePlaceholder from '../../_components/image-placeholder'
 import AmenityIcon from '../../_components/amenity-icon'
 import { JsonLd, listingLd, breadcrumbLd } from '../../_components/structured-data'
+import { T, BackToExplore, GuestFavoriteBadge } from './detail-text'
 
 export const dynamic = 'force-dynamic'
 
@@ -77,7 +78,7 @@ const COLORS = {
   muted: '#6B6055',
 }
 
-function Spec({ label, value }: { label: string; value: number | null }) {
+function Spec({ labelKey, value }: { labelKey: string; value: number | null }) {
   if (value == null) return null
   return (
     <div
@@ -91,7 +92,9 @@ function Spec({ label, value }: { label: string; value: number | null }) {
       <span style={{ fontSize: 20, fontWeight: 700, color: COLORS.ink }}>
         {value}
       </span>
-      <span style={{ fontSize: 13, color: COLORS.muted }}>{label}</span>
+      <span style={{ fontSize: 13, color: COLORS.muted }}>
+        <T k={labelKey} />
+      </span>
     </div>
   )
 }
@@ -149,23 +152,8 @@ export default async function ListingDetailPage({
       `}</style>
 
       <div style={{ maxWidth: 1040, margin: '0 auto', padding: '28px 24px 72px' }}>
-        {/* Back link */}
-        <a
-          href="/explore"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            fontSize: 14,
-            fontWeight: 600,
-            color: COLORS.burgundy,
-            textDecoration: 'none',
-            marginBottom: 22,
-          }}
-        >
-          <span style={{ fontSize: 18, lineHeight: 1 }}>&larr;</span>
-          Back to Explore
-        </a>
+        {/* Back link (localized client helper) */}
+        <BackToExplore />
 
         {/* Hero */}
         <div
@@ -228,20 +216,7 @@ export default async function ListingDetailPage({
         {/* Title + location */}
         <div style={{ marginTop: 34 }}>
           {listing.is_guest_favorite && (
-            <span
-              style={{
-                display: 'inline-block',
-                background: COLORS.tan,
-                color: COLORS.burgundy,
-                fontSize: 12,
-                fontWeight: 600,
-                padding: '5px 12px',
-                borderRadius: 999,
-                marginBottom: 12,
-              }}
-            >
-              ★ Guest favorite
-            </span>
+            <GuestFavoriteBadge background={COLORS.tan} />
           )}
           <h1
             style={{
@@ -286,10 +261,10 @@ export default async function ListingDetailPage({
                 borderBottom: `1px solid rgba(42,34,32,0.10)`,
               }}
             >
-              <Spec label="Guests" value={listing.max_guests} />
-              <Spec label="Bedrooms" value={listing.bedrooms} />
-              <Spec label="Beds" value={listing.beds} />
-              <Spec label="Baths" value={listing.bathrooms} />
+              <Spec labelKey="listing.spec.guests" value={listing.max_guests} />
+              <Spec labelKey="listing.spec.bedrooms" value={listing.bedrooms} />
+              <Spec labelKey="listing.spec.beds" value={listing.beds} />
+              <Spec labelKey="listing.spec.baths" value={listing.bathrooms} />
             </div>
 
             {/* Description */}
@@ -303,7 +278,7 @@ export default async function ListingDetailPage({
                     color: COLORS.ink,
                   }}
                 >
-                  About this stay
+                  <T k="listing.aboutThisStay" />
                 </h2>
                 <p
                   style={{
@@ -329,7 +304,7 @@ export default async function ListingDetailPage({
                     color: COLORS.ink,
                   }}
                 >
-                  What this place offers
+                  <T k="listing.whatThisPlaceOffers" />
                 </h2>
                 <div
                   className="qk-amenity-grid"
@@ -401,7 +376,7 @@ export default async function ListingDetailPage({
                   color: COLORS.muted,
                 }}
               >
-                Listing code{' '}
+                <T k="listing.listingCode" />{' '}
                 <span
                   style={{
                     fontFamily:

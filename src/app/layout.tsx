@@ -6,6 +6,7 @@ import {
 } from 'next/font/google'
 import './globals.css'
 import { JsonLd, organizationLd, webSiteLd } from './_components/structured-data'
+import Providers from './_components/providers'
 
 // Body font
 const dmSans = DM_Sans({
@@ -104,7 +105,8 @@ export default function RootLayout({
         {/* Site-wide structured data for SEO rich results + AEO (AI answer engines). */}
         <JsonLd data={organizationLd()} />
         <JsonLd data={webSiteLd()} />
-        {children}
+        {/* Client i18n + RTL provider (sets <html lang/dir> after mount). */}
+        <Providers>{children}</Providers>
       </body>
     </html>
   )

@@ -5,6 +5,7 @@ import Script from 'next/script'
 import { API_URL } from '@/lib/api'
 import { signInWithApple, APPLE_SERVICES_ID, APPLE_JS_SRC } from '@/lib/apple'
 import { EyeIcon, EyeOffIcon, eyeButtonStyle } from '@/app/_components/password-eye'
+import { useLanguage } from '@/lib/i18n/language-provider'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -51,6 +52,7 @@ function AppleGlyph() {
 type Role = 'user' | 'host'
 
 export default function SignupPage() {
+  const { t } = useLanguage()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -188,7 +190,7 @@ export default function SignupPage() {
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <img src="/logo.png" alt="QuickIn" style={{ height: 54, width: 'auto', margin: '0 auto', display: 'block' }} />
           <p style={{ margin: '14px 0 0', fontSize: 15, color: COLORS.muted }}>
-            {step === 'otp' ? 'Verify your email to finish' : 'Create your account to start exploring'}
+            {step === 'otp' ? t('signup.verifyEmail') : t('signup.createAccount')}
           </p>
         </div>
 
@@ -203,7 +205,7 @@ export default function SignupPage() {
           /* ---- OTP verification step ---- */
           <form onSubmit={handleVerify}>
             <label style={{ display: 'block', marginBottom: 18 }}>
-              <span style={labelStyle}>Verification code</span>
+              <span style={labelStyle}>{t('auth.verificationCode')}</span>
               <input
                 type="text" inputMode="numeric" autoComplete="one-time-code" required
                 maxLength={6} value={code}
@@ -213,11 +215,11 @@ export default function SignupPage() {
               />
             </label>
             <button type="submit" disabled={loading || code.length < 6} style={primaryButtonStyle(loading || code.length < 6)}>
-              {loading ? 'Verifying…' : 'Verify & continue'}
+              {loading ? t('login.verifying') : t('login.verifyContinue')}
             </button>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16, fontSize: 13.5 }}>
-              <button type="button" onClick={() => { setStep('form'); setError(null); setNotice(null) }} style={linkBtnStyle}>← Change details</button>
-              <button type="button" onClick={handleResend} disabled={loading} style={linkBtnStyle}>Resend code</button>
+              <button type="button" onClick={() => { setStep('form'); setError(null); setNotice(null) }} style={linkBtnStyle}>{t('signup.changeDetails')}</button>
+              <button type="button" onClick={handleResend} disabled={loading} style={linkBtnStyle}>{t('auth.resendCode')}</button>
             </div>
           </form>
         ) : (
@@ -225,51 +227,51 @@ export default function SignupPage() {
           <>
             {/* Role choice */}
             <div style={{ marginBottom: 18 }}>
-              <span style={labelStyle}>I want to join as</span>
+              <span style={labelStyle}>{t('signup.joinAs')}</span>
               <div style={{ display: 'flex', gap: 10 }}>
                 <button type="button" onClick={() => setRole('user')} style={roleBtnStyle(role === 'user')}>
-                  <span style={{ fontSize: 15, fontWeight: 700 }}>Guest</span>
-                  <span style={{ fontSize: 12, color: COLORS.muted }}>Book stays</span>
+                  <span style={{ fontSize: 15, fontWeight: 700 }}>{t('auth.roleGuest')}</span>
+                  <span style={{ fontSize: 12, color: COLORS.muted }}>{t('signup.guestSub')}</span>
                 </button>
                 <button type="button" onClick={() => setRole('host')} style={roleBtnStyle(role === 'host')}>
-                  <span style={{ fontSize: 15, fontWeight: 700 }}>Host</span>
-                  <span style={{ fontSize: 12, color: COLORS.muted }}>List your place</span>
+                  <span style={{ fontSize: 15, fontWeight: 700 }}>{t('auth.roleHost')}</span>
+                  <span style={{ fontSize: 12, color: COLORS.muted }}>{t('signup.hostSub')}</span>
                 </button>
               </div>
             </div>
 
             <form onSubmit={handleSubmit}>
               <label style={{ display: 'block', marginBottom: 16 }}>
-                <span style={labelStyle}>Full name</span>
+                <span style={labelStyle}>{t('signup.fullName')}</span>
                 <input type="text" required autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Layla Hassan" style={inputStyle} />
               </label>
               <label style={{ display: 'block', marginBottom: 16 }}>
-                <span style={labelStyle}>Email</span>
+                <span style={labelStyle}>{t('auth.email')}</span>
                 <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="layla@email.com" style={inputStyle} />
               </label>
               <label style={{ display: 'block', marginBottom: 22 }}>
-                <span style={labelStyle}>Password</span>
+                <span style={labelStyle}>{t('auth.password')}</span>
                 <div style={{ position: 'relative' }}>
-                  <input type={showPassword ? 'text' : 'password'} required minLength={6} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" style={{ ...inputStyle, paddingRight: 44 }} />
-                  <button type="button" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? 'Hide password' : 'Show password'} style={eyeButtonStyle}>
+                  <input type={showPassword ? 'text' : 'password'} required minLength={6} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t('auth.passwordMin')} style={{ ...inputStyle, paddingRight: 44 }} />
+                  <button type="button" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')} style={eyeButtonStyle}>
                     {showPassword ? <EyeOffIcon /> : <EyeIcon />}
                   </button>
                 </div>
               </label>
               <button type="submit" disabled={loading} style={primaryButtonStyle(loading)}>
-                {loading ? 'Sending code…' : `Create ${role === 'host' ? 'host' : 'guest'} account`}
+                {loading ? t('signup.sendingCode') : role === 'host' ? t('signup.createHost') : t('signup.createGuest')}
               </button>
             </form>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '24px 0' }}>
               <span style={{ flex: 1, height: 1, background: 'rgba(42,34,32,0.12)' }} />
-              <span style={{ fontSize: 12, color: COLORS.muted }}>or</span>
+              <span style={{ fontSize: 12, color: COLORS.muted }}>{t('auth.or')}</span>
               <span style={{ flex: 1, height: 1, background: 'rgba(42,34,32,0.12)' }} />
             </div>
 
             {appleEnabled && (
               <button type="button" onClick={handleAppleClick} style={appleButtonStyle(loading)}>
-                <AppleGlyph /> Continue with Apple
+                <AppleGlyph /> {t('auth.continueWithApple')}
               </button>
             )}
 
@@ -278,22 +280,22 @@ export default function SignupPage() {
                 <div ref={googleBtnRef} style={{ display: 'flex', justifyContent: 'center', minHeight: 44 }} />
                 {!gisReady && (
                   <button type="button" onClick={handleGoogleClick} disabled={loading} style={googleButtonStyle(loading)}>
-                    <GoogleG /> Continue with Google
+                    <GoogleG /> {t('auth.continueWithGoogle')}
                   </button>
                 )}
               </>
             ) : (
               <>
-                <button type="button" disabled aria-disabled="true" title="Add NEXT_PUBLIC_GOOGLE_CLIENT_ID to enable Google sign-in" style={googleButtonStyle(true)}>
-                  <GoogleG /> Continue with Google
+                <button type="button" disabled aria-disabled="true" title={t('auth.googleHint')} style={googleButtonStyle(true)}>
+                  <GoogleG /> {t('auth.continueWithGoogle')}
                 </button>
-                <p style={{ margin: '8px 0 0', fontSize: 12, color: COLORS.muted, textAlign: 'center' }}>Add NEXT_PUBLIC_GOOGLE_CLIENT_ID to enable Google sign-in</p>
+                <p style={{ margin: '8px 0 0', fontSize: 12, color: COLORS.muted, textAlign: 'center' }}>{t('auth.googleHint')}</p>
               </>
             )}
 
             <p style={{ margin: '26px 0 0', textAlign: 'center', fontSize: 14, color: COLORS.muted }}>
-              Already have an account?{' '}
-              <a href="/login" style={{ color: COLORS.burgundy, fontWeight: 600, textDecoration: 'none' }}>Sign in</a>
+              {t('signup.alreadyHaveAccount')}{' '}
+              <a href="/login" style={{ color: COLORS.burgundy, fontWeight: 600, textDecoration: 'none' }}>{t('signup.signIn')}</a>
             </p>
           </>
         )}

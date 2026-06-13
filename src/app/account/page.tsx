@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { API_URL, getToken } from '@/lib/api'
 import AuthArea from '../_components/auth-area'
 import { EyeIcon, EyeOffIcon, eyeButtonStyle } from '@/app/_components/password-eye'
+import { useLanguage } from '@/lib/i18n/language-provider'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -65,6 +66,7 @@ interface FormState {
 type Gate = 'checking' | 'anon' | 'ok'
 
 export default function AccountPage() {
+  const { t } = useLanguage()
   const [gate, setGate] = useState<Gate>('checking')
   const [email, setEmail] = useState<string | null>(null)
   const [role, setRole] = useState<string | null>(null)
@@ -150,7 +152,7 @@ export default function AccountPage() {
     }
 
     if (form.age.trim() && !(Number(form.age) > 0)) {
-      setSaveError('Please enter a valid age.')
+      setSaveError(t('account.invalidAge'))
       return
     }
 
@@ -177,9 +179,7 @@ export default function AccountPage() {
 
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setSaveError(
-          (data && data.error) || 'Could not save your changes. Please try again.'
-        )
+        setSaveError((data && data.error) || t('account.saveError'))
         return
       }
 
@@ -193,7 +193,7 @@ export default function AccountPage() {
       })
       setSaveOk(true)
     } catch {
-      setSaveError('Network error. Please try again.')
+      setSaveError(t('reserve.networkError'))
     } finally {
       setSaving(false)
     }
@@ -211,7 +211,7 @@ export default function AccountPage() {
     }
 
     if (newPassword.length < 6) {
-      setPwError('Your new password must be at least 6 characters.')
+      setPwError(t('account.pwTooShort'))
       return
     }
 
@@ -236,9 +236,7 @@ export default function AccountPage() {
 
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setPwError(
-          (data && data.error) || 'Could not update your password. Please try again.'
-        )
+        setPwError((data && data.error) || t('account.pwError'))
         return
       }
 
@@ -246,7 +244,7 @@ export default function AccountPage() {
       setNewPassword('')
       setPwOk(true)
     } catch {
-      setPwError('Network error. Please try again.')
+      setPwError(t('reserve.networkError'))
     } finally {
       setPwSaving(false)
     }
@@ -330,16 +328,16 @@ export default function AccountPage() {
             color: COLORS.burgundy,
           }}
         >
-          Account settings
+          {t('account.title')}
         </h1>
         <p style={{ margin: '0 0 28px', fontSize: 15, color: COLORS.muted }}>
-          Manage your personal details and verification information.
+          {t('account.subtitle')}
         </p>
 
         {gate === 'checking' ? (
-          <p style={{ fontSize: 15, color: COLORS.muted }}>Loading your profile…</p>
+          <p style={{ fontSize: 15, color: COLORS.muted }}>{t('account.loadingProfile')}</p>
         ) : gate === 'anon' ? (
-          <p style={{ fontSize: 15, color: COLORS.muted }}>Redirecting to sign in…</p>
+          <p style={{ fontSize: 15, color: COLORS.muted }}>{t('account.redirecting')}</p>
         ) : (
           <div
             style={{
@@ -363,8 +361,7 @@ export default function AccountPage() {
                   fontWeight: 600,
                 }}
               >
-                We couldn&apos;t load your saved profile. You can still update and
-                save your details below.
+                {t('account.loadError')}
               </div>
             )}
 
@@ -421,7 +418,14 @@ export default function AccountPage() {
                         textTransform: 'capitalize',
                       }}
                     >
-                      {role} account
+                      {t('account.roleAccount', {
+                        role:
+                          role === 'host'
+                            ? t('auth.roleHost')
+                            : role === 'user'
+                              ? t('auth.roleGuest')
+                              : role,
+                      })}
                     </p>
                   )}
                 </div>
@@ -431,7 +435,7 @@ export default function AccountPage() {
             <form onSubmit={handleSave}>
               <div style={{ display: 'grid', gap: 18 }}>
                 <label style={{ display: 'block' }}>
-                  <span style={labelStyle}>Full name</span>
+                  <span style={labelStyle}>{t('account.fullName')}</span>
                   <input
                     style={inputStyle}
                     value={form.full_name}
@@ -450,18 +454,18 @@ export default function AccountPage() {
                   }}
                 >
                   <label style={{ display: 'block' }}>
-                    <span style={labelStyle}>Age</span>
+                    <span style={labelStyle}>{t('account.age')}</span>
                     <input
                       style={inputStyle}
                       type="number"
                       min={1}
                       value={form.age}
                       onChange={(e) => patch({ age: e.target.value })}
-                      placeholder="e.g. 29"
+                      placeholder={t('account.agePlaceholder')}
                     />
                   </label>
                   <label style={{ display: 'block' }}>
-                    <span style={labelStyle}>Phone number</span>
+                    <span style={labelStyle}>{t('account.phone')}</span>
                     <input
                       style={inputStyle}
                       type="tel"
@@ -474,12 +478,12 @@ export default function AccountPage() {
                 </div>
 
                 <label style={{ display: 'block' }}>
-                  <span style={labelStyle}>ID / passport number</span>
+                  <span style={labelStyle}>{t('account.idDocument')}</span>
                   <input
                     style={inputStyle}
                     value={form.id_document}
                     onChange={(e) => patch({ id_document: e.target.value })}
-                    placeholder="For verification"
+                    placeholder={t('account.idForVerification')}
                   />
                   <span
                     style={{
@@ -489,8 +493,7 @@ export default function AccountPage() {
                       color: COLORS.muted,
                     }}
                   >
-                    Used to verify your identity. Kept private — never shown to
-                    hosts or guests.
+                    {t('account.idHint')}
                   </span>
                 </label>
               </div>
@@ -524,7 +527,7 @@ export default function AccountPage() {
                     fontWeight: 600,
                   }}
                 >
-                  Your account details were saved.
+                  {t('account.saved')}
                 </div>
               )}
 
@@ -545,7 +548,7 @@ export default function AccountPage() {
                   opacity: saving ? 0.6 : 1,
                 }}
               >
-                {saving ? 'Saving…' : 'Save changes'}
+                {saving ? t('account.saving') : t('account.saveChanges')}
               </button>
             </form>
           </div>
@@ -571,16 +574,16 @@ export default function AccountPage() {
                 color: COLORS.ink,
               }}
             >
-              Change password
+              {t('account.changePassword')}
             </h2>
             <p style={{ margin: '0 0 22px', fontSize: 14, color: COLORS.muted }}>
-              Use at least 6 characters. You&apos;ll stay signed in on this device.
+              {t('account.changePasswordHint')}
             </p>
 
             <form onSubmit={handleChangePassword}>
               <div style={{ display: 'grid', gap: 18 }}>
                 <label style={{ display: 'block' }}>
-                  <span style={labelStyle}>Current password</span>
+                  <span style={labelStyle}>{t('account.currentPassword')}</span>
                   <div style={{ position: 'relative' }}>
                     <input
                       style={{ ...inputStyle, paddingRight: 44 }}
@@ -598,7 +601,7 @@ export default function AccountPage() {
                     <button
                       type="button"
                       onClick={() => setShowCurrent((v) => !v)}
-                      aria-label={showCurrent ? 'Hide password' : 'Show password'}
+                      aria-label={showCurrent ? t('auth.hidePassword') : t('auth.showPassword')}
                       style={eyeButtonStyle}
                     >
                       {showCurrent ? <EyeOffIcon /> : <EyeIcon />}
@@ -607,7 +610,7 @@ export default function AccountPage() {
                 </label>
 
                 <label style={{ display: 'block' }}>
-                  <span style={labelStyle}>New password</span>
+                  <span style={labelStyle}>{t('account.newPassword')}</span>
                   <div style={{ position: 'relative' }}>
                     <input
                       style={{ ...inputStyle, paddingRight: 44 }}
@@ -619,14 +622,14 @@ export default function AccountPage() {
                         setPwError(null)
                         setPwOk(false)
                       }}
-                      placeholder="At least 6 characters"
+                      placeholder={t('auth.passwordMin')}
                       autoComplete="new-password"
                       required
                     />
                     <button
                       type="button"
                       onClick={() => setShowNew((v) => !v)}
-                      aria-label={showNew ? 'Hide password' : 'Show password'}
+                      aria-label={showNew ? t('auth.hidePassword') : t('auth.showPassword')}
                       style={eyeButtonStyle}
                     >
                       {showNew ? <EyeOffIcon /> : <EyeIcon />}
@@ -664,7 +667,7 @@ export default function AccountPage() {
                     fontWeight: 600,
                   }}
                 >
-                  Your password was updated.
+                  {t('account.pwUpdated')}
                 </div>
               )}
 
@@ -689,7 +692,7 @@ export default function AccountPage() {
                     pwSaving || !currentPassword || newPassword.length < 6 ? 0.6 : 1,
                 }}
               >
-                {pwSaving ? 'Updating…' : 'Update password'}
+                {pwSaving ? t('account.updating') : t('account.updatePassword')}
               </button>
             </form>
           </div>

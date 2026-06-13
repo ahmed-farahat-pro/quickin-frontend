@@ -9,6 +9,7 @@ import dynamic from 'next/dynamic'
 import { API_URL, type Listing } from '@/lib/api'
 import DatePickerField from '../_components/date-picker-field'
 import ImagePlaceholder from '../_components/image-placeholder'
+import { useLanguage } from '@/lib/i18n/language-provider'
 
 // Leaflet must never run on the server (it reads `window` at import time), so
 // the map is a client-only dynamic import with SSR disabled.
@@ -58,11 +59,12 @@ interface RegionCount {
 // `sort=` to the backend. 'recommended' is the default and omitted from the URL.
 type Sort = 'recommended' | 'price_asc' | 'price_desc' | 'newest'
 
-const SORT_OPTIONS: { value: Sort; label: string }[] = [
-  { value: 'recommended', label: 'Recommended' },
-  { value: 'price_asc', label: 'Price: low to high' },
-  { value: 'price_desc', label: 'Price: high to low' },
-  { value: 'newest', label: 'Newest' },
+// `labelKey` resolves to a translation at render time (see the component below).
+const SORT_OPTIONS: { value: Sort; labelKey: string }[] = [
+  { value: 'recommended', labelKey: 'explore.sort.recommended' },
+  { value: 'price_asc', labelKey: 'explore.sort.priceAsc' },
+  { value: 'price_desc', labelKey: 'explore.sort.priceDesc' },
+  { value: 'newest', labelKey: 'explore.sort.newest' },
 ]
 
 interface Filters {
@@ -106,6 +108,7 @@ const EMPTY: Filters = {
 }
 
 export default function ExploreClient({ initialListings, initialFilters }: Props) {
+  const { t } = useLanguage()
   const [filters, setFilters] = useState<Filters>(initialFilters)
   const [listings, setListings] = useState<Listing[]>(initialListings)
   const [searching, setSearching] = useState(false)
@@ -218,7 +221,9 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
   const hasFilters = useMemo(() => Boolean(buildQuery(filters)), [filters])
 
   const count = listings.length
-  const countLabel = `${count} ${count === 1 ? 'stay' : 'stays'} found`
+  const countLabel = t(count === 1 ? 'explore.stayFound' : 'explore.staysFound', {
+    count,
+  })
 
   return (
     <>
@@ -278,7 +283,7 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
               color: COLORS.burgundy,
             }}
           >
-            Curated stays for slow travelers
+            {t('explore.eyebrow')}
           </p>
 
           {/* Headline — one word in burgundy italic */}
@@ -294,11 +299,11 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
               color: COLORS.ink,
             }}
           >
-            Find your next{' '}
+            {t('explore.headlinePre')}{' '}
             <span style={{ fontStyle: 'italic', color: COLORS.burgundy }}>
-              boutique
+              {t('explore.headlineEm')}
             </span>{' '}
-            stay
+            {t('explore.headlinePost')}
           </h1>
           <p
             style={{
@@ -309,8 +314,7 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
               color: COLORS.muted,
             }}
           >
-            A hand-picked collection of homes — from lakeside villas to desert
-            hideaways.
+            {t('explore.subcopy')}
           </p>
 
           {/* Pill search (live — filters as you type; the round button flushes) */}
@@ -344,13 +348,13 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
               }}
             >
               <label htmlFor="where" style={segLabel}>
-                Where
+                {t('explore.where')}
               </label>
               <input
                 id="where"
                 type="text"
                 name="location"
-                placeholder="Search destinations"
+                placeholder={t('explore.wherePlaceholder')}
                 autoComplete="off"
                 value={filters.location}
                 onChange={(e) =>
@@ -376,10 +380,11 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
                 justifyContent: 'center',
               }}
             >
-              <span style={segLabel}>Check-in</span>
+              <span style={segLabel}>{t('explore.checkIn')}</span>
               <PillDate
                 value={filters.checkIn}
-                ariaLabel="Check-in date"
+                ariaLabel={t('explore.checkIn')}
+                placeholder={t('explore.datesPlaceholder')}
                 onChange={(iso) =>
                   updateFilter({
                     checkIn: iso,
@@ -406,11 +411,12 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
                 justifyContent: 'center',
               }}
             >
-              <span style={segLabel}>Check-out</span>
+              <span style={segLabel}>{t('explore.checkOut')}</span>
               <PillDate
                 value={filters.checkOut}
                 min={filters.checkIn || undefined}
-                ariaLabel="Check-out date"
+                ariaLabel={t('explore.checkOut')}
+                placeholder={t('explore.datesPlaceholder')}
                 onChange={(iso) => updateFilter({ checkOut: iso })}
               />
             </div>
@@ -428,14 +434,14 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
               }}
             >
               <label htmlFor="guests" style={segLabel}>
-                Guests
+                {t('explore.guests')}
               </label>
               <input
                 id="guests"
                 type="number"
                 name="guests"
                 min={1}
-                placeholder="Add guests"
+                placeholder={t('explore.guestsPlaceholder')}
                 value={filters.guests}
                 onChange={(e) => updateFilter({ guests: e.target.value })}
                 onKeyDown={(e) => {
@@ -459,7 +465,7 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
               <button
                 type="button"
                 onClick={submitSearch}
-                aria-label="Search"
+                aria-label={t('explore.search')}
                 className="qk-pill-search-btn"
                 style={{
                   height: 56,
@@ -496,7 +502,7 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
                   <path d="m21 21-4.3-4.3" />
                 </svg>
                 <span className="qk-pill-search-label" style={{ display: 'none' }}>
-                  Search
+                  {t('explore.search')}
                 </span>
               </button>
             </div>
@@ -508,7 +514,7 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
           {regions.length > 0 && (
             <div
               role="group"
-              aria-label="Filter by region"
+              aria-label={t('explore.filterByRegion')}
               style={{
                 margin: '22px auto 0',
                 maxWidth: 860,
@@ -519,14 +525,16 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
               }}
             >
               <RegionChip
-                label="All"
+                label={t('explore.all')}
                 active={filters.region === ''}
                 onClick={() => updateFilter({ region: '' })}
               />
               {regions.map((r) => (
                 <RegionChip
                   key={r.region}
-                  label={r.region}
+                  // Display label is localized; the region VALUE sent to the API
+                  // (in onClick below) stays the English canonical.
+                  label={t('region.' + r.region)}
                   count={r.count}
                   active={filters.region === r.region}
                   onClick={() =>
@@ -557,10 +565,10 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
         >
           {/* Sort segmented control */}
           <div>
-            <span style={controlLabel}>Sort by</span>
+            <span style={controlLabel}>{t('explore.sortBy')}</span>
             <div
               role="tablist"
-              aria-label="Sort listings"
+              aria-label={t('explore.sortBy')}
               className="qk-sort-seg"
               style={{
                 display: 'inline-flex',
@@ -574,7 +582,7 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
               {SORT_OPTIONS.map((opt) => (
                 <ToggleButton
                   key={opt.value}
-                  label={opt.label}
+                  label={t(opt.labelKey)}
                   active={filters.sort === opt.value}
                   onClick={() => updateFilter({ sort: opt.value })}
                   role="tab"
@@ -585,14 +593,14 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
 
           {/* Price min/max */}
           <div>
-            <span style={controlLabel}>Price / night (EGP)</span>
+            <span style={controlLabel}>{t('explore.pricePerNight')}</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input
                 type="number"
                 min={0}
                 inputMode="numeric"
-                placeholder="Min"
-                aria-label="Minimum price per night"
+                placeholder={t('explore.min')}
+                aria-label={t('explore.min')}
                 value={filters.minPrice}
                 onChange={(e) =>
                   updateFilter({ minPrice: e.target.value }, { debounce: true })
@@ -607,8 +615,8 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
                 type="number"
                 min={0}
                 inputMode="numeric"
-                placeholder="Max"
-                aria-label="Maximum price per night"
+                placeholder={t('explore.max')}
+                aria-label={t('explore.max')}
                 value={filters.maxPrice}
                 onChange={(e) =>
                   updateFilter({ maxPrice: e.target.value }, { debounce: true })
@@ -649,7 +657,7 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
           >
             {searching ? (
               <span style={{ color: COLORS.burgundy, fontWeight: 600 }}>
-                Searching…
+                {t('explore.searching')}
               </span>
             ) : (
               <span>{countLabel}</span>
@@ -671,7 +679,7 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
                   textDecoration: 'underline',
                 }}
               >
-                Clear filters
+                {t('explore.clearFilters')}
               </button>
             )}
           </div>
@@ -679,7 +687,7 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
           {/* List / Map toggle */}
           <div
             role="tablist"
-            aria-label="Choose view"
+            aria-label={t('explore.view.list') + ' / ' + t('explore.view.map')}
             style={{
               display: 'inline-flex',
               background: COLORS.tan,
@@ -689,12 +697,12 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
             }}
           >
             <ToggleButton
-              label="List"
+              label={t('explore.view.list')}
               active={view === 'list'}
               onClick={() => setView('list')}
             />
             <ToggleButton
-              label="Map"
+              label={t('explore.view.map')}
               active={view === 'map'}
               onClick={() => setView('map')}
             />
@@ -720,14 +728,11 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
               gap: 12,
             }}
           >
-            <span>
-              We couldn&apos;t refresh the results just now — showing your last
-              matches. Try again in a moment.
-            </span>
+            <span>{t('explore.searchError')}</span>
             <button
               type="button"
               onClick={() => setSearchError(false)}
-              aria-label="Dismiss"
+              aria-label={t('explore.dismiss')}
               style={{
                 appearance: 'none',
                 border: 'none',
@@ -762,10 +767,10 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
         ) : listings.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '64px 24px', color: COLORS.muted }}>
             <p style={{ margin: 0, fontSize: 20, fontWeight: 600, color: COLORS.ink }}>
-              No stays match your search
+              {t('explore.noResultsTitle')}
             </p>
             <p style={{ margin: '8px 0 18px', fontSize: 15 }}>
-              Try widening your dates or location.
+              {t('explore.noResultsBody')}
             </p>
             <button
               type="button"
@@ -783,7 +788,7 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
                 cursor: 'pointer',
               }}
             >
-              Clear filters
+              {t('explore.clearFilters')}
             </button>
           </div>
         ) : (
@@ -808,6 +813,7 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
 // A single explore card — rounded cover image (or clean placeholder), a heart,
 // a guest-favorite star badge, and "EGP X / night".
 function ListingCard({ listing }: { listing: Listing }) {
+  const { t } = useLanguage()
   const cover = listing.listing_images[0]?.url || null
   return (
     <a
@@ -899,7 +905,7 @@ function ListingCard({ listing }: { listing: Listing }) {
               boxShadow: '0 2px 8px rgba(42,34,32,0.14)',
             }}
           >
-            ★ Guest favorite
+            ★ {t('listing.guestFavorite')}
           </span>
         )}
       </div>
@@ -950,7 +956,7 @@ function ListingCard({ listing }: { listing: Listing }) {
           <span style={{ fontWeight: 700, color: COLORS.burgundy }}>
             EGP {listing.price_per_night}
           </span>{' '}
-          <span style={{ color: COLORS.muted }}>/ night</span>
+          <span style={{ color: COLORS.muted }}>{t('listing.perNight')}</span>
         </p>
       </div>
     </a>
@@ -964,11 +970,13 @@ function PillDate({
   onChange,
   min,
   ariaLabel = 'Date',
+  placeholder = 'Add dates',
 }: {
   value: string
   onChange: (iso: string) => void
   min?: string
   ariaLabel?: string
+  placeholder?: string
 }) {
   return (
     <div className="qk-pill-date">
@@ -987,7 +995,7 @@ function PillDate({
         onChange={onChange}
         min={min}
         ariaLabel={ariaLabel}
-        placeholder="Add dates"
+        placeholder={placeholder}
       />
     </div>
   )
