@@ -54,6 +54,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [role, setRole] = useState<'user' | 'host'>('user')
   const [step, setStep] = useState<'form' | 'otp'>('form')
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -107,7 +108,7 @@ export default function LoginPage() {
     try {
       const res = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, role }),
       })
       const data = await res.json().catch(() => ({}))
       if (res.status === 403 && data?.needsVerification) {
@@ -222,6 +223,13 @@ export default function LoginPage() {
           /* ---- Sign-in form step ---- */
           <>
             <form onSubmit={handleSubmit}>
+              <div style={{ marginBottom: 18 }}>
+                <span style={labelStyle}>Sign in as</span>
+                <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                  <button type="button" onClick={() => setRole('user')} style={{ flex: 1, padding: '11px', borderRadius: 12, fontFamily: 'inherit', fontWeight: 700, fontSize: 14, cursor: 'pointer', border: role === 'user' ? '1px solid #5B0F16' : '1px solid rgba(42,34,32,0.14)', background: role === 'user' ? '#5B0F16' : '#fff', color: role === 'user' ? '#fff' : '#2A2220' }}>Guest</button>
+                  <button type="button" onClick={() => setRole('host')} style={{ flex: 1, padding: '11px', borderRadius: 12, fontFamily: 'inherit', fontWeight: 700, fontSize: 14, cursor: 'pointer', border: role === 'host' ? '1px solid #5B0F16' : '1px solid rgba(42,34,32,0.14)', background: role === 'host' ? '#5B0F16' : '#fff', color: role === 'host' ? '#fff' : '#2A2220' }}>Host</button>
+                </div>
+              </div>
               <label style={{ display: 'block', marginBottom: 16 }}>
                 <span style={labelStyle}>Email or username</span>
                 <input type="text" required autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="layla@email.com" style={inputStyle} />
