@@ -54,6 +54,21 @@ const statusBadge = (v: unknown) => {
   return <span style={{ background: c.bg, color: c.fg, fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>{label}</span>
 }
 
+// Listing visibility badge: green "Active" when published (shows in
+// search/explore), muted grey "Inactive" when not (hidden but not deleted).
+const publishedBadge = (v: unknown) => {
+  const on = !!v
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, whiteSpace: 'nowrap',
+      background: on ? '#0f5132' : 'rgba(42,34,32,0.10)', color: on ? '#fff' : COLORS.muted,
+    }}>
+      <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 999, background: on ? '#fff' : COLORS.muted }} />
+      {on ? 'Active' : 'Inactive'}
+    </span>
+  )
+}
+
 // Gold ★ rating + "(N)" review count for the listings table.
 const ratingCell = (_v: unknown, r: Record<string, unknown>) => {
   const count = Number(r.review_count ?? 0)
@@ -98,6 +113,7 @@ const COLUMNS: Record<TabKey, Column[]> = {
     { key: 'title', label: 'Title' }, { key: 'location', label: 'Location' },
     { key: 'price_per_night', label: 'Price', render: (v) => `${money(v)}/night` }, { key: 'host_email', label: 'Host' },
     { key: 'rating', label: 'Reviews', render: ratingCell },
+    { key: 'is_published', label: 'Status', render: publishedBadge },
   ],
   bookings: [
     { key: 'reservation_code', label: 'Code' }, { key: 'listing_title', label: 'Listing' }, { key: 'guest_email', label: 'Guest' },
@@ -204,6 +220,22 @@ export default function AdminPage() {
     } catch { setToast({ message: 'Network error.', kind: 'error' }) } finally { setBusyId(null) }
   }
 
+  // Activate / deactivate a listing. PATCHes is_published; a deactivated listing
+  // disappears from search/explore but isn't deleted. Refreshes the overview after.
+  async function toggleListingPublished(id: string, next: boolean) {
+    if (!token) return
+    setBusyId(id)
+    try {
+      const res = await fetch(`${API_URL}/api/local/admin/listings/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ is_published: next }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { setToast({ message: d?.error || 'Update failed', kind: 'error' }); return }
+      setToast({ message: next ? 'Listing activated' : 'Listing deactivated', kind: 'success' })
+      await load(token)
+    } catch { setToast({ message: 'Network error.', kind: 'error' }) } finally { setBusyId(null) }
+  }
+
   // Open the reviews modal for a listing and fetch its public reviews.
   async function openReviews(listingId: string, title: string) {
     setReviewsModal({ listingId, title, reviews: null })
@@ -306,6 +338,25 @@ export default function AdminPage() {
                               ))}
                             </select>
                           )}
+                          {tab === 'listings' && (() => {
+                            const published = !!row.is_published
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => toggleListingPublished(id, !published)}
+                                disabled={busyId === id}
+                                className="qk-press"
+                                aria-label={published ? 'Deactivate listing' : 'Activate listing'}
+                                title={published ? 'Hide from search/explore' : 'Show in search/explore'}
+                                style={
+                                  published
+                                    ? { appearance: 'none', border: `1px solid ${COLORS.burgundy}`, background: busyId === id ? COLORS.tan : '#fff', color: COLORS.burgundy, fontWeight: 700, fontSize: 12.5, fontFamily: FONT, borderRadius: 999, padding: '6px 14px', cursor: busyId === id ? 'default' : 'pointer' }
+                                    : { appearance: 'none', border: 'none', background: busyId === id ? COLORS.tan : GRAD_BURGUNDY, color: '#fff', fontWeight: 700, fontSize: 12.5, fontFamily: FONT, borderRadius: 999, padding: '6px 14px', cursor: busyId === id ? 'default' : 'pointer', boxShadow: busyId === id ? 'none' : '0 8px 18px rgba(91,15,22,0.24)' }
+                                }>
+                                {busyId === id ? '…' : published ? 'Deactivate' : 'Activate'}
+                              </button>
+                            )
+                          })()}
                           {tab === 'listings' && (
                             <button
                               type="button"
