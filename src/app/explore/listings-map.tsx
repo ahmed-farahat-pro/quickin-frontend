@@ -17,8 +17,11 @@ import type { Listing } from '@/lib/api'
 import LeafletListingsMap from './leaflet-listings-map'
 import GoogleListingsMap from './google-listings-map'
 
-// Inlined at build time by Next. Empty string when unset -> Leaflet fallback.
-const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ''
+// Inlined at build time by Next. Falls back to the project key so the deployed map
+// works without needing the Vercel env var (the key is exposed client-side anyway).
+// Empty only if you explicitly want the Leaflet fallback.
+const GOOGLE_MAPS_API_KEY =
+  process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 'AIzaSyBigDJt5v66YrCqY-kd-V7AdU8fJl3N5_I'
 
 export default function ListingsMap({ listings }: { listings: Listing[] }) {
   if (GOOGLE_MAPS_API_KEY) {

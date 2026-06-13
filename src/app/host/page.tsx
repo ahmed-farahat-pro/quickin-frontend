@@ -23,7 +23,8 @@ import BookingChat from '@/app/_components/booking-chat'
 // Maps pin-picker; when empty we silently fall back to the manual lat/lng
 // inputs only. Client-only (touches window) -> dynamic import with ssr:false,
 // mirroring how the explore page loads its map.
-const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ''
+const GOOGLE_MAPS_API_KEY =
+  process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 'AIzaSyBigDJt5v66YrCqY-kd-V7AdU8fJl3N5_I'
 const LocationPicker = dynamic(() => import('./location-picker'), {
   ssr: false,
 })
