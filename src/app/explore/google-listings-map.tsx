@@ -37,41 +37,29 @@ export function loadGoogleMaps(apiKey: string): Promise<GMapsApi> {
   if (typeof window === 'undefined') {
     return Promise.reject(new Error('Google Maps can only load in the browser'))
   }
-  if (window.google?.maps) return Promise.resolve(window.google.maps)
+  // NB: no early `Promise.resolve(window.google.maps)` — with loading=async the
+  // `Map` class is lazy, so a second caller that finds window.google.maps already
+  // present must STILL await importLibrary('maps') or `new google.maps.Map()`
+  // throws "Map is not a constructor". The cached promise below guarantees that.
   if (window.__quickinGmapsPromise) return window.__quickinGmapsPromise
 
   window.__quickinGmapsPromise = new Promise<GMapsApi>((resolve, reject) => {
-    const params = new URLSearchParams({
-      key: apiKey,
-      // `marker` powers AdvancedMarkerElement; `places` powers the host
-      // add-listing place-search Autocomplete (host/location-picker.tsx).
-      // `loading=async` is the recommended bootstrap and silences the warning.
-      libraries: 'marker,places',
-      loading: 'async',
-      v: 'weekly',
-    })
-    const script = document.createElement('script')
-    script.src = `https://maps.googleapis.com/maps/api/js?${params.toString()}`
-    script.async = true
-    script.defer = true
-    script.onload = async () => {
+    // Import the classes we use, THEN resolve. Runs whether we inject the script
+    // ourselves or google.maps already exists on the page.
+    const ensure = async () => {
       const maps = window.google?.maps
       if (!maps) {
         reject(new Error('Google Maps loaded but window.google.maps is missing'))
         return
       }
       try {
-        // With loading=async the classes (Map, Marker, …) are lazy-loaded. Import
-        // the libraries we use so `google.maps.Map` etc. exist before first use —
-        // otherwise `new google.maps.Map()` throws "Map is not a constructor".
         const importLibrary = (maps as unknown as {
           importLibrary?: (name: string) => Promise<unknown>
         }).importLibrary
         if (typeof importLibrary === 'function') {
           await importLibrary('maps')
           await importLibrary('marker')
-          // `places` is best-effort — only the host add-listing search box uses
-          // it; a failure here must not break the explore map's markers.
+          // `places` is best-effort — only the host add-listing search box uses it.
           try {
             await importLibrary('places')
           } catch {
@@ -83,6 +71,24 @@ export function loadGoogleMaps(apiKey: string): Promise<GMapsApi> {
         reject(e instanceof Error ? e : new Error('Google Maps failed to import libraries'))
       }
     }
+
+    // Already loaded (e.g. the host picker injected it first) → just ensure libs.
+    if (window.google?.maps) {
+      void ensure()
+      return
+    }
+
+    const params = new URLSearchParams({
+      key: apiKey,
+      libraries: 'marker,places',
+      loading: 'async',
+      v: 'weekly',
+    })
+    const script = document.createElement('script')
+    script.src = `https://maps.googleapis.com/maps/api/js?${params.toString()}`
+    script.async = true
+    script.defer = true
+    script.onload = () => void ensure()
     script.onerror = () => reject(new Error('Failed to load Google Maps JS API'))
     document.head.appendChild(script)
   })
@@ -231,10 +237,10 @@ export default function GoogleListingsMap({
           const center =
             points.length > 0
               ? { lat: points[0].lat, lng: points[0].lng }
-              : { lat: 20, lng: 0 }
+              : { lat: 26.8206, lng: 30.8025 } // Egypt (not the world view)
           mapRef.current = new api.Map(containerRef.current, {
             center,
-            zoom: points.length > 0 ? 5 : 2,
+            zoom: points.length > 0 ? 5 : 6,
             // mapId is required for AdvancedMarkerElement; DEMO_MAP_ID works
             // without extra cloud config for prototypes.
             mapId: 'DEMO_MAP_ID',
