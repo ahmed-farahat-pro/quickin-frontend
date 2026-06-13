@@ -21,14 +21,18 @@ export function T({
 const COLORS = {
   burgundy: '#5B0F16',
   ink: '#2A2220',
+  gold: '#B07A2A',
 }
 
-// "← Back to Explore" link (arrow flips automatically under dir="rtl").
+// "← Back to Explore" link. The arrow points toward the inline-start edge, so it
+// flips to "→" under dir="rtl" (Arabic).
 export function BackToExplore() {
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
+  const arrow = lang === 'ar' ? '→' : '←'
   return (
     <a
       href="/explore"
+      className="qk-press"
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -40,13 +44,13 @@ export function BackToExplore() {
         marginBottom: 22,
       }}
     >
-      <span style={{ fontSize: 18, lineHeight: 1 }}>&larr;</span>
+      <span style={{ fontSize: 18, lineHeight: 1 }}>{arrow}</span>
       {t('listing.backToExplore')}
     </a>
   )
 }
 
-// Guest-favorite pill (shown above the title on the detail page).
+// Guest-favorite pill (shown above the title on the detail page). Gold star.
 export function GuestFavoriteBadge({
   background,
 }: {
@@ -55,18 +59,24 @@ export function GuestFavoriteBadge({
   const { t } = useLanguage()
   return (
     <span
+      className="qk-pop"
       style={{
-        display: 'inline-block',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 5,
         background,
-        color: COLORS.burgundy,
+        color: COLORS.ink,
         fontSize: 12,
-        fontWeight: 600,
+        fontWeight: 700,
         padding: '5px 12px',
         borderRadius: 999,
         marginBottom: 12,
       }}
     >
-      ★ {t('listing.guestFavorite')}
+      <span className="qk-star" aria-hidden="true">
+        ★
+      </span>{' '}
+      {t('listing.guestFavorite')}
     </span>
   )
 }

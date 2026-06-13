@@ -30,10 +30,14 @@ const LocationPicker = dynamic(() => import('./location-picker'), {
 const COLORS = {
   burgundy: '#5B0F16',
   cream: '#F6F1E6',
+  page: '#E4DECF',
   tan: '#EFE6D8',
   ink: '#2A2220',
   muted: '#6B6055',
+  gold: '#B07A2A',
 }
+
+const GRAD_BURGUNDY = 'linear-gradient(135deg,#5B0F16,#8a2530)'
 
 const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
 
@@ -805,7 +809,7 @@ export default function HostPage() {
                   padding: '10px 12px',
                   borderRadius: 14,
                   background: active
-                    ? COLORS.burgundy
+                    ? GRAD_BURGUNDY
                     : done
                       ? 'rgba(91,15,22,0.08)'
                       : COLORS.tan,
@@ -829,7 +833,11 @@ export default function HostPage() {
                     fontSize: 13,
                     fontWeight: 800,
                     color: active ? COLORS.burgundy : '#fff',
-                    background: active ? '#fff' : COLORS.burgundy,
+                    background: active
+                      ? '#fff'
+                      : done
+                        ? 'linear-gradient(135deg,#B07A2A,#d8a55a)'
+                        : COLORS.burgundy,
                   }}
                 >
                   {done ? '✓' : i + 1}
@@ -916,6 +924,7 @@ export default function HostPage() {
                         type="button"
                         onClick={() => patch({ region: r })}
                         aria-pressed={on}
+                        className="qk-chip"
                         style={{
                           padding: '9px 18px',
                           fontSize: 14,
@@ -924,11 +933,13 @@ export default function HostPage() {
                           cursor: 'pointer',
                           borderRadius: 999,
                           color: on ? '#fff' : COLORS.ink,
-                          background: on ? COLORS.burgundy : '#fff',
+                          background: on ? GRAD_BURGUNDY : '#fff',
                           border: on
-                            ? `1px solid ${COLORS.burgundy}`
+                            ? '1px solid transparent'
                             : '1px solid rgba(42,34,32,0.16)',
-                          transition: 'background 0.12s ease, color 0.12s ease',
+                          boxShadow: on
+                            ? '0 8px 20px rgba(91,15,22,0.22)'
+                            : 'none',
                         }}
                       >
                         {r}
@@ -1077,6 +1088,7 @@ export default function HostPage() {
                       type="button"
                       onClick={() => toggleAmenity(a)}
                       aria-pressed={on}
+                      className="qk-chip"
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -1088,11 +1100,11 @@ export default function HostPage() {
                         cursor: 'pointer',
                         borderRadius: 999,
                         color: on ? '#fff' : COLORS.ink,
-                        background: on ? COLORS.burgundy : '#fff',
+                        background: on ? GRAD_BURGUNDY : '#fff',
                         border: on
-                          ? `1px solid ${COLORS.burgundy}`
+                          ? '1px solid transparent'
                           : '1px solid rgba(42,34,32,0.16)',
-                        transition: 'background 0.12s ease, color 0.12s ease',
+                        boxShadow: on ? '0 8px 20px rgba(91,15,22,0.22)' : 'none',
                       }}
                     >
                       <span
@@ -1292,6 +1304,7 @@ export default function HostPage() {
               type="button"
               onClick={goBack}
               disabled={step === 0 || submitting}
+              className={step === 0 || submitting ? undefined : 'qk-press'}
               style={{
                 padding: '12px 24px',
                 fontSize: 15,
@@ -1316,16 +1329,18 @@ export default function HostPage() {
               <button
                 type="button"
                 onClick={goNext}
+                className="qk-press"
                 style={{
                   padding: '12px 28px',
                   fontSize: 15,
                   fontWeight: 700,
                   fontFamily: FONT,
                   color: '#fff',
-                  background: COLORS.burgundy,
+                  background: GRAD_BURGUNDY,
                   border: 'none',
                   borderRadius: 14,
                   cursor: 'pointer',
+                  boxShadow: '0 10px 24px rgba(91,15,22,0.28)',
                 }}
               >
                 Next
@@ -1334,17 +1349,19 @@ export default function HostPage() {
               <button
                 type="submit"
                 disabled={submitting}
+                className={submitting ? undefined : 'qk-press qk-pulse'}
                 style={{
                   padding: '12px 28px',
                   fontSize: 15,
                   fontWeight: 700,
                   fontFamily: FONT,
                   color: '#fff',
-                  background: COLORS.burgundy,
+                  background: GRAD_BURGUNDY,
                   border: 'none',
                   borderRadius: 14,
                   cursor: submitting ? 'not-allowed' : 'pointer',
                   opacity: submitting ? 0.6 : 1,
+                  boxShadow: submitting ? 'none' : '0 10px 24px rgba(91,15,22,0.28)',
                 }}
               >
                 {submitting ? 'Publishing…' : 'Publish listing'}
@@ -1376,6 +1393,7 @@ export default function HostPage() {
                 <a
                   key={l.id}
                   href={`/explore/${l.id}`}
+                  className="qk-card"
                   style={{
                     display: 'block',
                     background: '#fff',
@@ -1384,7 +1402,7 @@ export default function HostPage() {
                     textDecoration: 'none',
                     color: 'inherit',
                     border: '1px solid rgba(42,34,32,0.06)',
-                    boxShadow: '0 4px 18px rgba(42,34,32,0.07)',
+                    boxShadow: '0 8px 22px rgba(42,34,32,0.08)',
                   }}
                 >
                   <div
@@ -1392,6 +1410,7 @@ export default function HostPage() {
                       position: 'relative',
                       width: '100%',
                       aspectRatio: '4 / 3',
+                      overflow: 'hidden',
                       background: COLORS.tan,
                     }}
                   >
@@ -1400,6 +1419,7 @@ export default function HostPage() {
                         src={cover}
                         alt={l.title}
                         loading="lazy"
+                        className="qk-img-zoom"
                         style={{
                           width: '100%',
                           height: '100%',
@@ -1470,9 +1490,9 @@ export default function HostPage() {
                   key={b.id}
                   style={{
                     background: '#fff',
-                    borderRadius: 16,
+                    borderRadius: 18,
                     border: '1px solid rgba(42,34,32,0.06)',
-                    boxShadow: '0 4px 18px rgba(42,34,32,0.06)',
+                    boxShadow: '0 8px 22px rgba(42,34,32,0.08)',
                     padding: '16px 18px',
                   }}
                 >
@@ -1568,6 +1588,7 @@ export default function HostPage() {
                             type="button"
                             onClick={() => act(b.id, 'confirm')}
                             disabled={busy}
+                            className={busy ? undefined : 'qk-press'}
                             style={{
                               padding: '9px 18px',
                               fontSize: 14,
@@ -1587,6 +1608,7 @@ export default function HostPage() {
                             type="button"
                             onClick={() => act(b.id, 'reject')}
                             disabled={busy}
+                            className={busy ? undefined : 'qk-press'}
                             style={{
                               padding: '9px 18px',
                               fontSize: 14,
@@ -1610,6 +1632,7 @@ export default function HostPage() {
                           setOpenChatId((cur) => (cur === b.id ? null : b.id))
                         }
                         aria-expanded={openChatId === b.id}
+                        className="qk-press"
                         style={{
                           padding: '9px 18px',
                           fontSize: 14,
@@ -1617,8 +1640,11 @@ export default function HostPage() {
                           fontFamily: FONT,
                           color: openChatId === b.id ? '#fff' : COLORS.burgundy,
                           background:
-                            openChatId === b.id ? COLORS.burgundy : COLORS.tan,
-                          border: `1px solid ${COLORS.burgundy}`,
+                            openChatId === b.id ? GRAD_BURGUNDY : COLORS.tan,
+                          border:
+                            openChatId === b.id
+                              ? '1px solid transparent'
+                              : `1px solid ${COLORS.burgundy}`,
                           borderRadius: 12,
                           cursor: 'pointer',
                         }}
@@ -1760,6 +1786,7 @@ export default function HostPage() {
           <button
             type="submit"
             disabled={svcSubmitting}
+            className={svcSubmitting ? undefined : 'qk-press'}
             style={{
               marginTop: 18,
               padding: '13px 28px',
@@ -1767,11 +1794,12 @@ export default function HostPage() {
               fontWeight: 700,
               fontFamily: FONT,
               color: '#fff',
-              background: COLORS.burgundy,
+              background: GRAD_BURGUNDY,
               border: 'none',
               borderRadius: 14,
               cursor: svcSubmitting ? 'not-allowed' : 'pointer',
               opacity: svcSubmitting ? 0.6 : 1,
+              boxShadow: svcSubmitting ? 'none' : '0 10px 24px rgba(91,15,22,0.28)',
             }}
           >
             {svcSubmitting ? 'Publishing…' : 'Publish service'}
@@ -1801,6 +1829,7 @@ export default function HostPage() {
                 <a
                   key={s.id}
                   href={`/services/${s.id}`}
+                  className="qk-card"
                   style={{
                     display: 'block',
                     background: '#fff',
@@ -1809,7 +1838,7 @@ export default function HostPage() {
                     textDecoration: 'none',
                     color: 'inherit',
                     border: '1px solid rgba(42,34,32,0.06)',
-                    boxShadow: '0 4px 18px rgba(42,34,32,0.07)',
+                    boxShadow: '0 8px 22px rgba(42,34,32,0.08)',
                   }}
                 >
                   <div
@@ -1817,6 +1846,7 @@ export default function HostPage() {
                       position: 'relative',
                       width: '100%',
                       aspectRatio: '4 / 3',
+                      overflow: 'hidden',
                       background: COLORS.tan,
                     }}
                   >
@@ -1825,6 +1855,7 @@ export default function HostPage() {
                         src={cover}
                         alt={s.title}
                         loading="lazy"
+                        className="qk-img-zoom"
                         style={{
                           width: '100%',
                           height: '100%',
@@ -1911,9 +1942,9 @@ export default function HostPage() {
                   key={r.id}
                   style={{
                     background: '#fff',
-                    borderRadius: 16,
+                    borderRadius: 18,
                     border: '1px solid rgba(42,34,32,0.06)',
-                    boxShadow: '0 4px 18px rgba(42,34,32,0.06)',
+                    boxShadow: '0 8px 22px rgba(42,34,32,0.08)',
                     padding: '16px 18px',
                   }}
                 >
@@ -2019,6 +2050,7 @@ export default function HostPage() {
                             type="button"
                             onClick={() => actService(r.id, 'confirm')}
                             disabled={busy}
+                            className={busy ? undefined : 'qk-press'}
                             style={{
                               padding: '9px 18px',
                               fontSize: 14,
@@ -2038,6 +2070,7 @@ export default function HostPage() {
                             type="button"
                             onClick={() => actService(r.id, 'reject')}
                             disabled={busy}
+                            className={busy ? undefined : 'qk-press'}
                             style={{
                               padding: '9px 18px',
                               fontSize: 14,
@@ -2074,14 +2107,14 @@ function Shell({ children }: { children: React.ReactNode }) {
     <main
       style={{
         minHeight: '100vh',
-        background: COLORS.cream,
+        background: COLORS.page,
         color: COLORS.ink,
         fontFamily: FONT,
       }}
     >
       <header
         style={{
-          background: `linear-gradient(180deg, ${COLORS.tan} 0%, ${COLORS.cream} 100%)`,
+          background: `linear-gradient(180deg, ${COLORS.tan} 0%, ${COLORS.page} 100%)`,
           borderBottom: '1px solid rgba(91,15,22,0.10)',
           padding: '20px 24px',
         }}
@@ -2149,7 +2182,7 @@ function Section({
         background: '#fff',
         borderRadius: 22,
         border: '1px solid rgba(42,34,32,0.06)',
-        boxShadow: '0 6px 24px rgba(42,34,32,0.06)',
+        boxShadow: '0 8px 22px rgba(42,34,32,0.08)',
         padding: '24px 24px 26px',
         marginBottom: 24,
         scrollMarginTop: 90,
@@ -2161,8 +2194,20 @@ function Section({
           fontSize: 19,
           fontWeight: 700,
           color: COLORS.ink,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
         }}
       >
+        <span
+          aria-hidden="true"
+          style={{
+            width: 4,
+            height: 18,
+            borderRadius: 999,
+            background: 'linear-gradient(135deg,#B07A2A,#d8a55a)',
+          }}
+        />
         {title}
       </h2>
       {children}
@@ -2353,14 +2398,16 @@ function Notice({
       </p>
       <a
         href={ctaHref}
+        className="qk-press"
         style={{
           display: 'inline-block',
           color: '#fff',
-          background: COLORS.burgundy,
+          background: GRAD_BURGUNDY,
           textDecoration: 'none',
           fontWeight: 700,
           padding: '12px 26px',
           borderRadius: 999,
+          boxShadow: '0 10px 24px rgba(91,15,22,0.28)',
         }}
       >
         {ctaLabel}

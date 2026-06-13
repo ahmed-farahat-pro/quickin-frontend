@@ -35,10 +35,14 @@ export const metadata: Metadata = {
 const COLORS = {
   burgundy: '#5B0F16',
   cream: '#F6F1E6',
+  page: '#E4DECF',
   tan: '#EFE6D8',
   ink: '#2A2220',
   muted: '#6B6055',
+  gold: '#B07A2A',
 }
+
+const GRAD_BURGUNDY = 'linear-gradient(135deg,#5B0F16,#8a2530)'
 
 const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
 
@@ -64,7 +68,7 @@ export default async function ServicesPage() {
     <main
       style={{
         minHeight: '100vh',
-        background: COLORS.cream,
+        background: COLORS.page,
         color: COLORS.ink,
         fontFamily: FONT,
         display: 'flex',
@@ -121,8 +125,20 @@ export default async function ServicesPage() {
       </header>
 
       {/* Hero */}
-      <section style={{ background: COLORS.cream, padding: '36px 24px 8px' }}>
+      <section style={{ background: COLORS.page, padding: '40px 24px 8px' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+          <p
+            style={{
+              margin: '0 0 12px',
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: '0.22em',
+              textTransform: 'uppercase',
+              color: COLORS.gold,
+            }}
+          >
+            Experiences · Egypt
+          </p>
           <h1
             style={{
               margin: 0,
@@ -186,6 +202,7 @@ export default async function ServicesPage() {
                 <a
                   key={service.id}
                   href={`/services/${service.id}`}
+                  className="qk-card"
                   style={{
                     display: 'block',
                     background: '#fff',
@@ -193,7 +210,7 @@ export default async function ServicesPage() {
                     overflow: 'hidden',
                     textDecoration: 'none',
                     color: 'inherit',
-                    boxShadow: '0 6px 24px rgba(42,34,32,0.08)',
+                    boxShadow: '0 8px 22px rgba(42,34,32,0.10)',
                     border: '1px solid rgba(42,34,32,0.05)',
                     cursor: 'pointer',
                   }}
@@ -213,6 +230,7 @@ export default async function ServicesPage() {
                         src={cover}
                         alt={service.title}
                         loading="lazy"
+                        className="qk-img-zoom"
                         style={{
                           width: '100%',
                           height: '100%',
@@ -223,20 +241,31 @@ export default async function ServicesPage() {
                     ) : (
                       <ImagePlaceholder />
                     )}
+                    {/* Photo legibility overlay */}
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background:
+                          'linear-gradient(180deg, transparent 45%, rgba(42,34,32,0.6))',
+                        pointerEvents: 'none',
+                      }}
+                    />
                     {service.category && (
                       <span
                         style={{
                           position: 'absolute',
                           top: 14,
-                          left: 14,
+                          insetInlineStart: 14,
                           background: 'rgba(255,255,255,0.94)',
-                          color: COLORS.burgundy,
+                          color: COLORS.gold,
                           fontSize: 12,
                           fontWeight: 700,
                           letterSpacing: '0.01em',
                           padding: '6px 12px',
                           borderRadius: 999,
-                          boxShadow: '0 2px 8px rgba(42,34,32,0.14)',
+                          boxShadow: '0 4px 12px rgba(42,34,32,0.16)',
                         }}
                       >
                         {service.category}
@@ -283,13 +312,15 @@ export default async function ServicesPage() {
                         </span>
                       </span>
                       <span
+                        className="qk-press"
                         style={{
                           fontSize: 14,
                           fontWeight: 700,
                           color: '#fff',
-                          background: COLORS.burgundy,
+                          background: GRAD_BURGUNDY,
                           padding: '8px 16px',
                           borderRadius: 999,
+                          boxShadow: '0 8px 20px rgba(91,15,22,0.24)',
                         }}
                       >
                         Subscribe
@@ -306,7 +337,7 @@ export default async function ServicesPage() {
       {/* Footer */}
       <footer
         style={{
-          background: COLORS.burgundy,
+          background: 'linear-gradient(180deg,#5B0F16,#45070d)',
           color: COLORS.cream,
           padding: '32px 24px',
         }}

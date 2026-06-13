@@ -14,10 +14,13 @@ import BookingChat from '@/app/_components/booking-chat'
 const COLORS = {
   burgundy: '#5B0F16',
   cream: '#F6F1E6',
+  page: '#E4DECF',
   tan: '#EFE6D8',
   ink: '#2A2220',
   muted: '#6B6055',
 }
+
+const GRAD_BURGUNDY = 'linear-gradient(135deg,#5B0F16,#8a2530)'
 
 const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
 
@@ -122,14 +125,14 @@ export default function ReservationDetailPage() {
     <main
       style={{
         minHeight: '100vh',
-        background: COLORS.cream,
+        background: COLORS.page,
         color: COLORS.ink,
         fontFamily: FONT,
       }}
     >
       <header
         style={{
-          background: `linear-gradient(180deg, ${COLORS.tan} 0%, ${COLORS.cream} 100%)`,
+          background: `linear-gradient(180deg, ${COLORS.tan} 0%, ${COLORS.page} 100%)`,
           borderBottom: '1px solid rgba(91,15,22,0.10)',
           padding: '20px 24px',
         }}
@@ -291,7 +294,7 @@ function ReservationCard({
         {/* Header band */}
         <div
           style={{
-            background: COLORS.burgundy,
+            background: 'linear-gradient(135deg,#5B0F16,#7a1620)',
             color: COLORS.cream,
             padding: '22px 26px',
           }}
@@ -317,8 +320,11 @@ function ReservationCard({
               {reservation.title}
             </h1>
             <span
+              className="qk-pop"
               style={{
-                display: 'inline-block',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
                 background: s.bg,
                 color: s.fg,
                 fontSize: 13,
@@ -327,6 +333,18 @@ function ReservationCard({
                 borderRadius: 999,
               }}
             >
+              {(reservation.status || '').toLowerCase() === 'confirmed' && (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path
+                    d="M5 12.5l4.5 4.5L19 7"
+                    stroke="#0f5132"
+                    strokeWidth="2.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ strokeDasharray: 40, animation: 'qkDraw 0.6s 0.15s ease-out both' }}
+                  />
+                </svg>
+              )}
               {s.label}
             </span>
           </div>
@@ -544,14 +562,16 @@ function CenterNotice({
       <p style={{ margin: '12px auto 22px', fontSize: 15, maxWidth: 420 }}>{body}</p>
       <a
         href={ctaHref}
+        className="qk-press"
         style={{
           display: 'inline-block',
           color: '#fff',
-          background: COLORS.burgundy,
+          background: GRAD_BURGUNDY,
           textDecoration: 'none',
           fontWeight: 700,
           padding: '12px 26px',
           borderRadius: 999,
+          boxShadow: '0 10px 24px rgba(91,15,22,0.28)',
         }}
       >
         {ctaLabel}

@@ -182,13 +182,15 @@ export default function AuthArea() {
       </a>
       <a
         href="/signup"
+        className="qk-press"
         style={{
           color: '#fff',
-          background: COLORS.burgundy,
+          background: 'linear-gradient(135deg,#5B0F16,#8a2530)',
           textDecoration: 'none',
           fontWeight: 600,
           padding: '9px 18px',
           borderRadius: 999,
+          boxShadow: '0 8px 20px rgba(91,15,22,0.24)',
         }}
       >
         {t('nav.signup')}

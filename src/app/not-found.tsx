@@ -3,9 +3,11 @@
 const COLORS = {
   burgundy: '#5B0F16',
   cream: '#F6F1E6',
+  page: '#E4DECF',
   tan: '#EFE6D8',
   ink: '#2A2220',
   muted: '#6B6055',
+  gold: '#B07A2A',
 }
 
 const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
@@ -15,7 +17,7 @@ export default function NotFound() {
     <main
       style={{
         minHeight: '100vh',
-        background: COLORS.cream,
+        background: COLORS.page,
         color: COLORS.ink,
         fontFamily: FONT,
         display: 'flex',
@@ -38,7 +40,7 @@ export default function NotFound() {
             fontSize: 64,
             fontWeight: 700,
             lineHeight: 1,
-            color: COLORS.tan,
+            color: COLORS.gold,
           }}
         >
           404
@@ -60,16 +62,18 @@ export default function NotFound() {
         </p>
         <a
           href="/explore"
+          className="qk-press"
           style={{
             display: 'inline-block',
             fontFamily: FONT,
             fontSize: 15,
             fontWeight: 700,
             color: '#fff',
-            background: COLORS.burgundy,
+            background: 'linear-gradient(135deg,#5B0F16,#8a2530)',
             textDecoration: 'none',
             borderRadius: 999,
             padding: '12px 30px',
+            boxShadow: '0 10px 24px rgba(91,15,22,0.28)',
           }}
         >
           Browse stays

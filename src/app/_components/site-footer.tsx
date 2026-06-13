@@ -17,7 +17,7 @@ export default function SiteFooter() {
   return (
     <footer
       style={{
-        background: COLORS.burgundy,
+        background: 'linear-gradient(180deg,#5B0F16,#45070d)',
         color: COLORS.cream,
         padding: '48px 24px 32px',
       }}

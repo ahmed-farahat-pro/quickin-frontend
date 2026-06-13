@@ -9,10 +9,13 @@ import ImagePlaceholder from '../_components/image-placeholder'
 const COLORS = {
   burgundy: '#5B0F16',
   cream: '#F6F1E6',
+  page: '#E4DECF',
   tan: '#EFE6D8',
   ink: '#2A2220',
   muted: '#6B6055',
 }
+
+const GRAD_BURGUNDY = 'linear-gradient(135deg,#5B0F16,#8a2530)'
 
 const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
 
@@ -76,7 +79,7 @@ function Header() {
   return (
     <header
       style={{
-        background: `linear-gradient(180deg, ${COLORS.tan} 0%, ${COLORS.cream} 100%)`,
+        background: `linear-gradient(180deg, ${COLORS.tan} 0%, ${COLORS.page} 100%)`,
         borderBottom: `1px solid rgba(91,15,22,0.10)`,
         padding: '20px 24px',
       }}
@@ -171,7 +174,7 @@ export default function ReservationsPage() {
     <main
       style={{
         minHeight: '100vh',
-        background: COLORS.cream,
+        background: COLORS.page,
         color: COLORS.ink,
         fontFamily: FONT,
       }}
@@ -245,14 +248,16 @@ export default function ReservationsPage() {
             </p>
             <a
               href="/login"
+              className="qk-press"
               style={{
                 display: 'inline-block',
                 color: '#fff',
-                background: COLORS.burgundy,
+                background: GRAD_BURGUNDY,
                 textDecoration: 'none',
                 fontWeight: 700,
                 padding: '12px 26px',
                 borderRadius: 999,
+                boxShadow: '0 10px 24px rgba(91,15,22,0.28)',
               }}
             >
               Log in
@@ -271,15 +276,17 @@ export default function ReservationsPage() {
             <p style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>{state.message}</p>
             <a
               href="/reservations"
+              className="qk-press"
               style={{
                 display: 'inline-block',
                 marginTop: 18,
                 color: '#fff',
-                background: COLORS.burgundy,
+                background: GRAD_BURGUNDY,
                 textDecoration: 'none',
                 fontWeight: 700,
                 padding: '11px 24px',
                 borderRadius: 999,
+                boxShadow: '0 10px 24px rgba(91,15,22,0.28)',
               }}
             >
               Try again
@@ -339,14 +346,16 @@ function ReservationsList({
           </p>
           <a
             href="/explore"
+            className="qk-press"
             style={{
               display: 'inline-block',
               color: '#fff',
-              background: COLORS.burgundy,
+              background: GRAD_BURGUNDY,
               textDecoration: 'none',
               fontWeight: 700,
               padding: '11px 24px',
               borderRadius: 999,
+              boxShadow: '0 10px 24px rgba(91,15,22,0.28)',
             }}
           >
             Browse stays
@@ -358,7 +367,7 @@ function ReservationsList({
             <a
               key={b.id}
               href={`/reservation/${b.id}`}
-              className="qk-res-card"
+              className="qk-res-card qk-card"
               style={{
                 display: 'grid',
                 gridTemplateColumns: '160px 1fr auto',
@@ -366,7 +375,7 @@ function ReservationsList({
                 background: '#fff',
                 borderRadius: 20,
                 border: `1px solid rgba(42,34,32,0.06)`,
-                boxShadow: '0 6px 24px rgba(42,34,32,0.07)',
+                boxShadow: '0 8px 22px rgba(42,34,32,0.10)',
                 overflow: 'hidden',
                 alignItems: 'stretch',
                 textDecoration: 'none',
@@ -380,6 +389,7 @@ function ReservationsList({
                   position: 'relative',
                   width: 160,
                   minHeight: 130,
+                  overflow: 'hidden',
                   background: COLORS.tan,
                 }}
               >
@@ -387,6 +397,7 @@ function ReservationsList({
                   <img
                     src={b.image}
                     alt={b.title}
+                    className="qk-img-zoom"
                     style={{
                       width: '100%',
                       height: '100%',

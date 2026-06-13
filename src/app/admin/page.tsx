@@ -8,7 +8,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { API_URL } from '@/lib/api'
 import { EyeIcon, EyeOffIcon } from '@/app/_components/password-eye'
 
-const COLORS = { burgundy: '#5B0F16', cream: '#F6F1E6', tan: '#EFE6D8', ink: '#2A2220', muted: '#6B6055' }
+const COLORS = { burgundy: '#5B0F16', cream: '#F6F1E6', page: '#E4DECF', tan: '#EFE6D8', ink: '#2A2220', muted: '#6B6055', gold: '#B07A2A' }
+const GRAD_BURGUNDY = 'linear-gradient(135deg,#5B0F16,#8a2530)'
 const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
 
 interface Overview {
@@ -166,19 +167,20 @@ export default function AdminPage() {
   const singular = TAB_LABEL[tab].replace(/s$/, '').toLowerCase()
 
   return (
-    <main style={{ minHeight: '100vh', background: COLORS.cream, color: COLORS.ink, fontFamily: FONT, padding: '32px 18px 64px' }}>
+    <main style={{ minHeight: '100vh', background: COLORS.page, color: COLORS.ink, fontFamily: FONT, padding: '32px 18px 64px' }}>
       <div style={{ maxWidth: 1140, margin: '0 auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+        {/* Burgundy-gradient header bar */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12, background: 'linear-gradient(135deg,#5B0F16,#7a1620)', borderRadius: 22, padding: '20px 24px', boxShadow: '0 16px 40px rgba(91,15,22,0.28)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <img src="/logo.png" alt="QuickIn" style={{ height: 38 }} />
+            <img src="/logo.png" alt="QuickIn" style={{ height: 38, filter: 'brightness(0) invert(1)' }} />
             <div>
-              <h1 style={{ margin: 0, fontSize: 24, color: COLORS.burgundy }}>Admin Dashboard</h1>
-              <p style={{ margin: '2px 0 0', fontSize: 13, color: COLORS.muted }}>Signed in as {email} · full control</p>
+              <h1 style={{ margin: 0, fontSize: 24, color: '#fff' }}>Admin Dashboard</h1>
+              <p style={{ margin: '2px 0 0', fontSize: 13, color: 'rgba(246,241,230,0.8)' }}>Signed in as {email} · <span style={{ color: COLORS.gold, fontWeight: 700 }}>full control</span></p>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={() => token && load(token)} style={ghostBtn}>Refresh</button>
-            <button onClick={logout} style={ghostBtn}>Log out</button>
+            <button onClick={() => token && load(token)} className="qk-press" style={ghostBtnLight}>Refresh</button>
+            <button onClick={logout} className="qk-press" style={ghostBtnLight}>Log out</button>
           </div>
         </div>
 
@@ -187,20 +189,22 @@ export default function AdminPage() {
           {(Object.keys(TAB_LABEL) as TabKey[]).map((k) => {
             const active = tab === k
             return (
-              <button key={k} onClick={() => setTab(k)} style={{
+              <button key={k} onClick={() => setTab(k)} className="qk-tap" style={{
                 textAlign: 'left', cursor: 'pointer', appearance: 'none', fontFamily: FONT,
-                background: active ? COLORS.burgundy : '#fff', color: active ? '#fff' : COLORS.ink,
-                border: `1px solid ${active ? COLORS.burgundy : COLORS.tan}`, borderRadius: 16, padding: '14px 16px',
+                background: active ? GRAD_BURGUNDY : '#fff', color: active ? '#fff' : COLORS.ink,
+                border: `1px solid ${active ? 'transparent' : COLORS.tan}`, borderRadius: 18, padding: '14px 16px',
+                boxShadow: active ? '0 12px 28px rgba(91,15,22,0.22)' : '0 8px 22px rgba(42,34,32,0.08)',
               }}>
                 <span style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, opacity: 0.8 }}>{TAB_LABEL[k]}</span>
-                <span style={{ display: 'block', fontSize: 26, fontWeight: 800, marginTop: 2 }}>{data ? data.counts[k] ?? 0 : '—'}</span>
+                <span style={{ display: 'block', fontSize: 28, fontWeight: 800, marginTop: 2, color: active ? '#fff' : COLORS.gold }}>{data ? data.counts[k] ?? 0 : '—'}</span>
               </button>
             )
           })}
         </div>
 
-        <div style={{ background: '#fff', borderRadius: 18, border: `1px solid ${COLORS.tan}`, overflow: 'hidden' }}>
-          <div style={{ padding: '14px 18px', borderBottom: `1px solid ${COLORS.tan}` }}>
+        <div style={{ background: '#fff', borderRadius: 22, border: `1px solid ${COLORS.tan}`, overflow: 'hidden', boxShadow: '0 8px 22px rgba(42,34,32,0.08)' }}>
+          <div style={{ padding: '14px 18px', borderBottom: `1px solid ${COLORS.tan}`, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span aria-hidden="true" style={{ width: 4, height: 16, borderRadius: 999, background: 'linear-gradient(135deg,#B07A2A,#d8a55a)' }} />
             <h2 style={{ margin: 0, fontSize: 16, color: COLORS.burgundy }}>{TAB_LABEL[tab]} ({rows.length})</h2>
           </div>
           <div style={{ overflowX: 'auto' }}>
@@ -218,7 +222,7 @@ export default function AdminPage() {
                 {rows.map((row) => {
                   const id = String(row.id)
                   return (
-                    <tr key={id} style={{ borderTop: `1px solid ${COLORS.cream}` }}>
+                    <tr key={id} className="qk-row" style={{ borderTop: `1px solid ${COLORS.cream}` }}>
                       {columns.map((c) => <td key={c.key} style={td}>{c.render ? c.render(row[c.key], row) : String(row[c.key] ?? '—')}</td>)}
                       <td style={{ ...td, textAlign: 'right' }}>
                         <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end' }}>
@@ -255,7 +259,7 @@ export default function AdminPage() {
         <div role="dialog" aria-modal="true" onClick={() => setConfirm(null)}
           style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(20,12,10,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
           <div onClick={(e) => e.stopPropagation()}
-            style={{ width: '100%', maxWidth: 360, background: '#fff', borderRadius: 24, border: `1px solid rgba(42,34,32,0.06)`, boxShadow: '0 24px 60px rgba(42,34,32,0.28)', padding: 26, textAlign: 'center', fontFamily: FONT }}>
+            style={{ width: '100%', maxWidth: 360, background: '#fff', borderRadius: 28, border: `1px solid rgba(42,34,32,0.06)`, boxShadow: '0 24px 60px rgba(42,34,32,0.28)', padding: 26, textAlign: 'center', fontFamily: FONT }}>
             <div style={{ width: 56, height: 56, borderRadius: 28, background: 'rgba(91,15,22,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={COLORS.burgundy} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M10 11v6M14 11v6" />
@@ -264,8 +268,8 @@ export default function AdminPage() {
             <h2 style={{ margin: '0 0 6px', fontSize: 20, fontWeight: 800, color: COLORS.ink }}>{confirm.title}</h2>
             <p style={{ margin: '0 0 20px', fontSize: 14.5, color: COLORS.muted, lineHeight: 1.45 }}>{confirm.message}</p>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => setConfirm(null)} style={{ flex: 1, padding: '12px', borderRadius: 14, border: `1px solid ${COLORS.tan}`, background: '#fff', color: COLORS.ink, fontWeight: 700, fontSize: 14.5, fontFamily: FONT, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={confirm.onConfirm} style={{ flex: 1, padding: '12px', borderRadius: 14, border: 'none', background: COLORS.burgundy, color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: FONT, cursor: 'pointer' }}>Delete</button>
+              <button onClick={() => setConfirm(null)} className="qk-press" style={{ flex: 1, padding: '12px', borderRadius: 14, border: `1px solid ${COLORS.tan}`, background: '#fff', color: COLORS.ink, fontWeight: 700, fontSize: 14.5, fontFamily: FONT, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={confirm.onConfirm} className="qk-press" style={{ flex: 1, padding: '12px', borderRadius: 14, border: 'none', background: GRAD_BURGUNDY, color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: FONT, cursor: 'pointer', boxShadow: '0 10px 24px rgba(91,15,22,0.28)' }}>Delete</button>
             </div>
           </div>
         </div>
@@ -286,4 +290,5 @@ export default function AdminPage() {
 const th: React.CSSProperties = { textAlign: 'left', padding: '11px 16px', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, color: COLORS.muted, background: COLORS.cream, whiteSpace: 'nowrap' }
 const td: React.CSSProperties = { padding: '11px 16px', color: COLORS.ink, verticalAlign: 'middle', whiteSpace: 'nowrap' }
 const ghostBtn: React.CSSProperties = { appearance: 'none', border: `1px solid ${COLORS.burgundy}`, background: '#fff', color: COLORS.burgundy, fontWeight: 600, fontSize: 14, fontFamily: FONT, borderRadius: 999, padding: '8px 18px', cursor: 'pointer' }
+const ghostBtnLight: React.CSSProperties = { appearance: 'none', border: '1px solid rgba(246,241,230,0.5)', background: 'rgba(246,241,230,0.12)', color: '#fff', fontWeight: 600, fontSize: 14, fontFamily: FONT, borderRadius: 999, padding: '8px 18px', cursor: 'pointer' }
 const selectStyle: React.CSSProperties = { appearance: 'auto', border: `1px solid ${COLORS.tan}`, background: '#fff', color: COLORS.ink, fontSize: 12.5, fontFamily: FONT, borderRadius: 8, padding: '5px 8px', cursor: 'pointer' }

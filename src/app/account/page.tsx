@@ -17,10 +17,14 @@ import { useLanguage } from '@/lib/i18n/language-provider'
 const COLORS = {
   burgundy: '#5B0F16',
   cream: '#F6F1E6',
+  page: '#E4DECF',
   tan: '#EFE6D8',
   ink: '#2A2220',
   muted: '#6B6055',
+  gold: '#B07A2A',
 }
+
+const GRAD_BURGUNDY = 'linear-gradient(135deg,#5B0F16,#8a2530)'
 
 const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
 
@@ -254,7 +258,7 @@ export default function AccountPage() {
     <main
       style={{
         minHeight: '100vh',
-        background: COLORS.cream,
+        background: COLORS.page,
         color: COLORS.ink,
         fontFamily: FONT,
         display: 'flex',
@@ -270,7 +274,7 @@ export default function AccountPage() {
       {/* Header bar — same look as Explore */}
       <header
         style={{
-          background: `linear-gradient(180deg, ${COLORS.tan} 0%, ${COLORS.cream} 100%)`,
+          background: `linear-gradient(180deg, ${COLORS.tan} 0%, ${COLORS.page} 100%)`,
           borderBottom: '1px solid rgba(91,15,22,0.10)',
           padding: '20px 24px',
         }}
@@ -382,14 +386,15 @@ export default function AccountPage() {
                     width: 52,
                     height: 52,
                     borderRadius: 26,
-                    background: COLORS.tan,
-                    color: COLORS.burgundy,
+                    background: 'linear-gradient(135deg,#B07A2A,#d8a55a)',
+                    color: '#fff',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: 20,
                     fontWeight: 800,
                     flex: '0 0 auto',
+                    boxShadow: '0 0 0 3px rgba(176,122,42,0.25)',
                   }}
                 >
                   {(form.full_name || email || '?').trim().charAt(0).toUpperCase()}
@@ -534,6 +539,7 @@ export default function AccountPage() {
               <button
                 type="submit"
                 disabled={saving}
+                className={saving ? undefined : 'qk-press'}
                 style={{
                   marginTop: 24,
                   padding: '13px 30px',
@@ -541,11 +547,12 @@ export default function AccountPage() {
                   fontWeight: 700,
                   fontFamily: FONT,
                   color: '#fff',
-                  background: COLORS.burgundy,
+                  background: GRAD_BURGUNDY,
                   border: 'none',
                   borderRadius: 14,
                   cursor: saving ? 'not-allowed' : 'pointer',
                   opacity: saving ? 0.6 : 1,
+                  boxShadow: saving ? 'none' : '0 10px 24px rgba(91,15,22,0.28)',
                 }}
               >
                 {saving ? t('account.saving') : t('account.saveChanges')}
@@ -674,6 +681,11 @@ export default function AccountPage() {
               <button
                 type="submit"
                 disabled={pwSaving || !currentPassword || newPassword.length < 6}
+                className={
+                  pwSaving || !currentPassword || newPassword.length < 6
+                    ? undefined
+                    : 'qk-press'
+                }
                 style={{
                   marginTop: 24,
                   padding: '13px 30px',
@@ -681,7 +693,7 @@ export default function AccountPage() {
                   fontWeight: 700,
                   fontFamily: FONT,
                   color: '#fff',
-                  background: COLORS.burgundy,
+                  background: GRAD_BURGUNDY,
                   border: 'none',
                   borderRadius: 14,
                   cursor:
@@ -690,6 +702,10 @@ export default function AccountPage() {
                       : 'pointer',
                   opacity:
                     pwSaving || !currentPassword || newPassword.length < 6 ? 0.6 : 1,
+                  boxShadow:
+                    pwSaving || !currentPassword || newPassword.length < 6
+                      ? 'none'
+                      : '0 10px 24px rgba(91,15,22,0.28)',
                 }}
               >
                 {pwSaving ? t('account.updating') : t('account.updatePassword')}

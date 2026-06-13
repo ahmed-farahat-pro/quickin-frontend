@@ -73,9 +73,11 @@ export async function generateMetadata({
 const COLORS = {
   burgundy: '#5B0F16',
   cream: '#F6F1E6',
+  page: '#E4DECF',
   tan: '#EFE6D8',
   ink: '#2A2220',
   muted: '#6B6055',
+  gold: '#B07A2A',
 }
 
 function Spec({ labelKey, value }: { labelKey: string; value: number | null }) {
@@ -117,7 +119,7 @@ export default async function ListingDetailPage({
     <main
       style={{
         minHeight: '100vh',
-        background: COLORS.cream,
+        background: COLORS.page,
         color: COLORS.ink,
         fontFamily:
           '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif',
@@ -155,7 +157,7 @@ export default async function ListingDetailPage({
         {/* Back link (localized client helper) */}
         <BackToExplore />
 
-        {/* Hero */}
+        {/* Hero — slow Ken Burns drift on the cover, photo overlay for depth. */}
         <div
           style={{
             position: 'relative',
@@ -164,20 +166,33 @@ export default async function ListingDetailPage({
             borderRadius: 24,
             overflow: 'hidden',
             background: COLORS.tan,
-            boxShadow: '0 10px 36px rgba(42,34,32,0.12)',
+            boxShadow: '0 22px 48px rgba(42,34,32,0.18)',
           }}
         >
           {hero ? (
-            <img
-              src={hero}
-              alt={listing.title}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                display: 'block',
-              }}
-            />
+            <>
+              <img
+                src={hero}
+                alt={listing.title}
+                className="qk-kenburns"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  display: 'block',
+                }}
+              />
+              <span
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background:
+                    'linear-gradient(180deg, transparent 55%, rgba(42,34,32,0.45))',
+                  pointerEvents: 'none',
+                }}
+              />
+            </>
           ) : (
             <ImagePlaceholder iconSize={52} fontSize={15} />
           )}
@@ -331,7 +346,8 @@ export default async function ListingDetailPage({
                           width: 38,
                           height: 38,
                           borderRadius: 12,
-                          background: COLORS.tan,
+                          background: 'linear-gradient(135deg,#e7ddcb,#d8cdb8)',
+                          color: COLORS.burgundy,
                           display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -354,7 +370,7 @@ export default async function ListingDetailPage({
               background: '#fff',
               borderRadius: 22,
               border: `1px solid rgba(42,34,32,0.06)`,
-              boxShadow: '0 8px 28px rgba(42,34,32,0.10)',
+              boxShadow: '0 22px 48px rgba(42,34,32,0.14)',
               padding: '24px 24px 26px',
               position: 'sticky',
               top: 24,

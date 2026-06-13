@@ -10,6 +10,7 @@ import { useLanguage } from '@/lib/i18n/language-provider'
 const COLORS = {
   burgundy: '#5B0F16',
   cream: '#F6F1E6',
+  page: '#E4DECF',
   tan: '#EFE6D8',
   ink: '#2A2220',
   muted: '#6B6055',
@@ -183,7 +184,7 @@ export default function SignupPage() {
   }
 
   return (
-    <main style={{ minHeight: '100vh', background: COLORS.cream, color: COLORS.ink, fontFamily: FONT, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px' }}>
+    <main style={{ minHeight: '100vh', background: COLORS.page, color: COLORS.ink, fontFamily: FONT, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px' }}>
       <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" onReady={initGis} />
       {appleEnabled && <Script src={APPLE_JS_SRC} strategy="afterInteractive" />}
       <div style={{ width: '100%', maxWidth: 420, background: '#fff', borderRadius: 28, boxShadow: '0 12px 48px rgba(42,34,32,0.12)', border: '1px solid rgba(42,34,32,0.06)', padding: '40px 36px 36px' }}>
@@ -214,7 +215,7 @@ export default function SignupPage() {
                 style={{ ...inputStyle, textAlign: 'center', letterSpacing: 12, fontSize: 22, fontWeight: 700 }}
               />
             </label>
-            <button type="submit" disabled={loading || code.length < 6} style={primaryButtonStyle(loading || code.length < 6)}>
+            <button type="submit" disabled={loading || code.length < 6} className="qk-press" style={primaryButtonStyle(loading || code.length < 6)}>
               {loading ? t('login.verifying') : t('login.verifyContinue')}
             </button>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16, fontSize: 13.5 }}>
@@ -229,11 +230,11 @@ export default function SignupPage() {
             <div style={{ marginBottom: 18 }}>
               <span style={labelStyle}>{t('signup.joinAs')}</span>
               <div style={{ display: 'flex', gap: 10 }}>
-                <button type="button" onClick={() => setRole('user')} style={roleBtnStyle(role === 'user')}>
+                <button type="button" onClick={() => setRole('user')} className="qk-tap" style={roleBtnStyle(role === 'user')}>
                   <span style={{ fontSize: 15, fontWeight: 700 }}>{t('auth.roleGuest')}</span>
                   <span style={{ fontSize: 12, color: COLORS.muted }}>{t('signup.guestSub')}</span>
                 </button>
-                <button type="button" onClick={() => setRole('host')} style={roleBtnStyle(role === 'host')}>
+                <button type="button" onClick={() => setRole('host')} className="qk-tap" style={roleBtnStyle(role === 'host')}>
                   <span style={{ fontSize: 15, fontWeight: 700 }}>{t('auth.roleHost')}</span>
                   <span style={{ fontSize: 12, color: COLORS.muted }}>{t('signup.hostSub')}</span>
                 </button>
@@ -258,7 +259,7 @@ export default function SignupPage() {
                   </button>
                 </div>
               </label>
-              <button type="submit" disabled={loading} style={primaryButtonStyle(loading)}>
+              <button type="submit" disabled={loading} className={loading ? undefined : 'qk-press qk-pulse'} style={primaryButtonStyle(loading)}>
                 {loading ? t('signup.sendingCode') : role === 'host' ? t('signup.createHost') : t('signup.createGuest')}
               </button>
             </form>
@@ -328,9 +329,10 @@ function roleBtnStyle(active: boolean): React.CSSProperties {
 
 function primaryButtonStyle(loading: boolean): React.CSSProperties {
   return {
-    width: '100%', fontFamily: FONT, fontSize: 16, fontWeight: 600, color: '#fff', background: COLORS.burgundy,
-    border: 'none', borderRadius: 20, padding: '13px 16px', cursor: loading ? 'not-allowed' : 'pointer',
+    width: '100%', fontFamily: FONT, fontSize: 16, fontWeight: 600, color: '#fff', background: 'linear-gradient(135deg,#5B0F16,#8a2530)',
+    border: 'none', borderRadius: 20, padding: '14px 16px', cursor: loading ? 'not-allowed' : 'pointer',
     opacity: loading ? 0.7 : 1, transition: 'opacity 0.15s ease',
+    boxShadow: loading ? 'none' : '0 10px 24px rgba(91,15,22,0.28)',
   }
 }
 

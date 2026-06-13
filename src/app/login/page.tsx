@@ -255,7 +255,7 @@ export default function LoginPage() {
                 style={{ ...inputStyle, textAlign: 'center', letterSpacing: 12, fontSize: 22, fontWeight: 700 }}
               />
             </label>
-            <button type="submit" disabled={loading || code.length < 6} style={primaryButtonStyle(loading || code.length < 6)}>
+            <button type="submit" disabled={loading || code.length < 6} className="qk-press" style={primaryButtonStyle(loading || code.length < 6)}>
               {loading ? t('login.verifying') : t('login.verifyContinue')}
             </button>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16, fontSize: 13.5 }}>
@@ -270,7 +270,7 @@ export default function LoginPage() {
               <span style={labelStyle}>{t('auth.email')}</span>
               <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="layla@email.com" style={inputStyle} />
             </label>
-            <button type="submit" disabled={loading || !email.trim()} style={primaryButtonStyle(loading || !email.trim())}>
+            <button type="submit" disabled={loading || !email.trim()} className="qk-press" style={primaryButtonStyle(loading || !email.trim())}>
               {loading ? t('login.sending') : t('login.sendResetCode')}
             </button>
             <div style={{ marginTop: 16, fontSize: 13.5 }}>
@@ -299,7 +299,7 @@ export default function LoginPage() {
                 </button>
               </div>
             </label>
-            <button type="submit" disabled={loading || code.length < 6 || newPassword.length < 6} style={primaryButtonStyle(loading || code.length < 6 || newPassword.length < 6)}>
+            <button type="submit" disabled={loading || code.length < 6 || newPassword.length < 6} className="qk-press" style={primaryButtonStyle(loading || code.length < 6 || newPassword.length < 6)}>
               {loading ? t('login.resetting') : t('login.resetPasswordBtn')}
             </button>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16, fontSize: 13.5 }}>
@@ -314,8 +314,8 @@ export default function LoginPage() {
               <div style={{ marginBottom: 18 }}>
                 <span style={labelStyle}>{t('login.signInAs')}</span>
                 <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                  <button type="button" onClick={() => setRole('user')} style={{ flex: 1, padding: '11px', borderRadius: 12, fontFamily: 'inherit', fontWeight: 700, fontSize: 14, cursor: 'pointer', border: role === 'user' ? '1px solid #5B0F16' : '1px solid rgba(42,34,32,0.14)', background: role === 'user' ? '#5B0F16' : '#fff', color: role === 'user' ? '#fff' : '#2A2220' }}>{t('auth.roleGuest')}</button>
-                  <button type="button" onClick={() => setRole('host')} style={{ flex: 1, padding: '11px', borderRadius: 12, fontFamily: 'inherit', fontWeight: 700, fontSize: 14, cursor: 'pointer', border: role === 'host' ? '1px solid #5B0F16' : '1px solid rgba(42,34,32,0.14)', background: role === 'host' ? '#5B0F16' : '#fff', color: role === 'host' ? '#fff' : '#2A2220' }}>{t('auth.roleHost')}</button>
+                  <button type="button" onClick={() => setRole('user')} className="qk-tap" style={{ flex: 1, padding: '11px', borderRadius: 12, fontFamily: 'inherit', fontWeight: 700, fontSize: 14, cursor: 'pointer', border: role === 'user' ? '1px solid transparent' : '1px solid rgba(42,34,32,0.14)', background: role === 'user' ? 'linear-gradient(135deg,#5B0F16,#8a2530)' : '#fff', color: role === 'user' ? '#fff' : '#2A2220' }}>{t('auth.roleGuest')}</button>
+                  <button type="button" onClick={() => setRole('host')} className="qk-tap" style={{ flex: 1, padding: '11px', borderRadius: 12, fontFamily: 'inherit', fontWeight: 700, fontSize: 14, cursor: 'pointer', border: role === 'host' ? '1px solid transparent' : '1px solid rgba(42,34,32,0.14)', background: role === 'host' ? 'linear-gradient(135deg,#5B0F16,#8a2530)' : '#fff', color: role === 'host' ? '#fff' : '#2A2220' }}>{t('auth.roleHost')}</button>
                 </div>
               </div>
               <label style={{ display: 'block', marginBottom: 16 }}>
@@ -334,7 +334,7 @@ export default function LoginPage() {
                   </button>
                 </div>
               </label>
-              <button type="submit" disabled={loading} style={primaryButtonStyle(loading)}>
+              <button type="submit" disabled={loading} className={loading ? undefined : 'qk-press qk-pulse'} style={primaryButtonStyle(loading)}>
                 {loading ? t('login.signingIn') : t('login.signIn')}
               </button>
             </form>
@@ -394,9 +394,10 @@ const linkBtnStyle: React.CSSProperties = {
 
 function primaryButtonStyle(loading: boolean): React.CSSProperties {
   return {
-    width: '100%', fontFamily: FONT, fontSize: 16, fontWeight: 600, color: '#fff', background: COLORS.burgundy,
-    border: 'none', borderRadius: 20, padding: '13px 16px', cursor: loading ? 'not-allowed' : 'pointer',
+    width: '100%', fontFamily: FONT, fontSize: 16, fontWeight: 600, color: '#fff', background: 'linear-gradient(135deg,#5B0F16,#8a2530)',
+    border: 'none', borderRadius: 20, padding: '14px 16px', cursor: loading ? 'not-allowed' : 'pointer',
     opacity: loading ? 0.7 : 1, transition: 'opacity 0.15s ease',
+    boxShadow: loading ? 'none' : '0 10px 24px rgba(91,15,22,0.28)',
   }
 }
 

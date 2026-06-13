@@ -11,6 +11,7 @@ export const metadata: Metadata = {
 const C = {
   burgundy: '#5B0F16',
   cream: '#F6F1E6',
+  page: '#E4DECF',
   tan: '#EFE6D8',
   ink: '#2A2220',
   muted: '#6B6055',
@@ -63,7 +64,7 @@ function Card({ title, tag, children }: { title: string; tag?: string; children:
         background: C.white,
         borderRadius: 20,
         padding: '18px 20px',
-        boxShadow: '0 4px 18px rgba(42,34,32,0.07)',
+        boxShadow: '0 8px 22px rgba(42,34,32,0.08)',
         border: `1px solid ${C.tan}`,
       }}
     >
@@ -78,7 +79,7 @@ function Card({ title, tag, children }: { title: string; tag?: string; children:
 
 export default function PlanPage() {
   return (
-    <main style={{ minHeight: '100vh', background: C.cream, color: C.ink, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+    <main style={{ minHeight: '100vh', background: C.page, color: C.ink, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
       <style>{`
         .plan-wrap{max-width:1080px;margin:0 auto;padding:32px 22px 72px}
         .plan-tracks{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}

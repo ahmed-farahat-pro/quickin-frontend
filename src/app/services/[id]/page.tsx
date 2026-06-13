@@ -72,9 +72,11 @@ export async function generateMetadata({
 const COLORS = {
   burgundy: '#5B0F16',
   cream: '#F6F1E6',
+  page: '#E4DECF',
   tan: '#EFE6D8',
   ink: '#2A2220',
   muted: '#6B6055',
+  gold: '#B07A2A',
 }
 
 export default async function ServiceDetailPage({
@@ -92,7 +94,7 @@ export default async function ServiceDetailPage({
     <main
       style={{
         minHeight: '100vh',
-        background: COLORS.cream,
+        background: COLORS.page,
         color: COLORS.ink,
         fontFamily:
           '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif',
@@ -131,7 +133,7 @@ export default async function ServiceDetailPage({
           Back to Services
         </a>
 
-        {/* Hero */}
+        {/* Hero — slow Ken Burns drift + photo overlay. */}
         <div
           style={{
             position: 'relative',
@@ -140,20 +142,33 @@ export default async function ServiceDetailPage({
             borderRadius: 24,
             overflow: 'hidden',
             background: COLORS.tan,
-            boxShadow: '0 10px 36px rgba(42,34,32,0.12)',
+            boxShadow: '0 22px 48px rgba(42,34,32,0.18)',
           }}
         >
           {hero ? (
-            <img
-              src={hero}
-              alt={service.title}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                display: 'block',
-              }}
-            />
+            <>
+              <img
+                src={hero}
+                alt={service.title}
+                className="qk-kenburns"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  display: 'block',
+                }}
+              />
+              <span
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background:
+                    'linear-gradient(180deg, transparent 55%, rgba(42,34,32,0.45))',
+                  pointerEvents: 'none',
+                }}
+              />
+            </>
           ) : (
             <ImagePlaceholder iconSize={52} fontSize={15} />
           )}
@@ -166,7 +181,7 @@ export default async function ServiceDetailPage({
               style={{
                 display: 'inline-block',
                 background: COLORS.tan,
-                color: COLORS.burgundy,
+                color: COLORS.gold,
                 fontSize: 12,
                 fontWeight: 700,
                 padding: '5px 12px',
@@ -254,7 +269,7 @@ export default async function ServiceDetailPage({
               background: '#fff',
               borderRadius: 22,
               border: `1px solid rgba(42,34,32,0.06)`,
-              boxShadow: '0 8px 28px rgba(42,34,32,0.10)',
+              boxShadow: '0 22px 48px rgba(42,34,32,0.14)',
               padding: '24px 24px 26px',
               position: 'sticky',
               top: 24,

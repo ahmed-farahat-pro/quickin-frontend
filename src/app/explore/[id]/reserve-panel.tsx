@@ -238,19 +238,21 @@ export default function ReservePanel({
         type="button"
         onClick={handleReserve}
         disabled={!canReserve}
+        className={canReserve ? 'qk-press qk-pulse' : undefined}
         style={{
           marginTop: 18,
           width: '100%',
-          padding: '14px',
+          padding: '15px',
           fontSize: 16,
           fontWeight: 700,
           fontFamily: FONT,
           color: '#fff',
-          background: COLORS.burgundy,
+          background: 'linear-gradient(135deg,#5B0F16,#8a2530)',
           border: 'none',
-          borderRadius: 14,
+          borderRadius: 15,
           cursor: canReserve ? 'pointer' : 'not-allowed',
           opacity: canReserve ? 1 : 0.55,
+          boxShadow: canReserve ? '0 10px 24px rgba(91,15,22,0.28)' : 'none',
         }}
       >
         {status.kind === 'loading' ? t('reserve.reserving') : t('reserve.reserve')}
@@ -365,13 +367,14 @@ export default function ReservePanel({
                 ×
               </button>
 
-              {/* Burgundy "sent" badge */}
+              {/* Burgundy "sent" badge — pops in with a soft pulse ring. */}
               <div
+                className="qk-pop qk-pulse"
                 style={{
                   width: 64,
                   height: 64,
                   borderRadius: 32,
-                  background: COLORS.burgundy,
+                  background: 'linear-gradient(135deg,#5B0F16,#8a2530)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -446,15 +449,17 @@ export default function ReservePanel({
                 {status.reservationId ? (
                   <a
                     href={`/reservation/${status.reservationId}`}
+                    className="qk-press"
                     style={{
                       display: 'block',
                       padding: '13px',
                       borderRadius: 14,
-                      background: COLORS.burgundy,
+                      background: 'linear-gradient(135deg,#5B0F16,#8a2530)',
                       color: '#fff',
                       fontWeight: 700,
                       fontSize: 15,
                       textDecoration: 'none',
+                      boxShadow: '0 10px 24px rgba(91,15,22,0.28)',
                     }}
                   >
                     {t('reserve.viewReservation')}
@@ -463,16 +468,18 @@ export default function ReservePanel({
                   <button
                     type="button"
                     onClick={() => setStatus({ kind: 'idle' })}
+                    className="qk-press"
                     style={{
                       padding: '13px',
                       borderRadius: 14,
-                      background: COLORS.burgundy,
+                      background: 'linear-gradient(135deg,#5B0F16,#8a2530)',
                       color: '#fff',
                       fontWeight: 700,
                       fontSize: 15,
                       border: 'none',
                       cursor: 'pointer',
                       fontFamily: FONT,
+                      boxShadow: '0 10px 24px rgba(91,15,22,0.28)',
                     }}
                   >
                     {t('reserve.done')}

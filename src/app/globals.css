@@ -10,18 +10,39 @@
    ============================================================================= */
 
 :root {
-  /* QuickIn palette */
-  --background: #f6f1e6;
+  /* QuickIn palette — warm boutique (redesign) */
+  --background: #e4decf; /* page base cream */
+  --surface: #f6f1e6; /* cards / surfaces */
+  --surface-2: #faf6ee; /* row hover */
   --background-secondary: #efe6d8;
-  --foreground: #2b2b2b;
+  --foreground: #2a2220;
   --card: #ffffff;
   --primary: #5b0f16;
+  --primary-dark: #45070d;
+  --primary-light: #8a2530;
   --primary-foreground: #f6f1e6;
+  /* Gold accent — ratings, eyebrows, avatar rings, premium badges */
+  --gold: #b07a2a;
+  --gold-bright: #f3c969;
+  --gold-soft: #d8a55a;
+  --gold-deep: #8a5a00;
   --secondary: #efe6d8;
   --muted: #efe6d8;
-  --muted-foreground: #7a746a;
+  --muted-foreground: #6b6055;
+  --ink-muted: #6b6055;
   --border: #e2d8c8;
   --ring: #5b0f16;
+
+  /* Gradients (redesign) */
+  --grad-burgundy: linear-gradient(135deg, #5b0f16, #8a2530);
+  --grad-burgundy-deep: linear-gradient(180deg, #5b0f16, #45070d);
+  --grad-gold: linear-gradient(135deg, #b07a2a, #d8a55a);
+  --grad-tan: linear-gradient(135deg, #e7ddcb, #d8cdb8);
+
+  /* Shadows (redesign) */
+  --shadow-card: 0 8px 22px rgba(42, 34, 32, 0.1);
+  --shadow-card-hover: 0 22px 48px rgba(42, 34, 32, 0.18);
+  --shadow-btn: 0 10px 24px rgba(91, 15, 22, 0.28);
 
   /* Typography — next/font/google sets these vars in layout.tsx. The fallbacks
      also expose the literal family names used by the pages' inline styles. */
@@ -48,8 +69,8 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background-color: #f6f1e6;
-  color: #2b2b2b;
+  background-color: #e4decf;
+  color: #2a2220;
   font-family: var(--font-sans);
 }
 
@@ -121,3 +142,67 @@ button:disabled,
 .listing-popup-card .leaflet-popup-content {
   margin: 0 !important;
 }
+
+/* =============================================================================
+   ANIMATION KIT (redesign) — keyframes + interaction classes (verbatim spec)
+   ============================================================================= */
+@keyframes qkSwap { from { transform: translateX(14px); } to { transform: translateX(0); } }
+@keyframes qkOver { from { transform: translateX(34px); } to { transform: translateX(0); } }
+@keyframes qkZoom { from { transform: scale(1); } to { transform: scale(1.09); } }
+@keyframes qkPop { 0% { transform: scale(0.5); } 60% { transform: scale(1.1); } 100% { transform: scale(1); } }
+@keyframes qkDraw { from { stroke-dashoffset: 40; } to { stroke-dashoffset: 0; } }
+@keyframes qkSlideUp { from { transform: translateY(36px); } to { transform: translateY(0); } }
+@keyframes qkPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(91,15,22,0.30); } 50% { box-shadow: 0 0 0 10px rgba(91,15,22,0); } }
+.qk-screen { animation: qkSwap 0.42s cubic-bezier(0.22,1,0.36,1) both; }
+.qk-over { animation: qkOver 0.4s cubic-bezier(0.22,1,0.36,1) both; }
+.qk-card { transition: transform 0.4s cubic-bezier(0.22,1,0.36,1), box-shadow 0.4s ease; }
+.qk-card:hover { transform: translateY(-6px); box-shadow: 0 22px 48px rgba(42,34,32,0.18); }
+.qk-img-zoom { transition: transform 1.5s cubic-bezier(0.22,1,0.36,1); }
+.qk-card:hover .qk-img-zoom { transform: scale(1.07); }
+.qk-kenburns { animation: qkZoom 14s ease-in-out infinite alternate; }
+.qk-heart { transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+.qk-heart:hover { transform: scale(1.16); }
+.qk-press { transition: transform 0.22s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.3s ease, filter 0.2s ease; }
+.qk-press:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(91,15,22,0.3); }
+.qk-press:active { transform: scale(0.97); }
+.qk-tap { transition: transform 0.2s ease, background 0.25s ease; cursor: pointer; }
+.qk-tap:active { transform: scale(0.98); }
+.qk-chip { transition: transform 0.25s ease, background 0.3s ease, color 0.3s ease, border-color 0.3s ease; cursor: pointer; }
+.qk-chip:hover { transform: translateY(-2px); }
+.qk-row { transition: background 0.25s ease; cursor: pointer; }
+.qk-row:hover { background: #faf6ee; }
+
+/* Pulsing CTA ring — applied to primary call-to-action buttons. */
+.qk-pulse { animation: qkPulse 2.4s ease-out infinite; }
+/* Pop-in for badges / hearts / confirmed checks. */
+.qk-pop { animation: qkPop 0.6s cubic-bezier(0.34,1.56,0.64,1) both; }
+
+/* Respect reduced-motion preferences — keep transforms/transitions calm. */
+@media (prefers-reduced-motion: reduce) {
+  .qk-kenburns,
+  .qk-pulse,
+  .qk-pop,
+  .qk-screen,
+  .qk-over { animation: none !important; }
+  .qk-card,
+  .qk-img-zoom,
+  .qk-heart,
+  .qk-press,
+  .qk-tap,
+  .qk-chip { transition: none !important; }
+}
+
+/* -----------------------------------------------------------------------------
+   RTL-SAFE HELPERS
+   The i18n layer flips <html dir="rtl"> for Arabic. The qk-screen / qk-over
+   enter animations slide in from the inline-end; mirror their X translate under
+   RTL so content still flies in from the correct edge. Other classes are
+   transform-symmetric (scale / translateY) and need no mirroring.
+   ----------------------------------------------------------------------------- */
+[dir='rtl'] .qk-screen { animation-name: qkSwapRtl; }
+[dir='rtl'] .qk-over { animation-name: qkOverRtl; }
+@keyframes qkSwapRtl { from { transform: translateX(-14px); } to { transform: translateX(0); } }
+@keyframes qkOverRtl { from { transform: translateX(-34px); } to { transform: translateX(0); } }
+
+/* Gold star used for ratings (kept crisp regardless of UI lang). */
+.qk-star { color: #b07a2a; }

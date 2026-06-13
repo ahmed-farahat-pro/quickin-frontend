@@ -38,10 +38,17 @@ const ListingsMap = dynamic(() => import('./listings-map'), {
 const COLORS = {
   burgundy: '#5B0F16',
   cream: '#F6F1E6',
+  page: '#E4DECF',
   tan: '#EFE6D8',
   ink: '#2A2220',
   muted: '#6B6055',
+  gold: '#B07A2A',
 }
+
+const GRAD_BURGUNDY = 'linear-gradient(135deg,#5B0F16,#8a2530)'
+// A warm boutique cover used as the hero Ken Burns backdrop.
+const HERO_COVER =
+  'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1600&q=70'
 
 const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
 const SERIF = '"Playfair Display", Georgia, "Times New Roman", serif'
@@ -269,10 +276,57 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
         }
       `}</style>
 
-      {/* Hero + Search bar */}
-      <section style={{ background: COLORS.cream, padding: '52px 24px 16px' }}>
-        <div style={{ maxWidth: 1080, margin: '0 auto', textAlign: 'center' }}>
-          {/* Eyebrow */}
+      {/* Hero + Search bar — Ken Burns cover behind a soft cream wash. */}
+      <section
+        style={{
+          position: 'relative',
+          overflow: 'hidden',
+          background: COLORS.page,
+          padding: '64px 24px 22px',
+        }}
+      >
+        {/* Ken Burns backdrop */}
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 0,
+            overflow: 'hidden',
+          }}
+        >
+          <div
+            className="qk-kenburns"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: `url(${HERO_COVER})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              opacity: 0.22,
+            }}
+          />
+          {/* Cream wash so text + the search pill stay legible. */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background:
+                'linear-gradient(180deg, rgba(228,222,207,0.72) 0%, rgba(228,222,207,0.86) 55%, #E4DECF 100%)',
+            }}
+          />
+        </div>
+
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 1,
+            maxWidth: 1080,
+            margin: '0 auto',
+            textAlign: 'center',
+          }}
+        >
+          {/* Eyebrow — gold, uppercase, wide tracking ("North Coast · Egypt" style) */}
           <p
             style={{
               margin: 0,
@@ -280,7 +334,7 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
               fontWeight: 700,
               letterSpacing: '0.22em',
               textTransform: 'uppercase',
-              color: COLORS.burgundy,
+              color: COLORS.gold,
             }}
           >
             {t('explore.eyebrow')}
@@ -329,7 +383,7 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
               background: '#fff',
               borderRadius: 999,
               border: '1px solid rgba(42,34,32,0.08)',
-              boxShadow: '0 14px 40px rgba(42,34,32,0.12)',
+              boxShadow: '0 22px 48px rgba(42,34,32,0.16)',
               padding: 8,
               textAlign: 'left',
             }}
@@ -466,7 +520,7 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
                 type="button"
                 onClick={submitSearch}
                 aria-label={t('explore.search')}
-                className="qk-pill-search-btn"
+                className="qk-pill-search-btn qk-press"
                 style={{
                   height: 56,
                   minWidth: 56,
@@ -477,13 +531,13 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
                   gap: 8,
                   borderRadius: 999,
                   border: 'none',
-                  background: COLORS.burgundy,
+                  background: GRAD_BURGUNDY,
                   color: '#fff',
                   fontFamily: FONT,
                   fontSize: 15,
                   fontWeight: 700,
                   cursor: 'pointer',
-                  boxShadow: '0 6px 16px rgba(91,15,22,0.30)',
+                  boxShadow: '0 10px 24px rgba(91,15,22,0.28)',
                   whiteSpace: 'nowrap',
                 }}
               >
@@ -550,7 +604,7 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
       </section>
 
       {/* Sort + price filter row */}
-      <section style={{ background: COLORS.cream, padding: '20px 24px 0' }}>
+      <section style={{ background: COLORS.page, padding: '20px 24px 0' }}>
         <div
           className="qk-controls-row"
           style={{
@@ -632,7 +686,7 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
       </section>
 
       {/* Status row: result count + searching indicator + clear + List/Map toggle */}
-      <section style={{ background: COLORS.cream, padding: '18px 24px 4px' }}>
+      <section style={{ background: COLORS.page, padding: '18px 24px 4px' }}>
         <div
           style={{
             maxWidth: 1200,
@@ -775,10 +829,11 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
             <button
               type="button"
               onClick={clearAll}
+              className="qk-press"
               style={{
                 display: 'inline-block',
                 color: '#fff',
-                background: COLORS.burgundy,
+                background: GRAD_BURGUNDY,
                 border: 'none',
                 fontFamily: FONT,
                 fontSize: 15,
@@ -786,6 +841,7 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
                 padding: '10px 22px',
                 borderRadius: 999,
                 cursor: 'pointer',
+                boxShadow: '0 10px 24px rgba(91,15,22,0.28)',
               }}
             >
               {t('explore.clearFilters')}
@@ -818,6 +874,7 @@ function ListingCard({ listing }: { listing: Listing }) {
   return (
     <a
       href={`/explore/${listing.id}`}
+      className="qk-card"
       style={{
         display: 'block',
         background: '#fff',
@@ -825,7 +882,7 @@ function ListingCard({ listing }: { listing: Listing }) {
         overflow: 'hidden',
         textDecoration: 'none',
         color: 'inherit',
-        boxShadow: '0 6px 24px rgba(42,34,32,0.08)',
+        boxShadow: '0 8px 22px rgba(42,34,32,0.10)',
         border: '1px solid rgba(42,34,32,0.05)',
         cursor: 'pointer',
       }}
@@ -846,6 +903,7 @@ function ListingCard({ listing }: { listing: Listing }) {
             src={cover}
             alt={listing.title}
             loading="lazy"
+            className="qk-img-zoom"
             style={{
               width: '100%',
               height: '100%',
@@ -857,26 +915,39 @@ function ListingCard({ listing }: { listing: Listing }) {
           <ImagePlaceholder />
         )}
 
-        {/* Heart */}
+        {/* Photo legibility overlay */}
         <span
           aria-hidden="true"
           style={{
             position: 'absolute',
+            inset: 0,
+            background:
+              'linear-gradient(180deg, transparent 45%, rgba(42,34,32,0.6))',
+            pointerEvents: 'none',
+          }}
+        />
+
+        {/* Heart — pop-in + springy hover */}
+        <span
+          aria-hidden="true"
+          className="qk-heart qk-pop"
+          style={{
+            position: 'absolute',
             top: 12,
-            right: 12,
-            width: 34,
-            height: 34,
+            insetInlineEnd: 12,
+            width: 36,
+            height: 36,
             borderRadius: 999,
             background: 'rgba(255,255,255,0.92)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 2px 8px rgba(42,34,32,0.18)',
+            boxShadow: '0 4px 12px rgba(42,34,32,0.16)',
           }}
         >
           <svg
-            width="17"
-            height="17"
+            width="18"
+            height="18"
             viewBox="0 0 24 24"
             fill="none"
             stroke={COLORS.burgundy}
@@ -891,21 +962,28 @@ function ListingCard({ listing }: { listing: Listing }) {
 
         {listing.is_guest_favorite && (
           <span
+            className="qk-pop"
             style={{
               position: 'absolute',
               top: 14,
-              left: 14,
+              insetInlineStart: 14,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
               background: 'rgba(255,255,255,0.94)',
-              color: COLORS.burgundy,
+              color: COLORS.ink,
               fontSize: 12,
-              fontWeight: 600,
+              fontWeight: 700,
               letterSpacing: '0.01em',
               padding: '6px 12px',
               borderRadius: 999,
-              boxShadow: '0 2px 8px rgba(42,34,32,0.14)',
+              boxShadow: '0 4px 12px rgba(42,34,32,0.16)',
             }}
           >
-            ★ {t('listing.guestFavorite')}
+            <span className="qk-star" aria-hidden="true">
+              ★
+            </span>{' '}
+            {t('listing.guestFavorite')}
           </span>
         )}
       </div>
@@ -943,7 +1021,7 @@ function ListingCard({ listing }: { listing: Listing }) {
                 color: COLORS.ink,
               }}
             >
-              <span style={{ color: COLORS.burgundy }}>★</span> 5.0
+              <span className="qk-star">★</span> 5.0
             </span>
           )}
         </div>
@@ -1064,6 +1142,7 @@ function ToggleButton({
       role={role}
       aria-selected={active}
       onClick={onClick}
+      className="qk-tap"
       style={{
         appearance: 'none',
         border: 'none',
@@ -1074,7 +1153,7 @@ function ToggleButton({
         padding: '8px 20px',
         borderRadius: 999,
         color: active ? '#fff' : COLORS.ink,
-        background: active ? COLORS.burgundy : 'transparent',
+        background: active ? GRAD_BURGUNDY : 'transparent',
         transition: 'background 0.15s ease, color 0.15s ease',
         whiteSpace: 'nowrap',
       }}
@@ -1102,6 +1181,7 @@ function RegionChip({
       type="button"
       aria-pressed={active}
       onClick={onClick}
+      className="qk-chip"
       style={{
         appearance: 'none',
         cursor: 'pointer',
@@ -1112,19 +1192,20 @@ function RegionChip({
         borderRadius: 999,
         whiteSpace: 'nowrap',
         color: active ? '#fff' : COLORS.ink,
-        background: active ? COLORS.burgundy : '#fff',
+        background: active ? GRAD_BURGUNDY : '#fff',
         border: active
-          ? `1px solid ${COLORS.burgundy}`
+          ? '1px solid transparent'
           : '1px solid rgba(42,34,32,0.14)',
-        boxShadow: '0 2px 8px rgba(42,34,32,0.06)',
-        transition: 'background 0.12s ease, color 0.12s ease',
+        boxShadow: active
+          ? '0 8px 20px rgba(91,15,22,0.22)'
+          : '0 2px 8px rgba(42,34,32,0.06)',
       }}
     >
       {label}
       {typeof count === 'number' && (
         <span
           style={{
-            marginLeft: 7,
+            marginInlineStart: 7,
             fontWeight: 700,
             color: active ? 'rgba(255,255,255,0.85)' : COLORS.muted,
           }}

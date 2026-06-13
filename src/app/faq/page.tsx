@@ -13,8 +13,10 @@ export const metadata: Metadata = {
 const COLORS = {
   burgundy: '#5B0F16',
   cream: '#F6F1E6',
+  page: '#E4DECF',
   ink: '#2A2220',
   muted: '#6B6055',
+  gold: '#B07A2A',
 }
 
 // Edit answers here — they feed BOTH the visible page and the JSON-LD.
@@ -62,7 +64,7 @@ export default function FaqPage() {
     <main
       style={{
         minHeight: '100vh',
-        background: COLORS.cream,
+        background: COLORS.page,
         color: COLORS.ink,
         fontFamily: '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif',
         padding: '56px 24px 80px',
@@ -83,7 +85,7 @@ export default function FaqPage() {
             fontWeight: 700,
             letterSpacing: '0.22em',
             textTransform: 'uppercase',
-            color: COLORS.burgundy,
+            color: COLORS.gold,
           }}
         >
           QuickIn
@@ -107,11 +109,12 @@ export default function FaqPage() {
           {FAQS.map((item) => (
             <section
               key={item.q}
+              className="qk-card"
               style={{
                 background: '#fff',
                 borderRadius: 18,
                 padding: '20px 22px',
-                boxShadow: '0 6px 24px rgba(42,34,32,0.06)',
+                boxShadow: '0 8px 22px rgba(42,34,32,0.08)',
                 border: '1px solid rgba(42,34,32,0.05)',
               }}
             >
