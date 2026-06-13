@@ -137,22 +137,18 @@ export default async function ExplorePage({
             />
           </a>
 
-          {/* Right side: role-aware host link + auth (rendered client-side by
-              AuthArea, which reads the persisted user/role from localStorage). */}
+          {/* Role-aware primary nav + auth (rendered client-side by AuthArea,
+              which reads the persisted user/role from localStorage and swaps
+              the guest links for the host dashboard links). */}
           <nav
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 18,
               fontSize: 14,
+              flexWrap: 'wrap',
             }}
           >
-            <a
-              href="/services"
-              style={{ color: COLORS.ink, textDecoration: 'none', fontWeight: 600 }}
-            >
-              Services
-            </a>
             <AuthArea />
           </nav>
         </div>

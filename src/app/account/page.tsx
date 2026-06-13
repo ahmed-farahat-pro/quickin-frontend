@@ -302,14 +302,9 @@ export default function AccountPage() {
               alignItems: 'center',
               gap: 18,
               fontSize: 14,
+              flexWrap: 'wrap',
             }}
           >
-            <a
-              href="/services"
-              style={{ color: COLORS.ink, textDecoration: 'none', fontWeight: 600 }}
-            >
-              Services
-            </a>
             <AuthArea />
           </nav>
         </div>

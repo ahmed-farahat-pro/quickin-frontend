@@ -1,9 +1,16 @@
 'use client'
 
-// Client-side auth state for the explore header. Reads the user persisted in
-// localStorage (qk_user) after login/signup. Shows a greeting + Logout when
-// signed in, otherwise Log in / Sign up links. No cookies — the token lives in
-// localStorage so the UI can talk to a backend on another domain.
+// Client-side PRIMARY NAVIGATION + auth state for the site header.
+// Reads the user persisted in localStorage (qk_user) after login/signup and
+// renders ROLE-AWARE links:
+//   • guest (role 'user' / signed-out): Explore · Services · Trips · Account
+//     (+ "Become a host" and Log in / Sign up when anonymous)
+//   • host / admin:                     Listings · Reservations · Services · Profile
+//     (host links deep-link into the /host dashboard sections; Profile → /account)
+//   • admin also gets an extra "Admin" link.
+// No cookies — the token lives in localStorage so the UI can talk to a backend
+// on another domain. This component owns the whole <nav> link set; pages render
+// it as the single child of their header <nav>.
 import { useEffect, useState } from 'react'
 import NotificationBell from './notification-bell'
 
@@ -28,6 +35,17 @@ function firstNameOf(user: StoredUser | null): string | null {
     (user.email ? user.email.split('@')[0] : '')
   if (!raw) return null
   return raw.split(' ')[0]
+}
+
+// Shared link styling. `active` (burgundy + bolder) marks the host's primary
+// actions so the host nav reads as a small dashboard menu.
+function linkStyle(active = false): React.CSSProperties {
+  return {
+    color: active ? COLORS.burgundy : COLORS.ink,
+    textDecoration: 'none',
+    fontWeight: active ? 700 : 600,
+    whiteSpace: 'nowrap',
+  }
 }
 
 export default function AuthArea() {
@@ -58,46 +76,75 @@ export default function AuthArea() {
   const firstName = firstNameOf(user)
   const role = (user?.role || '').toLowerCase()
   const isHost = role === 'host' || role === 'admin'
+  const isAdmin = role === 'admin'
+  const signedIn = ready && !!firstName
 
-  // Role-aware nav link: signed-in hosts/admins get a "Host" link to the
-  // dashboard; everyone else gets "Become a host" → signup. Only shown once
-  // mounted, so the initial server/client markup stays stable.
-  const hostLink = ready ? (
-    <a
-      href={isHost ? '/host' : '/signup'}
-      style={{
-        color: COLORS.ink,
-        textDecoration: 'none',
-        fontWeight: 600,
-      }}
-    >
-      {isHost ? 'Host' : 'Become a host'}
-    </a>
-  ) : null
-
-  // Until mounted, render the logged-out links so the markup is stable.
-  if (ready && firstName) {
-    return (
+  // ---- Primary links (role-aware) -----------------------------------------
+  // Until mounted we render the GUEST link set so the server/client markup
+  // stays stable (no hydration mismatch); the role-specific set swaps in after
+  // the effect reads localStorage.
+  const primaryLinks =
+    signedIn && isHost ? (
+      // HOST / ADMIN: the /host dashboard combines listings + reservation
+      // requests + services in one page, so these deep-link to its sections.
       <>
-        {hostLink}
-        <a
-          href="/reservations"
-          style={{ color: COLORS.ink, textDecoration: 'none', fontWeight: 600 }}
-        >
+        <a href="/host#listings" style={linkStyle(true)}>
+          Listings
+        </a>
+        <a href="/host#reservations" style={linkStyle()}>
           Reservations
         </a>
-        <a
-          href="/subscriptions"
-          style={{ color: COLORS.ink, textDecoration: 'none', fontWeight: 600 }}
-        >
-          Subscriptions
+        <a href="/host#services" style={linkStyle()}>
+          Services
         </a>
-        <a
-          href="/account"
-          style={{ color: COLORS.ink, textDecoration: 'none', fontWeight: 600 }}
-        >
-          Account
+        <a href="/account" style={linkStyle()}>
+          Profile
         </a>
+        {isAdmin && (
+          <a href="/admin" style={linkStyle()}>
+            Admin
+          </a>
+        )}
+      </>
+    ) : (
+      // GUEST (signed-in 'user' or anonymous): the public browse/trip nav.
+      <>
+        <a href="/explore" style={linkStyle()}>
+          Explore
+        </a>
+        <a href="/services" style={linkStyle()}>
+          Services
+        </a>
+        {signedIn && (
+          <a href="/reservations" style={linkStyle()}>
+            Trips
+          </a>
+        )}
+        {signedIn && (
+          <a href="/subscriptions" style={linkStyle()}>
+            Subscriptions
+          </a>
+        )}
+        {signedIn && (
+          <a href="/account" style={linkStyle()}>
+            Account
+          </a>
+        )}
+        {/* Guests get the conversion CTA; only shown once mounted so the
+            initial markup is stable. */}
+        {ready && (
+          <a href="/signup" style={{ ...linkStyle(), fontWeight: 600 }}>
+            Become a host
+          </a>
+        )}
+      </>
+    )
+
+  // ---- Right side: notifications + greeting/logout OR log in / sign up -----
+  if (signedIn) {
+    return (
+      <>
+        {primaryLinks}
         <NotificationBell />
         <span style={{ color: COLORS.ink, fontWeight: 600 }}>
           Hi, {firstName}
@@ -125,15 +172,8 @@ export default function AuthArea() {
 
   return (
     <>
-      {hostLink}
-      <a
-        href="/login"
-        style={{
-          color: COLORS.ink,
-          textDecoration: 'none',
-          fontWeight: 600,
-        }}
-      >
+      {primaryLinks}
+      <a href="/login" style={linkStyle()}>
         Log in
       </a>
       <a

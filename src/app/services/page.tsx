@@ -112,20 +112,9 @@ export default async function ServicesPage() {
               alignItems: 'center',
               gap: 18,
               fontSize: 14,
+              flexWrap: 'wrap',
             }}
           >
-            <a
-              href="/explore"
-              style={{ color: COLORS.ink, textDecoration: 'none', fontWeight: 600 }}
-            >
-              Explore
-            </a>
-            <a
-              href="/services"
-              style={{ color: COLORS.burgundy, textDecoration: 'none', fontWeight: 700 }}
-            >
-              Services
-            </a>
             <AuthArea />
           </nav>
         </div>

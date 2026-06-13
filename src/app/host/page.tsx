@@ -20,12 +20,9 @@ import {
 import BookingChat from '@/app/_components/booking-chat'
 import ImagePlaceholder from '@/app/_components/image-placeholder'
 
-// Inlined at build time by Next. When set, the add-listing form shows a Google
-// Maps pin-picker; when empty we silently fall back to the manual lat/lng
-// inputs only. Client-only (touches window) -> dynamic import with ssr:false,
-// mirroring how the explore page loads its map.
-const GOOGLE_MAPS_API_KEY =
-  process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 'AIzaSyBigDJt5v66YrCqY-kd-V7AdU8fJl3N5_I'
+// Leaflet + OpenStreetMap pin-picker for the location step. Client-only (Leaflet
+// touches window) -> dynamic import with ssr:false, mirroring how the explore
+// page loads its map. Needs no API key.
 const LocationPicker = dynamic(() => import('./location-picker'), {
   ssr: false,
 })
@@ -890,27 +887,20 @@ export default function HostPage() {
                 Search for a place to jump there, then tap the map to drop the
                 pin — drag it to fine-tune the exact spot.
               </p>
-              {GOOGLE_MAPS_API_KEY ? (
-                <LocationPicker
-                  apiKey={GOOGLE_MAPS_API_KEY}
-                  value={pickedCoords}
-                  onPick={(lat, lng) =>
-                    patch({ lat: lat.toFixed(6), lng: lng.toFixed(6) })
-                  }
-                  onPlace={(p) =>
-                    patch({
-                      location: p.location || form.location,
-                      country: p.country || form.country,
-                      lat: p.lat.toFixed(6),
-                      lng: p.lng.toFixed(6),
-                    })
-                  }
-                />
-              ) : (
-                <p style={{ margin: 0, fontSize: 14, color: COLORS.muted }}>
-                  Map unavailable — enter coordinates below.
-                </p>
-              )}
+              <LocationPicker
+                value={pickedCoords}
+                onPick={(lat, lng) =>
+                  patch({ lat: lat.toFixed(6), lng: lng.toFixed(6) })
+                }
+                onPlace={(p) =>
+                  patch({
+                    location: p.location || form.location,
+                    country: p.country || form.country,
+                    lat: p.lat.toFixed(6),
+                    lng: p.lng.toFixed(6),
+                  })
+                }
+              />
 
               <p
                 style={{
@@ -976,42 +966,30 @@ export default function HostPage() {
                 gap: 16,
               }}
             >
-              <Field label="Guests">
-                <input
-                  style={inputStyle}
-                  type="number"
-                  min={1}
-                  value={form.max_guests}
-                  onChange={(e) => patch({ max_guests: e.target.value })}
-                />
-              </Field>
-              <Field label="Bedrooms">
-                <input
-                  style={inputStyle}
-                  type="number"
-                  min={0}
-                  value={form.bedrooms}
-                  onChange={(e) => patch({ bedrooms: e.target.value })}
-                />
-              </Field>
-              <Field label="Beds">
-                <input
-                  style={inputStyle}
-                  type="number"
-                  min={0}
-                  value={form.beds}
-                  onChange={(e) => patch({ beds: e.target.value })}
-                />
-              </Field>
-              <Field label="Bathrooms">
-                <input
-                  style={inputStyle}
-                  type="number"
-                  min={0}
-                  value={form.bathrooms}
-                  onChange={(e) => patch({ bathrooms: e.target.value })}
-                />
-              </Field>
+              <Stepper
+                label="Guests"
+                value={form.max_guests}
+                min={1}
+                onChange={(v) => patch({ max_guests: v })}
+              />
+              <Stepper
+                label="Bedrooms"
+                value={form.bedrooms}
+                min={0}
+                onChange={(v) => patch({ bedrooms: v })}
+              />
+              <Stepper
+                label="Beds"
+                value={form.beds}
+                min={0}
+                onChange={(v) => patch({ beds: v })}
+              />
+              <Stepper
+                label="Bathrooms"
+                value={form.bathrooms}
+                min={0}
+                onChange={(v) => patch({ bathrooms: v })}
+              />
               <Field className="qk-host-form-full" label="Price / night (EGP)">
                 <input
                   style={inputStyle}
@@ -1325,7 +1303,7 @@ export default function HostPage() {
       </Section>
 
       {/* b) Your listings ----------------------------------------------------- */}
-      <Section title="Your listings">
+      <Section title="Your listings" id="listings">
         {listingsLoading ? (
           <Muted>Loading your listings…</Muted>
         ) : listingsError ? (
@@ -1419,7 +1397,7 @@ export default function HostPage() {
       </Section>
 
       {/* c) Reservation requests --------------------------------------------- */}
-      <Section title="Reservation requests">
+      <Section title="Reservation requests" id="reservations">
         {bookingsLoading ? (
           <Muted>Loading reservation requests…</Muted>
         ) : bookingsError ? (
@@ -1750,7 +1728,7 @@ export default function HostPage() {
       </Section>
 
       {/* e) Your services ----------------------------------------------------- */}
-      <Section title="Your services">
+      <Section title="Your services" id="services">
         {servicesLoading ? (
           <Muted>Loading your services…</Muted>
         ) : servicesError ? (
@@ -2102,13 +2080,19 @@ function Shell({ children }: { children: React.ReactNode }) {
 
 function Section({
   title,
+  id,
   children,
 }: {
   title: string
+  // Optional anchor target so the role-aware host nav can deep-link to a
+  // section (e.g. /host#reservations). scroll-margin-top keeps the heading
+  // clear of the sticky-ish header when jumped to.
+  id?: string
   children: React.ReactNode
 }) {
   return (
     <div
+      id={id}
       style={{
         background: '#fff',
         borderRadius: 22,
@@ -2116,6 +2100,7 @@ function Section({
         boxShadow: '0 6px 24px rgba(42,34,32,0.06)',
         padding: '24px 24px 26px',
         marginBottom: 24,
+        scrollMarginTop: 90,
       }}
     >
       <h2
@@ -2152,6 +2137,104 @@ function Field({
 
 function Muted({ children }: { children: React.ReactNode }) {
   return <p style={{ margin: 0, fontSize: 14, color: COLORS.muted }}>{children}</p>
+}
+
+// A labelled +/- number stepper for the add-listing "Details" step (guests,
+// bedrooms, beds, bathrooms). The CURRENT VALUE renders between the two round
+// buttons; tapping − / + steps it within [min, max]. The value is kept as a
+// string in the parent form state (so it serializes straight into the POST
+// body), so we parse → clamp → write back a string on every change. A NaN /
+// blank value is treated as `min` so the control can never get stuck empty.
+function Stepper({
+  label,
+  value,
+  min = 0,
+  max = 50,
+  onChange,
+}: {
+  label: string
+  value: string
+  min?: number
+  max?: number
+  onChange: (next: string) => void
+}) {
+  const current = Number(value)
+  const n = Number.isFinite(current) ? current : min
+  const clamp = (x: number) => Math.max(min, Math.min(max, x))
+  const set = (x: number) => onChange(String(clamp(x)))
+
+  const btn = (disabled: boolean): React.CSSProperties => ({
+    flex: '0 0 auto',
+    width: 40,
+    height: 40,
+    borderRadius: '50%',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: 22,
+    lineHeight: 1,
+    fontWeight: 700,
+    fontFamily: FONT,
+    color: disabled ? 'rgba(91,15,22,0.35)' : COLORS.burgundy,
+    background: '#fff',
+    border: `1px solid ${disabled ? 'rgba(91,15,22,0.25)' : COLORS.burgundy}`,
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    userSelect: 'none',
+    padding: 0,
+  })
+
+  const atMin = n <= min
+  const atMax = n >= max
+
+  return (
+    <div>
+      <span style={labelStyle}>{label}</span>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          padding: '6px 10px',
+          background: '#fff',
+          border: '1px solid rgba(42,34,32,0.14)',
+          borderRadius: 14,
+        }}
+      >
+        <button
+          type="button"
+          aria-label={`Decrease ${label.toLowerCase()}`}
+          onClick={() => set(n - 1)}
+          disabled={atMin}
+          style={btn(atMin)}
+        >
+          −
+        </button>
+        <span
+          aria-live="polite"
+          style={{
+            minWidth: 28,
+            textAlign: 'center',
+            fontSize: 18,
+            fontWeight: 700,
+            color: COLORS.ink,
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          {clamp(n)}
+        </span>
+        <button
+          type="button"
+          aria-label={`Increase ${label.toLowerCase()}`}
+          onClick={() => set(n + 1)}
+          disabled={atMax}
+          style={btn(atMax)}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  )
 }
 
 function RetryRow({ label, onRetry }: { label: string; onRetry: () => void }) {
