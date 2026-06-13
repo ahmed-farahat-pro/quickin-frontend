@@ -111,14 +111,15 @@ function StatusBadge({ status }: { status: string }) {
 
 const PROPERTY_TYPES = [
   'Apartment',
-  'House',
   'Villa',
+  'House',
+  'Chalet',
   'Cabin',
-  'Loft',
-  'Cottage',
-  'Studio',
-  'Guesthouse',
+  'Guest House',
 ]
+
+// Add-listing wizard step labels (index 0..3).
+const WIZARD_STEPS = ['Basics', 'Location', 'Details', 'Photos & review']
 
 interface FormState {
   title: string
@@ -194,8 +195,9 @@ type Gate =
 export default function HostPage() {
   const [gate, setGate] = useState<Gate>({ kind: 'checking' })
 
-  // Form
+  // Add-listing wizard
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
+  const [step, setStep] = useState(0) // 0..3
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [formOk, setFormOk] = useState<string | null>(null)
@@ -213,6 +215,47 @@ export default function HostPage() {
     Number.isFinite(lngNum)
       ? { lat: latNum, lng: lngNum }
       : null
+
+  // Assembled image list (slots 1..3, trimmed, non-empty) — used by the review
+  // card on step 4 and as the POST body's `images`.
+  const imageList = [form.image1, form.image2, form.image3]
+    .map((u) => u.trim())
+    .filter(Boolean)
+
+  // Return an error string for the current wizard step's required fields, or
+  // null when the step is complete enough to advance.
+  function validateStep(s: number): string | null {
+    if (s === 0) {
+      if (!form.title.trim()) return 'Please give your place a title.'
+      return null
+    }
+    if (s === 1) {
+      if (!pickedCoords) return 'Drop a pin on the map to set the location.'
+      return null
+    }
+    if (s === 2) {
+      if (!(Number(form.price_per_night) > 0))
+        return 'Enter a price per night greater than 0.'
+      return null
+    }
+    return null
+  }
+
+  function goNext() {
+    const err = validateStep(step)
+    if (err) {
+      setFormError(err)
+      return
+    }
+    setFormError(null)
+    setStep((s) => Math.min(s + 1, WIZARD_STEPS.length - 1))
+  }
+
+  function goBack() {
+    setFormError(null)
+    setFormOk(null)
+    setStep((s) => Math.max(s - 1, 0))
+  }
 
   // Listings
   const [listings, setListings] = useState<Listing[]>([])
@@ -368,8 +411,8 @@ export default function HostPage() {
       .filter(Boolean)
 
     const price = Number(form.price_per_night)
-    if (!form.title.trim() || !form.location.trim() || !(price > 0)) {
-      setFormError('Title, location and a price greater than 0 are required.')
+    if (!form.title.trim() || !(price > 0)) {
+      setFormError('A title and a price greater than 0 are required.')
       return
     }
 
@@ -416,6 +459,7 @@ export default function HostPage() {
       }
 
       setForm(EMPTY_FORM)
+      setStep(0)
       setFormOk('Listing published. It now appears in “Your listings” below.')
       loadListings()
     } catch {
@@ -629,6 +673,9 @@ export default function HostPage() {
           .qk-host-form-grid { grid-template-columns: 1fr 1fr !important; }
           .qk-host-form-full { grid-column: 1 / -1 !important; }
         }
+        @media (max-width: 560px) {
+          .qk-host-step-label { display: none !important; }
+        }
         @media (max-width: 460px) {
           .qk-host-form-grid { grid-template-columns: 1fr !important; }
           .qk-host-req-card { grid-template-columns: 1fr !important; }
@@ -654,209 +701,375 @@ export default function HostPage() {
 
       {/* a) Add a listing ----------------------------------------------------- */}
       <Section title="Add a listing">
-        <form onSubmit={handleCreate}>
-          <div
-            className="qk-host-form-grid"
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: 16,
-            }}
-          >
-            <Field className="qk-host-form-full" label="Title">
-              <input
-                style={inputStyle}
-                value={form.title}
-                onChange={(e) => patch({ title: e.target.value })}
-                placeholder="Lakeside cabin with a view"
-                required
-              />
-            </Field>
-
-            <Field className="qk-host-form-full" label="Description">
-              <textarea
-                style={{ ...inputStyle, minHeight: 84, resize: 'vertical' }}
-                value={form.description}
-                onChange={(e) => patch({ description: e.target.value })}
-                placeholder="What makes this place special?"
-              />
-            </Field>
-
-            <Field label="Location">
-              <input
-                style={inputStyle}
-                value={form.location}
-                onChange={(e) => patch({ location: e.target.value })}
-                placeholder="Aspen, Colorado"
-                required
-              />
-            </Field>
-            <Field label="Country">
-              <input
-                style={inputStyle}
-                value={form.country}
-                onChange={(e) => patch({ country: e.target.value })}
-                placeholder="United States"
-              />
-            </Field>
-            <Field label="Price / night (USD)">
-              <input
-                style={inputStyle}
-                type="number"
-                min={1}
-                value={form.price_per_night}
-                onChange={(e) => patch({ price_per_night: e.target.value })}
-                placeholder="180"
-                required
-              />
-            </Field>
-
-            <Field label="Max guests">
-              <input
-                style={inputStyle}
-                type="number"
-                min={1}
-                value={form.max_guests}
-                onChange={(e) => patch({ max_guests: e.target.value })}
-              />
-            </Field>
-            <Field label="Bedrooms">
-              <input
-                style={inputStyle}
-                type="number"
-                min={0}
-                value={form.bedrooms}
-                onChange={(e) => patch({ bedrooms: e.target.value })}
-              />
-            </Field>
-            <Field label="Beds">
-              <input
-                style={inputStyle}
-                type="number"
-                min={0}
-                value={form.beds}
-                onChange={(e) => patch({ beds: e.target.value })}
-              />
-            </Field>
-
-            <Field label="Bathrooms">
-              <input
-                style={inputStyle}
-                type="number"
-                min={0}
-                value={form.bathrooms}
-                onChange={(e) => patch({ bathrooms: e.target.value })}
-              />
-            </Field>
-            <Field label="Property type">
-              <select
-                style={{ ...inputStyle, appearance: 'auto' }}
-                value={form.property_type}
-                onChange={(e) => patch({ property_type: e.target.value })}
+        {/* Step indicator -------------------------------------------------- */}
+        <ol
+          className="qk-host-steps"
+          style={{
+            listStyle: 'none',
+            margin: '0 0 24px',
+            padding: 0,
+            display: 'grid',
+            gridTemplateColumns: `repeat(${WIZARD_STEPS.length}, 1fr)`,
+            gap: 10,
+          }}
+        >
+          {WIZARD_STEPS.map((label, i) => {
+            const active = i === step
+            const done = i < step
+            return (
+              <li
+                key={label}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '10px 12px',
+                  borderRadius: 14,
+                  background: active
+                    ? COLORS.burgundy
+                    : done
+                      ? 'rgba(91,15,22,0.08)'
+                      : COLORS.tan,
+                  border:
+                    active || done
+                      ? `1px solid ${COLORS.burgundy}`
+                      : '1px solid rgba(42,34,32,0.08)',
+                  transition: 'background 120ms ease',
+                  minWidth: 0,
+                }}
               >
-                {PROPERTY_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Latitude (optional)">
-              <input
-                style={inputStyle}
-                value={form.lat}
-                onChange={(e) => patch({ lat: e.target.value })}
-                placeholder="39.1911"
-                inputMode="decimal"
-              />
-            </Field>
-
-            <Field label="Longitude (optional)">
-              <input
-                style={inputStyle}
-                value={form.lng}
-                onChange={(e) => patch({ lng: e.target.value })}
-                placeholder="-106.8175"
-                inputMode="decimal"
-              />
-            </Field>
-
-            {GOOGLE_MAPS_API_KEY && (
-              <div className="qk-host-form-full">
-                <span style={labelStyle}>Pin the location</span>
-                <p
+                <span
                   style={{
-                    margin: '0 0 8px',
+                    flex: '0 0 auto',
+                    width: 24,
+                    height: 24,
+                    borderRadius: '50%',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     fontSize: 13,
-                    color: COLORS.muted,
+                    fontWeight: 800,
+                    color: active ? COLORS.burgundy : '#fff',
+                    background: active ? '#fff' : COLORS.burgundy,
                   }}
                 >
-                  Click the map to drop a marker on the exact spot. Click again
-                  to move it — the coordinates above update automatically.
-                </p>
+                  {done ? '✓' : i + 1}
+                </span>
+                <span
+                  className="qk-host-step-label"
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: active ? '#fff' : COLORS.ink,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  {label}
+                </span>
+              </li>
+            )
+          })}
+        </ol>
+
+        <form onSubmit={handleCreate}>
+          {/* STEP 1 — Basics ---------------------------------------------- */}
+          {step === 0 && (
+            <div style={{ display: 'grid', gap: 16 }}>
+              <Field label="Title">
+                <input
+                  style={inputStyle}
+                  value={form.title}
+                  onChange={(e) => patch({ title: e.target.value })}
+                  placeholder="Lakeside cabin with a view"
+                  required
+                />
+              </Field>
+              <Field label="Property type">
+                <select
+                  style={{ ...inputStyle, appearance: 'auto' }}
+                  value={form.property_type}
+                  onChange={(e) => patch({ property_type: e.target.value })}
+                >
+                  {PROPERTY_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Description">
+                <textarea
+                  style={{ ...inputStyle, minHeight: 110, resize: 'vertical' }}
+                  value={form.description}
+                  onChange={(e) => patch({ description: e.target.value })}
+                  placeholder="What makes this place special?"
+                />
+              </Field>
+            </div>
+          )}
+
+          {/* STEP 2 — Location -------------------------------------------- */}
+          {step === 1 && (
+            <div style={{ display: 'grid', gap: 14 }}>
+              <p style={{ margin: 0, fontSize: 14, color: COLORS.muted }}>
+                Search for a place to jump there, then tap the map to drop the
+                pin — drag it to fine-tune the exact spot.
+              </p>
+              {GOOGLE_MAPS_API_KEY ? (
                 <LocationPicker
                   apiKey={GOOGLE_MAPS_API_KEY}
                   value={pickedCoords}
                   onPick={(lat, lng) =>
                     patch({ lat: lat.toFixed(6), lng: lng.toFixed(6) })
                   }
+                  onPlace={(p) =>
+                    patch({
+                      location: p.location || form.location,
+                      country: p.country || form.country,
+                      lat: p.lat.toFixed(6),
+                      lng: p.lng.toFixed(6),
+                    })
+                  }
                 />
-                <p
+              ) : (
+                <p style={{ margin: 0, fontSize: 14, color: COLORS.muted }}>
+                  Map unavailable — enter coordinates below.
+                </p>
+              )}
+
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 13,
+                  color: pickedCoords ? COLORS.ink : COLORS.muted,
+                }}
+              >
+                {pickedCoords ? (
+                  <>
+                    Pinned at{' '}
+                    <span
+                      style={{
+                        fontFamily:
+                          '"Geist Mono", ui-monospace, SFMono-Regular, monospace',
+                        fontWeight: 600,
+                        color: COLORS.burgundy,
+                      }}
+                    >
+                      {pickedCoords.lat.toFixed(6)}, {pickedCoords.lng.toFixed(6)}
+                    </span>
+                  </>
+                ) : (
+                  'No location pinned yet — required to continue.'
+                )}
+              </p>
+
+              <div
+                className="qk-host-form-grid"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: 16,
+                }}
+              >
+                <Field label="Location label">
+                  <input
+                    style={inputStyle}
+                    value={form.location}
+                    onChange={(e) => patch({ location: e.target.value })}
+                    placeholder="Aspen, Colorado"
+                  />
+                </Field>
+                <Field label="Country">
+                  <input
+                    style={inputStyle}
+                    value={form.country}
+                    onChange={(e) => patch({ country: e.target.value })}
+                    placeholder="United States"
+                  />
+                </Field>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3 — Details --------------------------------------------- */}
+          {step === 2 && (
+            <div
+              className="qk-host-form-grid"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: 16,
+              }}
+            >
+              <Field label="Guests">
+                <input
+                  style={inputStyle}
+                  type="number"
+                  min={1}
+                  value={form.max_guests}
+                  onChange={(e) => patch({ max_guests: e.target.value })}
+                />
+              </Field>
+              <Field label="Bedrooms">
+                <input
+                  style={inputStyle}
+                  type="number"
+                  min={0}
+                  value={form.bedrooms}
+                  onChange={(e) => patch({ bedrooms: e.target.value })}
+                />
+              </Field>
+              <Field label="Beds">
+                <input
+                  style={inputStyle}
+                  type="number"
+                  min={0}
+                  value={form.beds}
+                  onChange={(e) => patch({ beds: e.target.value })}
+                />
+              </Field>
+              <Field label="Bathrooms">
+                <input
+                  style={inputStyle}
+                  type="number"
+                  min={0}
+                  value={form.bathrooms}
+                  onChange={(e) => patch({ bathrooms: e.target.value })}
+                />
+              </Field>
+              <Field className="qk-host-form-full" label="Price / night (USD)">
+                <input
+                  style={inputStyle}
+                  type="number"
+                  min={1}
+                  value={form.price_per_night}
+                  onChange={(e) => patch({ price_per_night: e.target.value })}
+                  placeholder="180"
+                  required
+                />
+              </Field>
+            </div>
+          )}
+
+          {/* STEP 4 — Photos & review ------------------------------------- */}
+          {step === 3 && (
+            <div style={{ display: 'grid', gap: 16 }}>
+              <Field label="Photo URL 1">
+                <input
+                  style={inputStyle}
+                  value={form.image1}
+                  onChange={(e) => patch({ image1: e.target.value })}
+                  placeholder="https://…/photo.jpg"
+                  inputMode="url"
+                />
+              </Field>
+              <Field label="Photo URL 2 (optional)">
+                <input
+                  style={inputStyle}
+                  value={form.image2}
+                  onChange={(e) => patch({ image2: e.target.value })}
+                  placeholder="https://…/photo.jpg"
+                  inputMode="url"
+                />
+              </Field>
+              <Field label="Photo URL 3 (optional)">
+                <input
+                  style={inputStyle}
+                  value={form.image3}
+                  onChange={(e) => patch({ image3: e.target.value })}
+                  placeholder="https://…/photo.jpg"
+                  inputMode="url"
+                />
+              </Field>
+
+              {/* Review summary card */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '120px 1fr',
+                  gap: 16,
+                  alignItems: 'start',
+                  background: COLORS.tan,
+                  border: '1px solid rgba(91,15,22,0.12)',
+                  borderRadius: 18,
+                  padding: 16,
+                }}
+              >
+                <div
                   style={{
-                    margin: '8px 0 0',
-                    fontSize: 13,
-                    color: pickedCoords ? COLORS.ink : COLORS.muted,
+                    width: 120,
+                    aspectRatio: '4 / 3',
+                    borderRadius: 12,
+                    overflow: 'hidden',
+                    background: '#fff',
+                    border: '1px solid rgba(42,34,32,0.08)',
                   }}
                 >
-                  {pickedCoords ? (
-                    <>
-                      Selected:{' '}
+                  <img
+                    src={imageList[0] || FALLBACK_IMG}
+                    alt="Listing preview"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      display: 'block',
+                    }}
+                  />
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <h3
+                    style={{
+                      margin: '0 0 2px',
+                      fontSize: 17,
+                      fontWeight: 700,
+                      color: COLORS.ink,
+                    }}
+                  >
+                    {form.title.trim() || 'Untitled listing'}
+                  </h3>
+                  <p style={{ margin: 0, fontSize: 13, color: COLORS.muted }}>
+                    {form.property_type}
+                    {form.location.trim() ? ` · ${form.location.trim()}` : ''}
+                  </p>
+                  <p style={{ margin: '10px 0 0', fontSize: 14 }}>
+                    <span style={{ fontWeight: 700, color: COLORS.burgundy }}>
+                      ${form.price_per_night || '0'}
+                    </span>{' '}
+                    <span style={{ color: COLORS.muted }}>/ night</span>
+                    <span style={{ color: COLORS.muted }}>
+                      {' '}
+                      · {form.max_guests || '1'}{' '}
+                      {Number(form.max_guests) === 1 ? 'guest' : 'guests'}
+                    </span>
+                  </p>
+                  <p
+                    style={{
+                      margin: '6px 0 0',
+                      fontSize: 12,
+                      color: COLORS.muted,
+                    }}
+                  >
+                    {pickedCoords ? (
                       <span
                         style={{
                           fontFamily:
                             '"Geist Mono", ui-monospace, SFMono-Regular, monospace',
                           fontWeight: 600,
-                          color: COLORS.burgundy,
                         }}
                       >
-                        {pickedCoords.lat.toFixed(6)}, {pickedCoords.lng.toFixed(6)}
+                        {pickedCoords.lat.toFixed(6)},{' '}
+                        {pickedCoords.lng.toFixed(6)}
                       </span>
-                    </>
-                  ) : (
-                    'No location pinned yet.'
-                  )}
-                </p>
+                    ) : (
+                      'No pin set'
+                    )}
+                  </p>
+                </div>
               </div>
-            )}
-
-            <Field className="qk-host-form-full" label="Image URL 1">
-              <input
-                style={inputStyle}
-                value={form.image1}
-                onChange={(e) => patch({ image1: e.target.value })}
-                placeholder="https://…/photo.jpg"
-                inputMode="url"
-              />
-            </Field>
-            <Field className="qk-host-form-full" label="Image URL 2 (optional)">
-              <input
-                style={inputStyle}
-                value={form.image2}
-                onChange={(e) => patch({ image2: e.target.value })}
-                placeholder="https://…/photo.jpg"
-                inputMode="url"
-              />
-            </Field>
-            <Field className="qk-host-form-full" label="Image URL 3 (optional)">
-              <input
-                style={inputStyle}
-                value={form.image3}
-                onChange={(e) => patch({ image3: e.target.value })}
-                placeholder="https://…/photo.jpg"
-                inputMode="url"
-              />
-            </Field>
-          </div>
+            </div>
+          )}
 
           {formError && (
             <div
@@ -891,25 +1104,79 @@ export default function HostPage() {
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={submitting}
+          {/* Wizard controls ---------------------------------------------- */}
+          <div
             style={{
-              marginTop: 18,
-              padding: '13px 28px',
-              fontSize: 15,
-              fontWeight: 700,
-              fontFamily: FONT,
-              color: '#fff',
-              background: COLORS.burgundy,
-              border: 'none',
-              borderRadius: 14,
-              cursor: submitting ? 'not-allowed' : 'pointer',
-              opacity: submitting ? 0.6 : 1,
+              marginTop: 22,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
             }}
           >
-            {submitting ? 'Publishing…' : 'Publish listing'}
-          </button>
+            <button
+              type="button"
+              onClick={goBack}
+              disabled={step === 0 || submitting}
+              style={{
+                padding: '12px 24px',
+                fontSize: 15,
+                fontWeight: 700,
+                fontFamily: FONT,
+                color: COLORS.burgundy,
+                background: '#fff',
+                border: `1px solid ${COLORS.burgundy}`,
+                borderRadius: 14,
+                cursor: step === 0 || submitting ? 'not-allowed' : 'pointer',
+                opacity: step === 0 ? 0.4 : 1,
+              }}
+            >
+              Back
+            </button>
+
+            <span style={{ fontSize: 13, color: COLORS.muted }}>
+              Step {step + 1} of {WIZARD_STEPS.length}
+            </span>
+
+            {step < WIZARD_STEPS.length - 1 ? (
+              <button
+                type="button"
+                onClick={goNext}
+                style={{
+                  padding: '12px 28px',
+                  fontSize: 15,
+                  fontWeight: 700,
+                  fontFamily: FONT,
+                  color: '#fff',
+                  background: COLORS.burgundy,
+                  border: 'none',
+                  borderRadius: 14,
+                  cursor: 'pointer',
+                }}
+              >
+                Next
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={submitting}
+                style={{
+                  padding: '12px 28px',
+                  fontSize: 15,
+                  fontWeight: 700,
+                  fontFamily: FONT,
+                  color: '#fff',
+                  background: COLORS.burgundy,
+                  border: 'none',
+                  borderRadius: 14,
+                  cursor: submitting ? 'not-allowed' : 'pointer',
+                  opacity: submitting ? 0.6 : 1,
+                }}
+              >
+                {submitting ? 'Publishing…' : 'Publish listing'}
+              </button>
+            )}
+          </div>
         </form>
       </Section>
 

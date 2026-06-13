@@ -43,9 +43,10 @@ export function loadGoogleMaps(apiKey: string): Promise<GMapsApi> {
   window.__quickinGmapsPromise = new Promise<GMapsApi>((resolve, reject) => {
     const params = new URLSearchParams({
       key: apiKey,
-      // `marker` library powers AdvancedMarkerElement; `loading=async` is the
-      // recommended bootstrap and silences the performance warning.
-      libraries: 'marker',
+      // `marker` powers AdvancedMarkerElement; `places` powers the host
+      // add-listing place-search Autocomplete (host/location-picker.tsx).
+      // `loading=async` is the recommended bootstrap and silences the warning.
+      libraries: 'marker,places',
       loading: 'async',
       v: 'weekly',
     })
@@ -69,6 +70,13 @@ export function loadGoogleMaps(apiKey: string): Promise<GMapsApi> {
         if (typeof importLibrary === 'function') {
           await importLibrary('maps')
           await importLibrary('marker')
+          // `places` is best-effort — only the host add-listing search box uses
+          // it; a failure here must not break the explore map's markers.
+          try {
+            await importLibrary('places')
+          } catch {
+            /* places unavailable — autocomplete just won't attach */
+          }
         }
         resolve(maps)
       } catch (e) {

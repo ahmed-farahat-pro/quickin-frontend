@@ -20,6 +20,8 @@ interface QkGLatLngBounds {
 interface QkGMap {
   fitBounds(bounds: QkGLatLngBounds, padding?: number): void
   setCenter(p: { lat: number; lng: number }): void
+  // Smooth recenter — used when a Places Autocomplete result is picked.
+  panTo?: (p: { lat: number; lng: number }) => void
   setZoom(z: number): void
   // Map clicks carry the clicked coordinate in `latLng`; used by the host
   // add-listing pin-picker (host/location-picker.tsx).
@@ -37,13 +39,38 @@ interface QkGInfoWindow {
 }
 interface QkGMarkerLike {
   setMap(map: QkGMap | null): void
-  addListener(event: string, handler: () => void): void
+  // Marker events. Both the click-to-place picker and the draggable pin attach
+  // listeners; AdvancedMarkerElement fires `gmp-dragend` (payload carries the
+  // coordinate in `latLng`), classic Marker fires `dragend` (read via
+  // `getPosition`). The handler arg is optional so plain `click` handlers fit.
+  addListener(event: string, handler: (e?: QkGMapMouseEvent) => void): void
   // Reposition an existing marker. Classic Markers accept a {lat,lng}; the
   // AdvancedMarkerElement exposes `position` as a settable property. The
   // host pin-picker prefers `setPosition` when present and falls back to
   // assigning `position`.
   setPosition?: (p: { lat: number; lng: number }) => void
+  // Classic Marker — current position after a drag.
+  getPosition?: () => QkGLatLng | null
   position?: { lat: number; lng: number } | null
+}
+// ---- Places Autocomplete (the slice the host search box touches) ------------
+interface QkGPlaceAddressComponent {
+  long_name: string
+  short_name: string
+  types: string[]
+}
+interface QkGPlaceGeometry {
+  location: QkGLatLng
+}
+interface QkGPlaceResult {
+  name?: string
+  formatted_address?: string
+  geometry?: QkGPlaceGeometry
+  address_components?: QkGPlaceAddressComponent[]
+}
+interface QkGAutocomplete {
+  addListener(event: string, handler: () => void): void
+  getPlace(): QkGPlaceResult
 }
 interface QkGMapsApi {
   Map: new (el: HTMLElement, opts: Record<string, unknown>) => QkGMap
@@ -52,6 +79,12 @@ interface QkGMapsApi {
   Marker: new (opts: Record<string, unknown>) => QkGMarkerLike
   marker?: {
     AdvancedMarkerElement: new (opts: Record<string, unknown>) => QkGMarkerLike
+  }
+  places?: {
+    Autocomplete: new (
+      input: HTMLInputElement,
+      opts?: Record<string, unknown>
+    ) => QkGAutocomplete
   }
 }
 
