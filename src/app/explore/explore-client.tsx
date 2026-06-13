@@ -301,9 +301,9 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
             <div
               className="qk-pill-seg"
               style={{
-                flex: '1.2 1 0',
+                flex: '1 1 0',
                 minWidth: 0,
-                padding: '8px 22px',
+                padding: '8px 18px',
                 borderRight: '1px solid rgba(42,34,32,0.10)',
                 display: 'flex',
                 flexDirection: 'column',
@@ -313,6 +313,7 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
               <span style={segLabel}>Check-in</span>
               <PillDate
                 value={filters.checkIn}
+                ariaLabel="Check-in date"
                 onChange={(iso) =>
                   updateFilter({
                     checkIn: iso,
@@ -323,6 +324,28 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
                         : filters.checkOut,
                   })
                 }
+              />
+            </div>
+
+            {/* CHECK-OUT (custom date picker; can't fall before check-in) */}
+            <div
+              className="qk-pill-seg"
+              style={{
+                flex: '1 1 0',
+                minWidth: 0,
+                padding: '8px 18px',
+                borderRight: '1px solid rgba(42,34,32,0.10)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+              }}
+            >
+              <span style={segLabel}>Check-out</span>
+              <PillDate
+                value={filters.checkOut}
+                min={filters.checkIn || undefined}
+                ariaLabel="Check-out date"
+                onChange={(iso) => updateFilter({ checkOut: iso })}
               />
             </div>
 
@@ -754,9 +777,13 @@ function ListingCard({ listing }: { listing: Listing }) {
 function PillDate({
   value,
   onChange,
+  min,
+  ariaLabel = 'Date',
 }: {
   value: string
   onChange: (iso: string) => void
+  min?: string
+  ariaLabel?: string
 }) {
   return (
     <div className="qk-pill-date">
@@ -773,7 +800,8 @@ function PillDate({
       <DatePickerField
         value={value}
         onChange={onChange}
-        ariaLabel="Check-in date"
+        min={min}
+        ariaLabel={ariaLabel}
         placeholder="Add dates"
       />
     </div>

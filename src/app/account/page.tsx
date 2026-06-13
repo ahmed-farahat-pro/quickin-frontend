@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { API_URL, getToken } from '@/lib/api'
 import AuthArea from '../_components/auth-area'
+import { EyeIcon, EyeOffIcon, eyeButtonStyle } from '@/app/_components/password-eye'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -77,6 +78,15 @@ export default function AccountPage() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveOk, setSaveOk] = useState(false)
+
+  // Change-password section state (independent of the profile form above).
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [showCurrent, setShowCurrent] = useState(false)
+  const [showNew, setShowNew] = useState(false)
+  const [pwSaving, setPwSaving] = useState(false)
+  const [pwError, setPwError] = useState<string | null>(null)
+  const [pwOk, setPwOk] = useState(false)
 
   const loadProfile = useCallback(async () => {
     const token = getToken()
@@ -186,6 +196,59 @@ export default function AccountPage() {
       setSaveError('Network error. Please try again.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault()
+    setPwError(null)
+    setPwOk(false)
+
+    const token = getToken()
+    if (!token) {
+      setGate('anon')
+      return
+    }
+
+    if (newPassword.length < 6) {
+      setPwError('Your new password must be at least 6 characters.')
+      return
+    }
+
+    setPwSaving(true)
+    try {
+      const res = await fetch(`${API_URL}/api/local/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + token,
+        },
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword,
+        }),
+      })
+
+      if (res.status === 401) {
+        setGate('anon')
+        return
+      }
+
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setPwError(
+          (data && data.error) || 'Could not update your password. Please try again.'
+        )
+        return
+      }
+
+      setCurrentPassword('')
+      setNewPassword('')
+      setPwOk(true)
+    } catch {
+      setPwError('Network error. Please try again.')
+    } finally {
+      setPwSaving(false)
     }
   }
 
@@ -488,6 +551,150 @@ export default function AccountPage() {
                 }}
               >
                 {saving ? 'Saving…' : 'Save changes'}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* Change password — separate card below the profile form */}
+        {gate === 'ok' && (
+          <div
+            style={{
+              marginTop: 24,
+              background: '#fff',
+              borderRadius: 22,
+              border: '1px solid rgba(42,34,32,0.06)',
+              boxShadow: '0 6px 24px rgba(42,34,32,0.06)',
+              padding: '26px 26px 28px',
+            }}
+          >
+            <h2
+              style={{
+                margin: '0 0 4px',
+                fontSize: 18,
+                fontWeight: 700,
+                color: COLORS.ink,
+              }}
+            >
+              Change password
+            </h2>
+            <p style={{ margin: '0 0 22px', fontSize: 14, color: COLORS.muted }}>
+              Use at least 6 characters. You&apos;ll stay signed in on this device.
+            </p>
+
+            <form onSubmit={handleChangePassword}>
+              <div style={{ display: 'grid', gap: 18 }}>
+                <label style={{ display: 'block' }}>
+                  <span style={labelStyle}>Current password</span>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      style={{ ...inputStyle, paddingRight: 44 }}
+                      type={showCurrent ? 'text' : 'password'}
+                      value={currentPassword}
+                      onChange={(e) => {
+                        setCurrentPassword(e.target.value)
+                        setPwError(null)
+                        setPwOk(false)
+                      }}
+                      placeholder="••••••••"
+                      autoComplete="current-password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrent((v) => !v)}
+                      aria-label={showCurrent ? 'Hide password' : 'Show password'}
+                      style={eyeButtonStyle}
+                    >
+                      {showCurrent ? <EyeOffIcon /> : <EyeIcon />}
+                    </button>
+                  </div>
+                </label>
+
+                <label style={{ display: 'block' }}>
+                  <span style={labelStyle}>New password</span>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      style={{ ...inputStyle, paddingRight: 44 }}
+                      type={showNew ? 'text' : 'password'}
+                      minLength={6}
+                      value={newPassword}
+                      onChange={(e) => {
+                        setNewPassword(e.target.value)
+                        setPwError(null)
+                        setPwOk(false)
+                      }}
+                      placeholder="At least 6 characters"
+                      autoComplete="new-password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNew((v) => !v)}
+                      aria-label={showNew ? 'Hide password' : 'Show password'}
+                      style={eyeButtonStyle}
+                    >
+                      {showNew ? <EyeOffIcon /> : <EyeIcon />}
+                    </button>
+                  </div>
+                </label>
+              </div>
+
+              {pwError && (
+                <div
+                  style={{
+                    marginTop: 20,
+                    padding: '11px 14px',
+                    borderRadius: 12,
+                    background: 'rgba(91,15,22,0.08)',
+                    border: '1px solid rgba(91,15,22,0.2)',
+                    fontSize: 14,
+                    color: COLORS.burgundy,
+                    fontWeight: 600,
+                  }}
+                >
+                  {pwError}
+                </div>
+              )}
+              {pwOk && (
+                <div
+                  style={{
+                    marginTop: 20,
+                    padding: '11px 14px',
+                    borderRadius: 12,
+                    background: 'rgba(15,81,50,0.10)',
+                    border: '1px solid rgba(15,81,50,0.25)',
+                    fontSize: 14,
+                    color: '#0f5132',
+                    fontWeight: 600,
+                  }}
+                >
+                  Your password was updated.
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={pwSaving || !currentPassword || newPassword.length < 6}
+                style={{
+                  marginTop: 24,
+                  padding: '13px 30px',
+                  fontSize: 15,
+                  fontWeight: 700,
+                  fontFamily: FONT,
+                  color: '#fff',
+                  background: COLORS.burgundy,
+                  border: 'none',
+                  borderRadius: 14,
+                  cursor:
+                    pwSaving || !currentPassword || newPassword.length < 6
+                      ? 'not-allowed'
+                      : 'pointer',
+                  opacity:
+                    pwSaving || !currentPassword || newPassword.length < 6 ? 0.6 : 1,
+                }}
+              >
+                {pwSaving ? 'Updating…' : 'Update password'}
               </button>
             </form>
           </div>

@@ -393,20 +393,61 @@ export default function HostPage() {
       setGate({ kind: 'anon' })
       return
     }
+
+    // Open the dashboard for a host/admin user and load its data.
+    const enter = (u: {
+      full_name?: string | null
+      name?: string | null
+      email?: string | null
+    }) => {
+      const raw =
+        (u.full_name && u.full_name.trim()) ||
+        (u.name && u.name.trim()) ||
+        (u.email ? u.email.split('@')[0] : '')
+      setGate({ kind: 'ok', firstName: raw ? raw.split(' ')[0] : 'Host' })
+      loadListings()
+      loadBookings()
+      loadServices()
+      loadServiceRequests()
+    }
+
     const role = (user.role || '').toLowerCase()
-    if (role !== 'host' && role !== 'admin') {
-      setGate({ kind: 'forbidden' })
+    if (role === 'host' || role === 'admin') {
+      enter(user)
       return
     }
-    const raw =
-      (user.full_name && user.full_name.trim()) ||
-      (user.name && user.name.trim()) ||
-      (user.email ? user.email.split('@')[0] : '')
-    setGate({ kind: 'ok', firstName: raw ? raw.split(' ')[0] : 'Host' })
-    loadListings()
-    loadBookings()
-    loadServices()
-    loadServiceRequests()
+
+    // The stored role is 'guest' — but localStorage can be STALE (the account may
+    // have gained the host role in another session/device, or right after a role
+    // upgrade). Re-check the live role from the server before forbidding; if it's
+    // now a host, persist it and let them straight in. This is the usual cause of
+    // "the host dashboard won't open for me".
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/auth/me`, {
+          headers: { Authorization: 'Bearer ' + token },
+        })
+        const data = await res.json().catch(() => ({}))
+        const liveRole = (data?.user?.role || '').toLowerCase()
+        if (cancelled) return
+        if ((liveRole === 'host' || liveRole === 'admin') && data?.user) {
+          try {
+            localStorage.setItem('qk_user', JSON.stringify(data.user))
+          } catch {
+            /* ignore storage failures */
+          }
+          enter(data.user)
+        } else {
+          setGate({ kind: 'forbidden' })
+        }
+      } catch {
+        if (!cancelled) setGate({ kind: 'forbidden' })
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
   }, [loadListings, loadBookings, loadServices, loadServiceRequests])
 
   function patch(p: Partial<FormState>) {

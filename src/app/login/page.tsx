@@ -55,8 +55,10 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [role, setRole] = useState<'user' | 'host'>('user')
-  const [step, setStep] = useState<'form' | 'otp'>('form')
+  const [step, setStep] = useState<'form' | 'otp' | 'forgot' | 'reset'>('form')
   const [code, setCode] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [showNewPassword, setShowNewPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -155,6 +157,40 @@ export default function LoginPage() {
     } catch { setError('Network error. Please try again.'); setLoading(false) }
   }
 
+  // Forgot password: email a 6-digit reset code, then move to the 'reset' step.
+  async function handleForgot(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null); setNotice(null); setLoading(true)
+    try {
+      const res = await fetch(`${API_URL}/api/auth/forgot-password`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setError(data?.error || 'Could not send a reset code. Please try again.'); setLoading(false); return }
+      setStep('reset')
+      setCode(''); setNewPassword('')
+      setNotice(`We emailed a 6-digit code to ${email}.`)
+      setLoading(false)
+    } catch { setError('Network error. Please try again.'); setLoading(false) }
+  }
+
+  // Reset password with the emailed code + a new password. On success the
+  // backend returns {token, user} and we log the user straight in.
+  async function handleReset(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null); setNotice(null); setLoading(true)
+    try {
+      const res = await fetch(`${API_URL}/api/auth/reset-password`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code, password: newPassword }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setError(data?.error || 'Could not reset your password. Please try again.'); setLoading(false); return }
+      persistAuthAndGo(data)
+    } catch { setError('Network error. Please try again.'); setLoading(false) }
+  }
+
   function handleGoogleClick() {
     if (!googleEnabled) return
     setError(null); setNotice(null)
@@ -187,7 +223,13 @@ export default function LoginPage() {
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <img src="/logo.png" alt="QuickIn" style={{ height: 54, width: 'auto', margin: '0 auto', display: 'block' }} />
           <p style={{ margin: '14px 0 0', fontSize: 15, color: COLORS.muted }}>
-            {step === 'otp' ? 'Verify your email to continue' : 'Welcome back — sign in to continue'}
+            {step === 'otp'
+              ? 'Verify your email to continue'
+              : step === 'forgot'
+                ? 'Reset your password'
+                : step === 'reset'
+                  ? 'Enter the code and a new password'
+                  : 'Welcome back — sign in to continue'}
           </p>
         </div>
 
@@ -219,6 +261,50 @@ export default function LoginPage() {
               <button type="button" onClick={handleResend} disabled={loading} style={linkBtnStyle}>Resend code</button>
             </div>
           </form>
+        ) : step === 'forgot' ? (
+          /* ---- Forgot password: request a reset code ---- */
+          <form onSubmit={handleForgot}>
+            <label style={{ display: 'block', marginBottom: 22 }}>
+              <span style={labelStyle}>Email</span>
+              <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="layla@email.com" style={inputStyle} />
+            </label>
+            <button type="submit" disabled={loading || !email.trim()} style={primaryButtonStyle(loading || !email.trim())}>
+              {loading ? 'Sending…' : 'Send reset code'}
+            </button>
+            <div style={{ marginTop: 16, fontSize: 13.5 }}>
+              <button type="button" onClick={() => { setStep('form'); setError(null); setNotice(null) }} style={linkBtnStyle}>← Back to sign in</button>
+            </div>
+          </form>
+        ) : step === 'reset' ? (
+          /* ---- Reset password: enter the emailed code + a new password ---- */
+          <form onSubmit={handleReset}>
+            <label style={{ display: 'block', marginBottom: 18 }}>
+              <span style={labelStyle}>Verification code</span>
+              <input
+                type="text" inputMode="numeric" autoComplete="one-time-code" required
+                maxLength={6} value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="••••••"
+                style={{ ...inputStyle, textAlign: 'center', letterSpacing: 12, fontSize: 22, fontWeight: 700 }}
+              />
+            </label>
+            <label style={{ display: 'block', marginBottom: 22 }}>
+              <span style={labelStyle}>New password</span>
+              <div style={{ position: 'relative' }}>
+                <input type={showNewPassword ? 'text' : 'password'} required minLength={6} autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="At least 6 characters" style={{ ...inputStyle, paddingRight: 44 }} />
+                <button type="button" onClick={() => setShowNewPassword((v) => !v)} aria-label={showNewPassword ? 'Hide password' : 'Show password'} style={eyeButtonStyle}>
+                  {showNewPassword ? <EyeOffIcon /> : <EyeIcon />}
+                </button>
+              </div>
+            </label>
+            <button type="submit" disabled={loading || code.length < 6 || newPassword.length < 6} style={primaryButtonStyle(loading || code.length < 6 || newPassword.length < 6)}>
+              {loading ? 'Resetting…' : 'Reset password'}
+            </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16, fontSize: 13.5 }}>
+              <button type="button" onClick={() => { setStep('form'); setError(null); setNotice(null) }} style={linkBtnStyle}>← Back to sign in</button>
+              <button type="button" onClick={() => { setStep('forgot'); setError(null); setNotice(null) }} disabled={loading} style={linkBtnStyle}>Resend code</button>
+            </div>
+          </form>
         ) : (
           /* ---- Sign-in form step ---- */
           <>
@@ -235,7 +321,10 @@ export default function LoginPage() {
                 <input type="text" required autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="layla@email.com" style={inputStyle} />
               </label>
               <label style={{ display: 'block', marginBottom: 22 }}>
-                <span style={labelStyle}>Password</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={labelStyle}>Password</span>
+                  <button type="button" onClick={() => { setStep('forgot'); setError(null); setNotice(null) }} style={{ ...linkBtnStyle, marginBottom: 6 }}>Forgot password?</button>
+                </div>
                 <div style={{ position: 'relative' }}>
                   <input type={showPassword ? 'text' : 'password'} required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" style={{ ...inputStyle, paddingRight: 44 }} />
                   <button type="button" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? 'Hide password' : 'Show password'} style={eyeButtonStyle}>

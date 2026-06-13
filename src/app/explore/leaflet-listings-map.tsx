@@ -20,6 +20,21 @@ const COLORS = {
   muted: '#6B6055',
 }
 
+// This is an Egypt-focused product, so the map opens framed on Egypt rather than
+// the whole world. A rough Egypt bounding box lets us prefer Egyptian pins when
+// deciding the initial frame (stray international demo listings still render, but
+// don't yank the view out to a global zoom).
+const EGYPT_CENTER: [number, number] = [26.8206, 30.8025]
+const EGYPT_ZOOM = 5
+const inEgypt = (lat: number, lng: number): boolean =>
+  lat >= 22 && lat <= 32 && lng >= 24 && lng <= 37
+
+// Guard against bad data: latitude must be within ±90 and longitude within ±180.
+// Without this, a junk listing (e.g. lat 3213213) blows the fit-bounds out to the
+// entire planet and the map looks broken.
+const validLat = (n: number): boolean => Number.isFinite(n) && n >= -90 && n <= 90
+const validLng = (n: number): boolean => Number.isFinite(n) && n >= -180 && n <= 180
+
 type GeoListing = Listing & { lat: number; lng: number }
 
 // Escape any user-controlled text we drop into the divIcon HTML string.
@@ -51,12 +66,19 @@ function FitBounds({ points }: { points: GeoListing[] }) {
   const key = points.map((p) => `${p.id}:${p.lat},${p.lng}`).join('|')
 
   useEffect(() => {
-    if (points.length === 0) return
-    if (points.length === 1) {
-      map.setView([points[0].lat, points[0].lng], 11, { animate: false })
+    // Frame on Egyptian pins when there are any; otherwise on whatever valid pins
+    // exist (e.g. the user filtered to a foreign location); otherwise Egypt.
+    const egyptian = points.filter((p) => inEgypt(p.lat, p.lng))
+    const frame = egyptian.length > 0 ? egyptian : points
+    if (frame.length === 0) {
+      map.setView(EGYPT_CENTER, EGYPT_ZOOM, { animate: false })
       return
     }
-    const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lng] as [number, number]))
+    if (frame.length === 1) {
+      map.setView([frame[0].lat, frame[0].lng], 11, { animate: false })
+      return
+    }
+    const bounds = L.latLngBounds(frame.map((p) => [p.lat, p.lng] as [number, number]))
     map.fitBounds(bounds, { padding: [48, 48], maxZoom: 13, animate: false })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, map])
@@ -72,23 +94,18 @@ export default function LeafletListingsMap({ listings }: { listings: Listing[] }
         (l): l is GeoListing =>
           typeof l.lat === 'number' &&
           typeof l.lng === 'number' &&
-          Number.isFinite(l.lat) &&
-          Number.isFinite(l.lng)
+          validLat(l.lat) &&
+          validLng(l.lng)
       ),
     [listings]
   )
 
-  // Stable initial view (markers + FitBounds refine it once mounted).
-  // MapContainer only reads `center`/`zoom` on first mount, so compute these
-  // once and never recompute — feeding fresh values on every keystroke would
-  // otherwise yank the viewport while the user pans.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const initialCenter = useMemo<[number, number]>(
-    () => (points.length > 0 ? [points[0].lat, points[0].lng] : [20, 0]),
-    []
-  )
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const initialZoom = useMemo(() => (points.length > 0 ? 5 : 2), [])
+  // Stable initial view: always open on Egypt (FitBounds refines to the actual
+  // pins once mounted). MapContainer only reads `center`/`zoom` on first mount,
+  // so these are computed once and never recomputed — feeding fresh values on
+  // every keystroke would otherwise yank the viewport while the user pans.
+  const initialCenter = useMemo<[number, number]>(() => EGYPT_CENTER, [])
+  const initialZoom = useMemo(() => EGYPT_ZOOM, [])
 
   return (
     <div

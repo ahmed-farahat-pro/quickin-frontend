@@ -15,6 +15,16 @@ const COLORS = {
   muted: '#6B6055',
 }
 
+// Egypt-first framing (see leaflet-listings-map for the rationale): open on Egypt,
+// prefer Egyptian pins when fitting bounds, and reject impossible coordinates so a
+// junk listing can't blow the viewport out to the whole planet.
+const EGYPT_CENTER = { lat: 26.8206, lng: 30.8025 }
+const EGYPT_ZOOM = 5
+const inEgypt = (lat: number, lng: number): boolean =>
+  lat >= 22 && lat <= 32 && lng >= 24 && lng <= 37
+const validLat = (n: number): boolean => Number.isFinite(n) && n >= -90 && n <= 90
+const validLng = (n: number): boolean => Number.isFinite(n) && n >= -180 && n <= 180
+
 type GeoListing = Listing & { lat: number; lng: number }
 
 // Loose structural typings for the slice of the Google Maps JS API we touch are
@@ -142,9 +152,13 @@ function infoHtml(listing: GeoListing): string {
 export default function GoogleListingsMap({
   listings,
   apiKey,
+  onError,
 }: {
   listings: Listing[]
   apiKey: string
+  // Called when Google Maps can't be used (bad/restricted key, billing off,
+  // or the script fails to load) so the parent can fall back to Leaflet.
+  onError?: () => void
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<GMap | null>(null)
@@ -159,8 +173,8 @@ export default function GoogleListingsMap({
         (l): l is GeoListing =>
           typeof l.lat === 'number' &&
           typeof l.lng === 'number' &&
-          Number.isFinite(l.lat) &&
-          Number.isFinite(l.lng)
+          validLat(l.lat) &&
+          validLng(l.lng)
       ),
     [listings]
   )
@@ -223,32 +237,41 @@ export default function GoogleListingsMap({
       markersRef.current.push(marker)
     }
 
-    // Frame the markers.
-    if (!bounds.isEmpty()) {
-      if (points.length === 1) {
-        map.setCenter({ lat: points[0].lat, lng: points[0].lng })
-        map.setZoom(11)
-      } else {
-        map.fitBounds(bounds, 48)
-      }
+    // Frame on Egyptian pins when there are any; else on whatever pins exist
+    // (e.g. a foreign-location search); else stay on the Egypt home view.
+    const egyptian = points.filter((p) => inEgypt(p.lat, p.lng))
+    const frame = egyptian.length > 0 ? egyptian : points
+    if (frame.length === 1) {
+      map.setCenter({ lat: frame[0].lat, lng: frame[0].lng })
+      map.setZoom(11)
+    } else if (frame.length > 1) {
+      const fb = new api.LatLngBounds()
+      for (const p of frame) fb.extend({ lat: p.lat, lng: p.lng })
+      map.fitBounds(fb, 48)
+    } else {
+      map.setCenter(EGYPT_CENTER)
+      map.setZoom(EGYPT_ZOOM)
     }
   }
 
   // Boot the map once the API is available.
   useEffect(() => {
     let cancelled = false
+    // Google invokes this global on auth failures (InvalidKeyMapError,
+    // RefererNotAllowedMapError, billing not enabled). The script still loads,
+    // so .catch never fires — this is the only signal. Route it to the fallback.
+    ;(window as unknown as { gm_authFailure?: () => void }).gm_authFailure = () => {
+      if (!cancelled) onError?.()
+    }
     loadGoogleMaps(apiKey)
       .then((api) => {
         if (cancelled || !containerRef.current) return
         apiRef.current = api
         if (!mapRef.current) {
-          const center =
-            points.length > 0
-              ? { lat: points[0].lat, lng: points[0].lng }
-              : { lat: 26.8206, lng: 30.8025 } // Egypt (not the world view)
+          // Always boot on Egypt; renderMarkers() reframes to the actual pins.
           mapRef.current = new api.Map(containerRef.current, {
-            center,
-            zoom: points.length > 0 ? 5 : 6,
+            center: EGYPT_CENTER,
+            zoom: EGYPT_ZOOM,
             // mapId is required for AdvancedMarkerElement; DEMO_MAP_ID works
             // without extra cloud config for prototypes.
             mapId: 'DEMO_MAP_ID',
@@ -260,7 +283,10 @@ export default function GoogleListingsMap({
         renderMarkers(api, mapRef.current)
       })
       .catch((err) => {
-        console.error('Google Maps init failed:', err)
+        // Expected when the Maps key is invalid/restricted or billing is off.
+        // Not fatal — the parent swaps in the keyless Leaflet map.
+        console.warn('Google Maps unavailable, falling back to Leaflet:', err?.message || err)
+        if (!cancelled) onError?.()
       })
     return () => {
       cancelled = true
