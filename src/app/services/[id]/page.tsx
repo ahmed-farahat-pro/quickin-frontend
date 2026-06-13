@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation'
 import { API_URL, type Service } from '@/lib/api'
 import SubscribePanel from './subscribe-panel'
 import ImagePlaceholder from '../../_components/image-placeholder'
+import ShareButton from '../../_components/share-button'
 
 export const dynamic = 'force-dynamic'
 
@@ -192,20 +193,37 @@ export default async function ServiceDetailPage({
               {service.category}
             </span>
           )}
-          <h1
+          <div
             style={{
-              margin: 0,
-              fontFamily:
-                '"Playfair Display", Georgia, "Times New Roman", serif',
-              fontSize: 'clamp(28px, 4.5vw, 42px)',
-              fontWeight: 700,
-              letterSpacing: '-0.02em',
-              lineHeight: 1.15,
-              color: COLORS.burgundy,
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: 16,
             }}
           >
-            {service.title}
-          </h1>
+            <h1
+              style={{
+                margin: 0,
+                fontFamily:
+                  '"Playfair Display", Georgia, "Times New Roman", serif',
+                fontSize: 'clamp(28px, 4.5vw, 42px)',
+                fontWeight: 700,
+                letterSpacing: '-0.02em',
+                lineHeight: 1.15,
+                color: COLORS.burgundy,
+              }}
+            >
+              {service.title}
+            </h1>
+            {/* Share chip — mirrors the listing detail placement. */}
+            <span style={{ flex: '0 0 auto', marginTop: 4 }}>
+              <ShareButton
+                path={`/services/${service.id}`}
+                title={`${service.title} | QuickIn`}
+                size={44}
+              />
+            </span>
+          </div>
           <p style={{ margin: '10px 0 0', fontSize: 16, color: COLORS.muted }}>
             {[
               service.host_name ? `Hosted by ${service.host_name}` : null,

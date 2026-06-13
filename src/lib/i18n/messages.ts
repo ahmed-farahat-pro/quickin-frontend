@@ -137,6 +137,10 @@ export const messages: Record<Lang, Dict> = {
     'wishlist.emptyBody': 'Tap the heart on any stay or experience to save it here.',
     'wishlist.browseStays': 'Browse stays',
 
+    // ---- Share ------------------------------------------------------------
+    'share.label': 'Share',
+    'share.copied': 'Copied!',
+
     // ---- Reviews ----------------------------------------------------------
     'reviews.new': 'New',
     'reviews.countOne': '{count} review',
@@ -384,6 +388,10 @@ export const messages: Record<Lang, Dict> = {
     'wishlist.emptyTitle': 'لا توجد عناصر محفوظة بعد',
     'wishlist.emptyBody': 'اضغط على القلب في أي إقامة أو تجربة لحفظها هنا.',
     'wishlist.browseStays': 'تصفّح الإقامات',
+
+    // ---- Share ------------------------------------------------------------
+    'share.label': 'مشاركة',
+    'share.copied': 'تم النسخ!',
 
     // ---- Reviews ----------------------------------------------------------
     'reviews.new': 'جديد',

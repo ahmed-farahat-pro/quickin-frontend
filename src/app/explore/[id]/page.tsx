@@ -9,6 +9,7 @@ import { HostedBy, MoreFromHost } from './host-section'
 import ImagePlaceholder from '../../_components/image-placeholder'
 import AmenityIcon from '../../_components/amenity-icon'
 import HeartButton from '../../_components/heart-button'
+import ShareButton from '../../_components/share-button'
 import RatingStars from '../../_components/rating-stars'
 import { JsonLd, listingLd, breadcrumbLd } from '../../_components/structured-data'
 import { T, BackToExplore, GuestFavoriteBadge } from './detail-text'
@@ -259,8 +260,15 @@ export default async function ListingDetailPage({
             >
               {listing.title}
             </h1>
-            {/* Wishlist heart — stands alone here (no parent link to guard). */}
-            <span style={{ flex: '0 0 auto', marginTop: 4 }}>
+            {/* Share + wishlist heart — stand alone here (no parent link). */}
+            <span
+              style={{ flex: '0 0 auto', marginTop: 4, display: 'flex', gap: 10 }}
+            >
+              <ShareButton
+                path={`/explore/${listing.id}`}
+                title={`${listing.title} | QuickIn`}
+                size={44}
+              />
               <HeartButton
                 itemType="listing"
                 itemId={listing.id}
