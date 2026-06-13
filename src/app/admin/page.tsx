@@ -34,14 +34,38 @@ interface Column { key: string; label: string; render?: (v: unknown, row: Record
 
 const money = (v: unknown) => (v === null || v === undefined || v === '' ? '—' : `EGP ${Number(v).toFixed(0)}`)
 const yn = (v: unknown) => (v ? '✓' : '✗')
+
+// Booking lifecycle: the raw status values the backend stores + how we present
+// them. "confirmed" reads as "Booked"; "completed" as "Stay ended".
+const BOOKING_STATUSES = ['pending', 'confirmed', 'completed', 'rejected', 'cancelled'] as const
+type BookingStatus = (typeof BOOKING_STATUSES)[number]
+const STATUS_LABEL: Record<string, string> = {
+  pending: 'Pending', confirmed: 'Booked', completed: 'Stay ended', rejected: 'Rejected', cancelled: 'Cancelled',
+}
+const STATUS_COLOR: Record<string, { bg: string; fg: string }> = {
+  confirmed: { bg: '#0f5132', fg: '#fff' }, completed: { bg: 'rgba(15,81,50,0.12)', fg: '#0f5132' },
+  pending: { bg: COLORS.tan, fg: COLORS.burgundy }, rejected: { bg: 'rgba(91,15,22,0.10)', fg: COLORS.burgundy },
+  cancelled: { bg: 'rgba(42,34,32,0.10)', fg: COLORS.muted },
+}
 const statusBadge = (v: unknown) => {
   const s = String(v ?? '')
-  const map: Record<string, { bg: string; fg: string }> = {
-    confirmed: { bg: '#0f5132', fg: '#fff' }, pending: { bg: COLORS.tan, fg: COLORS.burgundy },
-    rejected: { bg: 'rgba(91,15,22,0.10)', fg: COLORS.burgundy }, cancelled: { bg: 'rgba(42,34,32,0.10)', fg: COLORS.muted },
-  }
-  const c = map[s] || { bg: COLORS.tan, fg: COLORS.ink }
-  return <span style={{ background: c.bg, color: c.fg, fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999 }}>{s || '—'}</span>
+  const c = STATUS_COLOR[s] || { bg: COLORS.tan, fg: COLORS.ink }
+  const label = STATUS_LABEL[s] || (s || '—')
+  return <span style={{ background: c.bg, color: c.fg, fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>{label}</span>
+}
+
+// Gold ★ rating + "(N)" review count for the listings table.
+const ratingCell = (_v: unknown, r: Record<string, unknown>) => {
+  const count = Number(r.review_count ?? 0)
+  const avg = Number(r.rating ?? 0)
+  if (!count) return <span style={{ color: COLORS.muted, fontSize: 12.5 }}>No reviews</span>
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 5, fontWeight: 700, color: COLORS.ink, fontSize: 13 }}>
+      <span style={{ color: COLORS.gold }} aria-hidden="true">★</span>
+      <span>{avg.toFixed(1)}</span>
+      <span style={{ color: COLORS.muted, fontWeight: 600 }}>({count})</span>
+    </span>
+  )
 }
 
 // Reveal/hide a stored password with an eye toggle.
@@ -73,6 +97,7 @@ const COLUMNS: Record<TabKey, Column[]> = {
   listings: [
     { key: 'title', label: 'Title' }, { key: 'location', label: 'Location' },
     { key: 'price_per_night', label: 'Price', render: (v) => `${money(v)}/night` }, { key: 'host_email', label: 'Host' },
+    { key: 'rating', label: 'Reviews', render: ratingCell },
   ],
   bookings: [
     { key: 'reservation_code', label: 'Code' }, { key: 'listing_title', label: 'Listing' }, { key: 'guest_email', label: 'Guest' },
@@ -90,6 +115,11 @@ const COLUMNS: Record<TabKey, Column[]> = {
 
 type Toast = { message: string; kind: 'success' | 'error' }
 type Confirm = { title: string; message: string; onConfirm: () => void }
+// One public review row (GET /api/local/reviews?listing_id=).
+type AdminReview = { rating: number; comment: string | null; reviewer_name: string | null; created_at: string }
+// State for the "view reviews" modal: which listing, plus the fetched reviews
+// (null while loading).
+type ReviewsModal = { listingId: string; title: string; reviews: AdminReview[] | null }
 
 export default function AdminPage() {
   const [token, setToken] = useState<string | null>(null)
@@ -100,6 +130,7 @@ export default function AdminPage() {
   const [checked, setChecked] = useState(false)
   const [toast, setToast] = useState<Toast | null>(null)
   const [confirm, setConfirm] = useState<Confirm | null>(null)
+  const [reviewsModal, setReviewsModal] = useState<ReviewsModal | null>(null)
 
   // Auto-dismiss toasts.
   useEffect(() => {
@@ -154,6 +185,35 @@ export default function AdminPage() {
       setToast({ message: `Role changed to ${role}`, kind: 'success' })
       await load(token)
     } catch { setToast({ message: 'Network error.', kind: 'error' }) } finally { setBusyId(null) }
+  }
+
+  // Move a booking through its lifecycle (pending → confirmed/Booked →
+  // completed/Stay ended, or rejected/cancelled). PATCHes the admin endpoint and
+  // refreshes the table.
+  async function changeBookingStatus(id: string, status: BookingStatus) {
+    if (!token) return
+    setBusyId(id)
+    try {
+      const res = await fetch(`${API_URL}/api/local/admin/bookings/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ status }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { setToast({ message: d?.error || 'Status change failed', kind: 'error' }); return }
+      setToast({ message: `Marked “${STATUS_LABEL[status] ?? status}”`, kind: 'success' })
+      await load(token)
+    } catch { setToast({ message: 'Network error.', kind: 'error' }) } finally { setBusyId(null) }
+  }
+
+  // Open the reviews modal for a listing and fetch its public reviews.
+  async function openReviews(listingId: string, title: string) {
+    setReviewsModal({ listingId, title, reviews: null })
+    try {
+      const res = await fetch(`${API_URL}/api/local/reviews?listing_id=${encodeURIComponent(listingId)}`)
+      const d = await res.json().catch(() => [])
+      setReviewsModal({ listingId, title, reviews: Array.isArray(d) ? (d as AdminReview[]) : [] })
+    } catch {
+      setReviewsModal({ listingId, title, reviews: [] })
+    }
   }
 
   function logout() {
@@ -233,6 +293,27 @@ export default function AdminPage() {
                               <option value="admin">admin</option>
                             </select>
                           )}
+                          {tab === 'bookings' && (
+                            <select
+                              value={BOOKING_STATUSES.includes(String(row.status) as BookingStatus) ? String(row.status) : 'pending'}
+                              disabled={busyId === id}
+                              onChange={(e) => changeBookingStatus(id, e.target.value as BookingStatus)}
+                              style={selectStyle}
+                              aria-label="Booking status"
+                            >
+                              {BOOKING_STATUSES.map((s) => (
+                                <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+                              ))}
+                            </select>
+                          )}
+                          {tab === 'listings' && (
+                            <button
+                              type="button"
+                              onClick={() => openReviews(id, String(row.title ?? 'Listing'))}
+                              style={{ appearance: 'none', border: `1px solid ${COLORS.gold}`, background: '#fff', color: COLORS.gold, fontWeight: 700, fontSize: 12.5, fontFamily: FONT, borderRadius: 999, padding: '6px 14px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                              <span aria-hidden="true">★</span> Reviews{Number(row.review_count ?? 0) > 0 ? ` (${Number(row.review_count)})` : ''}
+                            </button>
+                          )}
                           <button
                             onClick={() => setConfirm({ title: `Delete this ${singular}?`, message: 'This is permanent and cannot be undone.', onConfirm: () => doDelete(ENTITY_SLUG[tab], id, singular) })}
                             disabled={busyId === id}
@@ -270,6 +351,57 @@ export default function AdminPage() {
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => setConfirm(null)} className="qk-press" style={{ flex: 1, padding: '12px', borderRadius: 14, border: `1px solid ${COLORS.tan}`, background: '#fff', color: COLORS.ink, fontWeight: 700, fontSize: 14.5, fontFamily: FONT, cursor: 'pointer' }}>Cancel</button>
               <button onClick={confirm.onConfirm} className="qk-press" style={{ flex: 1, padding: '12px', borderRadius: 14, border: 'none', background: GRAD_BURGUNDY, color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: FONT, cursor: 'pointer', boxShadow: '0 10px 24px rgba(91,15,22,0.28)' }}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reviews viewer — opened from the listings table. */}
+      {reviewsModal && (
+        <div role="dialog" aria-modal="true" onClick={() => setReviewsModal(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(20,12,10,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ width: '100%', maxWidth: 520, maxHeight: '80vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#fff', borderRadius: 28, border: `1px solid rgba(42,34,32,0.06)`, boxShadow: '0 24px 60px rgba(42,34,32,0.28)', fontFamily: FONT }}>
+            <div style={{ background: 'linear-gradient(135deg,#5B0F16,#7a1620)', padding: '18px 22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div>
+                <p style={{ margin: 0, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, color: COLORS.gold, fontWeight: 700 }}>Reviews</p>
+                <h2 style={{ margin: '2px 0 0', fontSize: 18, color: '#fff' }}>{reviewsModal.title}</h2>
+              </div>
+              <button type="button" onClick={() => setReviewsModal(null)} aria-label="Close" className="qk-press"
+                style={{ flex: '0 0 auto', appearance: 'none', border: '1px solid rgba(246,241,230,0.5)', background: 'rgba(246,241,230,0.12)', color: '#fff', fontWeight: 700, fontSize: 16, lineHeight: 1, borderRadius: 999, width: 32, height: 32, cursor: 'pointer' }}>×</button>
+            </div>
+            <div style={{ padding: '18px 22px', overflowY: 'auto' }}>
+              {reviewsModal.reviews === null && (
+                <p style={{ margin: 0, padding: '20px 0', textAlign: 'center', color: COLORS.muted, fontSize: 14 }}>Loading reviews…</p>
+              )}
+              {reviewsModal.reviews !== null && reviewsModal.reviews.length === 0 && (
+                <p style={{ margin: 0, padding: '20px 0', textAlign: 'center', color: COLORS.muted, fontSize: 14 }}>No reviews yet for this listing.</p>
+              )}
+              {reviewsModal.reviews !== null && reviewsModal.reviews.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {reviewsModal.reviews.map((r, i) => {
+                    const full = Math.max(0, Math.min(5, Math.round(Number(r.rating) || 0)))
+                    return (
+                      <div key={i} style={{ background: COLORS.cream, borderRadius: 16, border: '1px solid rgba(42,34,32,0.06)', padding: '14px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                          <span aria-hidden="true" style={{ letterSpacing: 1, fontSize: 14 }}>
+                            {Array.from({ length: 5 }).map((_, n) => (
+                              <span key={n} style={{ color: n < full ? COLORS.gold : 'rgba(42,34,32,0.20)' }}>★</span>
+                            ))}
+                          </span>
+                          {r.created_at && (
+                            <span style={{ fontSize: 12, color: COLORS.muted }}>
+                              {new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </span>
+                          )}
+                        </div>
+                        <p style={{ margin: '8px 0 0', fontSize: 13.5, fontWeight: 700, color: COLORS.ink }}>{r.reviewer_name || 'Guest'}</p>
+                        {r.comment && <p style={{ margin: '5px 0 0', fontSize: 13.5, lineHeight: 1.55, color: COLORS.ink }}>{r.comment}</p>}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>

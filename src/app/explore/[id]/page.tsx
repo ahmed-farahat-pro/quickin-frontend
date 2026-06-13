@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation'
 import { API_URL, type Listing } from '@/lib/api'
 import ReservePanel from './reserve-panel'
 import ReviewsSection from './reviews-section'
+import { HostedBy, MoreFromHost } from './host-section'
 import ImagePlaceholder from '../../_components/image-placeholder'
 import AmenityIcon from '../../_components/amenity-icon'
 import HeartButton from '../../_components/heart-button'
@@ -392,6 +393,11 @@ export default async function ListingDetailPage({
               </div>
             )}
 
+            {/* Host — "Hosted by {name}" with a gold-gradient avatar. */}
+            {(listing.host_name || listing.host_id) && (
+              <HostedBy name={listing.host_name} />
+            )}
+
             {/* Guest reviews (client-fetched). Renders nothing until it has at
                 least one review — the "New" badge by the title covers empty. */}
             <ReviewsSection listingId={listing.id} />
@@ -441,6 +447,13 @@ export default async function ListingDetailPage({
             )}
           </aside>
         </div>
+
+        {/* More from this host — full-width below the two-column area. Fetches
+            the host's other published listings and hides itself if there are
+            none (or no host id is known). */}
+        {listing.host_id && (
+          <MoreFromHost hostId={listing.host_id} currentListingId={listing.id} />
+        )}
       </div>
     </main>
   )

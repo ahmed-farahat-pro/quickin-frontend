@@ -35,6 +35,11 @@ export interface Listing {
   // average (0 when there are no reviews); `review_count` is how many.
   rating?: number
   review_count?: number
+  // The host who owns this listing. `host_id` powers the "More from this host"
+  // section (GET /api/local/listings?host=<host_id>); `host_name` is the display
+  // label shown on the detail page. Both may be absent on older rows.
+  host_id?: string | null
+  host_name?: string | null
 }
 
 export interface Booking {

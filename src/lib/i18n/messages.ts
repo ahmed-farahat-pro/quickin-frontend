@@ -93,6 +93,11 @@ export const messages: Record<Lang, Dict> = {
     'listing.spec.baths': 'Baths',
     'listing.listingCode': 'Listing code',
 
+    // ---- Listing detail: host -------------------------------------------
+    'host.hostedByLabel': 'Hosted by',
+    'host.aHost': 'A QuickIn host',
+    'host.moreFromHost': 'More from this host',
+
     // ---- Reserve panel ----------------------------------------------------
     'reserve.pricesInEgp': 'Prices in EGP',
     'reserve.checkIn': 'Check-in',
@@ -335,6 +340,11 @@ export const messages: Record<Lang, Dict> = {
     'listing.spec.beds': 'الأسرّة',
     'listing.spec.baths': 'الحمّامات',
     'listing.listingCode': 'كود الإعلان',
+
+    // ---- Listing detail: host -------------------------------------------
+    'host.hostedByLabel': 'يستضيفك',
+    'host.aHost': 'مضيف لدى QuickIn',
+    'host.moreFromHost': 'المزيد من هذا المضيف',
 
     // ---- Reserve panel ----------------------------------------------------
     'reserve.pricesInEgp': 'الأسعار بالجنيه المصري',
