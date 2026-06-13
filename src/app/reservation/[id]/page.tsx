@@ -8,8 +8,10 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import QRCode from 'qrcode'
-import { API_URL, getToken, type Reservation } from '@/lib/api'
+import { API_URL, getToken, type Reservation, type ReviewableStay } from '@/lib/api'
 import BookingChat from '@/app/_components/booking-chat'
+import ReviewForm from '@/app/_components/review-form'
+import { useLanguage } from '@/lib/i18n/language-provider'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -52,10 +54,14 @@ type State =
   | { kind: 'ready'; reservation: Reservation }
 
 export default function ReservationDetailPage() {
+  const { t } = useLanguage()
   const params = useParams<{ id: string }>()
   const id = params?.id
   const [state, setState] = useState<State>({ kind: 'loading' })
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
+  // Whether THIS booking is reviewable (confirmed + checkout passed + not yet
+  // reviewed). Sourced from the authoritative reviewable-stays list.
+  const [reviewable, setReviewable] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -116,6 +122,33 @@ export default function ReservationDetailPage() {
       .catch(() => {
         if (!cancelled) setQrDataUrl(null)
       })
+    return () => {
+      cancelled = true
+    }
+  }, [state])
+
+  // Once the reservation loads, check the reviewable-stays list to see whether
+  // this booking can be reviewed. Non-fatal: any failure just hides the form.
+  useEffect(() => {
+    if (state.kind !== 'ready') return
+    const token = getToken()
+    if (!token) return
+    const bookingId = state.reservation.id
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/local/reviews`, {
+          headers: { Authorization: 'Bearer ' + token },
+        })
+        if (!res.ok) return
+        const data = (await res.json()) as ReviewableStay[]
+        if (!cancelled && Array.isArray(data)) {
+          setReviewable(data.some((s) => s.booking_id === bookingId))
+        }
+      } catch {
+        /* ignore — the review form simply stays hidden */
+      }
+    })()
     return () => {
       cancelled = true
     }
@@ -221,6 +254,49 @@ export default function ReservationDetailPage() {
               reservation={state.reservation}
               qrDataUrl={qrDataUrl}
             />
+
+            {/* Leave a review — shown only for a completed (confirmed + past
+                checkout, not-yet-reviewed) stay per the reviewable list. */}
+            {reviewable && (
+              <div
+                style={{
+                  marginTop: 24,
+                  background: '#fff',
+                  borderRadius: 24,
+                  border: '1px solid rgba(42,34,32,0.06)',
+                  boxShadow: '0 10px 36px rgba(42,34,32,0.10)',
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    padding: '18px 26px',
+                    borderBottom: '1px solid rgba(42,34,32,0.08)',
+                  }}
+                >
+                  <h2
+                    style={{
+                      margin: 0,
+                      fontFamily: '"Playfair Display", Georgia, serif',
+                      fontSize: 20,
+                      fontWeight: 700,
+                      color: COLORS.burgundy,
+                    }}
+                  >
+                    {t('reviews.leaveReview')}
+                  </h2>
+                  <p style={{ margin: '4px 0 0', fontSize: 13, color: COLORS.muted }}>
+                    {t('reviews.leaveReviewSub')}
+                  </p>
+                </div>
+                <div style={{ padding: '20px 26px 26px' }}>
+                  <ReviewForm
+                    bookingId={state.reservation.id}
+                    onSubmitted={() => setReviewable(false)}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Messages — per-booking thread with the host. */}
             <div

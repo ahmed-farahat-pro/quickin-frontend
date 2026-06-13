@@ -7,8 +7,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { API_URL, type Listing } from '@/lib/api'
+import { fetchWishlistIds } from '@/lib/wishlist'
 import DatePickerField from '../_components/date-picker-field'
 import ImagePlaceholder from '../_components/image-placeholder'
+import HeartButton from '../_components/heart-button'
+import RatingStars from '../_components/rating-stars'
 import { useLanguage } from '@/lib/i18n/language-provider'
 
 // Leaflet must never run on the server (it reads `window` at import time), so
@@ -126,6 +129,10 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
   // mount; the row stays hidden until it loads (or silently if the call fails).
   const [regions, setRegions] = useState<RegionCount[]>([])
 
+  // Saved listing ids (the user's wishlist) — used to pre-light the hearts on
+  // each card. Only populated when signed in; stays empty otherwise.
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
+
   // Tracks the query string that produced `listings`, so we can skip the very
   // first fetch (the server already rendered that exact result set).
   const lastQueryRef = useRef<string>(buildQuery(initialFilters))
@@ -223,6 +230,17 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
     return () => {
       cancelled = true
     }
+  }, [])
+
+  // Load the signed-in user's saved listing ids once on mount so already-saved
+  // hearts render filled. Skips entirely (empty set) when signed out.
+  useEffect(() => {
+    const controller = new AbortController()
+    ;(async () => {
+      const { listingIds } = await fetchWishlistIds(controller.signal)
+      setSavedIds(listingIds)
+    })()
+    return () => controller.abort()
   }, [])
 
   const hasFilters = useMemo(() => Boolean(buildQuery(filters)), [filters])
@@ -857,7 +875,11 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
             }}
           >
             {listings.map((listing) => (
-              <ListingCard key={listing.id} listing={listing} />
+              <ListingCard
+                key={listing.id}
+                listing={listing}
+                saved={savedIds.has(listing.id)}
+              />
             ))}
           </div>
         )}
@@ -868,9 +890,11 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
 
 // A single explore card — rounded cover image (or clean placeholder), a heart,
 // a guest-favorite star badge, and "EGP X / night".
-function ListingCard({ listing }: { listing: Listing }) {
+function ListingCard({ listing, saved }: { listing: Listing; saved: boolean }) {
   const { t } = useLanguage()
   const cover = listing.listing_images[0]?.url || null
+  const reviewCount = listing.review_count ?? 0
+  const rating = listing.rating ?? 0
   return (
     <a
       href={`/explore/${listing.id}`}
@@ -927,37 +951,17 @@ function ListingCard({ listing }: { listing: Listing }) {
           }}
         />
 
-        {/* Heart — pop-in + springy hover */}
+        {/* Heart — interactive wishlist toggle (pop-in + springy hover). Sits
+            above the card's <a>; the button stops the click from navigating. */}
         <span
-          aria-hidden="true"
-          className="qk-heart qk-pop"
           style={{
             position: 'absolute',
             top: 12,
             insetInlineEnd: 12,
-            width: 36,
-            height: 36,
-            borderRadius: 999,
-            background: 'rgba(255,255,255,0.92)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 4px 12px rgba(42,34,32,0.16)',
+            zIndex: 2,
           }}
         >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke={COLORS.burgundy}
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 1 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8Z" />
-          </svg>
+          <HeartButton itemType="listing" itemId={listing.id} initialSaved={saved} />
         </span>
 
         {listing.is_guest_favorite && (
@@ -1009,21 +1013,10 @@ function ListingCard({ listing }: { listing: Listing }) {
           >
             {listing.title}
           </h2>
-          {listing.is_guest_favorite && (
-            <span
-              style={{
-                flex: '0 0 auto',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-                fontSize: 13,
-                fontWeight: 700,
-                color: COLORS.ink,
-              }}
-            >
-              <span className="qk-star">★</span> 5.0
-            </span>
-          )}
+          {/* Real rating: gold ★ + average, or "New" when no reviews yet. */}
+          <span style={{ flex: '0 0 auto' }}>
+            <RatingStars rating={rating} reviewCount={reviewCount} size={13} showCount={false} />
+          </span>
         </div>
         {listing.location && (
           <p style={{ margin: '6px 0 0', fontSize: 14, color: COLORS.muted }}>

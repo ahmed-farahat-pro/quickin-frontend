@@ -31,6 +31,10 @@ export interface Listing {
   lng: number | null
   listing_images: ListingImage[]
   amenities?: string[]
+  // Real aggregate review stats (backend computes these). `rating` is the
+  // average (0 when there are no reviews); `review_count` is how many.
+  rating?: number
+  review_count?: number
 }
 
 export interface Booking {
@@ -117,6 +121,37 @@ export interface ServiceRequest {
   host_name: string | null
   requester_name: string | null
   requester_email: string | null
+}
+
+// ---- Wishlist ---------------------------------------------------------------
+
+// GET /api/local/wishlist (Bearer) — the user's saved items. `listings` and
+// `services` are full objects (for rendering cards); the *Ids arrays are the
+// cheap membership lists used to light up already-saved hearts.
+export interface WishlistResponse {
+  listings: Listing[]
+  services: Service[]
+  listingIds: string[]
+  serviceIds: string[]
+}
+
+// ---- Reviews ----------------------------------------------------------------
+
+// One public review of a listing (GET /api/local/reviews?listing_id=ID).
+export interface Review {
+  rating: number
+  comment: string | null
+  reviewer_name: string | null
+  created_at: string
+}
+
+// A stay the signed-in user can review (GET /api/local/reviews with Bearer):
+// a confirmed booking whose checkout has passed and isn't reviewed yet.
+export interface ReviewableStay {
+  booking_id: string
+  listing_id: string
+  title: string
+  check_out: string
 }
 
 // The shape persisted in localStorage 'qk_user' after login/signup.

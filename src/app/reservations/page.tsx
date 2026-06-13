@@ -2,9 +2,11 @@
 
 // My reservations (UI-only) — the signed-in user's bookings, fetched from the
 // backend with the bearer token stored in localStorage. No cookies / no DB here.
-import { useEffect, useState } from 'react'
-import { API_URL, type Booking } from '@/lib/api'
+import { useCallback, useEffect, useState } from 'react'
+import { API_URL, type Booking, type ReviewableStay } from '@/lib/api'
 import ImagePlaceholder from '../_components/image-placeholder'
+import ReviewForm from '../_components/review-form'
+import { useLanguage } from '@/lib/i18n/language-provider'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -126,6 +128,19 @@ type State =
 
 export default function ReservationsPage() {
   const [state, setState] = useState<State>({ kind: 'loading' })
+  // Booking ids the user can review (confirmed + past checkout, not yet
+  // reviewed). Fetched alongside the bookings; drives the "Leave a review" card.
+  const [reviewableIds, setReviewableIds] = useState<Set<string>>(new Set())
+
+  // Drop a stay from the reviewable set once its review is submitted.
+  const markReviewed = useCallback((bookingId: string) => {
+    setReviewableIds((prev) => {
+      if (!prev.has(bookingId)) return prev
+      const next = new Set(prev)
+      next.delete(bookingId)
+      return next
+    })
+  }, [])
 
   useEffect(() => {
     const token = localStorage.getItem('qk_token')
@@ -162,6 +177,23 @@ export default function ReservationsPage() {
             kind: 'error',
             message: 'We couldn’t load your reservations. Please try again.',
           })
+      }
+    })()
+
+    // Reviewable stays (best-effort, non-fatal). A failure just hides the
+    // review controls.
+    ;(async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/local/reviews`, {
+          headers: { Authorization: 'Bearer ' + token },
+        })
+        if (!res.ok) return
+        const data = (await res.json()) as ReviewableStay[]
+        if (!cancelled && Array.isArray(data)) {
+          setReviewableIds(new Set(data.map((s) => s.booking_id)))
+        }
+      } catch {
+        /* ignore */
       }
     })()
 
@@ -295,7 +327,12 @@ export default function ReservationsPage() {
         )}
 
         {state.kind === 'ready' && (
-          <ReservationsList bookings={state.bookings} firstName={state.firstName} />
+          <ReservationsList
+            bookings={state.bookings}
+            firstName={state.firstName}
+            reviewableIds={reviewableIds}
+            onReviewed={markReviewed}
+          />
         )}
       </section>
     </main>
@@ -305,9 +342,13 @@ export default function ReservationsPage() {
 function ReservationsList({
   bookings,
   firstName,
+  reviewableIds,
+  onReviewed,
 }: {
   bookings: Booking[]
   firstName: string
+  reviewableIds: Set<string>
+  onReviewed: (bookingId: string) => void
 }) {
   return (
     <>
@@ -364,127 +405,177 @@ function ReservationsList({
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           {bookings.map((b) => (
-            <a
+            <ReservationItem
               key={b.id}
-              href={`/reservation/${b.id}`}
-              className="qk-res-card qk-card"
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '160px 1fr auto',
-                gap: 20,
-                background: '#fff',
-                borderRadius: 20,
-                border: `1px solid rgba(42,34,32,0.06)`,
-                boxShadow: '0 8px 22px rgba(42,34,32,0.10)',
-                overflow: 'hidden',
-                alignItems: 'stretch',
-                textDecoration: 'none',
-                color: 'inherit',
-                cursor: 'pointer',
-              }}
-            >
-              <div
-                className="qk-res-img"
-                style={{
-                  position: 'relative',
-                  width: 160,
-                  minHeight: 130,
-                  overflow: 'hidden',
-                  background: COLORS.tan,
-                }}
-              >
-                {b.image ? (
-                  <img
-                    src={b.image}
-                    alt={b.title}
-                    className="qk-img-zoom"
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      display: 'block',
-                    }}
-                  />
-                ) : (
-                  <ImagePlaceholder iconSize={26} fontSize={11} />
-                )}
-              </div>
-
-              <div className="qk-res-body" style={{ padding: '18px 0', minWidth: 0 }}>
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  <h2
-                    style={{
-                      margin: 0,
-                      fontSize: 18,
-                      fontWeight: 700,
-                      color: COLORS.ink,
-                    }}
-                  >
-                    {b.title}
-                  </h2>
-                  <StatusBadge status={b.status} />
-                </div>
-                {b.location && (
-                  <p
-                    style={{
-                      margin: '4px 0 0',
-                      fontSize: 14,
-                      color: COLORS.muted,
-                    }}
-                  >
-                    {b.location}
-                  </p>
-                )}
-                <p
-                  style={{
-                    margin: '12px 0 0',
-                    fontSize: 14,
-                    color: COLORS.ink,
-                  }}
-                >
-                  {fmtDate(b.check_in)} → {fmtDate(b.check_out)}
-                </p>
-                <p
-                  style={{
-                    margin: '4px 0 0',
-                    fontSize: 14,
-                    color: COLORS.muted,
-                  }}
-                >
-                  {b.guests} {b.guests === 1 ? 'guest' : 'guests'}
-                </p>
-              </div>
-
-              <div
-                className="qk-res-price"
-                style={{
-                  padding: '18px 22px',
-                  textAlign: 'right',
-                  alignSelf: 'center',
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 22,
-                    fontWeight: 800,
-                    color: COLORS.burgundy,
-                  }}
-                >
-                  EGP {b.total_price}
-                </div>
-                <div style={{ fontSize: 13, color: COLORS.muted }}>total</div>
-              </div>
-            </a>
+              booking={b}
+              reviewable={reviewableIds.has(b.id)}
+              onReviewed={() => onReviewed(b.id)}
+            />
           ))}
         </div>
       )}
     </>
+  )
+}
+
+// One reservation row: the clickable card plus, when the stay is reviewable, an
+// inline "Leave a review" panel beneath it (kept OUTSIDE the card's <a> so its
+// star buttons + textarea aren't swallowed by the link navigation).
+function ReservationItem({
+  booking: b,
+  reviewable,
+  onReviewed,
+}: {
+  booking: Booking
+  reviewable: boolean
+  onReviewed: () => void
+}) {
+  const { t } = useLanguage()
+  return (
+    <div>
+      <a
+        href={`/reservation/${b.id}`}
+        className="qk-res-card qk-card"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '160px 1fr auto',
+          gap: 20,
+          background: '#fff',
+          borderRadius: 20,
+          border: `1px solid rgba(42,34,32,0.06)`,
+          boxShadow: '0 8px 22px rgba(42,34,32,0.10)',
+          overflow: 'hidden',
+          alignItems: 'stretch',
+          textDecoration: 'none',
+          color: 'inherit',
+          cursor: 'pointer',
+        }}
+      >
+        <div
+          className="qk-res-img"
+          style={{
+            position: 'relative',
+            width: 160,
+            minHeight: 130,
+            overflow: 'hidden',
+            background: COLORS.tan,
+          }}
+        >
+          {b.image ? (
+            <img
+              src={b.image}
+              alt={b.title}
+              className="qk-img-zoom"
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                display: 'block',
+              }}
+            />
+          ) : (
+            <ImagePlaceholder iconSize={26} fontSize={11} />
+          )}
+        </div>
+
+        <div className="qk-res-body" style={{ padding: '18px 0', minWidth: 0 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              flexWrap: 'wrap',
+            }}
+          >
+            <h2
+              style={{
+                margin: 0,
+                fontSize: 18,
+                fontWeight: 700,
+                color: COLORS.ink,
+              }}
+            >
+              {b.title}
+            </h2>
+            <StatusBadge status={b.status} />
+          </div>
+          {b.location && (
+            <p
+              style={{
+                margin: '4px 0 0',
+                fontSize: 14,
+                color: COLORS.muted,
+              }}
+            >
+              {b.location}
+            </p>
+          )}
+          <p
+            style={{
+              margin: '12px 0 0',
+              fontSize: 14,
+              color: COLORS.ink,
+            }}
+          >
+            {fmtDate(b.check_in)} → {fmtDate(b.check_out)}
+          </p>
+          <p
+            style={{
+              margin: '4px 0 0',
+              fontSize: 14,
+              color: COLORS.muted,
+            }}
+          >
+            {b.guests} {b.guests === 1 ? 'guest' : 'guests'}
+          </p>
+        </div>
+
+        <div
+          className="qk-res-price"
+          style={{
+            padding: '18px 22px',
+            textAlign: 'right',
+            alignSelf: 'center',
+          }}
+        >
+          <div
+            style={{
+              fontSize: 22,
+              fontWeight: 800,
+              color: COLORS.burgundy,
+            }}
+          >
+            EGP {b.total_price}
+          </div>
+          <div style={{ fontSize: 13, color: COLORS.muted }}>total</div>
+        </div>
+      </a>
+
+      {/* Inline review panel for a completed stay. */}
+      {reviewable && (
+        <div
+          style={{
+            marginTop: 10,
+            background: '#fff',
+            borderRadius: 16,
+            border: '1px solid rgba(42,34,32,0.06)',
+            boxShadow: '0 6px 18px rgba(42,34,32,0.07)',
+            padding: '16px 18px',
+          }}
+        >
+          <p
+            style={{
+              margin: '0 0 10px',
+              fontSize: 14,
+              fontWeight: 700,
+              color: COLORS.burgundy,
+            }}
+          >
+            {t('reviews.leaveReview')}
+          </p>
+          <ReviewForm bookingId={b.id} onSubmitted={onReviewed} compact />
+        </div>
+      )}
+    </div>
   )
 }

@@ -50,6 +50,33 @@ function linkStyle(active = false): React.CSSProperties {
   }
 }
 
+// "Saved" wishlist link — a small heart + label, signed-in only. Shared by both
+// the guest and host nav.
+function SavedLink({ label }: { label: string }) {
+  return (
+    <a
+      href="/wishlist"
+      style={{ ...linkStyle(), display: 'inline-flex', alignItems: 'center', gap: 6 }}
+      aria-label={label}
+    >
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke={COLORS.burgundy}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 1 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8Z" />
+      </svg>
+      {label}
+    </a>
+  )
+}
+
 export default function AuthArea() {
   const { t } = useLanguage()
   // Start null so server + first client render match; fill in after mount.
@@ -100,6 +127,7 @@ export default function AuthArea() {
         <a href="/host#services" style={linkStyle()}>
           {t('nav.services')}
         </a>
+        <SavedLink label={t('nav.saved')} />
         <a href="/account" style={linkStyle()}>
           {t('nav.profile')}
         </a>
@@ -128,6 +156,7 @@ export default function AuthArea() {
             {t('nav.subscriptions')}
           </a>
         )}
+        {signedIn && <SavedLink label={t('nav.saved')} />}
         {signedIn && (
           <a href="/account" style={linkStyle()}>
             {t('nav.account')}

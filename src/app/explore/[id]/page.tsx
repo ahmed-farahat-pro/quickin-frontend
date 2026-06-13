@@ -4,8 +4,11 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { API_URL, type Listing } from '@/lib/api'
 import ReservePanel from './reserve-panel'
+import ReviewsSection from './reviews-section'
 import ImagePlaceholder from '../../_components/image-placeholder'
 import AmenityIcon from '../../_components/amenity-icon'
+import HeartButton from '../../_components/heart-button'
+import RatingStars from '../../_components/rating-stars'
 import { JsonLd, listingLd, breadcrumbLd } from '../../_components/structured-data'
 import { T, BackToExplore, GuestFavoriteBadge } from './detail-text'
 
@@ -233,21 +236,48 @@ export default async function ListingDetailPage({
           {listing.is_guest_favorite && (
             <GuestFavoriteBadge background={COLORS.tan} />
           )}
-          <h1
+          <div
             style={{
-              margin: 0,
-              fontFamily:
-                '"Playfair Display", Georgia, "Times New Roman", serif',
-              fontSize: 'clamp(28px, 4.5vw, 42px)',
-              fontWeight: 700,
-              letterSpacing: '-0.02em',
-              lineHeight: 1.15,
-              color: COLORS.burgundy,
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: 16,
             }}
           >
-            {listing.title}
-          </h1>
-          <p style={{ margin: '10px 0 0', fontSize: 16, color: COLORS.muted }}>
+            <h1
+              style={{
+                margin: 0,
+                fontFamily:
+                  '"Playfair Display", Georgia, "Times New Roman", serif',
+                fontSize: 'clamp(28px, 4.5vw, 42px)',
+                fontWeight: 700,
+                letterSpacing: '-0.02em',
+                lineHeight: 1.15,
+                color: COLORS.burgundy,
+              }}
+            >
+              {listing.title}
+            </h1>
+            {/* Wishlist heart — stands alone here (no parent link to guard). */}
+            <span style={{ flex: '0 0 auto', marginTop: 4 }}>
+              <HeartButton
+                itemType="listing"
+                itemId={listing.id}
+                size={44}
+                stopPropagation={false}
+                autoFetchSaved
+              />
+            </span>
+          </div>
+          {/* Real rating: gold ★ + average + count, or "New" when no reviews. */}
+          <div style={{ marginTop: 10 }}>
+            <RatingStars
+              rating={listing.rating ?? 0}
+              reviewCount={listing.review_count ?? 0}
+              size={15}
+            />
+          </div>
+          <p style={{ margin: '8px 0 0', fontSize: 16, color: COLORS.muted }}>
             {[listing.location, listing.country].filter(Boolean).join(', ')}
             {listing.property_type ? ` · ${listing.property_type}` : ''}
           </p>
@@ -361,6 +391,10 @@ export default async function ListingDetailPage({
                 </div>
               </div>
             )}
+
+            {/* Guest reviews (client-fetched). Renders nothing until it has at
+                least one review — the "New" badge by the title covers empty. */}
+            <ReviewsSection listingId={listing.id} />
           </div>
 
           {/* Reserve panel */}
