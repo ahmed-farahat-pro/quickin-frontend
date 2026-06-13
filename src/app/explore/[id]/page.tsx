@@ -6,6 +6,7 @@ import { API_URL, type Listing } from '@/lib/api'
 import ReservePanel from './reserve-panel'
 import ImagePlaceholder from '../../_components/image-placeholder'
 import AmenityIcon from '../../_components/amenity-icon'
+import { JsonLd, listingLd, breadcrumbLd } from '../../_components/structured-data'
 
 export const dynamic = 'force-dynamic'
 
@@ -119,6 +120,15 @@ export default async function ListingDetailPage({
           '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif',
       }}
     >
+      {/* Rich-result + AEO structured data for this stay. */}
+      <JsonLd data={listingLd(listing)} />
+      <JsonLd
+        data={breadcrumbLd([
+          { name: 'Home', url: '/' },
+          { name: 'Explore', url: '/explore' },
+          { name: listing.title, url: `/explore/${listing.id}` },
+        ])}
+      />
       {/* On phones the details + reserve panel stack into one column and the
           sticky panel becomes static. Inline styles can't hold media queries. */}
       <style>{`

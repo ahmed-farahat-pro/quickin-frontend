@@ -24,6 +24,7 @@ export interface Listing {
   bathrooms: number | null
   max_guests: number | null
   property_type: string | null
+  region: string | null
   is_guest_favorite: boolean
   listing_code: string | null
   lat: number | null

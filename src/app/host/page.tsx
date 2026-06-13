@@ -113,6 +113,11 @@ const PROPERTY_TYPES = [
   'Guest House',
 ]
 
+// Canonical coarse areas the host picks before dropping the precise pin. These
+// match the backend's GET /api/local/regions list and are sent as `region` in
+// the POST /api/local/listings body.
+const REGIONS = ['North Coast', 'Ain Sokhna', 'El Gouna', 'Cairo']
+
 // Selectable amenities for the add-listing wizard (chip grid). Stored on the
 // listing and rendered on the detail page's "What this place offers".
 const AMENITIES = [
@@ -139,6 +144,7 @@ const WIZARD_STEPS = ['Basics', 'Location', 'Details', 'Amenities', 'Photos & re
 interface FormState {
   title: string
   description: string
+  region: string
   location: string
   country: string
   price_per_night: string
@@ -158,6 +164,7 @@ interface FormState {
 const EMPTY_FORM: FormState = {
   title: '',
   description: '',
+  region: '',
   location: '',
   country: '',
   price_per_night: '',
@@ -247,6 +254,7 @@ export default function HostPage() {
       return null
     }
     if (s === 1) {
+      if (!form.region) return 'Pick a region for your place.'
       if (!pickedCoords) return 'Drop a pin on the map to set the location.'
       return null
     }
@@ -496,6 +504,7 @@ export default function HostPage() {
         body: JSON.stringify({
           title: form.title.trim(),
           description: form.description.trim(),
+          region: form.region || null,
           location: form.location.trim(),
           country: form.country.trim(),
           price_per_night: price,
@@ -884,9 +893,51 @@ export default function HostPage() {
           {step === 1 && (
             <div style={{ display: 'grid', gap: 14 }}>
               <p style={{ margin: 0, fontSize: 14, color: COLORS.muted }}>
-                Search for a place to jump there, then tap the map to drop the
+                Pick the region your place is in, then tap the map to drop the
                 pin — drag it to fine-tune the exact spot.
               </p>
+
+              {/* Region selector — the host picks the coarse area first, then
+                  drops the precise pin below. Required to advance the step. */}
+              <div>
+                <span style={labelStyle}>Region</span>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 10,
+                  }}
+                >
+                  {REGIONS.map((r) => {
+                    const on = form.region === r
+                    return (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => patch({ region: r })}
+                        aria-pressed={on}
+                        style={{
+                          padding: '9px 18px',
+                          fontSize: 14,
+                          fontWeight: 600,
+                          fontFamily: FONT,
+                          cursor: 'pointer',
+                          borderRadius: 999,
+                          color: on ? '#fff' : COLORS.ink,
+                          background: on ? COLORS.burgundy : '#fff',
+                          border: on
+                            ? `1px solid ${COLORS.burgundy}`
+                            : '1px solid rgba(42,34,32,0.16)',
+                          transition: 'background 0.12s ease, color 0.12s ease',
+                        }}
+                      >
+                        {r}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
               <LocationPicker
                 value={pickedCoords}
                 onPick={(lat, lng) =>
@@ -1153,6 +1204,7 @@ export default function HostPage() {
                   </h3>
                   <p style={{ margin: 0, fontSize: 13, color: COLORS.muted }}>
                     {form.property_type}
+                    {form.region ? ` · ${form.region}` : ''}
                     {form.location.trim() ? ` · ${form.location.trim()}` : ''}
                   </p>
                   <p style={{ margin: '10px 0 0', fontSize: 14 }}>

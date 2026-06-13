@@ -47,11 +47,33 @@ const SERIF = '"Playfair Display", Georgia, "Times New Roman", serif'
 
 type View = 'list' | 'map'
 
+// One canonical area + how many published listings it holds (GET
+// /api/local/regions). Selecting one adds `region=<region>` to the fetch.
+interface RegionCount {
+  region: string
+  count: number
+}
+
+// Sort options offered by the segmented control; the value is sent verbatim as
+// `sort=` to the backend. 'recommended' is the default and omitted from the URL.
+type Sort = 'recommended' | 'price_asc' | 'price_desc' | 'newest'
+
+const SORT_OPTIONS: { value: Sort; label: string }[] = [
+  { value: 'recommended', label: 'Recommended' },
+  { value: 'price_asc', label: 'Price: low to high' },
+  { value: 'price_desc', label: 'Price: high to low' },
+  { value: 'newest', label: 'Newest' },
+]
+
 interface Filters {
   location: string
   checkIn: string
   checkOut: string
   guests: string
+  region: string
+  sort: Sort
+  minPrice: string
+  maxPrice: string
 }
 
 interface Props {
@@ -65,10 +87,23 @@ function buildQuery(f: Filters): string {
   if (f.checkIn) params.set('checkIn', f.checkIn)
   if (f.checkOut) params.set('checkOut', f.checkOut)
   if (f.guests.trim()) params.set('guests', f.guests.trim())
+  if (f.region) params.set('region', f.region)
+  if (f.sort && f.sort !== 'recommended') params.set('sort', f.sort)
+  if (f.minPrice.trim()) params.set('minPrice', f.minPrice.trim())
+  if (f.maxPrice.trim()) params.set('maxPrice', f.maxPrice.trim())
   return params.toString()
 }
 
-const EMPTY: Filters = { location: '', checkIn: '', checkOut: '', guests: '' }
+const EMPTY: Filters = {
+  location: '',
+  checkIn: '',
+  checkOut: '',
+  guests: '',
+  region: '',
+  sort: 'recommended',
+  minPrice: '',
+  maxPrice: '',
+}
 
 export default function ExploreClient({ initialListings, initialFilters }: Props) {
   const [filters, setFilters] = useState<Filters>(initialFilters)
@@ -76,6 +111,10 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState(false)
   const [view, setView] = useState<View>('list')
+
+  // Canonical regions for the chip row (GET /api/local/regions). Fetched once on
+  // mount; the row stays hidden until it loads (or silently if the call fails).
+  const [regions, setRegions] = useState<RegionCount[]>([])
 
   // Tracks the query string that produced `listings`, so we can skip the very
   // first fetch (the server already rendered that exact result set).
@@ -157,6 +196,25 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
     }
   }, [])
 
+  // Load the region chips once on mount. Failure is non-fatal — the row simply
+  // stays empty and the rest of the search keeps working.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/local/regions`)
+        if (!res.ok) return
+        const data = await res.json()
+        if (!cancelled && Array.isArray(data)) setRegions(data as RegionCount[])
+      } catch {
+        /* ignore — chips are an enhancement, not required */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const hasFilters = useMemo(() => Boolean(buildQuery(filters)), [filters])
 
   const count = listings.length
@@ -195,6 +253,14 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
         }
         @media (max-width: 440px) {
           .qk-results-grid { grid-template-columns: 1fr !important; }
+        }
+        @media (max-width: 620px) {
+          .qk-controls-row {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 14px !important;
+          }
+          .qk-sort-seg { width: 100% !important; justify-content: center; }
         }
       `}</style>
 
@@ -433,6 +499,125 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
                   Search
                 </span>
               </button>
+            </div>
+          </div>
+
+          {/* Region chips — an "All" chip plus one per region (with its listing
+              count). Selecting a chip adds `region=` to the fetch; "All" clears
+              it. Lives alongside the Where/dates/guests pill as an extra filter. */}
+          {regions.length > 0 && (
+            <div
+              role="group"
+              aria-label="Filter by region"
+              style={{
+                margin: '22px auto 0',
+                maxWidth: 860,
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 10,
+                justifyContent: 'center',
+              }}
+            >
+              <RegionChip
+                label="All"
+                active={filters.region === ''}
+                onClick={() => updateFilter({ region: '' })}
+              />
+              {regions.map((r) => (
+                <RegionChip
+                  key={r.region}
+                  label={r.region}
+                  count={r.count}
+                  active={filters.region === r.region}
+                  onClick={() =>
+                    updateFilter({
+                      region: filters.region === r.region ? '' : r.region,
+                    })
+                  }
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Sort + price filter row */}
+      <section style={{ background: COLORS.cream, padding: '20px 24px 0' }}>
+        <div
+          className="qk-controls-row"
+          style={{
+            maxWidth: 1200,
+            margin: '0 auto',
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'space-between',
+            gap: 16,
+            flexWrap: 'wrap',
+          }}
+        >
+          {/* Sort segmented control */}
+          <div>
+            <span style={controlLabel}>Sort by</span>
+            <div
+              role="tablist"
+              aria-label="Sort listings"
+              className="qk-sort-seg"
+              style={{
+                display: 'inline-flex',
+                flexWrap: 'wrap',
+                background: COLORS.tan,
+                borderRadius: 999,
+                padding: 4,
+                gap: 4,
+              }}
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <ToggleButton
+                  key={opt.value}
+                  label={opt.label}
+                  active={filters.sort === opt.value}
+                  onClick={() => updateFilter({ sort: opt.value })}
+                  role="tab"
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Price min/max */}
+          <div>
+            <span style={controlLabel}>Price / night (EGP)</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                type="number"
+                min={0}
+                inputMode="numeric"
+                placeholder="Min"
+                aria-label="Minimum price per night"
+                value={filters.minPrice}
+                onChange={(e) =>
+                  updateFilter({ minPrice: e.target.value }, { debounce: true })
+                }
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') submitSearch()
+                }}
+                style={priceInput}
+              />
+              <span style={{ color: COLORS.muted, fontSize: 14 }}>–</span>
+              <input
+                type="number"
+                min={0}
+                inputMode="numeric"
+                placeholder="Max"
+                aria-label="Maximum price per night"
+                value={filters.maxPrice}
+                onChange={(e) =>
+                  updateFilter({ maxPrice: e.target.value }, { debounce: true })
+                }
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') submitSearch()
+                }}
+                style={priceInput}
+              />
             </div>
           </div>
         </div>
@@ -830,19 +1015,45 @@ const segInput: React.CSSProperties = {
   padding: '2px 0',
 }
 
+// Small uppercase caption above the sort + price controls.
+const controlLabel: React.CSSProperties = {
+  display: 'block',
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: '0.05em',
+  textTransform: 'uppercase',
+  color: COLORS.muted,
+  marginBottom: 6,
+}
+
+const priceInput: React.CSSProperties = {
+  width: 92,
+  boxSizing: 'border-box',
+  padding: '9px 12px',
+  fontFamily: FONT,
+  fontSize: 14,
+  color: COLORS.ink,
+  background: '#fff',
+  border: '1px solid rgba(42,34,32,0.14)',
+  borderRadius: 999,
+  outline: 'none',
+}
+
 function ToggleButton({
   label,
   active,
   onClick,
+  role = 'tab',
 }: {
   label: string
   active: boolean
   onClick: () => void
+  role?: string
 }) {
   return (
     <button
       type="button"
-      role="tab"
+      role={role}
       aria-selected={active}
       onClick={onClick}
       style={{
@@ -857,9 +1068,62 @@ function ToggleButton({
         color: active ? '#fff' : COLORS.ink,
         background: active ? COLORS.burgundy : 'transparent',
         transition: 'background 0.15s ease, color 0.15s ease',
+        whiteSpace: 'nowrap',
       }}
     >
       {label}
+    </button>
+  )
+}
+
+// A region filter chip: name + optional count (e.g. "Ain Sokhna · 2"). Burgundy
+// when selected, matching the host add-listing region chips.
+function RegionChip({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string
+  count?: number
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      style={{
+        appearance: 'none',
+        cursor: 'pointer',
+        fontFamily: FONT,
+        fontSize: 14,
+        fontWeight: 600,
+        padding: '9px 18px',
+        borderRadius: 999,
+        whiteSpace: 'nowrap',
+        color: active ? '#fff' : COLORS.ink,
+        background: active ? COLORS.burgundy : '#fff',
+        border: active
+          ? `1px solid ${COLORS.burgundy}`
+          : '1px solid rgba(42,34,32,0.14)',
+        boxShadow: '0 2px 8px rgba(42,34,32,0.06)',
+        transition: 'background 0.12s ease, color 0.12s ease',
+      }}
+    >
+      {label}
+      {typeof count === 'number' && (
+        <span
+          style={{
+            marginLeft: 7,
+            fontWeight: 700,
+            color: active ? 'rgba(255,255,255,0.85)' : COLORS.muted,
+          }}
+        >
+          · {count}
+        </span>
+      )}
     </button>
   )
 }

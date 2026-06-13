@@ -66,6 +66,10 @@ export default async function ExplorePage({
     checkIn?: string
     checkOut?: string
     guests?: string
+    region?: string
+    sort?: string
+    minPrice?: string
+    maxPrice?: string
   }>
 }) {
   const sp = await searchParams
@@ -73,12 +77,26 @@ export default async function ExplorePage({
   const checkIn = sp.checkIn?.trim() || ''
   const checkOut = sp.checkOut?.trim() || ''
   const guestsRaw = sp.guests?.trim() || ''
+  const region = sp.region?.trim() || ''
+  // Only accept the known sort values; anything else falls back to 'recommended'.
+  const sortRaw = sp.sort?.trim() || ''
+  const sort = (
+    ['price_asc', 'price_desc', 'newest'].includes(sortRaw)
+      ? sortRaw
+      : 'recommended'
+  ) as 'recommended' | 'price_asc' | 'price_desc' | 'newest'
+  const minPrice = sp.minPrice?.trim() || ''
+  const maxPrice = sp.maxPrice?.trim() || ''
 
   const params = new URLSearchParams()
   if (location) params.set('location', location)
   if (checkIn) params.set('checkIn', checkIn)
   if (checkOut) params.set('checkOut', checkOut)
   if (guestsRaw) params.set('guests', guestsRaw)
+  if (region) params.set('region', region)
+  if (sort !== 'recommended') params.set('sort', sort)
+  if (minPrice) params.set('minPrice', minPrice)
+  if (maxPrice) params.set('maxPrice', maxPrice)
 
   const listings = await fetchListings(params.toString())
 
@@ -159,7 +177,16 @@ export default async function ExplorePage({
           re-fetches the backend live as the user types/filters. */}
       <ExploreClient
         initialListings={listings}
-        initialFilters={{ location, checkIn, checkOut, guests: guestsRaw }}
+        initialFilters={{
+          location,
+          checkIn,
+          checkOut,
+          guests: guestsRaw,
+          region,
+          sort,
+          minPrice,
+          maxPrice,
+        }}
       />
 
       {/* Footer */}
