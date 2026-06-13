@@ -31,7 +31,7 @@ const TAB_LABEL: Record<TabKey, string> = {
 
 interface Column { key: string; label: string; render?: (v: unknown, row: Record<string, unknown>) => React.ReactNode }
 
-const money = (v: unknown) => (v === null || v === undefined || v === '' ? '—' : `$${Number(v).toFixed(0)}`)
+const money = (v: unknown) => (v === null || v === undefined || v === '' ? '—' : `EGP ${Number(v).toFixed(0)}`)
 const yn = (v: unknown) => (v ? '✓' : '✗')
 const statusBadge = (v: unknown) => {
   const s = String(v ?? '')

@@ -6,7 +6,7 @@
 //   - key present  -> Google Maps (google-listings-map.tsx)
 //   - key missing  -> Leaflet price-pin map (leaflet-listings-map.tsx)
 //
-// Both render the same Airbnb-style burgundy "$price" pills over the FILTERED
+// Both render the same Airbnb-style burgundy "EGP price" pills over the FILTERED
 // listings, so the page always shows a working price-pin map and silently
 // upgrades to Google Maps the moment the key is set.
 //

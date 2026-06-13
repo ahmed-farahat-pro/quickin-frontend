@@ -4,6 +4,8 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { API_URL, type Listing } from '@/lib/api'
 import ReservePanel from './reserve-panel'
+import ImagePlaceholder from '../../_components/image-placeholder'
+import AmenityIcon from '../../_components/amenity-icon'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,7 +44,7 @@ export async function generateMetadata({
   const place = [listing.location, listing.country].filter(Boolean).join(', ')
   const description =
     listing.description?.trim() ||
-    `A boutique stay${place ? ` in ${place}` : ''} from $${listing.price_per_night} / night on QuickIn.`
+    `A boutique stay${place ? ` in ${place}` : ''} from EGP ${listing.price_per_night} / night on QuickIn.`
   const cover = listing.listing_images[0]?.url || '/logo.png'
 
   return {
@@ -65,9 +67,6 @@ export async function generateMetadata({
     },
   }
 }
-
-const FALLBACK_IMG =
-  'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=1600&q=80'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -106,8 +105,9 @@ export default async function ListingDetailPage({
   if (!listing) notFound()
 
   const images = listing.listing_images
-  const hero = images[0]?.url || FALLBACK_IMG
+  const hero = images[0]?.url || null
   const thumbs = images.slice(1)
+  const amenities = (listing.amenities || []).filter(Boolean)
 
   return (
     <main
@@ -129,6 +129,11 @@ export default async function ListingDetailPage({
           .qk-detail-aside {
             position: static !important;
             top: auto !important;
+          }
+        }
+        @media (max-width: 440px) {
+          .qk-amenity-grid {
+            grid-template-columns: 1fr !important;
           }
         }
       `}</style>
@@ -155,6 +160,7 @@ export default async function ListingDetailPage({
         {/* Hero */}
         <div
           style={{
+            position: 'relative',
             width: '100%',
             aspectRatio: '16 / 9',
             borderRadius: 24,
@@ -163,16 +169,20 @@ export default async function ListingDetailPage({
             boxShadow: '0 10px 36px rgba(42,34,32,0.12)',
           }}
         >
-          <img
-            src={hero}
-            alt={listing.title}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              display: 'block',
-            }}
-          />
+          {hero ? (
+            <img
+              src={hero}
+              alt={listing.title}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                display: 'block',
+              }}
+            />
+          ) : (
+            <ImagePlaceholder iconSize={52} fontSize={15} />
+          )}
         </div>
 
         {/* Thumbnail strip */}
@@ -295,6 +305,59 @@ export default async function ListingDetailPage({
                 >
                   {listing.description}
                 </p>
+              </div>
+            )}
+
+            {/* What this place offers (amenities) */}
+            {amenities.length > 0 && (
+              <div style={{ marginTop: 30 }}>
+                <h2
+                  style={{
+                    margin: '0 0 16px',
+                    fontSize: 19,
+                    fontWeight: 700,
+                    color: COLORS.ink,
+                  }}
+                >
+                  What this place offers
+                </h2>
+                <div
+                  className="qk-amenity-grid"
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                    gap: '14px 24px',
+                  }}
+                >
+                  {amenities.map((a) => (
+                    <div
+                      key={a}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        fontSize: 15,
+                        color: COLORS.ink,
+                      }}
+                    >
+                      <span
+                        style={{
+                          flex: '0 0 auto',
+                          width: 38,
+                          height: 38,
+                          borderRadius: 12,
+                          background: COLORS.tan,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <AmenityIcon name={a} />
+                      </span>
+                      <span>{a}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>

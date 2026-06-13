@@ -5,6 +5,7 @@
 import type { Metadata } from 'next'
 import { API_URL, type Service } from '@/lib/api'
 import AuthArea from '../_components/auth-area'
+import ImagePlaceholder from '../_components/image-placeholder'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,9 +41,6 @@ const COLORS = {
 }
 
 const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
-
-const FALLBACK_IMG =
-  'https://images.unsplash.com/photo-1502933691298-84fc14542831?w=1200&q=80'
 
 // Fetch all published services from the backend. Fails gracefully (empty grid)
 // if the backend is unreachable.
@@ -194,7 +192,7 @@ export default async function ServicesPage() {
             }}
           >
             {services.map((service) => {
-              const cover = service.image_url || FALLBACK_IMG
+              const cover = service.image_url || null
               return (
                 <a
                   key={service.id}
@@ -221,17 +219,21 @@ export default async function ServicesPage() {
                       background: COLORS.tan,
                     }}
                   >
-                    <img
-                      src={cover}
-                      alt={service.title}
-                      loading="lazy"
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                        display: 'block',
-                      }}
-                    />
+                    {cover ? (
+                      <img
+                        src={cover}
+                        alt={service.title}
+                        loading="lazy"
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          display: 'block',
+                        }}
+                      />
+                    ) : (
+                      <ImagePlaceholder />
+                    )}
                     {service.category && (
                       <span
                         style={{
@@ -288,7 +290,7 @@ export default async function ServicesPage() {
                     >
                       <span style={{ fontSize: 15, color: COLORS.ink }}>
                         <span style={{ fontWeight: 700, color: COLORS.burgundy }}>
-                          ${service.price}
+                          EGP {service.price}
                         </span>
                       </span>
                       <span

@@ -92,6 +92,12 @@ export default function AuthArea() {
         >
           Subscriptions
         </a>
+        <a
+          href="/account"
+          style={{ color: COLORS.ink, textDecoration: 'none', fontWeight: 600 }}
+        >
+          Account
+        </a>
         <NotificationBell />
         <span style={{ color: COLORS.ink, fontWeight: 600 }}>
           Hi, {firstName}

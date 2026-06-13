@@ -5,9 +5,7 @@
 // /reservations list. No cookies / no DB here.
 import { useEffect, useState } from 'react'
 import { API_URL, type ServiceRequest } from '@/lib/api'
-
-const FALLBACK_IMG =
-  'https://images.unsplash.com/photo-1502933691298-84fc14542831?w=800&q=80'
+import ImagePlaceholder from '../_components/image-placeholder'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -383,21 +381,26 @@ function SubscriptionsList({
                 <div
                   className="qk-sub-img"
                   style={{
+                    position: 'relative',
                     width: 160,
                     minHeight: 130,
                     background: COLORS.tan,
                   }}
                 >
-                  <img
-                    src={r.service_image || FALLBACK_IMG}
-                    alt={r.service_title}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      display: 'block',
-                    }}
-                  />
+                  {r.service_image ? (
+                    <img
+                      src={r.service_image}
+                      alt={r.service_title}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        display: 'block',
+                      }}
+                    />
+                  ) : (
+                    <ImagePlaceholder iconSize={26} fontSize={11} />
+                  )}
                 </div>
 
                 <div className="qk-sub-body" style={{ padding: '18px 0', minWidth: 0 }}>
@@ -483,7 +486,7 @@ function SubscriptionsList({
                       color: COLORS.burgundy,
                     }}
                   >
-                    ${r.service_price}
+                    EGP {r.service_price}
                   </div>
                   <div style={{ fontSize: 13, color: COLORS.muted }}>price</div>
                 </div>

@@ -5,6 +5,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { API_URL, type Service } from '@/lib/api'
 import SubscribePanel from './subscribe-panel'
+import ImagePlaceholder from '../../_components/image-placeholder'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,7 +45,7 @@ export async function generateMetadata({
     service.description?.trim() ||
     `A ${service.category || 'standalone'} experience${
       service.location ? ` in ${service.location}` : ''
-    } from $${service.price} on QuickIn.`
+    } from EGP ${service.price} on QuickIn.`
   const cover = service.image_url || '/logo.png'
 
   return {
@@ -68,9 +69,6 @@ export async function generateMetadata({
   }
 }
 
-const FALLBACK_IMG =
-  'https://images.unsplash.com/photo-1502933691298-84fc14542831?w=1600&q=80'
-
 const COLORS = {
   burgundy: '#5B0F16',
   cream: '#F6F1E6',
@@ -88,7 +86,7 @@ export default async function ServiceDetailPage({
   const service = await fetchService(id)
   if (!service) notFound()
 
-  const hero = service.image_url || FALLBACK_IMG
+  const hero = service.image_url || null
 
   return (
     <main
@@ -136,6 +134,7 @@ export default async function ServiceDetailPage({
         {/* Hero */}
         <div
           style={{
+            position: 'relative',
             width: '100%',
             aspectRatio: '16 / 9',
             borderRadius: 24,
@@ -144,16 +143,20 @@ export default async function ServiceDetailPage({
             boxShadow: '0 10px 36px rgba(42,34,32,0.12)',
           }}
         >
-          <img
-            src={hero}
-            alt={service.title}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              display: 'block',
-            }}
-          />
+          {hero ? (
+            <img
+              src={hero}
+              alt={service.title}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                display: 'block',
+              }}
+            />
+          ) : (
+            <ImagePlaceholder iconSize={52} fontSize={15} />
+          )}
         </div>
 
         {/* Title + category + host/location */}

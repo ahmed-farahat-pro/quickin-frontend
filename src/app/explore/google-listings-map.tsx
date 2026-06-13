@@ -3,14 +3,11 @@
 // Google Maps version of the explore price-pin map. Used ONLY when
 // NEXT_PUBLIC_GOOGLE_MAPS_API_KEY is set (listings-map.tsx decides). Loads the
 // Maps JavaScript API on demand, then renders one Airbnb-style burgundy
-// "$price" pill per listing. Clicking a pill opens an InfoWindow with a photo
+// "EGP price" pill per listing. Clicking a pill opens an InfoWindow with a photo
 // thumbnail + title + location + price + a link to /explore/[id]. The map fits
 // its bounds to the markers and rebuilds them whenever the listings change.
 import { useEffect, useMemo, useRef } from 'react'
 import type { Listing } from '@/lib/api'
-
-const FALLBACK_IMG =
-  'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=1200&q=80'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -96,9 +93,17 @@ export function loadGoogleMaps(apiKey: string): Promise<GMapsApi> {
 }
 
 function priceLabel(listing: Listing): string {
-  const dollar = listing.currency === 'USD' || !listing.currency ? '$' : ''
-  return `${dollar}${listing.price_per_night}`
+  return `EGP ${listing.price_per_night}`
 }
+
+// Inline "no photo" placeholder (HTML string) for the InfoWindow when a listing
+// has no image — mirrors the shared ImagePlaceholder look (tan box + house +
+// label) without React, since the InfoWindow body is a raw HTML string.
+const PLACEHOLDER_HTML = `
+  <div style="width:100%;height:110px;border-radius:10px;margin-bottom:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:linear-gradient(160deg,#EFE6D8 0%,#F6F1E6 100%);color:#6B6055">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#5B0F16" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="opacity:.55"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/></svg>
+    <span style="font-size:11px;font-weight:600">No photo</span>
+  </div>`
 
 // Burgundy price-pill DOM node for an AdvancedMarkerElement.
 function makePill(label: string): HTMLDivElement {
@@ -111,7 +116,7 @@ function makePill(label: string): HTMLDivElement {
 
 // InfoWindow body: photo thumbnail + title + location + price + link.
 function infoHtml(listing: GeoListing): string {
-  const thumb = listing.listing_images[0]?.url || FALLBACK_IMG
+  const thumb = listing.listing_images[0]?.url || null
   const price = priceLabel(listing)
   const esc = (s: string) =>
     s
@@ -119,9 +124,12 @@ function infoHtml(listing: GeoListing): string {
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
+  const media = thumb
+    ? `<img src="${esc(thumb)}" alt="${esc(listing.title)}" style="width:100%;height:110px;object-fit:cover;border-radius:10px;display:block;margin-bottom:8px" />`
+    : PLACEHOLDER_HTML
   return `
     <a href="/explore/${esc(listing.id)}" style="display:block;width:180px;text-decoration:none;color:${COLORS.ink};font-family:'DM Sans',ui-sans-serif,system-ui,sans-serif">
-      <img src="${esc(thumb)}" alt="${esc(listing.title)}" style="width:100%;height:110px;object-fit:cover;border-radius:10px;display:block;margin-bottom:8px" />
+      ${media}
       <div style="font-weight:600;font-size:14px;line-height:1.3">${esc(listing.title)}</div>
       ${listing.location ? `<div style="font-size:12px;color:${COLORS.muted};margin-top:2px">${esc(listing.location)}</div>` : ''}
       <div style="font-size:13px;margin-top:6px">

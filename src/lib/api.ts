@@ -29,6 +29,7 @@ export interface Listing {
   lat: number | null
   lng: number | null
   listing_images: ListingImage[]
+  amenities?: string[]
 }
 
 export interface Booking {

@@ -6,6 +6,7 @@
 // booking confirmation. Auth is the bearer token in localStorage (qk_token).
 import { useState } from 'react'
 import { API_URL } from '@/lib/api'
+import DatePickerField from '../../_components/date-picker-field'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -122,27 +123,23 @@ export default function SubscribePanel({
     <div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
         <span style={{ fontSize: 30, fontWeight: 800, color: COLORS.burgundy }}>
-          ${price}
+          EGP {price}
         </span>
         <span style={{ fontSize: 15, color: COLORS.muted }}>/ booking</span>
       </div>
       <p style={{ margin: '6px 0 18px', fontSize: 13, color: COLORS.muted }}>
-        Prices in {currency}
+        Prices in EGP
       </p>
 
       <div>
-        <label htmlFor="sp-date" style={labelStyle}>
-          Preferred date (optional)
-        </label>
-        <input
-          id="sp-date"
-          type="date"
+        <DatePickerField
+          label="Preferred date (optional)"
           value={preferredDate}
-          onChange={(e) => {
-            setPreferredDate(e.target.value)
+          ariaLabel="Preferred date"
+          onChange={(iso) => {
+            setPreferredDate(iso)
             setStatus({ kind: 'idle' })
           }}
-          style={inputStyle}
         />
       </div>
 
@@ -349,7 +346,7 @@ export default function SubscribePanel({
               >
                 <span style={{ fontSize: 14, color: COLORS.muted }}>Price</span>
                 <span style={{ fontSize: 18, fontWeight: 800, color: COLORS.burgundy }}>
-                  ${price}
+                  EGP {price}
                 </span>
               </div>
             </div>

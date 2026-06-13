@@ -18,6 +18,7 @@ import {
   type ServiceRequest,
 } from '@/lib/api'
 import BookingChat from '@/app/_components/booking-chat'
+import ImagePlaceholder from '@/app/_components/image-placeholder'
 
 // Inlined at build time by Next. When set, the add-listing form shows a Google
 // Maps pin-picker; when empty we silently fall back to the manual lat/lng
@@ -38,9 +39,6 @@ const COLORS = {
 }
 
 const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
-
-const FALLBACK_IMG =
-  'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800&q=80'
 
 const labelStyle: React.CSSProperties = {
   display: 'block',
@@ -118,8 +116,28 @@ const PROPERTY_TYPES = [
   'Guest House',
 ]
 
-// Add-listing wizard step labels (index 0..3).
-const WIZARD_STEPS = ['Basics', 'Location', 'Details', 'Photos & review']
+// Selectable amenities for the add-listing wizard (chip grid). Stored on the
+// listing and rendered on the detail page's "What this place offers".
+const AMENITIES = [
+  'WiFi',
+  'Pool',
+  'Kitchen',
+  'Air conditioning',
+  'Free parking',
+  'Washer',
+  'TV',
+  'Heating',
+  'Workspace',
+  'Gym',
+  'Beach access',
+  'Pets allowed',
+  'Hot tub',
+  'BBQ grill',
+  'Breakfast',
+]
+
+// Add-listing wizard step labels (index 0..4).
+const WIZARD_STEPS = ['Basics', 'Location', 'Details', 'Amenities', 'Photos & review']
 
 interface FormState {
   title: string
@@ -132,6 +150,7 @@ interface FormState {
   beds: string
   bathrooms: string
   property_type: string
+  amenities: string[]
   lat: string
   lng: string
   image1: string
@@ -150,6 +169,7 @@ const EMPTY_FORM: FormState = {
   beds: '1',
   bathrooms: '1',
   property_type: 'Apartment',
+  amenities: [],
   lat: '',
   lng: '',
   image1: '',
@@ -395,6 +415,17 @@ export default function HostPage() {
     setFormOk(null)
   }
 
+  function toggleAmenity(a: string) {
+    setForm((prev) => ({
+      ...prev,
+      amenities: prev.amenities.includes(a)
+        ? prev.amenities.filter((x) => x !== a)
+        : [...prev.amenities, a],
+    }))
+    setFormError(null)
+    setFormOk(null)
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     setFormError(null)
@@ -435,6 +466,7 @@ export default function HostPage() {
           bathrooms: Number(form.bathrooms) || 0,
           max_guests: Number(form.max_guests) || 1,
           property_type: form.property_type,
+          amenities: form.amenities,
           lat: form.lat.trim() ? Number(form.lat) : null,
           lng: form.lng.trim() ? Number(form.lng) : null,
           images,
@@ -939,7 +971,7 @@ export default function HostPage() {
                   onChange={(e) => patch({ bathrooms: e.target.value })}
                 />
               </Field>
-              <Field className="qk-host-form-full" label="Price / night (USD)">
+              <Field className="qk-host-form-full" label="Price / night (EGP)">
                 <input
                   style={inputStyle}
                   type="number"
@@ -953,8 +985,74 @@ export default function HostPage() {
             </div>
           )}
 
-          {/* STEP 4 — Photos & review ------------------------------------- */}
+          {/* STEP 4 — Amenities ------------------------------------------- */}
           {step === 3 && (
+            <div style={{ display: 'grid', gap: 14 }}>
+              <p style={{ margin: 0, fontSize: 14, color: COLORS.muted }}>
+                Pick the amenities your place offers. Guests see these on your
+                listing under “What this place offers.”
+              </p>
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 10,
+                }}
+              >
+                {AMENITIES.map((a) => {
+                  const on = form.amenities.includes(a)
+                  return (
+                    <button
+                      key={a}
+                      type="button"
+                      onClick={() => toggleAmenity(a)}
+                      aria-pressed={on}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '9px 16px',
+                        fontSize: 14,
+                        fontWeight: 600,
+                        fontFamily: FONT,
+                        cursor: 'pointer',
+                        borderRadius: 999,
+                        color: on ? '#fff' : COLORS.ink,
+                        background: on ? COLORS.burgundy : '#fff',
+                        border: on
+                          ? `1px solid ${COLORS.burgundy}`
+                          : '1px solid rgba(42,34,32,0.16)',
+                        transition: 'background 0.12s ease, color 0.12s ease',
+                      }}
+                    >
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          display: 'inline-flex',
+                          width: 16,
+                          height: 16,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 13,
+                          fontWeight: 800,
+                          color: on ? '#fff' : COLORS.burgundy,
+                        }}
+                      >
+                        {on ? '✓' : '+'}
+                      </span>
+                      {a}
+                    </button>
+                  )
+                })}
+              </div>
+              <p style={{ margin: '2px 0 0', fontSize: 13, color: COLORS.muted }}>
+                {form.amenities.length} selected
+              </p>
+            </div>
+          )}
+
+          {/* STEP 5 — Photos & review ------------------------------------- */}
+          {step === 4 && (
             <div style={{ display: 'grid', gap: 16 }}>
               <Field label="Photo URL 1">
                 <input
@@ -999,6 +1097,7 @@ export default function HostPage() {
               >
                 <div
                   style={{
+                    position: 'relative',
                     width: 120,
                     aspectRatio: '4 / 3',
                     borderRadius: 12,
@@ -1007,16 +1106,20 @@ export default function HostPage() {
                     border: '1px solid rgba(42,34,32,0.08)',
                   }}
                 >
-                  <img
-                    src={imageList[0] || FALLBACK_IMG}
-                    alt="Listing preview"
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      display: 'block',
-                    }}
-                  />
+                  {imageList[0] ? (
+                    <img
+                      src={imageList[0]}
+                      alt="Listing preview"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        display: 'block',
+                      }}
+                    />
+                  ) : (
+                    <ImagePlaceholder iconSize={24} fontSize={11} />
+                  )}
                 </div>
                 <div style={{ minWidth: 0 }}>
                   <h3
@@ -1035,7 +1138,7 @@ export default function HostPage() {
                   </p>
                   <p style={{ margin: '10px 0 0', fontSize: 14 }}>
                     <span style={{ fontWeight: 700, color: COLORS.burgundy }}>
-                      ${form.price_per_night || '0'}
+                      EGP {form.price_per_night || '0'}
                     </span>{' '}
                     <span style={{ color: COLORS.muted }}>/ night</span>
                     <span style={{ color: COLORS.muted }}>
@@ -1197,7 +1300,7 @@ export default function HostPage() {
             }}
           >
             {listings.map((l) => {
-              const cover = l.listing_images?.[0]?.url || FALLBACK_IMG
+              const cover = l.listing_images?.[0]?.url || null
               return (
                 <a
                   key={l.id}
@@ -1215,22 +1318,27 @@ export default function HostPage() {
                 >
                   <div
                     style={{
+                      position: 'relative',
                       width: '100%',
                       aspectRatio: '4 / 3',
                       background: COLORS.tan,
                     }}
                   >
-                    <img
-                      src={cover}
-                      alt={l.title}
-                      loading="lazy"
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                        display: 'block',
-                      }}
-                    />
+                    {cover ? (
+                      <img
+                        src={cover}
+                        alt={l.title}
+                        loading="lazy"
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          display: 'block',
+                        }}
+                      />
+                    ) : (
+                      <ImagePlaceholder iconSize={28} fontSize={12} />
+                    )}
                   </div>
                   <div style={{ padding: '12px 14px 16px' }}>
                     <h3
@@ -1257,7 +1365,7 @@ export default function HostPage() {
                     )}
                     <p style={{ margin: '10px 0 0', fontSize: 14 }}>
                       <span style={{ fontWeight: 700, color: COLORS.burgundy }}>
-                        ${l.price_per_night}
+                        EGP {l.price_per_night}
                       </span>{' '}
                       <span style={{ color: COLORS.muted }}>/ night</span>
                     </p>
@@ -1348,7 +1456,7 @@ export default function HostPage() {
                       {fmtDate(b.check_in)} → {fmtDate(b.check_out)} ·{' '}
                       {b.guests} {b.guests === 1 ? 'guest' : 'guests'} ·{' '}
                       <span style={{ fontWeight: 700, color: COLORS.burgundy }}>
-                        ${b.total_price}
+                        EGP {b.total_price}
                       </span>
                     </p>
                     {b.reservation_code && (
@@ -1522,7 +1630,7 @@ export default function HostPage() {
                 placeholder="Marina Bay"
               />
             </Field>
-            <Field label="Price (USD)">
+            <Field label="Price (EGP)">
               <input
                 style={inputStyle}
                 type="number"
@@ -1617,7 +1725,7 @@ export default function HostPage() {
             }}
           >
             {services.map((s) => {
-              const cover = s.image_url || FALLBACK_IMG
+              const cover = s.image_url || null
               return (
                 <a
                   key={s.id}
@@ -1635,22 +1743,27 @@ export default function HostPage() {
                 >
                   <div
                     style={{
+                      position: 'relative',
                       width: '100%',
                       aspectRatio: '4 / 3',
                       background: COLORS.tan,
                     }}
                   >
-                    <img
-                      src={cover}
-                      alt={s.title}
-                      loading="lazy"
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                        display: 'block',
-                      }}
-                    />
+                    {cover ? (
+                      <img
+                        src={cover}
+                        alt={s.title}
+                        loading="lazy"
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          display: 'block',
+                        }}
+                      />
+                    ) : (
+                      <ImagePlaceholder iconSize={28} fontSize={12} label="No photo" />
+                    )}
                   </div>
                   <div style={{ padding: '12px 14px 16px' }}>
                     {s.category && (
@@ -1693,7 +1806,7 @@ export default function HostPage() {
                     )}
                     <p style={{ margin: '10px 0 0', fontSize: 14 }}>
                       <span style={{ fontWeight: 700, color: COLORS.burgundy }}>
-                        ${s.price}
+                        EGP {s.price}
                       </span>
                     </p>
                   </div>
@@ -1782,7 +1895,7 @@ export default function HostPage() {
                       >
                         {prefDate ? `${prefDate} · ` : ''}
                         <span style={{ fontWeight: 700, color: COLORS.burgundy }}>
-                          ${r.service_price}
+                          EGP {r.service_price}
                         </span>
                       </p>
                       {r.note && (

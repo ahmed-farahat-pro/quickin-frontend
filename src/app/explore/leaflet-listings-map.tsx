@@ -4,7 +4,7 @@
 // Rendered ONLY on the client (imported via next/dynamic with { ssr: false }
 // from listings-map.tsx) because Leaflet touches `window` at module load.
 //
-// Each listing is drawn as a rounded burgundy "$price" pill (an L.divIcon)
+// Each listing is drawn as a rounded burgundy "EGP price" pill (an L.divIcon)
 // instead of the default teardrop marker. Clicking a pill opens a popup with a
 // photo thumbnail + title + location + price + a link to /explore/[id].
 import { useEffect, useMemo } from 'react'
@@ -12,9 +12,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { Listing } from '@/lib/api'
-
-const FALLBACK_IMG =
-  'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=1200&q=80'
+import ImagePlaceholder from '../_components/image-placeholder'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -37,7 +35,7 @@ function esc(s: string): string {
 // itself, so we let Leaflet size the icon to its content and anchor it at the
 // center so the pill sits exactly over the coordinate.
 function priceIcon(listing: GeoListing): L.DivIcon {
-  const price = `${listing.currency === 'USD' || !listing.currency ? '$' : ''}${listing.price_per_night}`
+  const price = `EGP ${listing.price_per_night}`
   return L.divIcon({
     className: '',
     iconSize: undefined,
@@ -115,8 +113,8 @@ export default function LeafletListingsMap({ listings }: { listings: Listing[] }
         />
         <FitBounds points={points} />
         {points.map((listing) => {
-          const thumb = listing.listing_images[0]?.url || FALLBACK_IMG
-          const price = `${listing.currency === 'USD' || !listing.currency ? '$' : ''}${listing.price_per_night}`
+          const thumb = listing.listing_images[0]?.url || null
+          const price = `EGP ${listing.price_per_night}`
           return (
             <Marker
               key={listing.id}
@@ -133,18 +131,34 @@ export default function LeafletListingsMap({ listings }: { listings: Listing[] }
                     color: COLORS.ink,
                   }}
                 >
-                  <img
-                    src={thumb}
-                    alt={listing.title}
-                    style={{
-                      width: '100%',
-                      height: 110,
-                      objectFit: 'cover',
-                      borderRadius: 10,
-                      display: 'block',
-                      marginBottom: 8,
-                    }}
-                  />
+                  {thumb ? (
+                    <img
+                      src={thumb}
+                      alt={listing.title}
+                      style={{
+                        width: '100%',
+                        height: 110,
+                        objectFit: 'cover',
+                        borderRadius: 10,
+                        display: 'block',
+                        marginBottom: 8,
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        position: 'relative',
+                        width: '100%',
+                        height: 110,
+                        borderRadius: 10,
+                        overflow: 'hidden',
+                        marginBottom: 8,
+                        background: '#EFE6D8',
+                      }}
+                    >
+                      <ImagePlaceholder iconSize={24} fontSize={11} />
+                    </div>
+                  )}
                   <div style={{ fontWeight: 600, fontSize: 14, lineHeight: 1.3 }}>
                     {listing.title}
                   </div>

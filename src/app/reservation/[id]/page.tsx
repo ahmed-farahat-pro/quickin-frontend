@@ -365,7 +365,7 @@ function ReservationCard({
             />
             <DetailRow
               label="Total"
-              value={`$${reservation.total_price}`}
+              value={`EGP ${reservation.total_price}`}
               emphasis
             />
             {reservation.reservation_code && (

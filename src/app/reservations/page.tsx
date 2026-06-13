@@ -4,9 +4,7 @@
 // backend with the bearer token stored in localStorage. No cookies / no DB here.
 import { useEffect, useState } from 'react'
 import { API_URL, type Booking } from '@/lib/api'
-
-const FALLBACK_IMG =
-  'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800&q=80'
+import ImagePlaceholder from '../_components/image-placeholder'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -379,21 +377,26 @@ function ReservationsList({
               <div
                 className="qk-res-img"
                 style={{
+                  position: 'relative',
                   width: 160,
                   minHeight: 130,
                   background: COLORS.tan,
                 }}
               >
-                <img
-                  src={b.image || FALLBACK_IMG}
-                  alt={b.title}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                    display: 'block',
-                  }}
-                />
+                {b.image ? (
+                  <img
+                    src={b.image}
+                    alt={b.title}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      display: 'block',
+                    }}
+                  />
+                ) : (
+                  <ImagePlaceholder iconSize={26} fontSize={11} />
+                )}
               </div>
 
               <div className="qk-res-body" style={{ padding: '18px 0', minWidth: 0 }}>
@@ -463,7 +466,7 @@ function ReservationsList({
                     color: COLORS.burgundy,
                   }}
                 >
-                  ${b.total_price}
+                  EGP {b.total_price}
                 </div>
                 <div style={{ fontSize: 13, color: COLORS.muted }}>total</div>
               </div>

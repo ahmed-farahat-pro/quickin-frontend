@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { API_URL } from '@/lib/api'
+import DatePickerField from '../../_components/date-picker-field'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -136,48 +137,40 @@ export default function ReservePanel({
     <div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
         <span style={{ fontSize: 30, fontWeight: 800, color: COLORS.burgundy }}>
-          ${pricePerNight}
+          EGP {pricePerNight}
         </span>
         <span style={{ fontSize: 15, color: COLORS.muted }}>/ night</span>
       </div>
       <p style={{ margin: '6px 0 18px', fontSize: 13, color: COLORS.muted }}>
-        Prices in {currency}
+        Prices in EGP
       </p>
 
-      {/* Date inputs — wrap to one column when the card is too narrow for two
-          native date fields side by side (prevents overflow on tablet widths). */}
+      {/* Date pickers — a custom themed calendar popover (replaces the native
+          date inputs). Wrap to one column when the card is too narrow. */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: 12 }}>
-        <div>
-          <label htmlFor="rp-checkin" style={labelStyle}>
-            Check-in
-          </label>
-          <input
-            id="rp-checkin"
-            type="date"
-            value={checkIn}
-            onChange={(e) => {
-              setCheckIn(e.target.value)
-              setStatus({ kind: 'idle' })
-            }}
-            style={inputStyle}
-          />
-        </div>
-        <div>
-          <label htmlFor="rp-checkout" style={labelStyle}>
-            Check-out
-          </label>
-          <input
-            id="rp-checkout"
-            type="date"
-            value={checkOut}
-            min={checkIn || undefined}
-            onChange={(e) => {
-              setCheckOut(e.target.value)
-              setStatus({ kind: 'idle' })
-            }}
-            style={inputStyle}
-          />
-        </div>
+        <DatePickerField
+          label="Check-in"
+          value={checkIn}
+          ariaLabel="Check-in date"
+          compact
+          onChange={(iso) => {
+            setCheckIn(iso)
+            // Keep checkout valid: clear it if it now precedes check-in.
+            if (iso && checkOut && checkOut < iso) setCheckOut('')
+            setStatus({ kind: 'idle' })
+          }}
+        />
+        <DatePickerField
+          label="Check-out"
+          value={checkOut}
+          ariaLabel="Check-out date"
+          compact
+          min={checkIn || undefined}
+          onChange={(iso) => {
+            setCheckOut(iso)
+            setStatus({ kind: 'idle' })
+          }}
+        />
       </div>
 
       <div style={{ marginTop: 12 }}>
@@ -215,9 +208,9 @@ export default function ReservePanel({
           }}
         >
           <span>
-            ${pricePerNight} × {nights} {nights === 1 ? 'night' : 'nights'}
+            EGP {pricePerNight} × {nights} {nights === 1 ? 'night' : 'nights'}
           </span>
-          <span style={{ fontWeight: 700 }}>${total}</span>
+          <span style={{ fontWeight: 700 }}>EGP {total}</span>
         </div>
         <div
           style={{
@@ -232,7 +225,7 @@ export default function ReservePanel({
           }}
         >
           <span>Total</span>
-          <span>${total}</span>
+          <span>EGP {total}</span>
         </div>
       </div>
 
@@ -418,7 +411,7 @@ export default function ReservePanel({
                   <span>
                     {status.nights} {status.nights === 1 ? 'night' : 'nights'}
                   </span>
-                  <span>${pricePerNight} / night</span>
+                  <span>EGP {pricePerNight} / night</span>
                 </div>
                 <div style={{ height: 1, background: 'rgba(42,34,32,0.10)', margin: '10px 0' }} />
                 <div
@@ -430,7 +423,7 @@ export default function ReservePanel({
                 >
                   <span style={{ fontSize: 14, color: COLORS.muted }}>Total</span>
                   <span style={{ fontSize: 18, fontWeight: 800, color: COLORS.burgundy }}>
-                    ${status.total}
+                    EGP {status.total}
                   </span>
                 </div>
               </div>
