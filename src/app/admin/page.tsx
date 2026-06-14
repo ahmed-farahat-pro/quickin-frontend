@@ -148,6 +148,17 @@ export default function AdminPage() {
   const [confirm, setConfirm] = useState<Confirm | null>(null)
   const [reviewsModal, setReviewsModal] = useState<ReviewsModal | null>(null)
 
+  // "Send a notification" broadcast composer state.
+  const [notifTitle, setNotifTitle] = useState('')
+  const [notifBody, setNotifBody] = useState('')
+  const [notifLink, setNotifLink] = useState('')
+  const [notifAudience, setNotifAudience] = useState<'all' | 'guests' | 'hosts'>('all')
+  const [notifPush, setNotifPush] = useState(true)
+  const [notifEmail, setNotifEmail] = useState(false)
+  const [notifSending, setNotifSending] = useState(false)
+  // Inline confirmation under the composer (in addition to the toast).
+  const [notifResult, setNotifResult] = useState<{ recipients: number; emailed: number } | null>(null)
+
   // Auto-dismiss toasts.
   useEffect(() => {
     if (!toast) return
@@ -248,6 +259,41 @@ export default function AdminPage() {
     }
   }
 
+  // Broadcast an announcement to every targeted user. Writes an in-app
+  // notification per recipient + (optionally) FCM push and email. Title is
+  // required; link/body are optional.
+  async function sendNotification() {
+    if (!token) return
+    const title = notifTitle.trim()
+    if (!title) { setToast({ message: 'Add a title before firing.', kind: 'error' }); return }
+    setNotifSending(true)
+    setNotifResult(null)
+    try {
+      const body = notifBody.trim()
+      const link = notifLink.trim()
+      const res = await fetch(`${API_URL}/api/local/admin/notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          title,
+          body: body || undefined,
+          link: link || undefined,
+          audience: notifAudience,
+          push: notifPush,
+          email: notifEmail,
+        }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { setToast({ message: d?.error || 'Failed to send notification', kind: 'error' }); return }
+      const recipients = Number(d?.recipients ?? 0)
+      const emailed = Number(d?.emailed ?? 0)
+      setNotifResult({ recipients, emailed })
+      setToast({ message: `Sent to ${recipients} recipient${recipients === 1 ? '' : 's'}`, kind: 'success' })
+      // Clear the composer on success (keep audience/push/email preferences).
+      setNotifTitle(''); setNotifBody(''); setNotifLink('')
+    } catch { setToast({ message: 'Network error sending notification.', kind: 'error' }) } finally { setNotifSending(false) }
+  }
+
   function logout() {
     try { localStorage.removeItem('qk_token'); localStorage.removeItem('qk_user') } catch {}
     window.location.href = '/login'
@@ -273,6 +319,80 @@ export default function AdminPage() {
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={() => token && load(token)} className="qk-press" style={ghostBtnLight}>Refresh</button>
             <button onClick={logout} className="qk-press" style={ghostBtnLight}>Log out</button>
+          </div>
+        </div>
+
+        {/* Broadcast composer — fire an in-app notification (+ push / email) to
+            every targeted user. */}
+        <div className="qk-card" style={{ background: '#fff', borderRadius: 22, border: `1px solid ${COLORS.tan}`, overflow: 'hidden', boxShadow: '0 8px 22px rgba(42,34,32,0.08)', marginBottom: 22 }}>
+          <div style={{ background: GRAD_BURGUNDY, padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, borderRadius: 12, background: 'rgba(246,241,230,0.14)', border: '1px solid rgba(246,241,230,0.35)' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+              </svg>
+            </span>
+            <div>
+              <p style={{ margin: 0, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, color: COLORS.gold, fontWeight: 700 }}>Broadcast</p>
+              <h2 style={{ margin: '2px 0 0', fontSize: 18, color: '#fff' }}>Send a notification</h2>
+            </div>
+          </div>
+          <div style={{ padding: '18px 22px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label htmlFor="notif-title" style={notifLabel}>Title <span style={{ color: COLORS.burgundy }}>*</span></label>
+                <input id="notif-title" type="text" value={notifTitle} onChange={(e) => setNotifTitle(e.target.value)} maxLength={120}
+                  placeholder="e.g. New beachfront stays just dropped" disabled={notifSending} style={notifInput} />
+              </div>
+              <div>
+                <label htmlFor="notif-body" style={notifLabel}>Message</label>
+                <textarea id="notif-body" value={notifBody} onChange={(e) => setNotifBody(e.target.value)} rows={3} maxLength={500}
+                  placeholder="What do you want everyone to know? (optional)" disabled={notifSending} style={{ ...notifInput, resize: 'vertical', minHeight: 72 }} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 14 }}>
+                <div>
+                  <label htmlFor="notif-link" style={notifLabel}>Link <span style={{ color: COLORS.muted, fontWeight: 500 }}>(optional)</span></label>
+                  <input id="notif-link" type="text" value={notifLink} onChange={(e) => setNotifLink(e.target.value)}
+                    placeholder="/explore or https://…" disabled={notifSending} style={notifInput} />
+                </div>
+                <div>
+                  <label htmlFor="notif-audience" style={notifLabel}>Audience</label>
+                  <select id="notif-audience" value={notifAudience} onChange={(e) => setNotifAudience(e.target.value as 'all' | 'guests' | 'hosts')}
+                    disabled={notifSending} style={{ ...notifInput, appearance: 'auto', cursor: notifSending ? 'default' : 'pointer' }}>
+                    <option value="all">All users</option>
+                    <option value="guests">Guests</option>
+                    <option value="hosts">Hosts</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 18 }}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600, color: COLORS.ink, cursor: notifSending ? 'default' : 'pointer' }}>
+                  <input type="checkbox" checked={notifPush} onChange={(e) => setNotifPush(e.target.checked)} disabled={notifSending} style={{ accentColor: COLORS.burgundy, width: 17, height: 17, cursor: notifSending ? 'default' : 'pointer' }} />
+                  Send push
+                </label>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600, color: COLORS.ink, cursor: notifSending ? 'default' : 'pointer' }}>
+                  <input type="checkbox" checked={notifEmail} onChange={(e) => setNotifEmail(e.target.checked)} disabled={notifSending} style={{ accentColor: COLORS.burgundy, width: 17, height: 17, cursor: notifSending ? 'default' : 'pointer' }} />
+                  Also email
+                </label>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 14 }}>
+                <button type="button" onClick={sendNotification} disabled={notifSending || !notifTitle.trim()} className="qk-press"
+                  style={{ appearance: 'none', border: 'none', fontFamily: FONT, fontWeight: 800, fontSize: 15, color: '#fff', borderRadius: 14, padding: '12px 24px',
+                    background: (notifSending || !notifTitle.trim()) ? 'rgba(91,15,22,0.45)' : GRAD_BURGUNDY,
+                    boxShadow: (notifSending || !notifTitle.trim()) ? 'none' : '0 12px 28px rgba(91,15,22,0.28)',
+                    cursor: (notifSending || !notifTitle.trim()) ? 'default' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 9 }}>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" />
+                  </svg>
+                  {notifSending ? 'Firing…' : 'Fire notification'}
+                </button>
+                {notifResult && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 700, color: '#0f5132', background: 'rgba(15,81,50,0.12)', borderRadius: 999, padding: '7px 14px' }}>
+                    <span aria-hidden="true">✓</span>
+                    Sent to {notifResult.recipients} recipient{notifResult.recipients === 1 ? '' : 's'}{notifResult.emailed > 0 ? ` · ${notifResult.emailed} emailed` : ''}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -475,3 +595,5 @@ const td: React.CSSProperties = { padding: '11px 16px', color: COLORS.ink, verti
 const ghostBtn: React.CSSProperties = { appearance: 'none', border: `1px solid ${COLORS.burgundy}`, background: '#fff', color: COLORS.burgundy, fontWeight: 600, fontSize: 14, fontFamily: FONT, borderRadius: 999, padding: '8px 18px', cursor: 'pointer' }
 const ghostBtnLight: React.CSSProperties = { appearance: 'none', border: '1px solid rgba(246,241,230,0.5)', background: 'rgba(246,241,230,0.12)', color: '#fff', fontWeight: 600, fontSize: 14, fontFamily: FONT, borderRadius: 999, padding: '8px 18px', cursor: 'pointer' }
 const selectStyle: React.CSSProperties = { appearance: 'auto', border: `1px solid ${COLORS.tan}`, background: '#fff', color: COLORS.ink, fontSize: 12.5, fontFamily: FONT, borderRadius: 8, padding: '5px 8px', cursor: 'pointer' }
+const notifLabel: React.CSSProperties = { display: 'block', fontSize: 12.5, fontWeight: 700, color: COLORS.muted, marginBottom: 6 }
+const notifInput: React.CSSProperties = { width: '100%', boxSizing: 'border-box', border: `1px solid ${COLORS.tan}`, background: COLORS.cream, color: COLORS.ink, fontSize: 14.5, fontFamily: FONT, borderRadius: 14, padding: '11px 14px', outline: 'none' }
