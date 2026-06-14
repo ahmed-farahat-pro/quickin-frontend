@@ -5,6 +5,7 @@ import Script from 'next/script'
 import { API_URL } from '@/lib/api'
 import { signInWithApple, APPLE_SERVICES_ID, APPLE_JS_SRC } from '@/lib/apple'
 import { EyeIcon, EyeOffIcon, eyeButtonStyle } from '@/app/_components/password-eye'
+import PasswordStrength, { passwordMeetsMin } from '@/app/_components/password-strength'
 import { useLanguage } from '@/lib/i18n/language-provider'
 
 const COLORS = {
@@ -258,8 +259,9 @@ export default function SignupPage() {
                     {showPassword ? <EyeOffIcon /> : <EyeIcon />}
                   </button>
                 </div>
+                <PasswordStrength value={password} />
               </label>
-              <button type="submit" disabled={loading} className={loading ? undefined : 'qk-press qk-pulse'} style={primaryButtonStyle(loading)}>
+              <button type="submit" disabled={loading || !passwordMeetsMin(password)} className={loading || !passwordMeetsMin(password) ? undefined : 'qk-press qk-pulse'} style={primaryButtonStyle(loading || !passwordMeetsMin(password))}>
                 {loading ? t('signup.sendingCode') : role === 'host' ? t('signup.createHost') : t('signup.createGuest')}
               </button>
             </form>

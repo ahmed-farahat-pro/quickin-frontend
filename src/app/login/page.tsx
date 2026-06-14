@@ -5,6 +5,7 @@ import Script from 'next/script'
 import { API_URL } from '@/lib/api'
 import { signInWithApple, APPLE_SERVICES_ID, APPLE_JS_SRC } from '@/lib/apple'
 import { EyeIcon, EyeOffIcon, eyeButtonStyle } from '@/app/_components/password-eye'
+import PasswordStrength, { passwordMeetsMin } from '@/app/_components/password-strength'
 import { useLanguage } from '@/lib/i18n/language-provider'
 
 const COLORS = {
@@ -298,8 +299,9 @@ export default function LoginPage() {
                   {showNewPassword ? <EyeOffIcon /> : <EyeIcon />}
                 </button>
               </div>
+              <PasswordStrength value={newPassword} />
             </label>
-            <button type="submit" disabled={loading || code.length < 6 || newPassword.length < 6} className="qk-press" style={primaryButtonStyle(loading || code.length < 6 || newPassword.length < 6)}>
+            <button type="submit" disabled={loading || code.length < 6 || !passwordMeetsMin(newPassword)} className="qk-press" style={primaryButtonStyle(loading || code.length < 6 || !passwordMeetsMin(newPassword))}>
               {loading ? t('login.resetting') : t('login.resetPasswordBtn')}
             </button>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16, fontSize: 13.5 }}>

@@ -179,6 +179,17 @@ export const messages: Record<Lang, Dict> = {
     'auth.roleGuest': 'Guest',
     'auth.roleHost': 'Host',
 
+    // ---- Password strength meter -----------------------------------------
+    'pw.weak': 'Weak',
+    'pw.fair': 'Fair',
+    'pw.good': 'Good',
+    'pw.strong': 'Strong',
+    'pw.req.length': 'At least 8 characters',
+    'pw.req.upper': 'Uppercase letter',
+    'pw.req.lower': 'Lowercase letter',
+    'pw.req.number': 'Number',
+    'pw.req.special': 'Special character',
+
     // ---- Login ------------------------------------------------------------
     'login.welcome': 'Welcome back — sign in to continue',
     'login.verifyEmail': 'Verify your email to continue',
@@ -430,6 +441,17 @@ export const messages: Record<Lang, Dict> = {
     'auth.hidePassword': 'إخفاء كلمة المرور',
     'auth.roleGuest': 'ضيف',
     'auth.roleHost': 'مضيف',
+
+    // ---- Password strength meter -----------------------------------------
+    'pw.weak': 'ضعيفة',
+    'pw.fair': 'مقبولة',
+    'pw.good': 'جيدة',
+    'pw.strong': 'قوية',
+    'pw.req.length': '8 أحرف على الأقل',
+    'pw.req.upper': 'حرف كبير',
+    'pw.req.lower': 'حرف صغير',
+    'pw.req.number': 'رقم',
+    'pw.req.special': 'رمز خاص',
 
     // ---- Login ------------------------------------------------------------
     'login.welcome': 'مرحبًا بعودتك — سجّل الدخول للمتابعة',

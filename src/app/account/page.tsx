@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { API_URL, getToken } from '@/lib/api'
 import AuthArea from '../_components/auth-area'
 import { EyeIcon, EyeOffIcon, eyeButtonStyle } from '@/app/_components/password-eye'
+import PasswordStrength, { passwordMeetsMin } from '@/app/_components/password-strength'
 import { useLanguage } from '@/lib/i18n/language-provider'
 
 const COLORS = {
@@ -642,6 +643,7 @@ export default function AccountPage() {
                       {showNew ? <EyeOffIcon /> : <EyeIcon />}
                     </button>
                   </div>
+                  <PasswordStrength value={newPassword} />
                 </label>
               </div>
 
@@ -680,9 +682,9 @@ export default function AccountPage() {
 
               <button
                 type="submit"
-                disabled={pwSaving || !currentPassword || newPassword.length < 6}
+                disabled={pwSaving || !currentPassword || !passwordMeetsMin(newPassword)}
                 className={
-                  pwSaving || !currentPassword || newPassword.length < 6
+                  pwSaving || !currentPassword || !passwordMeetsMin(newPassword)
                     ? undefined
                     : 'qk-press'
                 }
@@ -697,13 +699,13 @@ export default function AccountPage() {
                   border: 'none',
                   borderRadius: 14,
                   cursor:
-                    pwSaving || !currentPassword || newPassword.length < 6
+                    pwSaving || !currentPassword || !passwordMeetsMin(newPassword)
                       ? 'not-allowed'
                       : 'pointer',
                   opacity:
-                    pwSaving || !currentPassword || newPassword.length < 6 ? 0.6 : 1,
+                    pwSaving || !currentPassword || !passwordMeetsMin(newPassword) ? 0.6 : 1,
                   boxShadow:
-                    pwSaving || !currentPassword || newPassword.length < 6
+                    pwSaving || !currentPassword || !passwordMeetsMin(newPassword)
                       ? 'none'
                       : '0 10px 24px rgba(91,15,22,0.28)',
                 }}
