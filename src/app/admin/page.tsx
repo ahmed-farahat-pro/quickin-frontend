@@ -12,12 +12,25 @@ const COLORS = { burgundy: '#5B0F16', cream: '#F6F1E6', page: '#E4DECF', tan: '#
 const GRAD_BURGUNDY = 'linear-gradient(135deg,#5B0F16,#8a2530)'
 const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
 
+// One saved push token (FCM / APNs). Populated once a user opens the mobile app
+// with notifications allowed on a real device. `platform` is ios | android | web.
+interface DeviceToken {
+  id: string
+  token: string
+  platform: string | null
+  created_at: string | null
+  user_email: string | null
+  user_name: string | null
+  user_role: string | null
+}
+
 interface Overview {
   users: Record<string, unknown>[]
   listings: Record<string, unknown>[]
   bookings: Record<string, unknown>[]
   services: Record<string, unknown>[]
   serviceRequests: Record<string, unknown>[]
+  deviceTokens: DeviceToken[]
   counts: Record<string, number>
 }
 
@@ -83,6 +96,36 @@ const ratingCell = (_v: unknown, r: Record<string, unknown>) => {
   )
 }
 
+// Small role pill (user / host / admin) — reused beside a device token's owner.
+const rolePill = (role: unknown) => {
+  const r = String(role ?? 'user')
+  const tone = r === 'admin' ? { bg: 'rgba(91,15,22,0.10)', fg: COLORS.burgundy } : r === 'host' ? { bg: 'rgba(15,81,50,0.12)', fg: '#0f5132' } : { bg: COLORS.tan, fg: COLORS.ink }
+  return <span style={{ background: tone.bg, color: tone.fg, fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 999, textTransform: 'capitalize', whiteSpace: 'nowrap' }}>{r}</span>
+}
+
+// Platform badge for a push token (ios / android / web). Unknown values fall
+// back to a neutral tan chip.
+const PLATFORM_COLOR: Record<string, { bg: string; fg: string }> = {
+  ios: { bg: 'rgba(42,34,32,0.10)', fg: COLORS.ink },
+  android: { bg: 'rgba(15,81,50,0.12)', fg: '#0f5132' },
+  web: { bg: 'rgba(176,122,42,0.16)', fg: COLORS.gold },
+}
+const platformBadge = (platform: unknown) => {
+  const p = String(platform ?? '').toLowerCase()
+  const tone = PLATFORM_COLOR[p] || { bg: COLORS.tan, fg: COLORS.muted }
+  const label = p === 'ios' ? 'iOS' : p ? p.charAt(0).toUpperCase() + p.slice(1) : '—'
+  return <span style={{ background: tone.bg, color: tone.fg, fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>{label}</span>
+}
+
+// Format a stored timestamp as "Jun 14, 2026". Falls back to "—" when absent /
+// unparseable.
+const formatDate = (v: unknown) => {
+  if (!v) return '—'
+  const d = new Date(String(v))
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 // Reveal/hide a stored password with an eye toggle.
 function PasswordCell({ value }: { value: unknown }) {
   const [show, setShow] = useState(false)
@@ -96,6 +139,42 @@ function PasswordCell({ value }: { value: unknown }) {
       <button type="button" onClick={() => setShow((s) => !s)} aria-label={show ? 'Hide password' : 'Show password'}
         style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: COLORS.muted, padding: 2, display: 'inline-flex' }}>
         {show ? <EyeOffIcon /> : <EyeIcon />}
+      </button>
+    </span>
+  )
+}
+
+// A push token shown truncated (they're long) with a copy-to-clipboard button.
+// Reports success/failure up via `onCopied` so it reuses the page's toast.
+function TokenCell({ value, onCopied }: { value: string; onCopied: (ok: boolean) => void }) {
+  const [copied, setCopied] = useState(false)
+  const head = value.slice(0, 12)
+  const tail = value.length > 22 ? value.slice(-6) : ''
+  const display = tail ? `${head}…${tail}` : value
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(true)
+      onCopied(true)
+      setTimeout(() => setCopied(false), 1600)
+    } catch {
+      onCopied(false)
+    }
+  }
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+      <code title={value} style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12.5, color: COLORS.ink, background: COLORS.cream, border: `1px solid ${COLORS.tan}`, borderRadius: 8, padding: '3px 8px', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {display}
+      </code>
+      <button type="button" onClick={copy} className="qk-press" aria-label="Copy token"
+        title={copied ? 'Copied' : 'Copy full token'}
+        style={{ appearance: 'none', border: `1px solid ${copied ? '#0f5132' : COLORS.tan}`, background: '#fff', color: copied ? '#0f5132' : COLORS.muted, cursor: 'pointer', padding: '4px 8px', borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, fontFamily: FONT }}>
+        {copied ? (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+        ) : (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+        )}
+        {copied ? 'Copied' : 'Copy'}
       </button>
     </span>
   )
@@ -301,6 +380,8 @@ export default function AdminPage() {
 
   const rows = useMemo(() => (data ? (data[tab] as Record<string, unknown>[]) : []), [data, tab])
   const columns = COLUMNS[tab]
+  // Saved push tokens (FCM / APNs) — rendered in their own section, not a tab.
+  const deviceTokens = useMemo<DeviceToken[]>(() => (data?.deviceTokens ?? []), [data])
   if (!checked) return null
   const singular = TAB_LABEL[tab].replace(/s$/, '').toLowerCase()
 
@@ -412,6 +493,16 @@ export default function AdminPage() {
               </button>
             )
           })}
+          {/* Device tokens — a read-only count (not a table tab); the full list
+              renders in its own section below. */}
+          <div style={{
+            textAlign: 'left', fontFamily: FONT, background: '#fff', color: COLORS.ink,
+            border: `1px solid ${COLORS.tan}`, borderRadius: 18, padding: '14px 16px',
+            boxShadow: '0 8px 22px rgba(42,34,32,0.08)',
+          }}>
+            <span style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, opacity: 0.8 }}>Device tokens</span>
+            <span style={{ display: 'block', fontSize: 28, fontWeight: 800, marginTop: 2, color: COLORS.gold }}>{data ? data.counts.deviceTokens ?? 0 : '—'}</span>
+          </div>
         </div>
 
         <div style={{ background: '#fff', borderRadius: 22, border: `1px solid ${COLORS.tan}`, overflow: 'hidden', boxShadow: '0 8px 22px rgba(42,34,32,0.08)' }}>
@@ -504,6 +595,77 @@ export default function AdminPage() {
         <p style={{ marginTop: 14, fontSize: 12.5, color: COLORS.muted }}>
           Passwords show only for accounts created in-app (prototype) and the demo accounts; older / Google sign-ins show “—”. Click the eye to reveal. Deleting a user also removes the places they host.
         </p>
+
+        {/* Device tokens — the saved push (FCM / APNs) registrations. Read-only
+            list with copy + delete; no inline editing. */}
+        <div className="qk-card" style={{ background: '#fff', borderRadius: 22, border: `1px solid ${COLORS.tan}`, overflow: 'hidden', boxShadow: '0 8px 22px rgba(42,34,32,0.08)', marginTop: 22 }}>
+          <div style={{ background: GRAD_BURGUNDY, padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, borderRadius: 12, background: 'rgba(246,241,230,0.14)', border: '1px solid rgba(246,241,230,0.35)' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="5" y="2" width="14" height="20" rx="2" ry="2" /><path d="M12 18h.01" />
+              </svg>
+            </span>
+            <div>
+              <p style={{ margin: 0, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, color: COLORS.gold, fontWeight: 700 }}>Push</p>
+              <h2 style={{ margin: '2px 0 0', fontSize: 18, color: '#fff' }}>Device tokens ({deviceTokens.length})</h2>
+            </div>
+          </div>
+          {deviceTokens.length === 0 ? (
+            <div style={{ padding: '34px 24px', textAlign: 'center' }}>
+              <div style={{ width: 52, height: 52, borderRadius: 26, background: COLORS.cream, border: `1px solid ${COLORS.tan}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={COLORS.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="5" y="2" width="14" height="20" rx="2" ry="2" /><path d="M12 18h.01" />
+                </svg>
+              </div>
+              <p style={{ margin: '0 auto', maxWidth: 460, fontSize: 14, lineHeight: 1.55, color: COLORS.muted }}>
+                No devices have registered for push yet — they appear here once a user opens the app (with notifications allowed) on a real device.
+              </p>
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
+                <thead>
+                  <tr>
+                    <th style={th}>Owner</th>
+                    <th style={th}>Platform</th>
+                    <th style={th}>Token</th>
+                    <th style={th}>Registered</th>
+                    <th style={{ ...th, textAlign: 'right' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {deviceTokens.map((dt) => {
+                    const id = String(dt.id)
+                    return (
+                      <tr key={id} className="qk-row" style={{ borderTop: `1px solid ${COLORS.cream}` }}>
+                        <td style={td}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 1 }}>
+                              <span style={{ fontWeight: 700, color: COLORS.ink }}>{dt.user_email || '—'}</span>
+                              {dt.user_name && <span style={{ fontSize: 12, color: COLORS.muted }}>{dt.user_name}</span>}
+                            </span>
+                            {rolePill(dt.user_role)}
+                          </span>
+                        </td>
+                        <td style={td}>{platformBadge(dt.platform)}</td>
+                        <td style={td}><TokenCell value={dt.token} onCopied={(ok) => setToast(ok ? { message: 'Token copied', kind: 'success' } : { message: 'Couldn’t copy to clipboard', kind: 'error' })} /></td>
+                        <td style={td}>{formatDate(dt.created_at)}</td>
+                        <td style={{ ...td, textAlign: 'right' }}>
+                          <button
+                            onClick={() => setConfirm({ title: 'Delete this device token?', message: 'The device stops receiving push until it re-registers. This cannot be undone.', onConfirm: () => doDelete('device-tokens', id, 'device token') })}
+                            disabled={busyId === id}
+                            style={{ appearance: 'none', border: `1px solid ${COLORS.burgundy}`, background: busyId === id ? COLORS.tan : '#fff', color: COLORS.burgundy, fontWeight: 700, fontSize: 12.5, fontFamily: FONT, borderRadius: 999, padding: '6px 14px', cursor: busyId === id ? 'default' : 'pointer' }}>
+                            {busyId === id ? '…' : 'Delete'}
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Branded confirm modal (replaces the native browser confirm) */}
