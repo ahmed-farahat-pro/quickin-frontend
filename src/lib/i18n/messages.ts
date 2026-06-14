@@ -29,6 +29,21 @@ export const messages: Record<Lang, Dict> = {
     'nav.subscriptions': 'Subscriptions',
     'nav.account': 'Account',
     'nav.becomeHost': 'Become a host',
+
+    // ---- AI travel concierge ---------------------------------------------
+    'ai.open': 'Ask the travel AI',
+    'ai.close': 'Close',
+    'ai.title': 'Travel concierge',
+    'ai.subtitle': 'Where to go in Egypt',
+    'ai.greeting':
+      "Hi! I'm your QuickIn travel concierge. Tell me what you're looking for and I'll help you find the perfect spot in Egypt. ✨",
+    'ai.placeholder': 'Ask about destinations, seasons…',
+    'ai.send': 'Send',
+    'ai.error': 'Something went wrong. Please try again.',
+    'ai.suggest1': 'Best beach for a calm weekend?',
+    'ai.suggest2': 'Where to go this summer?',
+    'ai.suggest3': 'Family trip ideas',
+    'ai.suggest4': 'Where can I dive?',
     'nav.listings': 'Listings',
     'nav.reservations': 'Reservations',
     'nav.profile': 'Profile',
@@ -292,6 +307,21 @@ export const messages: Record<Lang, Dict> = {
     'nav.subscriptions': 'الاشتراكات',
     'nav.account': 'حسابي',
     'nav.becomeHost': 'كن مضيفًا',
+
+    // ---- AI travel concierge ---------------------------------------------
+    'ai.open': 'اسأل مساعد السفر',
+    'ai.close': 'إغلاق',
+    'ai.title': 'مرشد السفر',
+    'ai.subtitle': 'إلى أين تذهب في مصر',
+    'ai.greeting':
+      'أهلاً! أنا مرشد السفر في كويك إن. أخبرني بما تبحث عنه وسأساعدك في اختيار أفضل وجهة في مصر. ✨',
+    'ai.placeholder': 'اسأل عن الوجهات والمواسم…',
+    'ai.send': 'إرسال',
+    'ai.error': 'حدث خطأ ما. حاول مرة أخرى.',
+    'ai.suggest1': 'أفضل شاطئ لعطلة هادئة؟',
+    'ai.suggest2': 'إلى أين أذهب هذا الصيف؟',
+    'ai.suggest3': 'أفكار لرحلة عائلية',
+    'ai.suggest4': 'أين يمكنني الغوص؟',
     'nav.listings': 'الإعلانات',
     'nav.reservations': 'الحجوزات',
     'nav.profile': 'الملف الشخصي',
