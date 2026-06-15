@@ -180,7 +180,7 @@ export default function AIConcierge() {
             fontFamily: FONT,
           }}
         >
-          <SparkleIcon size={26} />
+          <WaveBotIcon size={32} />
           <span
             style={{
               position: 'absolute',
@@ -237,7 +237,7 @@ export default function AIConcierge() {
                 flexShrink: 0,
               }}
             >
-              <SparkleIcon size={22} color={COLORS.goldLight} />
+              <WaveBotIcon size={28} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: 16 }}>{t('ai.title')}</div>
@@ -429,14 +429,31 @@ function TypingDots() {
   )
 }
 
-function SparkleIcon({ size = 24, color = 'currentColor' }: { size?: number; color?: string }) {
+// Animated "sun over the sea" mark for the AI launcher: a gold sun + two
+// scrolling cream/gold waves (SMIL translate loop), clipped to a circle.
+// Vacation-themed and continuously animated.
+function WaveBotIcon({ size = 28 }: { size?: number }) {
+  const wave = 'M0 15 q3 -2.6 6 0 t6 0 t6 0 t6 0 t6 0 t6 0 t6 0 t6 0 L48 24 L0 24 Z'
+  const wave2 = 'M0 17.2 q3 -2.6 6 0 t6 0 t6 0 t6 0 t6 0 t6 0 t6 0 t6 0 L48 24 L0 24 Z'
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M12 2.5l1.9 4.9 4.9 1.9-4.9 1.9L12 16.1l-1.9-4.9L5.2 9.3l4.9-1.9L12 2.5z"
-        fill={color}
-      />
-      <path d="M5 15l.9 2.3 2.3.9-2.3.9L5 21.4l-.9-2.3L1.8 18l2.3-.9L5 15z" fill={color} opacity={0.85} />
+      <defs>
+        <clipPath id="qkWaveClip">
+          <circle cx="12" cy="12" r="12" />
+        </clipPath>
+      </defs>
+      <g clipPath="url(#qkWaveClip)">
+        {/* sun */}
+        <circle cx="17.5" cy="6.8" r="2.7" fill={COLORS.goldLight} />
+        {/* back wave (gold, slower) */}
+        <path d={wave} fill={COLORS.goldLight} fillOpacity={0.55}>
+          <animateTransform attributeName="transform" type="translate" from="0 0" to="-12 0" dur="2.8s" repeatCount="indefinite" />
+        </path>
+        {/* front wave (cream, faster) */}
+        <path d={wave2} fill={COLORS.cream}>
+          <animateTransform attributeName="transform" type="translate" from="0 0" to="-12 0" dur="2.1s" repeatCount="indefinite" />
+        </path>
+      </g>
     </svg>
   )
 }
