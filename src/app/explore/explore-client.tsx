@@ -344,8 +344,48 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
             textAlign: 'center',
           }}
         >
+          {/* Travel motif: a plane climbs in along a dashed gold contrail that
+              draws left→right — the same "boarding pass" flourish as the iOS app. */}
+          <div
+            aria-hidden="true"
+            style={{ position: 'absolute', top: -14, left: 0, right: 0, height: 54, pointerEvents: 'none' }}
+          >
+            <svg
+              width="100%"
+              height="54"
+              viewBox="0 0 1000 54"
+              preserveAspectRatio="none"
+              style={{ position: 'absolute', inset: 0 }}
+            >
+              <path
+                className="qk-contrail"
+                d="M40 46 Q 520 2 940 18"
+                fill="none"
+                stroke={COLORS.gold}
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeDasharray="2 10"
+              />
+            </svg>
+            <span
+              className="qk-fly"
+              style={{
+                position: 'absolute',
+                left: 'min(94%, 940px)',
+                top: 2,
+                color: COLORS.gold,
+                filter: 'drop-shadow(0 3px 8px rgba(176,122,42,0.45))',
+              }}
+            >
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" style={{ transform: 'rotate(43deg)' }}>
+                <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" />
+              </svg>
+            </span>
+          </div>
+
           {/* Eyebrow — gold, uppercase, wide tracking ("North Coast · Egypt" style) */}
           <p
+            className="qk-reveal"
             style={{
               margin: 0,
               fontSize: 12,
@@ -353,6 +393,7 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
               letterSpacing: '0.22em',
               textTransform: 'uppercase',
               color: COLORS.gold,
+              animationDelay: '0.25s',
             }}
           >
             {t('explore.eyebrow')}
@@ -360,6 +401,7 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
 
           {/* Headline — one word in burgundy italic */}
           <h1
+            className="qk-reveal"
             style={{
               margin: '14px auto 0',
               maxWidth: 760,
@@ -369,6 +411,7 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
               letterSpacing: '-0.02em',
               lineHeight: 1.08,
               color: COLORS.ink,
+              animationDelay: '0.35s',
             }}
           >
             {t('explore.headlinePre')}{' '}
@@ -378,12 +421,14 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
             {t('explore.headlinePost')}
           </h1>
           <p
+            className="qk-reveal"
             style={{
               margin: '16px auto 0',
               maxWidth: 540,
               fontSize: 16,
               lineHeight: 1.6,
               color: COLORS.muted,
+              animationDelay: '0.45s',
             }}
           >
             {t('explore.subcopy')}
