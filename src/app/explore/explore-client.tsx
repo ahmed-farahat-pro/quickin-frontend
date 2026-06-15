@@ -317,20 +317,25 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
             className="qk-kenburns"
             style={{
               position: 'absolute',
-              inset: 0,
+              // Negative inset + the parent's overflow:hidden hides the soft blur edges.
+              inset: -28,
               backgroundImage: `url(${HERO_COVER})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
-              opacity: 0.22,
+              // Blurred so it reads as a dreamy North Coast scene behind the hero.
+              filter: 'blur(3px) saturate(1.08)',
+              opacity: 0.6,
             }}
           />
-          {/* Cream wash so text + the search pill stay legible. */}
+          {/* Cream wash: lighter at the top so the North Coast photo shows through,
+              fading to solid cream by the search/results so the headline + pill and
+              everything below stay legible. */}
           <div
             style={{
               position: 'absolute',
               inset: 0,
               background:
-                'linear-gradient(180deg, rgba(228,222,207,0.72) 0%, rgba(228,222,207,0.86) 55%, #E4DECF 100%)',
+                'linear-gradient(180deg, rgba(228,222,207,0.34) 0%, rgba(228,222,207,0.58) 42%, rgba(228,222,207,0.9) 76%, #E4DECF 100%)',
             }}
           />
         </div>
@@ -345,10 +350,11 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
           }}
         >
           {/* Travel motif: a plane climbs in along a dashed gold contrail that
-              draws left→right — the same "boarding pass" flourish as the iOS app. */}
+              draws left→right — the same "boarding pass" flourish as the iOS app.
+              In its own row above the eyebrow so the dotted line never overlaps text. */}
           <div
             aria-hidden="true"
-            style={{ position: 'absolute', top: -14, left: 0, right: 0, height: 54, pointerEvents: 'none' }}
+            style={{ position: 'relative', height: 44, marginBottom: 4, pointerEvents: 'none' }}
           >
             <svg
               width="100%"

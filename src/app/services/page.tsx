@@ -126,8 +126,48 @@ export default async function ServicesPage() {
 
       {/* Hero */}
       <section style={{ background: COLORS.page, padding: '40px 24px 8px' }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+        <div style={{ position: 'relative', maxWidth: 1200, margin: '0 auto' }}>
+          {/* Travel motif: a plane climbs in along a dashed gold contrail that
+              draws left→right — the same "boarding pass" flourish as the iOS app. */}
+          <div
+            aria-hidden="true"
+            style={{ position: 'absolute', top: -24, left: 0, right: 0, height: 54, pointerEvents: 'none' }}
+          >
+            <svg
+              width="100%"
+              height="54"
+              viewBox="0 0 1000 54"
+              preserveAspectRatio="none"
+              style={{ position: 'absolute', inset: 0 }}
+            >
+              <path
+                className="qk-contrail"
+                d="M40 46 Q 520 2 940 18"
+                fill="none"
+                stroke={COLORS.gold}
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeDasharray="2 10"
+              />
+            </svg>
+            <span
+              className="qk-fly"
+              style={{
+                position: 'absolute',
+                left: 'min(94%, 940px)',
+                top: 2,
+                color: COLORS.gold,
+                filter: 'drop-shadow(0 3px 8px rgba(176,122,42,0.45))',
+              }}
+            >
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" style={{ transform: 'rotate(43deg)' }}>
+                <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" />
+              </svg>
+            </span>
+          </div>
+
           <p
+            className="qk-reveal"
             style={{
               margin: '0 0 12px',
               fontSize: 12,
@@ -135,11 +175,13 @@ export default async function ServicesPage() {
               letterSpacing: '0.22em',
               textTransform: 'uppercase',
               color: COLORS.gold,
+              animationDelay: '0.25s',
             }}
           >
             Experiences · Egypt
           </p>
           <h1
+            className="qk-reveal"
             style={{
               margin: 0,
               fontFamily: '"Playfair Display", Georgia, serif',
@@ -147,16 +189,19 @@ export default async function ServicesPage() {
               fontWeight: 700,
               letterSpacing: '-0.02em',
               color: COLORS.burgundy,
+              animationDelay: '0.35s',
             }}
           >
             Book a standalone experience
           </h1>
           <p
+            className="qk-reveal"
             style={{
               margin: '10px 0 4px',
               fontSize: 15,
               color: COLORS.muted,
               maxWidth: 560,
+              animationDelay: '0.45s',
             }}
           >
             Jet ski rentals, diving trips, yacht charters and more — offered by
