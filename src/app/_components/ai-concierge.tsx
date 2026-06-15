@@ -7,7 +7,6 @@
 //     -> data: {"delta":"..."}\n\n  (per token) ... data: [DONE]\n\n
 // The OpenAI key lives only on the backend; this just renders the stream.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { API_URL } from '@/lib/api'
 import { useLanguage } from '@/lib/i18n/language-provider'
 
 const COLORS = {
@@ -76,7 +75,7 @@ export default function AIConcierge() {
       const payload = next.slice(0, -1).map((m) => ({ role: m.role, content: m.content }))
 
       try {
-        const res = await fetch(`${API_URL}/api/local/ai/chat`, {
+        const res = await fetch('/api/ai/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ messages: payload }),
