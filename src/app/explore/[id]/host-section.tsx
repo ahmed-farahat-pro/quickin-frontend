@@ -13,10 +13,16 @@
 // Both opt into the client-side i18n context so their labels localize (and stay
 // RTL-safe via logical properties).
 import { useEffect, useState } from 'react'
-import { API_URL, type Listing } from '@/lib/api'
+import {
+  API_URL,
+  getPublicProfile,
+  type Listing,
+  type TrustBadgeSet,
+} from '@/lib/api'
 import { useLanguage } from '@/lib/i18n/language-provider'
 import ImagePlaceholder from '../../_components/image-placeholder'
 import RatingStars from '../../_components/rating-stars'
+import TrustBadges from '../../_components/trust-badges'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -34,10 +40,37 @@ function initialOf(name: string | null | undefined): string {
   return c ? c.toUpperCase() : '·'
 }
 
-// "Hosted by {name}" with a gold-gradient avatar (the host's initial).
-export function HostedBy({ name }: { name: string | null | undefined }) {
+// "Hosted by {name}" with a gold-gradient avatar (the host's initial) plus the
+// host's trust badges (Verified ✓, Superhost, New host).
+//
+// The verified chip lights up immediately from the listing's `hostVerified`
+// flag (no round-trip). When a `hostId` is known we additionally fetch the
+// host's public profile (GET /api/local/users/:id) to surface the full badge
+// set; that fetch only ever ADDS badges, so the line is correct on first paint.
+export function HostedBy({
+  name,
+  hostId,
+  hostVerified,
+}: {
+  name: string | null | undefined
+  hostId?: string | null
+  hostVerified?: boolean
+}) {
   const { t } = useLanguage()
   const display = (name ?? '').trim() || t('host.aHost')
+  const [badges, setBadges] = useState<TrustBadgeSet | null>(null)
+
+  useEffect(() => {
+    if (!hostId) return
+    let cancelled = false
+    getPublicProfile(hostId).then((p) => {
+      if (!cancelled && p) setBadges(p.badges)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [hostId])
+
   return (
     <div
       style={{
@@ -68,7 +101,7 @@ export function HostedBy({ name }: { name: string | null | undefined }) {
       >
         {initialOf(name)}
       </span>
-      <div>
+      <div style={{ minWidth: 0 }}>
         <p style={{ margin: 0, fontSize: 13, color: COLORS.muted }}>
           {t('host.hostedByLabel')}
         </p>
@@ -82,6 +115,11 @@ export function HostedBy({ name }: { name: string | null | undefined }) {
         >
           {display}
         </p>
+        <TrustBadges
+          badges={badges}
+          verifiedOverride={!!hostVerified}
+          style={{ marginTop: 8 }}
+        />
       </div>
     </div>
   )

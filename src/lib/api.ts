@@ -48,6 +48,9 @@ export interface Listing {
   // 'moderate', so it's effectively always present, but typed optional for
   // older cached shapes.
   cancellation_policy?: CancellationPolicy
+  // Whether the listing's host has a verified identity. Powers the "Verified"
+  // trust chip on the host area without an extra profile fetch.
+  host_verified?: boolean
 }
 
 // ---- Listing search filters -------------------------------------------------
@@ -438,6 +441,263 @@ export async function updateListingPolicy(
     throw new Error((data && data.error) || `Request failed: ${res.status}`)
   }
   return (await res.json()) as Listing
+}
+
+// ---- Trust & safety: identity verification ----------------------------------
+
+// A user's identity-verification state. `unverified` (never submitted) →
+// `pending` (an ID is awaiting admin review) → `verified` / `rejected`.
+export type VerificationStatus =
+  | 'unverified'
+  | 'pending'
+  | 'verified'
+  | 'rejected'
+
+// GET /api/local/verification (Bearer). The signed-in user's own status, plus
+// when they were verified (null until approved).
+export interface VerificationState {
+  status: VerificationStatus
+  verified_at: string | null
+}
+
+// Fetch the signed-in user's verification status. Bearer = the user. Returns a
+// safe `unverified` default on any non-2xx / parse error so the UI never breaks.
+export async function getVerification(
+  token: string,
+  signal?: AbortSignal
+): Promise<VerificationState> {
+  try {
+    const res = await fetch(`${API_URL}/api/local/verification`, {
+      headers: { Authorization: 'Bearer ' + token },
+      cache: 'no-store',
+      signal,
+    })
+    if (!res.ok) return { status: 'unverified', verified_at: null }
+    const data = await res.json()
+    const status = (data && data.status) as VerificationStatus
+    return {
+      status: status || 'unverified',
+      verified_at: (data && data.verified_at) ?? null,
+    }
+  } catch {
+    return { status: 'unverified', verified_at: null }
+  }
+}
+
+// Submit an ID image (a data:image/* URL) for review. Bearer = the user; on
+// success the status flips to `pending`. Resolves to the updated state; throws
+// on a non-2xx response (e.g. 400 missing/too large) so callers can surface it.
+export async function submitVerification(
+  token: string,
+  doc: string
+): Promise<VerificationState> {
+  const res = await fetch(`${API_URL}/api/local/verification`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + token,
+    },
+    body: JSON.stringify({ doc }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error((data && data.error) || `Request failed: ${res.status}`)
+  }
+  const data = await res.json().catch(() => ({}))
+  return {
+    status: (data && data.status) || 'pending',
+    verified_at: (data && data.verified_at) ?? null,
+  }
+}
+
+// ---- Trust & safety: public profile + badges --------------------------------
+
+// The trust badges the backend computes for a host/user. All booleans/counts
+// are derived server-side from reviews, stays, and verification.
+export interface TrustBadgeSet {
+  verified: boolean
+  superhost: boolean
+  newHost: boolean
+  isHost: boolean
+  completedStays: number
+  reviewCount: number
+  hostRating: number
+  memberSince: string | null
+}
+
+// GET /api/local/users/:id — a PUBLIC profile. Deliberately carries NO private
+// fields (email/phone/id) — only what's safe to show on a listing/host page.
+export interface PublicProfile {
+  id: string
+  full_name: string | null
+  avatar_url: string | null
+  bio: string | null
+  verification_status: VerificationStatus
+  guest_rating: number
+  guest_review_count: number
+  badges: TrustBadgeSet
+}
+
+// Fetch a user's public profile + trust badges (no auth). Returns null on any
+// non-2xx / parse error so callers can degrade (hide the badges) gracefully.
+export async function getPublicProfile(
+  userId: string,
+  signal?: AbortSignal
+): Promise<PublicProfile | null> {
+  try {
+    const res = await fetch(
+      `${API_URL}/api/local/users/${encodeURIComponent(userId)}`,
+      { signal }
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    return data && typeof data === 'object' ? (data as PublicProfile) : null
+  } catch {
+    return null
+  }
+}
+
+// ---- Trust & safety: reporting ----------------------------------------------
+
+// What can be reported. Drives POST /api/local/reports { target_type }.
+export type ReportTargetType = 'listing' | 'user' | 'review'
+
+// File a report against a listing/user/review. Bearer = the reporter (sign-in
+// required). Resolves to the created report id; throws on a non-2xx response.
+export async function createReport(
+  token: string,
+  body: {
+    target_type: ReportTargetType
+    target_id: string
+    reason: string
+    details?: string
+  }
+): Promise<{ ok: boolean; id: string }> {
+  const res = await fetch(`${API_URL}/api/local/reports`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + token,
+    },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error((data && data.error) || `Request failed: ${res.status}`)
+  }
+  return (await res.json()) as { ok: boolean; id: string }
+}
+
+// ---- Trust & safety: admin triage -------------------------------------------
+
+// One pending identity-verification submission in the admin queue
+// (GET /api/local/admin/verifications). `verification_doc` is the submitted ID
+// image (data:/http URL) shown as a thumbnail for review.
+export interface AdminVerification {
+  id: string
+  full_name: string | null
+  email: string | null
+  verification_doc: string | null
+  role: string | null
+}
+
+// Fetch the pending verification submissions. Bearer = admin. Returns [] on any
+// non-2xx / parse error.
+export async function listVerifications(
+  token: string,
+  signal?: AbortSignal
+): Promise<AdminVerification[]> {
+  try {
+    const res = await fetch(`${API_URL}/api/local/admin/verifications`, {
+      headers: { Authorization: 'Bearer ' + token },
+      cache: 'no-store',
+      signal,
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    return Array.isArray(data) ? (data as AdminVerification[]) : []
+  } catch {
+    return []
+  }
+}
+
+// Approve or reject a user's identity verification. Bearer = admin. Throws on a
+// non-2xx response so the caller can toast the error.
+export async function setVerification(
+  token: string,
+  userId: string,
+  action: 'approve' | 'reject'
+): Promise<void> {
+  const res = await fetch(`${API_URL}/api/local/admin/verifications`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + token,
+    },
+    body: JSON.stringify({ user_id: userId, action }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error((data && data.error) || `Request failed: ${res.status}`)
+  }
+}
+
+// One report row in the admin queue (GET /api/local/admin/reports?status=open).
+export interface AdminReport {
+  id: string
+  reporter_id: string
+  reporter_name: string | null
+  target_type: ReportTargetType
+  target_id: string
+  reason: string
+  details: string | null
+  status: string
+  created_at: string
+  resolved_at: string | null
+}
+
+// Fetch reports filtered by status (default 'open'). Bearer = admin. Returns []
+// on any non-2xx / parse error.
+export async function listReports(
+  token: string,
+  status: string = 'open',
+  signal?: AbortSignal
+): Promise<AdminReport[]> {
+  try {
+    const res = await fetch(
+      `${API_URL}/api/local/admin/reports?status=${encodeURIComponent(status)}`,
+      {
+        headers: { Authorization: 'Bearer ' + token },
+        cache: 'no-store',
+        signal,
+      }
+    )
+    if (!res.ok) return []
+    const data = await res.json()
+    return Array.isArray(data) ? (data as AdminReport[]) : []
+  } catch {
+    return []
+  }
+}
+
+// Resolve or dismiss a report. Bearer = admin. Throws on a non-2xx response.
+export async function resolveReport(
+  token: string,
+  reportId: string,
+  action: 'resolve' | 'dismiss'
+): Promise<void> {
+  const res = await fetch(`${API_URL}/api/local/admin/reports`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + token,
+    },
+    body: JSON.stringify({ report_id: reportId, action }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error((data && data.error) || `Request failed: ${res.status}`)
+  }
 }
 
 // The shape persisted in localStorage 'qk_user' after login/signup.

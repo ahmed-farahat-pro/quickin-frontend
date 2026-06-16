@@ -15,8 +15,10 @@ import {
   getToken,
   getGuestReviews,
   type GuestReview,
+  type VerificationStatus,
 } from '@/lib/api'
 import AuthArea from '../_components/auth-area'
+import VerifyIdentity from './verify-identity'
 import { EyeIcon, EyeOffIcon, eyeButtonStyle } from '@/app/_components/password-eye'
 import PasswordStrength, { passwordMeetsMin } from '@/app/_components/password-strength'
 import { useLanguage } from '@/lib/i18n/language-provider'
@@ -99,6 +101,9 @@ interface Profile {
   phone?: string | null
   bio?: string | null
   avatar_url?: string | null
+  // Self-profile now carries the identity-verification status; seeds the
+  // "Verify your identity" card to avoid a flash before its own fetch.
+  verification_status?: VerificationStatus | null
 }
 
 interface FormState {
@@ -126,6 +131,10 @@ export default function AccountPage() {
     avatar_url: '',
   })
   const [loadError, setLoadError] = useState(false)
+  // Identity-verification status seeded from the self-profile (the card
+  // refreshes it from /api/local/verification on mount).
+  const [verificationStatus, setVerificationStatus] =
+    useState<VerificationStatus | null>(null)
   // Reviews this user has received from hosts (host → guest), + the current
   // user id used to fetch them. null guestReviews = not loaded / none yet.
   const [guestReviews, setGuestReviews] = useState<GuestReview[] | null>(null)
@@ -162,6 +171,7 @@ export default function AccountPage() {
       const p: Profile = await res.json()
       setEmail(p.email ?? null)
       setRole(p.role ?? null)
+      setVerificationStatus(p.verification_status ?? null)
       setForm({
         full_name: p.full_name ?? '',
         age: p.age != null ? String(p.age) : '',
@@ -768,6 +778,9 @@ export default function AccountPage() {
             </form>
           </div>
         )}
+
+        {/* Verify your identity — trust & safety card below the profile form */}
+        {gate === 'ok' && <VerifyIdentity initialStatus={verificationStatus} />}
 
         {/* Change password — separate card below the profile form */}
         {gate === 'ok' && (

@@ -6,6 +6,7 @@ import { API_URL, type Listing } from '@/lib/api'
 import ReservePanel from './reserve-panel'
 import ReviewsSection from './reviews-section'
 import { HostedBy, MoreFromHost } from './host-section'
+import ReportListing from './report-listing'
 import ImagePlaceholder from '../../_components/image-placeholder'
 import AmenityIcon from '../../_components/amenity-icon'
 import HeartButton from '../../_components/heart-button'
@@ -401,10 +402,18 @@ export default async function ListingDetailPage({
               </div>
             )}
 
-            {/* Host — "Hosted by {name}" with a gold-gradient avatar. */}
+            {/* Host — "Hosted by {name}" with a gold-gradient avatar + trust
+                badges (Verified ✓, Superhost, New host). */}
             {(listing.host_name || listing.host_id) && (
-              <HostedBy name={listing.host_name} />
+              <HostedBy
+                name={listing.host_name}
+                hostId={listing.host_id}
+                hostVerified={listing.host_verified}
+              />
             )}
+
+            {/* Report this listing — opens a small dialog (sign-in required). */}
+            <ReportListing listingId={listing.id} />
 
             {/* Guest reviews (client-fetched). Renders nothing until it has at
                 least one review — the "New" badge by the title covers empty. */}

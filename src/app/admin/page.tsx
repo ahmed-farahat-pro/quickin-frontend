@@ -5,8 +5,17 @@
 // /api/local/admin/overview and gives full control: reveal passwords (eye toggle),
 // change roles, and delete any row — all with branded (non-native) confirm + toast.
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { API_URL } from '@/lib/api'
+import {
+  API_URL,
+  listVerifications,
+  setVerification,
+  listReports,
+  resolveReport,
+  type AdminVerification,
+  type AdminReport,
+} from '@/lib/api'
 import { EyeIcon, EyeOffIcon } from '@/app/_components/password-eye'
+import { useLanguage } from '@/lib/i18n/language-provider'
 
 const COLORS = { burgundy: '#5B0F16', cream: '#F6F1E6', page: '#E4DECF', tan: '#EFE6D8', ink: '#2A2220', muted: '#6B6055', gold: '#B07A2A' }
 const GRAD_BURGUNDY = 'linear-gradient(135deg,#5B0F16,#8a2530)'
@@ -217,6 +226,7 @@ type AdminReview = { rating: number; comment: string | null; reviewer_name: stri
 type ReviewsModal = { listingId: string; title: string; reviews: AdminReview[] | null }
 
 export default function AdminPage() {
+  const { t } = useLanguage()
   const [token, setToken] = useState<string | null>(null)
   const [email, setEmail] = useState('')
   const [data, setData] = useState<Overview | null>(null)
@@ -226,6 +236,12 @@ export default function AdminPage() {
   const [toast, setToast] = useState<Toast | null>(null)
   const [confirm, setConfirm] = useState<Confirm | null>(null)
   const [reviewsModal, setReviewsModal] = useState<ReviewsModal | null>(null)
+
+  // Trust & safety triage: pending verifications + open reports. null = not yet
+  // loaded. `docModal` holds an ID image shown full-size on demand.
+  const [verifications, setVerifications] = useState<AdminVerification[] | null>(null)
+  const [reports, setReports] = useState<AdminReport[] | null>(null)
+  const [docModal, setDocModal] = useState<string | null>(null)
 
   // "Send a notification" broadcast composer state.
   const [notifTitle, setNotifTitle] = useState('')
@@ -241,29 +257,32 @@ export default function AdminPage() {
   // Auto-dismiss toasts.
   useEffect(() => {
     if (!toast) return
-    const t = setTimeout(() => setToast(null), 3200)
-    return () => clearTimeout(t)
+    const timer = setTimeout(() => setToast(null), 3200)
+    return () => clearTimeout(timer)
   }, [toast])
 
-  const load = useCallback(async (t: string) => {
+  const load = useCallback(async (tok: string) => {
     try {
-      const res = await fetch(`${API_URL}/api/local/admin/overview`, { headers: { Authorization: `Bearer ${t}` } })
+      const res = await fetch(`${API_URL}/api/local/admin/overview`, { headers: { Authorization: `Bearer ${tok}` } })
       if (res.status === 401 || res.status === 403) { window.location.href = '/login'; return }
       const d = await res.json()
       if (!res.ok) { setToast({ message: d?.error || 'Failed to load', kind: 'error' }); return }
       setData(d)
     } catch { setToast({ message: 'Network error loading admin data.', kind: 'error' }) }
+    // Trust & safety queues — fetched alongside the overview (own endpoints).
+    listVerifications(tok).then(setVerifications)
+    listReports(tok, 'open').then(setReports)
   }, [])
 
   useEffect(() => {
-    let t: string | null = null, role: string | undefined
+    let tok: string | null = null, role: string | undefined
     try {
-      t = localStorage.getItem('qk_token')
+      tok = localStorage.getItem('qk_token')
       const raw = localStorage.getItem('qk_user')
       if (raw) { const u = JSON.parse(raw); role = u?.role; setEmail(u?.email || 'admin') }
     } catch {}
-    if (!t || role !== 'admin') { window.location.href = '/login'; return }
-    setToken(t); setChecked(true); load(t)
+    if (!tok || role !== 'admin') { window.location.href = '/login'; return }
+    setToken(tok); setChecked(true); load(tok)
   }, [load])
 
   async function doDelete(slug: string, id: string, label: string) {
@@ -335,6 +354,42 @@ export default function AdminPage() {
       setReviewsModal({ listingId, title, reviews: Array.isArray(d) ? (d as AdminReview[]) : [] })
     } catch {
       setReviewsModal({ listingId, title, reviews: [] })
+    }
+  }
+
+  // Approve / reject a pending identity verification, then drop the row.
+  async function decideVerification(userId: string, action: 'approve' | 'reject') {
+    if (!token) return
+    setBusyId(userId)
+    try {
+      await setVerification(token, userId, action)
+      setVerifications((prev) => (prev ? prev.filter((v) => v.id !== userId) : prev))
+      setToast({
+        message: action === 'approve' ? t('admin.verifyApproved') : t('admin.verifyRejected'),
+        kind: 'success',
+      })
+    } catch {
+      setToast({ message: t('admin.actionFailed'), kind: 'error' })
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  // Resolve / dismiss an open report, then drop the row.
+  async function decideReport(reportId: string, action: 'resolve' | 'dismiss') {
+    if (!token) return
+    setBusyId(reportId)
+    try {
+      await resolveReport(token, reportId, action)
+      setReports((prev) => (prev ? prev.filter((r) => r.id !== reportId) : prev))
+      setToast({
+        message: action === 'resolve' ? t('admin.reportResolved') : t('admin.reportDismissed'),
+        kind: 'success',
+      })
+    } catch {
+      setToast({ message: t('admin.actionFailed'), kind: 'error' })
+    } finally {
+      setBusyId(null)
     }
   }
 
@@ -666,7 +721,158 @@ export default function AdminPage() {
             </div>
           )}
         </div>
+
+        {/* Trust & safety: pending identity verifications. Each row shows the
+            submitted ID thumbnail (click to enlarge) + Approve / Reject. */}
+        <div className="qk-card" style={{ background: '#fff', borderRadius: 22, border: `1px solid ${COLORS.tan}`, overflow: 'hidden', boxShadow: '0 8px 22px rgba(42,34,32,0.08)', marginTop: 22 }}>
+          <div style={{ background: GRAD_BURGUNDY, padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, borderRadius: 12, background: 'rgba(246,241,230,0.14)', border: '1px solid rgba(246,241,230,0.35)' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 12l2 2 4-4" /><path d="M12 3a12 12 0 0 0 8 3 12 12 0 0 1-8 15 12 12 0 0 1-8-15 12 12 0 0 0 8-3z" />
+              </svg>
+            </span>
+            <div>
+              <p style={{ margin: 0, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, color: COLORS.gold, fontWeight: 700 }}>Trust &amp; safety</p>
+              <h2 style={{ margin: '2px 0 0', fontSize: 18, color: '#fff' }}>{t('admin.verifications')} ({verifications?.length ?? 0})</h2>
+            </div>
+          </div>
+          {verifications && verifications.length === 0 ? (
+            <div style={{ padding: '34px 24px', textAlign: 'center', color: COLORS.muted, fontSize: 14 }}>
+              {t('admin.verificationsEmpty')}
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
+                <thead>
+                  <tr>
+                    <th style={th}>ID</th>
+                    <th style={th}>Name</th>
+                    <th style={th}>Email</th>
+                    <th style={th}>Role</th>
+                    <th style={{ ...th, textAlign: 'right' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(verifications ?? []).map((v) => {
+                    const id = String(v.id)
+                    return (
+                      <tr key={id} className="qk-row" style={{ borderTop: `1px solid ${COLORS.cream}` }}>
+                        <td style={td}>
+                          {v.verification_doc ? (
+                            <button type="button" onClick={() => setDocModal(v.verification_doc)} title={t('admin.viewDoc')}
+                              style={{ appearance: 'none', border: `1px solid ${COLORS.tan}`, background: '#fff', padding: 0, borderRadius: 10, cursor: 'pointer', display: 'inline-flex', overflow: 'hidden' }}>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={v.verification_doc} alt="ID" style={{ width: 64, height: 44, objectFit: 'cover', display: 'block' }} />
+                            </button>
+                          ) : (
+                            <span style={{ color: COLORS.muted }}>—</span>
+                          )}
+                        </td>
+                        <td style={td}><span style={{ fontWeight: 700, color: COLORS.ink }}>{v.full_name || '—'}</span></td>
+                        <td style={td}>{v.email || '—'}</td>
+                        <td style={td}>{rolePill(v.role)}</td>
+                        <td style={{ ...td, textAlign: 'right' }}>
+                          <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end' }}>
+                            <button type="button" onClick={() => decideVerification(id, 'approve')} disabled={busyId === id} className="qk-press"
+                              style={{ appearance: 'none', border: 'none', background: busyId === id ? COLORS.tan : '#0f5132', color: '#fff', fontWeight: 700, fontSize: 12.5, fontFamily: FONT, borderRadius: 999, padding: '6px 14px', cursor: busyId === id ? 'default' : 'pointer' }}>
+                              {busyId === id ? '…' : t('admin.approve')}
+                            </button>
+                            <button type="button" onClick={() => decideVerification(id, 'reject')} disabled={busyId === id}
+                              style={{ appearance: 'none', border: `1px solid ${COLORS.burgundy}`, background: busyId === id ? COLORS.tan : '#fff', color: COLORS.burgundy, fontWeight: 700, fontSize: 12.5, fontFamily: FONT, borderRadius: 999, padding: '6px 14px', cursor: busyId === id ? 'default' : 'pointer' }}>
+                              {busyId === id ? '…' : t('admin.reject')}
+                            </button>
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Trust & safety: open reports. Each row shows reason / details /
+            reporter + target, with Resolve / Dismiss. */}
+        <div className="qk-card" style={{ background: '#fff', borderRadius: 22, border: `1px solid ${COLORS.tan}`, overflow: 'hidden', boxShadow: '0 8px 22px rgba(42,34,32,0.08)', marginTop: 22 }}>
+          <div style={{ background: GRAD_BURGUNDY, padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, borderRadius: 12, background: 'rgba(246,241,230,0.14)', border: '1px solid rgba(246,241,230,0.35)' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><line x1="4" y1="22" x2="4" y2="15" />
+              </svg>
+            </span>
+            <div>
+              <p style={{ margin: 0, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, color: COLORS.gold, fontWeight: 700 }}>Trust &amp; safety</p>
+              <h2 style={{ margin: '2px 0 0', fontSize: 18, color: '#fff' }}>{t('admin.reports')} ({reports?.length ?? 0})</h2>
+            </div>
+          </div>
+          {reports && reports.length === 0 ? (
+            <div style={{ padding: '34px 24px', textAlign: 'center', color: COLORS.muted, fontSize: 14 }}>
+              {t('admin.reportsEmpty')}
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
+                <thead>
+                  <tr>
+                    <th style={th}>{t('admin.reason')}</th>
+                    <th style={th}>{t('admin.target')}</th>
+                    <th style={th}>{t('admin.reporter')}</th>
+                    <th style={th}>Date</th>
+                    <th style={{ ...th, textAlign: 'right' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(reports ?? []).map((r) => {
+                    const id = String(r.id)
+                    return (
+                      <tr key={id} className="qk-row" style={{ borderTop: `1px solid ${COLORS.cream}` }}>
+                        <td style={{ ...td, whiteSpace: 'normal', maxWidth: 340 }}>
+                          <span style={{ fontWeight: 700, color: COLORS.ink }}>{r.reason || '—'}</span>
+                          {r.details && <span style={{ display: 'block', marginTop: 3, fontSize: 12.5, color: COLORS.muted, lineHeight: 1.45 }}>{r.details}</span>}
+                        </td>
+                        <td style={td}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ background: COLORS.tan, color: COLORS.burgundy, fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 999, textTransform: 'capitalize' }}>{r.target_type}</span>
+                            <code style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12, color: COLORS.muted }}>{String(r.target_id).slice(0, 8)}</code>
+                          </span>
+                        </td>
+                        <td style={td}>{r.reporter_name || '—'}</td>
+                        <td style={td}>{formatDate(r.created_at)}</td>
+                        <td style={{ ...td, textAlign: 'right' }}>
+                          <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end' }}>
+                            <button type="button" onClick={() => decideReport(id, 'resolve')} disabled={busyId === id} className="qk-press"
+                              style={{ appearance: 'none', border: 'none', background: busyId === id ? COLORS.tan : '#0f5132', color: '#fff', fontWeight: 700, fontSize: 12.5, fontFamily: FONT, borderRadius: 999, padding: '6px 14px', cursor: busyId === id ? 'default' : 'pointer' }}>
+                              {busyId === id ? '…' : t('admin.resolve')}
+                            </button>
+                            <button type="button" onClick={() => decideReport(id, 'dismiss')} disabled={busyId === id}
+                              style={{ appearance: 'none', border: `1px solid ${COLORS.burgundy}`, background: busyId === id ? COLORS.tan : '#fff', color: COLORS.burgundy, fontWeight: 700, fontSize: 12.5, fontFamily: FONT, borderRadius: 999, padding: '6px 14px', cursor: busyId === id ? 'default' : 'pointer' }}>
+                              {busyId === id ? '…' : t('admin.dismiss')}
+                            </button>
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* ID document viewer — opened from a verification thumbnail. */}
+      {docModal && (
+        <div role="dialog" aria-modal="true" onClick={() => setDocModal(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(20,12,10,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', maxWidth: '90vw', maxHeight: '85vh' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={docModal} alt={t('admin.viewDoc')} style={{ maxWidth: '90vw', maxHeight: '85vh', borderRadius: 16, boxShadow: '0 24px 60px rgba(0,0,0,0.5)', display: 'block' }} />
+            <button type="button" onClick={() => setDocModal(null)} aria-label="Close" className="qk-press"
+              style={{ position: 'absolute', top: 10, right: 10, appearance: 'none', border: 'none', background: 'rgba(20,12,10,0.6)', color: '#fff', fontWeight: 700, fontSize: 18, lineHeight: 1, borderRadius: 999, width: 36, height: 36, cursor: 'pointer' }}>×</button>
+          </div>
+        </div>
+      )}
 
       {/* Branded confirm modal (replaces the native browser confirm) */}
       {confirm && (
