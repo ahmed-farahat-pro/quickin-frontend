@@ -19,6 +19,7 @@ import ImagePlaceholder from '../_components/image-placeholder'
 import HeartButton from '../_components/heart-button'
 import RatingStars from '../_components/rating-stars'
 import { useLanguage } from '@/lib/i18n/language-provider'
+import { useCurrency } from '@/lib/currency/currency-provider'
 
 // Leaflet must never run on the server (it reads `window` at import time), so
 // the map is a client-only dynamic import with SSR disabled.
@@ -1119,6 +1120,7 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
 // a guest-favorite star badge, and "EGP X / night".
 function ListingCard({ listing, saved }: { listing: Listing; saved: boolean }) {
   const { t } = useLanguage()
+  const { format } = useCurrency()
   const cover = listing.listing_images[0]?.url || null
   const reviewCount = listing.review_count ?? 0
   const rating = listing.rating ?? 0
@@ -1252,7 +1254,7 @@ function ListingCard({ listing, saved }: { listing: Listing; saved: boolean }) {
         )}
         <p style={{ margin: '14px 0 0', fontSize: 15, color: COLORS.ink }}>
           <span style={{ fontWeight: 700, color: COLORS.burgundy }}>
-            EGP {listing.price_per_night}
+            {format(listing.price_per_night)}
           </span>{' '}
           <span style={{ color: COLORS.muted }}>{t('listing.perNight')}</span>
         </p>

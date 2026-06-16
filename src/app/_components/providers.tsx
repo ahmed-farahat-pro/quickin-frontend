@@ -4,14 +4,19 @@
 // a server component while still mounting the client-only LanguageProvider that
 // powers i18n + RTL across the app.
 import { LanguageProvider } from '@/lib/i18n/language-provider'
+import { CurrencyProvider } from '@/lib/currency/currency-provider'
 import AIConcierge from './ai-concierge'
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <LanguageProvider>
-      {children}
-      {/* Floating AI travel-concierge button + chat, available site-wide. */}
-      <AIConcierge />
+      {/* Multi-currency DISPLAY layer (EGP base + USD/EUR/GBP/SAR/AED). Converts
+          shown prices only; bookings/payments always stay EGP. */}
+      <CurrencyProvider>
+        {children}
+        {/* Floating AI travel-concierge button + chat, available site-wide. */}
+        <AIConcierge />
+      </CurrencyProvider>
     </LanguageProvider>
   )
 }

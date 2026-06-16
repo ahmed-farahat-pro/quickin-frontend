@@ -14,6 +14,7 @@
 import { useEffect, useState } from 'react'
 import NotificationBell from './notification-bell'
 import LanguageToggle from './language-toggle'
+import CurrencySwitcher from './currency-switcher'
 import { useLanguage } from '@/lib/i18n/language-provider'
 
 const COLORS = {
@@ -124,6 +125,9 @@ export default function AuthArea() {
         <a href="/host#reservations" style={linkStyle()}>
           {t('nav.reservations')}
         </a>
+        <a href="/host#earnings" style={linkStyle()}>
+          {t('money.earnings')}
+        </a>
         <a href="/host#services" style={linkStyle()}>
           {t('nav.services')}
         </a>
@@ -154,6 +158,11 @@ export default function AuthArea() {
         {signedIn && (
           <a href="/subscriptions" style={linkStyle()}>
             {t('nav.subscriptions')}
+          </a>
+        )}
+        {signedIn && (
+          <a href="/receipts" style={linkStyle()}>
+            {t('money.receipts')}
           </a>
         )}
         {signedIn && <SavedLink label={t('nav.saved')} />}
@@ -198,6 +207,7 @@ export default function AuthArea() {
         >
           {t('nav.logout')}
         </button>
+        <CurrencySwitcher />
         <LanguageToggle />
       </>
     )
@@ -224,6 +234,7 @@ export default function AuthArea() {
       >
         {t('nav.signup')}
       </a>
+      <CurrencySwitcher />
       <LanguageToggle />
     </>
   )

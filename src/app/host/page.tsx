@@ -13,6 +13,7 @@ import {
   getReviewableGuests,
   getStoredUser,
   getToken,
+  getHostEarnings,
   submitOwnershipDoc,
   updateListingDiscounts,
   updateListingPolicy,
@@ -20,6 +21,7 @@ import {
   type CancellationPolicy,
   type Listing,
   type HostBooking,
+  type HostEarnings,
   type Service,
   type ServiceRequest,
   type ReviewableGuest,
@@ -30,6 +32,7 @@ import GuestReviewForm from '@/app/_components/guest-review-form'
 import ImagePlaceholder from '@/app/_components/image-placeholder'
 import AvailabilityManager from './availability-manager'
 import { useLanguage } from '@/lib/i18n/language-provider'
+import { useCurrency } from '@/lib/currency/currency-provider'
 
 // Leaflet + OpenStreetMap pin-picker for the location step. Client-only (Leaflet
 // touches window) -> dynamic import with ssr:false, mirroring how the explore
@@ -319,6 +322,11 @@ export default function HostPage() {
   const { t } = useLanguage()
   const [gate, setGate] = useState<Gate>({ kind: 'checking' })
 
+  // Earnings & payouts (mock) — totals + per-booking breakdown.
+  const [earnings, setEarnings] = useState<HostEarnings | null>(null)
+  const [earningsLoading, setEarningsLoading] = useState(true)
+  const [earningsError, setEarningsError] = useState(false)
+
   // Add-listing wizard
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [step, setStep] = useState(0) // 0..6
@@ -511,6 +519,23 @@ export default function HostPage() {
     }
   }, [])
 
+  const loadEarnings = useCallback(async () => {
+    const token = getToken()
+    if (!token) return
+    setEarningsLoading(true)
+    setEarningsError(false)
+    try {
+      const data = await getHostEarnings(token)
+      if (!data) {
+        setEarningsError(true)
+        return
+      }
+      setEarnings(data)
+    } finally {
+      setEarningsLoading(false)
+    }
+  }, [])
+
   // Drop a stay from the "guests to review" list once its review lands.
   const onGuestReviewed = useCallback((bookingId: string) => {
     setReviewableGuests((prev) => prev.filter((g) => g.booking_id !== bookingId))
@@ -541,6 +566,7 @@ export default function HostPage() {
       loadServices()
       loadServiceRequests()
       loadReviewableGuests()
+      loadEarnings()
     }
 
     const role = (user.role || '').toLowerCase()
@@ -580,7 +606,7 @@ export default function HostPage() {
     return () => {
       cancelled = true
     }
-  }, [loadListings, loadBookings, loadServices, loadServiceRequests, loadReviewableGuests])
+  }, [loadListings, loadBookings, loadServices, loadServiceRequests, loadReviewableGuests, loadEarnings])
 
   function patch(p: Partial<FormState>) {
     setForm((prev) => ({ ...prev, ...p }))
@@ -923,6 +949,14 @@ export default function HostPage() {
       <p style={{ margin: '0 0 30px', fontSize: 15, color: COLORS.muted }}>
         Publish a stay, see your listings, and respond to reservation requests.
       </p>
+
+      {/* Earnings & payouts (mock) -------------------------------------------- */}
+      <EarningsPanel
+        earnings={earnings}
+        loading={earningsLoading}
+        error={earningsError}
+        onRetry={loadEarnings}
+      />
 
       {/* a) Add a listing ----------------------------------------------------- */}
       <Section title="Add a listing">
@@ -2573,6 +2607,238 @@ export default function HostPage() {
         )}
       </Section>
     </Shell>
+  )
+}
+
+// ---- Earnings & payouts (mock) ---------------------------------------------
+
+// Host earnings dashboard: three stat cards (total earned / paid out / pending)
+// + a per-booking breakdown. All amounts come from the backend in EGP and are
+// rendered through the currency formatter so they follow the chosen display
+// currency. Lives at the top of the host dashboard (anchor #earnings).
+function EarningsPanel({
+  earnings,
+  loading,
+  error,
+  onRetry,
+}: {
+  earnings: HostEarnings | null
+  loading: boolean
+  error: boolean
+  onRetry: () => void
+}) {
+  const { t, lang } = useLanguage()
+  const { format } = useCurrency()
+  const locale = lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US'
+
+  function fmtRowDate(d: string): string {
+    const date = new Date(d + 'T00:00:00')
+    if (Number.isNaN(date.getTime())) return d
+    return date.toLocaleDateString(locale, { month: 'short', day: 'numeric' })
+  }
+
+  function fmtPaidAt(iso: string | null): string | null {
+    if (!iso) return null
+    const date = new Date(iso)
+    if (Number.isNaN(date.getTime())) return null
+    return date.toLocaleDateString(locale, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+  }
+
+  return (
+    <Section title={t('money.earnings')} id="earnings">
+      <p style={{ margin: '0 0 18px', fontSize: 14, color: COLORS.muted }}>
+        {t('money.earningsSubtitle')}
+      </p>
+
+      {loading ? (
+        <Muted>{t('money.loading')}</Muted>
+      ) : error || !earnings ? (
+        <RetryRow label={t('money.earningsError')} onRetry={onRetry} />
+      ) : (
+        <>
+          {/* Stat cards */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+              gap: 14,
+            }}
+          >
+            <StatCard
+              label={t('money.totalEarned')}
+              value={format(earnings.totalEarned)}
+              accent
+            />
+            <StatCard label={t('money.paidOut')} value={format(earnings.paidOut)} />
+            <StatCard label={t('money.pending')} value={format(earnings.pending)} />
+          </div>
+
+          <p style={{ margin: '14px 0 0', fontSize: 12.5, color: COLORS.muted }}>
+            {t('money.commissionNote', {
+              percent: Math.round((1 - earnings.commissionRate) * 100),
+            })}{' '}
+            · {t('money.bookingsCount')}: {earnings.bookingsCount}
+          </p>
+
+          {/* Per-booking breakdown */}
+          <h3
+            style={{
+              margin: '24px 0 12px',
+              fontSize: 14,
+              fontWeight: 700,
+              color: COLORS.ink,
+            }}
+          >
+            {t('money.recentPayouts')}
+          </h3>
+
+          {earnings.recent.length === 0 ? (
+            <Muted>{t('money.noEarnings')}</Muted>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {earnings.recent.map((row) => {
+                const paidAt = fmtPaidAt(row.paid_at)
+                return (
+                  <div
+                    key={row.booking_id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 14,
+                      flexWrap: 'wrap',
+                      background: COLORS.cream,
+                      border: '1px solid rgba(42,34,32,0.06)',
+                      borderRadius: 16,
+                      padding: '14px 16px',
+                    }}
+                  >
+                    <div style={{ minWidth: 0, flex: '1 1 180px' }}>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 14.5,
+                          fontWeight: 700,
+                          color: COLORS.ink,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {row.title}
+                      </p>
+                      <p style={{ margin: '4px 0 0', fontSize: 12.5, color: COLORS.muted }}>
+                        {fmtRowDate(row.check_in)} – {fmtRowDate(row.check_out)}
+                        {paidAt ? ` · ${t('money.paidOn')} ${paidAt}` : ''}
+                      </p>
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 14,
+                        flex: '0 0 auto',
+                      }}
+                    >
+                      <div style={{ textAlign: 'end' }}>
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: 15,
+                            fontWeight: 800,
+                            color: COLORS.burgundy,
+                          }}
+                        >
+                          {format(row.net)}
+                        </p>
+                        <p style={{ margin: '2px 0 0', fontSize: 11.5, color: COLORS.muted }}>
+                          {t('money.net')} · {t('money.gross')} {format(row.gross)}
+                        </p>
+                      </div>
+                      <EarningStatusBadge status={row.status} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </>
+      )}
+    </Section>
+  )
+}
+
+// A single earnings stat tile (label + big value). `accent` paints the value
+// burgundy for the headline "Total earned" card.
+function StatCard({
+  label,
+  value,
+  accent = false,
+}: {
+  label: string
+  value: string
+  accent?: boolean
+}) {
+  return (
+    <div
+      style={{
+        background: COLORS.cream,
+        border: '1px solid rgba(42,34,32,0.06)',
+        borderRadius: 18,
+        padding: '16px 18px',
+      }}
+    >
+      <p
+        style={{
+          margin: 0,
+          fontSize: 11,
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          color: COLORS.muted,
+        }}
+      >
+        {label}
+      </p>
+      <p
+        style={{
+          margin: '8px 0 0',
+          fontSize: 'clamp(20px, 3vw, 26px)',
+          fontWeight: 800,
+          color: accent ? COLORS.burgundy : COLORS.ink,
+          lineHeight: 1.1,
+        }}
+      >
+        {value}
+      </p>
+    </div>
+  )
+}
+
+// Payout status pill: green "Paid out" vs gold "Upcoming". Labels localized.
+function EarningStatusBadge({ status }: { status: 'paid_out' | 'upcoming' }) {
+  const { t } = useLanguage()
+  const paid = status === 'paid_out'
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        background: paid ? 'rgba(15,81,50,0.12)' : 'rgba(176,122,42,0.16)',
+        color: paid ? '#0f5132' : '#8a5a00',
+        fontSize: 12,
+        fontWeight: 700,
+        padding: '4px 12px',
+        borderRadius: 999,
+        whiteSpace: 'nowrap',
+        flex: '0 0 auto',
+      }}
+    >
+      {paid ? t('money.status.paidOut') : t('money.status.upcoming')}
+    </span>
   )
 }
 

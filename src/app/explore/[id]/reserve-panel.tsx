@@ -17,6 +17,7 @@ import {
 } from '@/lib/availability'
 import DatePickerField from '../../_components/date-picker-field'
 import { useLanguage } from '@/lib/i18n/language-provider'
+import { useCurrency } from '@/lib/currency/currency-provider'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -116,6 +117,7 @@ export default function ReservePanel({
   monthlyDiscount?: number
 }) {
   const { t } = useLanguage()
+  const { format } = useCurrency()
   const [checkIn, setCheckIn] = useState('')
   const [checkOut, setCheckOut] = useState('')
   const [guests, setGuests] = useState(1)
@@ -341,7 +343,7 @@ export default function ReservePanel({
     <div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
         <span style={{ fontSize: 30, fontWeight: 800, color: COLORS.burgundy }}>
-          EGP {pricePerNight}
+          {format(pricePerNight)}
         </span>
         <span style={{ fontSize: 15, color: COLORS.muted }}>
           {t('listing.perNight')}
@@ -450,10 +452,10 @@ export default function ReservePanel({
           }}
         >
           <span>
-            EGP {pricePerNight} × {nights}{' '}
+            {format(pricePerNight)} × {nights}{' '}
             {nights === 1 ? t('reserve.night') : t('reserve.nights')}
           </span>
-          <span style={{ fontWeight: 700 }}>EGP {total}</span>
+          <span style={{ fontWeight: 700 }}>{format(total)}</span>
         </div>
         <div
           style={{
@@ -468,7 +470,7 @@ export default function ReservePanel({
           }}
         >
           <span>{t('reserve.total')}</span>
-          <span>EGP {total}</span>
+          <span>{format(total)}</span>
         </div>
       </div>
 
@@ -827,7 +829,7 @@ export default function ReservePanel({
                       }}
                     >
                       {promoPreview.valid
-                        ? `✓ ${t('promo.applied')} · −EGP ${promoPreview.discount}`
+                        ? `✓ ${t('promo.applied')} · −${format(promoPreview.discount)}`
                         : promoPreview.message || t('promo.invalid')}
                     </p>
                   )}
@@ -849,19 +851,19 @@ export default function ReservePanel({
                     {status.nights === 1 ? t('reserve.night') : t('reserve.nights')}
                   </span>
                   <span>
-                    EGP {pricePerNight} {t('listing.perNight')}
+                    {format(pricePerNight)} {t('listing.perNight')}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: COLORS.muted, marginTop: 8 }}>
                   <span>{t('reserve.serviceFee')}</span>
-                  <span>EGP {status.fee}</span>
+                  <span>{format(status.fee)}</span>
                 </div>
                 {(() => {
                   const mf = status.kind === 'paid' ? status.methodFee : methodFeeFor(status.method, status.subtotal)
                   return (
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: mf < 0 ? '#0F5132' : COLORS.muted, marginTop: 8 }}>
                       <span>{status.method === 'card' ? t('reserve.cardSurcharge') : t('reserve.bankDiscount')}</span>
-                      <span>{mf < 0 ? '−' : '+'}EGP {Math.abs(mf)}</span>
+                      <span>{mf < 0 ? '−' : '+'}{format(Math.abs(mf))}</span>
                     </div>
                   )
                 })()}
@@ -887,7 +889,7 @@ export default function ReservePanel({
                         {t('promo.discount')}
                         {pc ? ` (${pc})` : ''}
                       </span>
-                      <span>−EGP {pd}</span>
+                      <span>−{format(pd)}</span>
                     </div>
                   )
                 })()}
@@ -909,7 +911,7 @@ export default function ReservePanel({
                     {t('reserve.total')}
                   </span>
                   <span style={{ fontSize: 18, fontWeight: 800, color: COLORS.burgundy }}>
-                    EGP {status.kind === 'paid' ? status.grand : payNowAmount}
+                    {format(status.kind === 'paid' ? status.grand : payNowAmount)}
                   </span>
                 </div>
               </div>
@@ -937,7 +939,7 @@ export default function ReservePanel({
                         boxShadow: '0 10px 24px rgba(91,15,22,0.28)',
                       }}
                     >
-                      {status.paying ? t('reserve.paying') : t('reserve.payNow', { amount: String(payNowAmount) })}
+                      {status.paying ? t('reserve.paying') : t('reserve.payNow', { amount: format(payNowAmount) })}
                     </button>
                     <span style={{ fontSize: 12, color: COLORS.muted }}>{t('reserve.demoNote')}</span>
                   </>

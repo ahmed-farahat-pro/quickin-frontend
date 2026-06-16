@@ -1027,6 +1027,154 @@ export async function deletePromo(token: string, id: string): Promise<void> {
   }
 }
 
+// ---- Money: host earnings & payouts -----------------------------------------
+
+// One booking row in the host's earnings breakdown. `gross` is what the guest
+// paid for the stay; `net` is what the host keeps after the platform commission
+// (host keeps 90% — commissionRate 0.1). `status` is 'paid_out' once the stay is
+// complete, else 'upcoming'. `paid_at` is when the payout cleared (null while
+// upcoming). All amounts are EGP. Mirrors GET /api/local/host/earnings → recent[].
+export interface HostEarningRow {
+  booking_id: string
+  title: string
+  check_in: string
+  check_out: string
+  gross: number
+  net: number
+  status: 'paid_out' | 'upcoming'
+  paid_at: string | null
+}
+
+// The host's earnings dashboard (GET /api/local/host/earnings, Bearer = host).
+// `totalEarned` is lifetime net; `paidOut` is what's already cleared; `pending`
+// is the net still upcoming. `commissionRate` is the platform's cut (0.1 → host
+// keeps 90%). All amounts are EGP.
+export interface HostEarnings {
+  currency: string
+  totalEarned: number
+  paidOut: number
+  pending: number
+  bookingsCount: number
+  commissionRate: number
+  recent: HostEarningRow[]
+}
+
+// Fetch the signed-in host's earnings + per-booking breakdown. Bearer = host.
+// Returns null on any non-2xx / parse error so the dashboard can degrade
+// gracefully (show an empty/retry state).
+export async function getHostEarnings(
+  token: string,
+  signal?: AbortSignal
+): Promise<HostEarnings | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/local/host/earnings`, {
+      headers: { Authorization: 'Bearer ' + token },
+      cache: 'no-store',
+      signal,
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    if (!data || typeof data !== 'object') return null
+    return {
+      currency: String(data.currency ?? 'EGP'),
+      totalEarned: Number(data.totalEarned ?? 0),
+      paidOut: Number(data.paidOut ?? 0),
+      pending: Number(data.pending ?? 0),
+      bookingsCount: Number(data.bookingsCount ?? 0),
+      commissionRate: Number(data.commissionRate ?? 0.1),
+      recent: Array.isArray(data.recent) ? (data.recent as HostEarningRow[]) : [],
+    }
+  } catch {
+    return null
+  }
+}
+
+// ---- Money: guest receipts --------------------------------------------------
+
+// One paid receipt for the signed-in guest (GET /api/local/receipts, Bearer).
+// Itemizes a paid stay: `subtotal` (nights × nightly), `serviceFee` (10%),
+// `methodFee` (card +5% / bank −5%), `promoDiscount` (when a code applied),
+// and `total` (the grand total charged). All amounts are EGP.
+export interface Receipt {
+  booking_id: string
+  reservation_code: string | null
+  title: string
+  check_in: string
+  check_out: string
+  nights: number
+  subtotal: number
+  serviceFee: number
+  method: string
+  methodFee: number
+  promoCode: string | null
+  promoDiscount: number
+  total: number
+  paidAt: string | null
+  currency: string
+}
+
+// Fetch the signed-in guest's paid receipts. Bearer = the guest. Returns [] on
+// any non-2xx / parse error so the receipts surface degrades gracefully.
+export async function getReceipts(
+  token: string,
+  signal?: AbortSignal
+): Promise<Receipt[]> {
+  try {
+    const res = await fetch(`${API_URL}/api/local/receipts`, {
+      headers: { Authorization: 'Bearer ' + token },
+      cache: 'no-store',
+      signal,
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    return Array.isArray(data) ? (data as Receipt[]) : []
+  } catch {
+    return []
+  }
+}
+
+// ---- Money: multi-currency display ------------------------------------------
+
+// The supported display currencies. EGP is the base (everything the backend
+// returns is EGP); the rest are conversion targets for display only — bookings
+// are always charged in EGP.
+export type CurrencyCode = 'EGP' | 'USD' | 'EUR' | 'GBP' | 'SAR' | 'AED'
+
+// The currency rate table (GET /api/local/currencies). `base` is 'EGP'; `rates`
+// maps each currency to its multiplier against 1 EGP (EGP:1). To convert an EGP
+// amount to a target: amount * rates[target].
+export interface CurrencyRates {
+  base: string
+  rates: Record<string, number>
+}
+
+// Static fallback rates so currency formatting still works (in EGP, and
+// approximately for others) if the backend fetch fails. Mirrors the documented
+// GET /api/local/currencies contract.
+export const FALLBACK_RATES: CurrencyRates = {
+  base: 'EGP',
+  rates: { EGP: 1, USD: 0.0203, EUR: 0.0188, GBP: 0.016, SAR: 0.0762, AED: 0.0746 },
+}
+
+// Fetch the currency rate table (no auth). Returns the documented fallback on
+// any non-2xx / parse error so display conversion never breaks.
+export async function getCurrencies(
+  signal?: AbortSignal
+): Promise<CurrencyRates> {
+  try {
+    const res = await fetch(`${API_URL}/api/local/currencies`, { signal })
+    if (!res.ok) return FALLBACK_RATES
+    const data = await res.json()
+    if (!data || typeof data !== 'object' || !data.rates) return FALLBACK_RATES
+    return {
+      base: String(data.base ?? 'EGP'),
+      rates: { ...FALLBACK_RATES.rates, ...(data.rates as Record<string, number>) },
+    }
+  } catch {
+    return FALLBACK_RATES
+  }
+}
+
 // The shape persisted in localStorage 'qk_user' after login/signup.
 export interface StoredUser {
   id?: string
