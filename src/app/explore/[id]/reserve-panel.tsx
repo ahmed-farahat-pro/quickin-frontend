@@ -44,10 +44,16 @@ type Status =
   | { kind: 'loading' }
   | { kind: 'needsLogin' }
   | { kind: 'error'; message: string }
-  // Booking created → show the (mock) payment step.
-  | { kind: 'pay'; nights: number; subtotal: number; fee: number; grand: number; reservationId: string | null; paying: boolean }
+  // Booking created → show the (mock) payment step. `method` drives the ±5%.
+  | { kind: 'pay'; nights: number; subtotal: number; fee: number; reservationId: string | null; paying: boolean; method: PayMethod }
   // Mock payment succeeded → confirmation + receipt.
-  | { kind: 'paid'; nights: number; subtotal: number; fee: number; grand: number; reservationId: string | null; reference: string | null }
+  | { kind: 'paid'; nights: number; subtotal: number; fee: number; methodFee: number; grand: number; reservationId: string | null; reference: string | null; method: PayMethod }
+
+type PayMethod = 'card' | 'bank_transfer'
+// Card adds 5% on the subtotal, bank transfer takes 5% off (mock — mirrors /pay).
+function methodFeeFor(method: PayMethod, subtotal: number): number {
+  return Math.round(subtotal * (method === 'card' ? 0.05 : -0.05))
+}
 
 function nightsBetween(checkIn: string, checkOut: string): number {
   if (!checkIn || !checkOut) return 0
@@ -120,9 +126,9 @@ export default function ReservePanel({
           nights: subtotal && pricePerNight ? Math.round(subtotal / pricePerNight) : nights,
           subtotal,
           fee,
-          grand: subtotal + fee,
           reservationId: typeof data.id === 'string' ? data.id : null,
           paying: false,
+          method: 'card',
         })
         return
       }
@@ -152,19 +158,24 @@ export default function ReservePanel({
       const res = await fetch(`${API_URL}/api/local/bookings/${snap.reservationId}/pay`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-        body: JSON.stringify({ method: 'mock' }),
+        body: JSON.stringify({ method: snap.method }),
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.ok) {
         const r = data.receipt || {}
+        const fee = typeof r.serviceFee === 'number' ? r.serviceFee : snap.fee
+        const mf = typeof r.methodFee === 'number' ? r.methodFee : methodFeeFor(snap.method, snap.subtotal)
+        const sub = typeof r.subtotal === 'number' ? r.subtotal : snap.subtotal
         setStatus({
           kind: 'paid',
           nights: snap.nights,
-          subtotal: typeof r.subtotal === 'number' ? r.subtotal : snap.subtotal,
-          fee: typeof r.serviceFee === 'number' ? r.serviceFee : snap.fee,
-          grand: typeof r.total === 'number' ? r.total : snap.grand,
+          subtotal: sub,
+          fee,
+          methodFee: mf,
+          grand: typeof r.total === 'number' ? r.total : sub + fee + mf,
           reservationId: snap.reservationId,
           reference: typeof r.reference === 'string' ? r.reference : null,
+          method: snap.method,
         })
         return
       }
@@ -446,6 +457,39 @@ export default function ReservePanel({
                 {status.kind === 'paid' ? t('reserve.paidBody') : t('reserve.paySubtitle')}
               </p>
 
+              {/* Payment method — card adds 5%, bank transfer takes 5% off. */}
+              {status.kind === 'pay' && (
+                <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                  {(['card', 'bank_transfer'] as PayMethod[]).map((m) => {
+                    const active = status.method === m
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setStatus({ ...status, method: m })}
+                        style={{
+                          flex: 1,
+                          padding: '10px 8px',
+                          borderRadius: 12,
+                          cursor: 'pointer',
+                          border: active ? '2px solid #5B0F16' : '1px solid rgba(42,34,32,0.16)',
+                          background: active ? 'rgba(91,15,22,0.06)' : '#fff',
+                          color: COLORS.ink,
+                          fontFamily: FONT,
+                          fontSize: 13,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {m === 'card' ? t('reserve.methodCard') : t('reserve.methodBank')}
+                        <div style={{ fontSize: 11, fontWeight: 700, color: m === 'card' ? '#8a5a00' : '#0F5132', marginTop: 2 }}>
+                          {m === 'card' ? t('reserve.cardPlus') : t('reserve.bankMinus')}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+
               {/* Summary */}
               <div style={{ background: COLORS.tan, borderRadius: 16, padding: 14, textAlign: 'left' }}>
                 <div
@@ -468,6 +512,15 @@ export default function ReservePanel({
                   <span>{t('reserve.serviceFee')}</span>
                   <span>EGP {status.fee}</span>
                 </div>
+                {(() => {
+                  const mf = status.kind === 'paid' ? status.methodFee : methodFeeFor(status.method, status.subtotal)
+                  return (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: mf < 0 ? '#0F5132' : COLORS.muted, marginTop: 8 }}>
+                      <span>{status.method === 'card' ? t('reserve.cardSurcharge') : t('reserve.bankDiscount')}</span>
+                      <span>{mf < 0 ? '−' : '+'}EGP {Math.abs(mf)}</span>
+                    </div>
+                  )
+                })()}
                 {status.kind === 'paid' && status.reference && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: COLORS.muted, marginTop: 8 }}>
                     <span>{t('reserve.reference')}</span>
@@ -486,7 +539,7 @@ export default function ReservePanel({
                     {t('reserve.total')}
                   </span>
                   <span style={{ fontSize: 18, fontWeight: 800, color: COLORS.burgundy }}>
-                    EGP {status.grand}
+                    EGP {status.kind === 'paid' ? status.grand : status.subtotal + status.fee + methodFeeFor(status.method, status.subtotal)}
                   </span>
                 </div>
               </div>
@@ -514,7 +567,7 @@ export default function ReservePanel({
                         boxShadow: '0 10px 24px rgba(91,15,22,0.28)',
                       }}
                     >
-                      {status.paying ? t('reserve.paying') : t('reserve.payNow', { amount: String(status.grand) })}
+                      {status.paying ? t('reserve.paying') : t('reserve.payNow', { amount: String(status.subtotal + status.fee + methodFeeFor(status.method, status.subtotal)) })}
                     </button>
                     <span style={{ fontSize: 12, color: COLORS.muted }}>{t('reserve.demoNote')}</span>
                   </>
