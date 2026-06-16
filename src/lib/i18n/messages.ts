@@ -207,6 +207,33 @@ export const messages: Record<Lang, Dict> = {
     'availability.removeError': 'Couldn’t remove that block. Please try again.',
     'availability.networkError': 'Network error. Please try again.',
 
+    // ---- Cancellation policy & guest cancel -------------------------------
+    'cancel.policy': 'Cancellation policy',
+    'cancel.policyLabel': 'Cancellation policy',
+    'cancel.flexible': 'Flexible',
+    'cancel.moderate': 'Moderate',
+    'cancel.strict': 'Strict',
+    'cancel.flexibleDesc':
+      'Full refund if you cancel at least 1 day before check-in. After that, no refund.',
+    'cancel.moderateDesc':
+      'Full refund if you cancel at least 5 days before check-in. After that, 50% back.',
+    'cancel.strictDesc':
+      '50% refund if you cancel at least 7 days before check-in. After that, no refund.',
+    'cancel.policyIntro':
+      'Choose how flexible your cancellation terms are. Guests see this on your listing.',
+    'cancel.cancelReservation': 'Cancel reservation',
+    'cancel.refundQuote': 'You’ll be refunded {amount} {currency} ({percent}%).',
+    'cancel.noRefund': 'This cancellation is non-refundable ({percent}%).',
+    'cancel.confirmTitle': 'Cancel this reservation?',
+    'cancel.confirm': 'Yes, cancel',
+    'cancel.keep': 'Keep reservation',
+    'cancel.cancelling': 'Cancelling…',
+    'cancel.cancelled': 'Cancelled',
+    'cancel.refunded': 'Refunded {amount} {currency} ({percent}%)',
+    'cancel.quoteError': 'Couldn’t load the refund details. Please try again.',
+    'cancel.error': 'Couldn’t cancel this reservation. Please try again.',
+    'cancel.cancelledNote': 'This reservation was cancelled.',
+
     // ---- Wishlist ---------------------------------------------------------
     'wishlist.save': 'Save to wishlist',
     'wishlist.remove': 'Remove from wishlist',
@@ -583,6 +610,33 @@ export const messages: Record<Lang, Dict> = {
     'availability.addError': 'تعذّر حجب هذه التواريخ. حاول مرة أخرى.',
     'availability.removeError': 'تعذّر إزالة هذا الحجب. حاول مرة أخرى.',
     'availability.networkError': 'خطأ في الشبكة. حاول مرة أخرى.',
+
+    // ---- Cancellation policy & guest cancel -------------------------------
+    'cancel.policy': 'سياسة الإلغاء',
+    'cancel.policyLabel': 'سياسة الإلغاء',
+    'cancel.flexible': 'مرنة',
+    'cancel.moderate': 'متوسّطة',
+    'cancel.strict': 'صارمة',
+    'cancel.flexibleDesc':
+      'استرداد كامل عند الإلغاء قبل موعد الوصول بيوم واحد على الأقل. بعد ذلك لا يوجد استرداد.',
+    'cancel.moderateDesc':
+      'استرداد كامل عند الإلغاء قبل موعد الوصول بخمسة أيام على الأقل. بعد ذلك يُسترد 50%.',
+    'cancel.strictDesc':
+      'استرداد 50% عند الإلغاء قبل موعد الوصول بسبعة أيام على الأقل. بعد ذلك لا يوجد استرداد.',
+    'cancel.policyIntro':
+      'اختر مدى مرونة شروط الإلغاء لديك. يرى الضيوف هذه السياسة في إعلانك.',
+    'cancel.cancelReservation': 'إلغاء الحجز',
+    'cancel.refundQuote': 'سيُسترد لك {amount} {currency} ({percent}%).',
+    'cancel.noRefund': 'هذا الإلغاء غير قابل للاسترداد ({percent}%).',
+    'cancel.confirmTitle': 'هل تريد إلغاء هذا الحجز؟',
+    'cancel.confirm': 'نعم، ألغِ الحجز',
+    'cancel.keep': 'الاحتفاظ بالحجز',
+    'cancel.cancelling': 'جارٍ الإلغاء…',
+    'cancel.cancelled': 'مُلغى',
+    'cancel.refunded': 'تم استرداد {amount} {currency} ({percent}%)',
+    'cancel.quoteError': 'تعذّر تحميل تفاصيل الاسترداد. حاول مرة أخرى.',
+    'cancel.error': 'تعذّر إلغاء هذا الحجز. حاول مرة أخرى.',
+    'cancel.cancelledNote': 'تم إلغاء هذا الحجز.',
 
     // ---- Wishlist ---------------------------------------------------------
     'wishlist.save': 'أضِف إلى المفضلة',

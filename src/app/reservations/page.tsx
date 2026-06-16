@@ -48,16 +48,32 @@ function fmtDate(d: string): string {
 }
 
 // Booking status → badge colors (shared look with /host + /reservation/[id]).
-function statusStyle(status: string): { bg: string; fg: string; label: string } {
+// `labelKey` is an i18n key so the badge localizes (the cancelled state is the
+// one this feature adds; pending/confirmed/rejected keep their English text via
+// their literal label fallback).
+function statusStyle(status: string): {
+  bg: string
+  fg: string
+  label: string
+  labelKey?: string
+} {
   const s = (status || '').toLowerCase()
   if (s === 'confirmed')
     return { bg: 'rgba(15,81,50,0.12)', fg: '#0f5132', label: 'Confirmed' }
   if (s === 'rejected')
     return { bg: 'rgba(91,15,22,0.10)', fg: COLORS.burgundy, label: 'Rejected' }
+  if (s === 'cancelled')
+    return {
+      bg: 'rgba(42,34,32,0.10)',
+      fg: COLORS.muted,
+      label: 'Cancelled',
+      labelKey: 'cancel.cancelled',
+    }
   return { bg: 'rgba(176,122,0,0.14)', fg: '#8a5a00', label: 'Pending' }
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useLanguage()
   const s = statusStyle(status)
   return (
     <span
@@ -72,7 +88,7 @@ function StatusBadge({ status }: { status: string }) {
         whiteSpace: 'nowrap',
       }}
     >
-      {s.label}
+      {s.labelKey ? t(s.labelKey) : s.label}
     </span>
   )
 }

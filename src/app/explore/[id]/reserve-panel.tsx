@@ -1,7 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { API_URL, getAvailability, type AvailabilitySpan } from '@/lib/api'
+import {
+  API_URL,
+  getAvailability,
+  type AvailabilitySpan,
+  type CancellationPolicy,
+} from '@/lib/api'
 import {
   firstBlockedDayAfter,
   isDayUnavailable,
@@ -70,16 +75,25 @@ function nightsBetween(checkIn: string, checkOut: string): number {
   return Math.round(ms / (1000 * 60 * 60 * 24))
 }
 
+// i18n keys for each policy's name + one-line guest-facing description.
+const POLICY_COPY: Record<CancellationPolicy, { nameKey: string; descKey: string }> = {
+  flexible: { nameKey: 'cancel.flexible', descKey: 'cancel.flexibleDesc' },
+  moderate: { nameKey: 'cancel.moderate', descKey: 'cancel.moderateDesc' },
+  strict: { nameKey: 'cancel.strict', descKey: 'cancel.strictDesc' },
+}
+
 export default function ReservePanel({
   listingId,
   pricePerNight,
   currency,
   maxGuests,
+  cancellationPolicy,
 }: {
   listingId: string
   pricePerNight: number
   currency: string
   maxGuests: number | null
+  cancellationPolicy: CancellationPolicy
 }) {
   const { t } = useLanguage()
   const [checkIn, setCheckIn] = useState('')
@@ -267,6 +281,7 @@ export default function ReservePanel({
 
       {/* Date pickers — a custom themed calendar popover (replaces the native
           date inputs). Wrap to one column when the card is too narrow. */}
+      {/* (cancellation policy line is rendered at the bottom of the panel) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: 12 }}>
         <DatePickerField
           label={t('reserve.checkIn')}
@@ -448,6 +463,56 @@ export default function ReservePanel({
           {status.message}
         </div>
       )}
+
+      {/* Cancellation policy — name + one-line explanation for this listing. */}
+      <div
+        style={{
+          marginTop: 18,
+          paddingTop: 16,
+          borderTop: `1px solid rgba(42,34,32,0.10)`,
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontSize: 14,
+            fontWeight: 700,
+            color: COLORS.ink,
+          }}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke={COLORS.burgundy}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M3 3v5h5" />
+            <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
+            <path d="M12 7v5l3 2" />
+          </svg>
+          {t('cancel.policy')}:{' '}
+          <span style={{ color: COLORS.burgundy }}>
+            {t(POLICY_COPY[cancellationPolicy].nameKey)}
+          </span>
+        </div>
+        <p
+          style={{
+            margin: '6px 0 0',
+            fontSize: 13,
+            color: COLORS.muted,
+            lineHeight: 1.5,
+          }}
+        >
+          {t(POLICY_COPY[cancellationPolicy].descKey)}
+        </p>
+      </div>
 
       {(status.kind === 'pay' || status.kind === 'paid') && (
           <div

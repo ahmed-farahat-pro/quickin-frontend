@@ -13,6 +13,8 @@ import {
   getReviewableGuests,
   getStoredUser,
   getToken,
+  updateListingPolicy,
+  type CancellationPolicy,
   type Listing,
   type HostBooking,
   type Service,
@@ -147,8 +149,28 @@ const AMENITIES = [
   'Breakfast',
 ]
 
-// Add-listing wizard step labels (index 0..4).
-const WIZARD_STEPS = ['Basics', 'Location', 'Details', 'Amenities', 'Photos & review']
+// The three cancellation policies a host can pick, with the i18n keys for their
+// name + one-line guest-facing description. Shared by the wizard step and the
+// inline "Your listings" editor.
+const CANCELLATION_POLICIES: {
+  value: CancellationPolicy
+  nameKey: string
+  descKey: string
+}[] = [
+  { value: 'flexible', nameKey: 'cancel.flexible', descKey: 'cancel.flexibleDesc' },
+  { value: 'moderate', nameKey: 'cancel.moderate', descKey: 'cancel.moderateDesc' },
+  { value: 'strict', nameKey: 'cancel.strict', descKey: 'cancel.strictDesc' },
+]
+
+// Add-listing wizard step labels (index 0..5).
+const WIZARD_STEPS = [
+  'Basics',
+  'Location',
+  'Details',
+  'Amenities',
+  'Cancellation',
+  'Photos & review',
+]
 
 interface FormState {
   title: string
@@ -163,6 +185,7 @@ interface FormState {
   bathrooms: string
   property_type: string
   amenities: string[]
+  cancellation_policy: CancellationPolicy
   lat: string
   lng: string
   image1: string
@@ -183,6 +206,7 @@ const EMPTY_FORM: FormState = {
   bathrooms: '1',
   property_type: 'Apartment',
   amenities: [],
+  cancellation_policy: 'moderate',
   lat: '',
   lng: '',
   image1: '',
@@ -548,6 +572,7 @@ export default function HostPage() {
           max_guests: Number(form.max_guests) || 1,
           property_type: form.property_type,
           amenities: form.amenities,
+          cancellation_policy: form.cancellation_policy,
           lat: form.lat.trim() ? Number(form.lat) : null,
           lng: form.lng.trim() ? Number(form.lng) : null,
           images,
@@ -1163,8 +1188,83 @@ export default function HostPage() {
             </div>
           )}
 
-          {/* STEP 5 — Photos & review ------------------------------------- */}
+          {/* STEP 5 — Cancellation policy --------------------------------- */}
           {step === 4 && (
+            <div style={{ display: 'grid', gap: 14 }}>
+              <p style={{ margin: 0, fontSize: 14, color: COLORS.muted }}>
+                {t('cancel.policyIntro')}
+              </p>
+              <div style={{ display: 'grid', gap: 12 }}>
+                {CANCELLATION_POLICIES.map((p) => {
+                  const on = form.cancellation_policy === p.value
+                  return (
+                    <button
+                      key={p.value}
+                      type="button"
+                      onClick={() => patch({ cancellation_policy: p.value })}
+                      aria-pressed={on}
+                      className="qk-press"
+                      style={{
+                        display: 'block',
+                        textAlign: 'start',
+                        padding: '14px 16px',
+                        borderRadius: 16,
+                        cursor: 'pointer',
+                        fontFamily: FONT,
+                        background: on ? 'rgba(91,15,22,0.06)' : '#fff',
+                        border: on
+                          ? `2px solid ${COLORS.burgundy}`
+                          : '1px solid rgba(42,34,32,0.16)',
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                          fontSize: 15,
+                          fontWeight: 700,
+                          color: on ? COLORS.burgundy : COLORS.ink,
+                        }}
+                      >
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            flex: '0 0 auto',
+                            width: 18,
+                            height: 18,
+                            borderRadius: '50%',
+                            border: on
+                              ? `5px solid ${COLORS.burgundy}`
+                              : '2px solid rgba(42,34,32,0.3)',
+                            background: '#fff',
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                        {t(p.nameKey)}
+                      </span>
+                      <span
+                        style={{
+                          display: 'block',
+                          margin: '6px 0 0',
+                          paddingInlineStart: 28,
+                          fontSize: 13,
+                          fontWeight: 400,
+                          color: COLORS.muted,
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        {t(p.descKey)}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* STEP 6 — Photos & review ------------------------------------- */}
+          {step === 5 && (
             <div style={{ display: 'grid', gap: 16 }}>
               <Field label="Photo URL 1">
                 <input
@@ -1281,6 +1381,22 @@ export default function HostPage() {
                     ) : (
                       'No pin set'
                     )}
+                  </p>
+                  <p
+                    style={{
+                      margin: '6px 0 0',
+                      fontSize: 12,
+                      color: COLORS.muted,
+                    }}
+                  >
+                    {t('cancel.policy')}:{' '}
+                    <span style={{ fontWeight: 700, color: COLORS.ink }}>
+                      {t(
+                        CANCELLATION_POLICIES.find(
+                          (p) => p.value === form.cancellation_policy
+                        )?.nameKey ?? 'cancel.moderate'
+                      )}
+                    </span>
                   </p>
                 </div>
               </div>
@@ -1503,8 +1619,20 @@ export default function HostPage() {
                     </div>
                   </a>
 
-                  {/* Manage availability toggle + inline panel */}
-                  <div style={{ padding: '0 14px 14px', marginTop: 'auto' }}>
+                  {/* Cancellation policy (inline editor) + Manage availability */}
+                  <div
+                    style={{
+                      padding: '0 14px 14px',
+                      marginTop: 'auto',
+                      display: 'grid',
+                      gap: 10,
+                    }}
+                  >
+                    <ListingPolicyEditor
+                      listingId={l.id}
+                      current={l.cancellation_policy ?? 'moderate'}
+                    />
+
                     <button
                       type="button"
                       onClick={() =>
@@ -2448,6 +2576,113 @@ function Stepper({
           +
         </button>
       </div>
+    </div>
+  )
+}
+
+// Inline cancellation-policy selector shown on each "Your listings" card. Picks
+// one of the three policies and PATCHes /api/local/listings/:id immediately
+// (optimistic — reverts on failure). Matches the inline-editor feel of the
+// availability manager. `current` seeds the control from the loaded listing.
+function ListingPolicyEditor({
+  listingId,
+  current,
+}: {
+  listingId: string
+  current: CancellationPolicy
+}) {
+  const { t } = useLanguage()
+  const [policy, setPolicy] = useState<CancellationPolicy>(current)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Keep in sync if the parent list reloads with a new value.
+  useEffect(() => {
+    setPolicy(current)
+  }, [current])
+
+  async function change(next: CancellationPolicy) {
+    if (next === policy || saving) return
+    const token = getToken()
+    if (!token) {
+      setError(t('availability.signInRequired'))
+      return
+    }
+    const prev = policy
+    setPolicy(next)
+    setSaving(true)
+    setSaved(false)
+    setError(null)
+    try {
+      await updateListingPolicy(token, listingId, next)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch {
+      setPolicy(prev) // revert the optimistic change
+      setError(t('cancel.error'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const selectId = `policy-${listingId}`
+  const desc = CANCELLATION_POLICIES.find((p) => p.value === policy)?.descKey
+
+  return (
+    <div>
+      <label
+        htmlFor={selectId}
+        style={{
+          display: 'block',
+          fontSize: 11,
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          color: COLORS.muted,
+          marginBottom: 6,
+        }}
+      >
+        {t('cancel.policyLabel')}
+      </label>
+      <select
+        id={selectId}
+        value={policy}
+        disabled={saving}
+        onChange={(e) => change(e.target.value as CancellationPolicy)}
+        style={{
+          width: '100%',
+          boxSizing: 'border-box',
+          padding: '9px 12px',
+          fontSize: 13.5,
+          fontFamily: FONT,
+          fontWeight: 600,
+          color: COLORS.ink,
+          background: '#fff',
+          border: '1px solid rgba(42,34,32,0.16)',
+          borderRadius: 12,
+          appearance: 'auto',
+          cursor: saving ? 'wait' : 'pointer',
+        }}
+      >
+        {CANCELLATION_POLICIES.map((p) => (
+          <option key={p.value} value={p.value}>
+            {t(p.nameKey)}
+          </option>
+        ))}
+      </select>
+      {desc && (
+        <p
+          style={{
+            margin: '6px 0 0',
+            fontSize: 12,
+            color: error ? COLORS.burgundy : COLORS.muted,
+            lineHeight: 1.45,
+          }}
+        >
+          {error ? error : saved ? `✓ ${t(desc)}` : t(desc)}
+        </p>
+      )}
     </div>
   )
 }

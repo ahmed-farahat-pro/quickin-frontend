@@ -429,6 +429,7 @@ export default async function ListingDetailPage({
               pricePerNight={listing.price_per_night}
               currency={listing.currency}
               maxGuests={listing.max_guests}
+              cancellationPolicy={listing.cancellation_policy ?? 'moderate'}
             />
             {listing.listing_code && (
               <div

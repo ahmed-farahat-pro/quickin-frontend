@@ -6,6 +6,10 @@ export const API_URL =
 
 // ---- Shared data shapes (mirror the backend JSON responses) -----------------
 
+// A listing's cancellation policy. Drives the refund a guest gets when they
+// cancel (see getCancellationQuote). Mirrors the backend enum.
+export type CancellationPolicy = 'flexible' | 'moderate' | 'strict'
+
 export interface ListingImage {
   url: string
   order: number
@@ -40,6 +44,10 @@ export interface Listing {
   // label shown on the detail page. Both may be absent on older rows.
   host_id?: string | null
   host_name?: string | null
+  // The host-set cancellation policy. The backend defaults missing rows to
+  // 'moderate', so it's effectively always present, but typed optional for
+  // older cached shapes.
+  cancellation_policy?: CancellationPolicy
 }
 
 // ---- Listing search filters -------------------------------------------------
@@ -158,6 +166,11 @@ export interface Booking {
   location: string | null
   image: string | null
   reservation_code?: string | null
+  // Cancellation fields (present on every booking row; the policy comes from
+  // the listing, the rest are filled in once the guest cancels).
+  cancellation_policy?: CancellationPolicy
+  cancelled_at?: string | null
+  refund_percent?: number | null
 }
 
 // One row of the host's "Reservation requests" list (GET /host/bookings).
@@ -178,13 +191,17 @@ export interface HostBooking {
 export interface Reservation {
   id: string
   reservation_code: string | null
-  status: 'pending' | 'confirmed' | 'rejected' | string
+  status: 'pending' | 'confirmed' | 'rejected' | 'cancelled' | string
   title: string
   location: string | null
   check_in: string
   check_out: string
   guests: number
   total_price: number
+  // Cancellation fields (see Booking).
+  cancellation_policy?: CancellationPolicy
+  cancelled_at?: string | null
+  refund_percent?: number | null
 }
 
 // A standalone experience a host offers (jet ski, diving, yacht…). Browsed
@@ -340,6 +357,87 @@ export async function postGuestReview(
     },
     body: JSON.stringify(body),
   })
+}
+
+// ---- Cancellation -----------------------------------------------------------
+
+// What a guest would get back if they cancelled now. Mirrors GET (no mutation)
+// and the `refund` block of POST /api/local/bookings/:id/cancel.
+export interface CancellationQuote {
+  policy: CancellationPolicy
+  daysUntilCheckIn: number
+  refundPercent: number
+  refundAmount: number
+  total: number
+  currency: string
+}
+
+// Fetch the refund quote for cancelling a booking (no mutation). Bearer = the
+// booking's guest. Throws on a non-2xx response so callers can surface an error.
+export async function getCancellationQuote(
+  token: string,
+  bookingId: string,
+  signal?: AbortSignal
+): Promise<CancellationQuote> {
+  const res = await fetch(
+    `${API_URL}/api/local/bookings/${encodeURIComponent(bookingId)}/cancel`,
+    {
+      headers: { Authorization: 'Bearer ' + token },
+      cache: 'no-store',
+      signal,
+    }
+  )
+  if (!res.ok) throw new Error(`Request failed: ${res.status}`)
+  return (await res.json()) as CancellationQuote
+}
+
+// Cancel a booking. Bearer = the booking's guest. Resolves to the updated
+// booking (status 'cancelled') plus the applied refund quote. Throws on a
+// non-2xx response (e.g. 400 when the booking isn't cancellable).
+export async function cancelBooking(
+  token: string,
+  bookingId: string
+): Promise<{ booking: Booking; refund: CancellationQuote }> {
+  const res = await fetch(
+    `${API_URL}/api/local/bookings/${encodeURIComponent(bookingId)}/cancel`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + token,
+      },
+    }
+  )
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error((data && data.error) || `Request failed: ${res.status}`)
+  }
+  return (await res.json()) as { booking: Booking; refund: CancellationQuote }
+}
+
+// Host updates a listing's cancellation policy. Bearer must be the listing's
+// host (403 otherwise). Resolves to the refreshed listing; throws on non-2xx.
+export async function updateListingPolicy(
+  token: string,
+  listingId: string,
+  policy: CancellationPolicy
+): Promise<Listing> {
+  const res = await fetch(
+    `${API_URL}/api/local/listings/${encodeURIComponent(listingId)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + token,
+      },
+      body: JSON.stringify({ cancellation_policy: policy }),
+    }
+  )
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error((data && data.error) || `Request failed: ${res.status}`)
+  }
+  return (await res.json()) as Listing
 }
 
 // The shape persisted in localStorage 'qk_user' after login/signup.

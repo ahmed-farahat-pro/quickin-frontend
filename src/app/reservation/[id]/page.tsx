@@ -8,8 +8,15 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import QRCode from 'qrcode'
-import { API_URL, getToken, type Reservation, type ReviewableStay } from '@/lib/api'
+import {
+  API_URL,
+  getToken,
+  type CancellationQuote,
+  type Reservation,
+  type ReviewableStay,
+} from '@/lib/api'
 import BookingChat from '@/app/_components/booking-chat'
+import CancelReservation from '@/app/_components/cancel-reservation'
 import ReviewForm from '@/app/_components/review-form'
 import { useLanguage } from '@/lib/i18n/language-provider'
 
@@ -43,7 +50,23 @@ function statusStyle(status: string): { bg: string; fg: string; label: string } 
     return { bg: 'rgba(15,81,50,0.12)', fg: '#0f5132', label: 'Confirmed' }
   if (s === 'rejected')
     return { bg: 'rgba(91,15,22,0.10)', fg: COLORS.burgundy, label: 'Rejected' }
+  if (s === 'cancelled')
+    return { bg: 'rgba(42,34,32,0.10)', fg: COLORS.muted, label: 'Cancelled' }
   return { bg: 'rgba(176,122,0,0.14)', fg: '#8a5a00', label: 'Pending' }
+}
+
+// Is this booking still cancellable by the guest? (upcoming + not already
+// cancelled/rejected). Mirrors the backend's IN ('pending','confirmed') guard.
+function isCancellable(status: string): boolean {
+  const s = (status || '').toLowerCase()
+  return s === 'pending' || s === 'confirmed'
+}
+
+// Policy value → i18n key for its display name.
+const CANCEL_POLICY_NAME_KEY: Record<string, string> = {
+  flexible: 'cancel.flexible',
+  moderate: 'cancel.moderate',
+  strict: 'cancel.strict',
 }
 
 type State =
@@ -253,6 +276,25 @@ export default function ReservationDetailPage() {
             <ReservationCard
               reservation={state.reservation}
               qrDataUrl={qrDataUrl}
+            />
+
+            {/* Cancellation — a "Cancel reservation" action for an upcoming stay
+                (shows the refund quote first), or the refunded summary once the
+                booking has been cancelled. */}
+            <CancellationSection
+              reservation={state.reservation}
+              onCancelled={(refund) =>
+                setState({
+                  kind: 'ready',
+                  reservation: {
+                    ...state.reservation,
+                    status: 'cancelled',
+                    cancellation_policy: refund.policy,
+                    refund_percent: refund.refundPercent,
+                    cancelled_at: new Date().toISOString(),
+                  },
+                })
+              }
             />
 
             {/* Leave a review — shown only for a completed (confirmed + past
@@ -569,6 +611,119 @@ function ReservationCard({
         </div>
       </div>
     </>
+  )
+}
+
+// Cancellation block beneath the reservation card. Either offers the guest a
+// "Cancel reservation" action (upcoming stay) or summarizes the refund on an
+// already-cancelled booking. Renders nothing for rejected stays.
+function CancellationSection({
+  reservation,
+  onCancelled,
+}: {
+  reservation: Reservation
+  onCancelled: (refund: CancellationQuote) => void
+}) {
+  const { t } = useLanguage()
+  const status = (reservation.status || '').toLowerCase()
+
+  // Already cancelled → show the policy + refunded amount (computed from the
+  // stored refund_percent and the total).
+  if (status === 'cancelled') {
+    const pct = reservation.refund_percent ?? 0
+    const amount = Math.round((reservation.total_price * pct) / 100)
+    return (
+      <div
+        style={{
+          marginTop: 24,
+          background: '#fff',
+          borderRadius: 24,
+          border: '1px solid rgba(42,34,32,0.06)',
+          boxShadow: '0 10px 36px rgba(42,34,32,0.10)',
+          padding: '20px 26px',
+        }}
+      >
+        <p
+          style={{
+            margin: '0 0 8px',
+            fontSize: 15,
+            fontWeight: 700,
+            color: COLORS.ink,
+          }}
+        >
+          {t('cancel.cancelledNote')}
+        </p>
+        {reservation.cancellation_policy && (
+          <p style={{ margin: '0 0 4px', fontSize: 13, color: COLORS.muted }}>
+            {t('cancel.policy')}:{' '}
+            <span style={{ fontWeight: 700, color: COLORS.ink }}>
+              {t(
+                CANCEL_POLICY_NAME_KEY[reservation.cancellation_policy] ??
+                  'cancel.moderate'
+              )}
+            </span>
+          </p>
+        )}
+        <p
+          style={{
+            margin: 0,
+            fontSize: 14,
+            fontWeight: 700,
+            color: pct > 0 ? '#0F5132' : COLORS.muted,
+          }}
+        >
+          {t('cancel.refunded', {
+            amount: String(amount),
+            currency: 'EGP',
+            percent: String(pct),
+          })}
+        </p>
+      </div>
+    )
+  }
+
+  // Rejected (or any non-cancellable, non-cancelled state) → no action.
+  if (!isCancellable(status)) return null
+
+  // Upcoming, cancellable → the cancel action (fetches a quote first).
+  return (
+    <div
+      style={{
+        marginTop: 24,
+        background: '#fff',
+        borderRadius: 24,
+        border: '1px solid rgba(42,34,32,0.06)',
+        boxShadow: '0 10px 36px rgba(42,34,32,0.10)',
+        padding: '20px 26px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 16,
+        flexWrap: 'wrap',
+      }}
+    >
+      <div style={{ minWidth: 0 }}>
+        <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: COLORS.ink }}>
+          {t('cancel.cancelReservation')}
+        </p>
+        {reservation.cancellation_policy && (
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: COLORS.muted }}>
+            {t('cancel.policy')}:{' '}
+            <span style={{ fontWeight: 700, color: COLORS.ink }}>
+              {t(
+                CANCEL_POLICY_NAME_KEY[reservation.cancellation_policy] ??
+                  'cancel.moderate'
+              )}
+            </span>
+          </p>
+        )}
+      </div>
+      <CancelReservation
+        bookingId={reservation.id}
+        onCancelled={onCancelled}
+        variant="solid"
+      />
+    </div>
   )
 }
 
