@@ -19,6 +19,7 @@ import {
 } from '@/lib/api'
 import AuthArea from '../_components/auth-area'
 import VerifyIdentity from './verify-identity'
+import ReferFriends from './refer-friends'
 import { EyeIcon, EyeOffIcon, eyeButtonStyle } from '@/app/_components/password-eye'
 import PasswordStrength, { passwordMeetsMin } from '@/app/_components/password-strength'
 import { useLanguage } from '@/lib/i18n/language-provider'
@@ -781,6 +782,9 @@ export default function AccountPage() {
 
         {/* Verify your identity — trust & safety card below the profile form */}
         {gate === 'ok' && <VerifyIdentity initialStatus={verificationStatus} />}
+
+        {/* Refer friends — shareable referral code + stats */}
+        {gate === 'ok' && <ReferFriends />}
 
         {/* Change password — separate card below the profile form */}
         {gate === 'ok' && (

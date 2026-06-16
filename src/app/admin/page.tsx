@@ -13,9 +13,14 @@ import {
   resolveReport,
   listPendingListings,
   moderateListing,
+  listPromos,
+  upsertPromo,
+  togglePromo,
+  deletePromo,
   type AdminVerification,
   type AdminReport,
   type AdminPendingListing,
+  type AdminPromo,
 } from '@/lib/api'
 import { EyeIcon, EyeOffIcon } from '@/app/_components/password-eye'
 import { useLanguage } from '@/lib/i18n/language-provider'
@@ -251,6 +256,15 @@ export default function AdminPage() {
     AdminPendingListing[] | null
   >(null)
 
+  // Promo codes (growth). null = not yet loaded. The create form lives alongside.
+  const [promos, setPromos] = useState<AdminPromo[] | null>(null)
+  const [promoCode, setPromoCode] = useState('')
+  const [promoKind, setPromoKind] = useState<'percent' | 'fixed'>('percent')
+  const [promoValue, setPromoValue] = useState('')
+  const [promoMax, setPromoMax] = useState('')
+  const [promoExpires, setPromoExpires] = useState('')
+  const [promoSaving, setPromoSaving] = useState(false)
+
   // "Send a notification" broadcast composer state.
   const [notifTitle, setNotifTitle] = useState('')
   const [notifBody, setNotifBody] = useState('')
@@ -282,6 +296,8 @@ export default function AdminPage() {
     listReports(tok, 'open').then(setReports)
     // Listing moderation queue (pending listings).
     listPendingListings(tok).then(setPendingListings)
+    // Promo codes (growth).
+    listPromos(tok).then(setPromos)
   }, [])
 
   useEffect(() => {
@@ -405,6 +421,73 @@ export default function AdminPage() {
       })
       // Keep the main Listings table's published state in sync.
       await load(token)
+    } catch {
+      setToast({ message: t('admin.actionFailed'), kind: 'error' })
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  // Create / update a promo code from the composer. Validates code + value,
+  // POSTs it, refreshes the list, and clears the form on success.
+  async function createPromo() {
+    if (!token) return
+    const code = promoCode.trim().toUpperCase()
+    const value = Number(promoValue)
+    if (!code || !(value > 0)) {
+      setToast({ message: t('admin.promoCodeRequired'), kind: 'error' })
+      return
+    }
+    setPromoSaving(true)
+    try {
+      await upsertPromo(token, {
+        code,
+        kind: promoKind,
+        value,
+        max_redemptions: promoMax.trim() ? Number(promoMax) : null,
+        expires_at: promoExpires.trim() ? promoExpires : null,
+      })
+      const fresh = await listPromos(token)
+      setPromos(fresh)
+      setToast({ message: t('admin.promoSaved'), kind: 'success' })
+      setPromoCode('')
+      setPromoValue('')
+      setPromoMax('')
+      setPromoExpires('')
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : t('admin.actionFailed')
+      setToast({ message: msg, kind: 'error' })
+    } finally {
+      setPromoSaving(false)
+    }
+  }
+
+  // Enable / disable a promo code, then reflect the new state in the row.
+  async function changePromoActive(id: string, active: boolean) {
+    if (!token) return
+    setBusyId(id)
+    try {
+      await togglePromo(token, id, active)
+      setPromos((prev) =>
+        prev ? prev.map((p) => (p.id === id ? { ...p, active } : p)) : prev
+      )
+      setToast({ message: t('admin.promoToggled'), kind: 'success' })
+    } catch {
+      setToast({ message: t('admin.actionFailed'), kind: 'error' })
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  // Delete a promo code, then drop the row.
+  async function removePromo(id: string) {
+    setConfirm(null)
+    if (!token) return
+    setBusyId(id)
+    try {
+      await deletePromo(token, id)
+      setPromos((prev) => (prev ? prev.filter((p) => p.id !== id) : prev))
+      setToast({ message: t('admin.promoDeleted'), kind: 'success' })
     } catch {
       setToast({ message: t('admin.actionFailed'), kind: 'error' })
     } finally {
@@ -825,6 +908,134 @@ export default function AdminPage() {
                             <button type="button" onClick={() => decideListing(id, 'reject')} disabled={busyId === id}
                               style={{ appearance: 'none', border: `1px solid ${COLORS.burgundy}`, background: busyId === id ? COLORS.tan : '#fff', color: COLORS.burgundy, fontWeight: 700, fontSize: 12.5, fontFamily: FONT, borderRadius: 999, padding: '6px 14px', cursor: busyId === id ? 'default' : 'pointer' }}>
                               {busyId === id ? '…' : t('admin.reject')}
+                            </button>
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Growth: promo codes. Create form + a table of existing codes with
+            toggle active / delete. */}
+        <div className="qk-card" style={{ background: '#fff', borderRadius: 22, border: `1px solid ${COLORS.tan}`, overflow: 'hidden', boxShadow: '0 8px 22px rgba(42,34,32,0.08)', marginTop: 22 }}>
+          <div style={{ background: GRAD_BURGUNDY, padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, borderRadius: 12, background: 'rgba(246,241,230,0.14)', border: '1px solid rgba(246,241,230,0.35)' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 12v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8" /><path d="M2 7h20v5H2z" /><path d="M12 22V7" /><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" /><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
+              </svg>
+            </span>
+            <div>
+              <p style={{ margin: 0, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, color: COLORS.gold, fontWeight: 700 }}>Growth</p>
+              <h2 style={{ margin: '2px 0 0', fontSize: 18, color: '#fff' }}>{t('admin.promos')} ({promos?.length ?? 0})</h2>
+            </div>
+          </div>
+
+          {/* Create form */}
+          <div style={{ padding: '18px 22px', borderBottom: `1px solid ${COLORS.tan}` }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 14 }}>
+              <div>
+                <label htmlFor="promo-code" style={notifLabel}>{t('admin.promoCode')} <span style={{ color: COLORS.burgundy }}>*</span></label>
+                <input id="promo-code" type="text" value={promoCode} onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                  placeholder="SUMMER10" disabled={promoSaving} style={{ ...notifInput, textTransform: 'uppercase' }} />
+              </div>
+              <div>
+                <label htmlFor="promo-kind" style={notifLabel}>{t('admin.promoKind')}</label>
+                <select id="promo-kind" value={promoKind} onChange={(e) => setPromoKind(e.target.value as 'percent' | 'fixed')}
+                  disabled={promoSaving} style={{ ...notifInput, appearance: 'auto', cursor: promoSaving ? 'default' : 'pointer' }}>
+                  <option value="percent">{t('admin.kindPercent')}</option>
+                  <option value="fixed">{t('admin.kindFixed')}</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="promo-value" style={notifLabel}>{t('admin.promoValue')} <span style={{ color: COLORS.burgundy }}>*</span></label>
+                <input id="promo-value" type="number" min={1} value={promoValue} onChange={(e) => setPromoValue(e.target.value)}
+                  placeholder={promoKind === 'percent' ? '10' : '100'} disabled={promoSaving} style={notifInput} />
+              </div>
+              <div>
+                <label htmlFor="promo-max" style={notifLabel}>{t('admin.maxRedemptions')}</label>
+                <input id="promo-max" type="number" min={1} value={promoMax} onChange={(e) => setPromoMax(e.target.value)}
+                  placeholder={t('admin.unlimited')} disabled={promoSaving} style={notifInput} />
+              </div>
+              <div>
+                <label htmlFor="promo-expires" style={notifLabel}>{t('admin.expiresAt')}</label>
+                <input id="promo-expires" type="date" value={promoExpires} onChange={(e) => setPromoExpires(e.target.value)}
+                  disabled={promoSaving} style={{ ...notifInput, appearance: 'auto' }} />
+              </div>
+            </div>
+            <div style={{ marginTop: 14 }}>
+              <button type="button" onClick={createPromo} disabled={promoSaving || !promoCode.trim() || !(Number(promoValue) > 0)} className="qk-press"
+                style={{ appearance: 'none', border: 'none', fontFamily: FONT, fontWeight: 800, fontSize: 15, color: '#fff', borderRadius: 14, padding: '12px 24px',
+                  background: (promoSaving || !promoCode.trim() || !(Number(promoValue) > 0)) ? 'rgba(91,15,22,0.45)' : GRAD_BURGUNDY,
+                  boxShadow: (promoSaving || !promoCode.trim() || !(Number(promoValue) > 0)) ? 'none' : '0 12px 28px rgba(91,15,22,0.28)',
+                  cursor: (promoSaving || !promoCode.trim() || !(Number(promoValue) > 0)) ? 'default' : 'pointer' }}>
+                {promoSaving ? t('growth.saving') : t('admin.createPromo')}
+              </button>
+            </div>
+          </div>
+
+          {/* Existing codes */}
+          {promos && promos.length === 0 ? (
+            <div style={{ padding: '34px 24px', textAlign: 'center', color: COLORS.muted, fontSize: 14 }}>
+              {t('admin.promosEmpty')}
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
+                <thead>
+                  <tr>
+                    <th style={th}>{t('admin.promoCode')}</th>
+                    <th style={th}>{t('admin.promoKind')}</th>
+                    <th style={th}>{t('admin.promoValue')}</th>
+                    <th style={th}>{t('admin.redeemed')}</th>
+                    <th style={th}>{t('admin.expiresAt')}</th>
+                    <th style={th}>{t('admin.active')}</th>
+                    <th style={{ ...th, textAlign: 'right' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(promos ?? []).map((p) => {
+                    const id = String(p.id)
+                    const limit = p.max_redemptions != null ? `${p.redemptions}/${p.max_redemptions}` : `${p.redemptions} · ${t('admin.unlimited')}`
+                    return (
+                      <tr key={id} className="qk-row" style={{ borderTop: `1px solid ${COLORS.cream}` }}>
+                        <td style={td}>
+                          <code style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 13, fontWeight: 700, color: COLORS.burgundy }}>{p.code}</code>
+                        </td>
+                        <td style={td}>{p.kind === 'percent' ? t('admin.kindPercent') : t('admin.kindFixed')}</td>
+                        <td style={td}>
+                          <span style={{ fontWeight: 700, color: COLORS.ink }}>
+                            {p.kind === 'percent' ? `${p.value}%` : `EGP ${p.value}`}
+                          </span>
+                        </td>
+                        <td style={td}>{limit}</td>
+                        <td style={td}>{p.expires_at ? formatDate(p.expires_at) : t('admin.never')}</td>
+                        <td style={td}>
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, whiteSpace: 'nowrap',
+                            background: p.active ? '#0f5132' : 'rgba(42,34,32,0.10)', color: p.active ? '#fff' : COLORS.muted,
+                          }}>
+                            <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 999, background: p.active ? '#fff' : COLORS.muted }} />
+                            {p.active ? t('admin.active') : t('admin.inactive')}
+                          </span>
+                        </td>
+                        <td style={{ ...td, textAlign: 'right' }}>
+                          <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end' }}>
+                            <button type="button" onClick={() => changePromoActive(id, !p.active)} disabled={busyId === id} className="qk-press"
+                              style={
+                                p.active
+                                  ? { appearance: 'none', border: `1px solid ${COLORS.burgundy}`, background: busyId === id ? COLORS.tan : '#fff', color: COLORS.burgundy, fontWeight: 700, fontSize: 12.5, fontFamily: FONT, borderRadius: 999, padding: '6px 14px', cursor: busyId === id ? 'default' : 'pointer' }
+                                  : { appearance: 'none', border: 'none', background: busyId === id ? COLORS.tan : '#0f5132', color: '#fff', fontWeight: 700, fontSize: 12.5, fontFamily: FONT, borderRadius: 999, padding: '6px 14px', cursor: busyId === id ? 'default' : 'pointer' }
+                              }>
+                              {busyId === id ? '…' : p.active ? t('admin.deactivate') : t('admin.activate')}
+                            </button>
+                            <button type="button" onClick={() => setConfirm({ title: t('admin.deletePromoTitle'), message: t('admin.deletePromoBody'), onConfirm: () => removePromo(id) })} disabled={busyId === id}
+                              style={{ appearance: 'none', border: `1px solid ${COLORS.burgundy}`, background: busyId === id ? COLORS.tan : '#fff', color: COLORS.burgundy, fontWeight: 700, fontSize: 12.5, fontFamily: FONT, borderRadius: 999, padding: '6px 14px', cursor: busyId === id ? 'default' : 'pointer' }}>
+                              {busyId === id ? '…' : t('admin.delete')}
                             </button>
                           </span>
                         </td>

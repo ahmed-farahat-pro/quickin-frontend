@@ -64,6 +64,11 @@ export interface Listing {
   // URL). Only returned to the listing's host and to admins (in the moderation
   // queue); absent on public listing responses.
   ownership_doc?: string | null
+  // Length-of-stay discounts (percent off), set by the host. The backend applies
+  // them to booking totals automatically (≥28 nights → monthly%, ≥7 → weekly%).
+  // 0 / absent means no discount. Typed optional for older cached shapes.
+  weekly_discount?: number
+  monthly_discount?: number
 }
 
 // ---- Listing search filters -------------------------------------------------
@@ -456,6 +461,135 @@ export async function updateListingPolicy(
   return (await res.json()) as Listing
 }
 
+// ---- Growth: length-of-stay discounts ---------------------------------------
+
+// Host updates a listing's length-of-stay discounts (percent off). Bearer must
+// be the listing's host (403 otherwise). `weekly` applies at ≥7 nights and
+// `monthly` at ≥28 nights (the backend applies them to totals). Resolves to the
+// refreshed listing; throws on non-2xx.
+export async function updateListingDiscounts(
+  token: string,
+  listingId: string,
+  discounts: { weekly_discount: number; monthly_discount: number }
+): Promise<Listing> {
+  const res = await fetch(
+    `${API_URL}/api/local/listings/${encodeURIComponent(listingId)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + token,
+      },
+      body: JSON.stringify({
+        weekly_discount: discounts.weekly_discount,
+        monthly_discount: discounts.monthly_discount,
+      }),
+    }
+  )
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error((data && data.error) || `Request failed: ${res.status}`)
+  }
+  return (await res.json()) as Listing
+}
+
+// ---- Growth: promo codes ----------------------------------------------------
+
+// The preview a promo code yields against a given subtotal. `kind` is the
+// discount type; `value` its raw amount (percent or fixed); `discount` the EGP
+// the guest would save; `message` a human reason when invalid. Mirrors
+// POST /api/local/promo/validate.
+export interface PromoPreview {
+  valid: boolean
+  code: string | null
+  kind: 'percent' | 'fixed' | null
+  value: number | null
+  discount: number
+  message: string | null
+}
+
+// Preview a promo code against the current subtotal (no mutation, no auth). The
+// real discount is applied server-side at /pay. Returns a safe `invalid`
+// preview on any non-2xx / parse error so the UI can simply show "invalid".
+export async function validatePromo(
+  code: string,
+  subtotal: number
+): Promise<PromoPreview> {
+  try {
+    const res = await fetch(`${API_URL}/api/local/promo/validate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, subtotal }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      return {
+        valid: false,
+        code: null,
+        kind: null,
+        value: null,
+        discount: 0,
+        message: (data && data.message) || (data && data.error) || null,
+      }
+    }
+    return {
+      valid: Boolean(data && data.valid),
+      code: (data && data.code) ?? null,
+      kind: (data && data.kind) ?? null,
+      value: typeof data?.value === 'number' ? data.value : null,
+      discount: typeof data?.discount === 'number' ? data.discount : 0,
+      message: (data && data.message) ?? null,
+    }
+  } catch {
+    return { valid: false, code: null, kind: null, value: null, discount: 0, message: null }
+  }
+}
+
+// ---- Growth: referrals ------------------------------------------------------
+
+// One friend the user has referred (GET /api/local/referrals → referred[]).
+export interface ReferredFriend {
+  name: string | null
+  created_at: string
+  reward_amount: number
+}
+
+// The signed-in user's referral surface: their shareable `code`, how many
+// friends they've brought (`count`), the total reward earned (`rewardTotal`),
+// and the list of referred friends. Mirrors GET /api/local/referrals.
+export interface ReferralState {
+  code: string
+  count: number
+  rewardTotal: number
+  referred: ReferredFriend[]
+}
+
+// Fetch the signed-in user's referral code + stats. Bearer = the user. Returns
+// null on any non-2xx / parse error so callers can hide the surface gracefully.
+export async function getReferrals(
+  token: string,
+  signal?: AbortSignal
+): Promise<ReferralState | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/local/referrals`, {
+      headers: { Authorization: 'Bearer ' + token },
+      cache: 'no-store',
+      signal,
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    if (!data || typeof data !== 'object') return null
+    return {
+      code: String(data.code ?? ''),
+      count: Number(data.count ?? 0),
+      rewardTotal: Number(data.rewardTotal ?? 0),
+      referred: Array.isArray(data.referred) ? (data.referred as ReferredFriend[]) : [],
+    }
+  } catch {
+    return null
+  }
+}
+
 // ---- Listing approval: ownership document -----------------------------------
 
 // Host (re)submits the ownership / proof-of-right-to-rent document for a
@@ -787,6 +921,106 @@ export async function moderateListing(
     },
     body: JSON.stringify({ listing_id: listingId, action }),
   })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error((data && data.error) || `Request failed: ${res.status}`)
+  }
+}
+
+// ---- Growth: admin promo codes ----------------------------------------------
+
+// One promo code in the admin panel (GET /api/local/admin/promos). `kind` is the
+// discount type; `value` its raw amount (percent or fixed EGP). `redemptions`
+// counts how many times it's been used; `max_redemptions` / `expires_at` are
+// optional limits (null = unlimited / never expires).
+export interface AdminPromo {
+  id: string
+  code: string
+  kind: 'percent' | 'fixed'
+  value: number
+  active: boolean
+  redemptions: number
+  max_redemptions: number | null
+  expires_at: string | null
+}
+
+// Fetch all promo codes. Bearer = admin. Returns [] on any non-2xx / parse error.
+export async function listPromos(
+  token: string,
+  signal?: AbortSignal
+): Promise<AdminPromo[]> {
+  try {
+    const res = await fetch(`${API_URL}/api/local/admin/promos`, {
+      headers: { Authorization: 'Bearer ' + token },
+      cache: 'no-store',
+      signal,
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    return Array.isArray(data) ? (data as AdminPromo[]) : []
+  } catch {
+    return []
+  }
+}
+
+// Create or update a promo code. Bearer = admin. The backend upserts on `code`.
+// Resolves to the saved promo; throws on a non-2xx response so the caller can
+// toast the error.
+export async function upsertPromo(
+  token: string,
+  body: {
+    code: string
+    kind: 'percent' | 'fixed'
+    value: number
+    max_redemptions?: number | null
+    expires_at?: string | null
+  }
+): Promise<AdminPromo> {
+  const res = await fetch(`${API_URL}/api/local/admin/promos`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + token,
+    },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error((data && data.error) || `Request failed: ${res.status}`)
+  }
+  return (await res.json()) as AdminPromo
+}
+
+// Enable / disable a promo code by id. Bearer = admin. Throws on a non-2xx
+// response.
+export async function togglePromo(
+  token: string,
+  id: string,
+  active: boolean
+): Promise<void> {
+  const res = await fetch(`${API_URL}/api/local/admin/promos`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + token,
+    },
+    body: JSON.stringify({ id, action: 'toggle', active }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error((data && data.error) || `Request failed: ${res.status}`)
+  }
+}
+
+// Delete a promo code by id. Bearer = admin. Throws on a non-2xx response.
+export async function deletePromo(token: string, id: string): Promise<void> {
+  const res = await fetch(
+    `${API_URL}/api/local/admin/promos?id=${encodeURIComponent(id)}`,
+    {
+      method: 'DELETE',
+      headers: { Authorization: 'Bearer ' + token },
+    }
+  )
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
     throw new Error((data && data.error) || `Request failed: ${res.status}`)

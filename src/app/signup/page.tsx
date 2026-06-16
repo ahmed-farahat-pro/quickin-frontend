@@ -60,6 +60,8 @@ export default function SignupPage() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [role, setRole] = useState<Role>('user')
+  // Optional referral code — collected on the form, forwarded to verify-otp.
+  const [referralCode, setReferralCode] = useState('')
   const [step, setStep] = useState<'form' | 'otp'>('form')
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -138,7 +140,7 @@ export default function SignupPage() {
     try {
       const res = await fetch(`${API_URL}/api/auth/verify-otp`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code }),
+        body: JSON.stringify({ email, code, referral_code: referralCode.trim() || undefined }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) { setError(data?.error || 'Invalid or expired code.'); setLoading(false); return }
@@ -260,6 +262,20 @@ export default function SignupPage() {
                   </button>
                 </div>
                 <PasswordStrength value={password} />
+              </label>
+              <label style={{ display: 'block', marginBottom: 22 }}>
+                <span style={labelStyle}>{t('referral.signupField')}</span>
+                <input
+                  type="text"
+                  autoComplete="off"
+                  value={referralCode}
+                  onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                  placeholder={t('promo.placeholder')}
+                  style={{ ...inputStyle, textTransform: 'uppercase' }}
+                />
+                <span style={{ display: 'block', marginTop: 6, fontSize: 12.5, color: COLORS.muted }}>
+                  {t('referral.signupHint')}
+                </span>
               </label>
               <button type="submit" disabled={loading || !passwordMeetsMin(password)} className={loading || !passwordMeetsMin(password) ? undefined : 'qk-press qk-pulse'} style={primaryButtonStyle(loading || !passwordMeetsMin(password))}>
                 {loading ? t('signup.sendingCode') : role === 'host' ? t('signup.createHost') : t('signup.createGuest')}

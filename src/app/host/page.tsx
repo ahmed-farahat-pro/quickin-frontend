@@ -14,6 +14,7 @@ import {
   getStoredUser,
   getToken,
   submitOwnershipDoc,
+  updateListingDiscounts,
   updateListingPolicy,
   type ApprovalStatus,
   type CancellationPolicy,
@@ -82,6 +83,14 @@ function fmtDate(d: string): string {
     day: 'numeric',
     year: 'numeric',
   })
+}
+
+// Parse a percent string and clamp it to the 0..90 range the backend accepts.
+// A blank / NaN value becomes 0 (no discount).
+function clampPercent(value: string | number): number {
+  const n = Math.round(Number(value))
+  if (!Number.isFinite(n)) return 0
+  return Math.max(0, Math.min(90, n))
 }
 
 // Reservation status → badge colors (shared look with /reservations + /reservation/[id]).
@@ -231,6 +240,10 @@ interface FormState {
   beds: string
   bathrooms: string
   property_type: string
+  // Length-of-stay discounts (percent off) kept as strings so they serialize
+  // straight from the form inputs; parsed to ints on submit.
+  weekly_discount: string
+  monthly_discount: string
   amenities: string[]
   cancellation_policy: CancellationPolicy
   // Ownership / proof-of-right-to-rent document, downscaled to a data:image/*
@@ -255,6 +268,8 @@ const EMPTY_FORM: FormState = {
   beds: '1',
   bathrooms: '1',
   property_type: 'Apartment',
+  weekly_discount: '0',
+  monthly_discount: '0',
   amenities: [],
   cancellation_policy: 'moderate',
   ownership_doc: '',
@@ -640,6 +655,8 @@ export default function HostPage() {
           max_guests: Number(form.max_guests) || 1,
           property_type: form.property_type,
           amenities: form.amenities,
+          weekly_discount: clampPercent(form.weekly_discount),
+          monthly_discount: clampPercent(form.monthly_discount),
           cancellation_policy: form.cancellation_policy,
           ownership_doc: form.ownership_doc || undefined,
           lat: form.lat.trim() ? Number(form.lat) : null,
@@ -1188,6 +1205,33 @@ export default function HostPage() {
                   required
                 />
               </Field>
+
+              {/* Length-of-stay discounts — optional % off for longer stays.
+                  Applied by the backend automatically at checkout. */}
+              <div className="qk-host-form-full">
+                <span style={labelStyle}>{t('growth.discounts')}</span>
+                <p style={{ margin: '0 0 10px', fontSize: 13, color: COLORS.muted, lineHeight: 1.5 }}>
+                  {t('growth.discountsHint')}
+                </p>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: 16,
+                  }}
+                >
+                  <PercentField
+                    label={`${t('growth.weeklyDiscount')} (${t('growth.weeklyHint')})`}
+                    value={form.weekly_discount}
+                    onChange={(v) => patch({ weekly_discount: v })}
+                  />
+                  <PercentField
+                    label={`${t('growth.monthlyDiscount')} (${t('growth.monthlyHint')})`}
+                    value={form.monthly_discount}
+                    onChange={(v) => patch({ monthly_discount: v })}
+                  />
+                </div>
+              </div>
             </div>
           )}
 
@@ -1811,6 +1855,12 @@ export default function HostPage() {
                     <ListingPolicyEditor
                       listingId={l.id}
                       current={l.cancellation_policy ?? 'moderate'}
+                    />
+
+                    <ListingDiscountsEditor
+                      listingId={l.id}
+                      weekly={l.weekly_discount ?? 0}
+                      monthly={l.monthly_discount ?? 0}
                     />
 
                     <button
@@ -2861,6 +2911,163 @@ function ListingPolicyEditor({
           }}
         >
           {error ? error : saved ? `✓ ${t(desc)}` : t(desc)}
+        </p>
+      )}
+    </div>
+  )
+}
+
+// A small "% off" number input used in the add-listing Details step. Keeps the
+// value as a string in the parent form; clamps display to a sane range on blur.
+function PercentField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: string
+  onChange: (next: string) => void
+}) {
+  return (
+    <label style={{ display: 'block' }}>
+      <span style={labelStyle}>{label}</span>
+      <div style={{ position: 'relative' }}>
+        <input
+          style={{ ...inputStyle, paddingInlineEnd: 34 }}
+          type="number"
+          min={0}
+          max={90}
+          step={1}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={(e) => onChange(String(clampPercent(e.target.value)))}
+          placeholder="0"
+          inputMode="numeric"
+        />
+        <span
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            insetInlineEnd: 14,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            fontSize: 14,
+            fontWeight: 700,
+            color: COLORS.muted,
+            pointerEvents: 'none',
+          }}
+        >
+          %
+        </span>
+      </div>
+    </label>
+  )
+}
+
+// Inline length-of-stay discount editor shown on each "Your listings" card. Two
+// "% off" inputs (weekly ≥7 nights, monthly ≥28 nights) with a Save button that
+// PATCHes /api/local/listings/:id. Mirrors the policy editor's inline feel and
+// seeds from the loaded listing's values.
+function ListingDiscountsEditor({
+  listingId,
+  weekly,
+  monthly,
+}: {
+  listingId: string
+  weekly: number
+  monthly: number
+}) {
+  const { t } = useLanguage()
+  const [weeklyVal, setWeeklyVal] = useState(String(weekly))
+  const [monthlyVal, setMonthlyVal] = useState(String(monthly))
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Keep in sync if the parent list reloads with new values.
+  useEffect(() => {
+    setWeeklyVal(String(weekly))
+    setMonthlyVal(String(monthly))
+  }, [weekly, monthly])
+
+  const dirty =
+    clampPercent(weeklyVal) !== weekly || clampPercent(monthlyVal) !== monthly
+
+  async function save() {
+    if (saving || !dirty) return
+    const token = getToken()
+    if (!token) {
+      setError(t('availability.signInRequired'))
+      return
+    }
+    setSaving(true)
+    setSaved(false)
+    setError(null)
+    try {
+      const w = clampPercent(weeklyVal)
+      const m = clampPercent(monthlyVal)
+      await updateListingDiscounts(token, listingId, {
+        weekly_discount: w,
+        monthly_discount: m,
+      })
+      // Normalize the inputs to the saved (clamped) values.
+      setWeeklyVal(String(w))
+      setMonthlyVal(String(m))
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch {
+      setError(t('growth.discountsError'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div>
+      <span style={labelStyle}>{t('growth.discounts')}</span>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <PercentField
+          label={t('growth.weeklyHint')}
+          value={weeklyVal}
+          onChange={setWeeklyVal}
+        />
+        <PercentField
+          label={t('growth.monthlyHint')}
+          value={monthlyVal}
+          onChange={setMonthlyVal}
+        />
+      </div>
+      <button
+        type="button"
+        onClick={save}
+        disabled={saving || !dirty}
+        className={saving || !dirty ? undefined : 'qk-press'}
+        style={{
+          marginTop: 8,
+          width: '100%',
+          padding: '8px 14px',
+          fontSize: 13,
+          fontWeight: 700,
+          fontFamily: FONT,
+          color: saving || !dirty ? COLORS.muted : COLORS.burgundy,
+          background: '#fff',
+          border: `1px solid ${saving || !dirty ? 'rgba(42,34,32,0.16)' : COLORS.burgundy}`,
+          borderRadius: 12,
+          cursor: saving || !dirty ? 'default' : 'pointer',
+        }}
+      >
+        {saving ? t('growth.saving') : t('growth.save')}
+      </button>
+      {(saved || error) && (
+        <p
+          style={{
+            margin: '6px 0 0',
+            fontSize: 12,
+            color: error ? COLORS.burgundy : '#0f5132',
+            fontWeight: 600,
+          }}
+        >
+          {error ? error : `✓ ${t('growth.discountsSaved')}`}
         </p>
       )}
     </div>

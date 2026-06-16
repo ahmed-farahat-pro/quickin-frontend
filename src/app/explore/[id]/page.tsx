@@ -439,6 +439,8 @@ export default async function ListingDetailPage({
               currency={listing.currency}
               maxGuests={listing.max_guests}
               cancellationPolicy={listing.cancellation_policy ?? 'moderate'}
+              weeklyDiscount={listing.weekly_discount ?? 0}
+              monthlyDiscount={listing.monthly_discount ?? 0}
             />
             {listing.listing_code && (
               <div
