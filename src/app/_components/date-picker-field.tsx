@@ -73,6 +73,12 @@ export interface DatePickerFieldProps {
   ariaLabel?: string
   /** When true, render a compact trigger (used inside narrow cards). */
   compact?: boolean
+  /**
+   * Optional predicate to disable individual day cells beyond the `min` rule —
+   * receives each day's ISO string and returns true to grey it out. Used to
+   * grey out already-booked / host-blocked days on a listing's calendar.
+   */
+  isDateDisabled?: (iso: string) => boolean
 }
 
 export default function DatePickerField({
@@ -83,6 +89,7 @@ export default function DatePickerField({
   min,
   ariaLabel,
   compact = false,
+  isDateDisabled,
 }: DatePickerFieldProps) {
   const [open, setOpen] = useState(false)
   const selected = parseISO(value)
@@ -295,7 +302,13 @@ export default function DatePickerField({
               if (!d) return <div key={`b-${i}`} />
               const isSelected = selected ? sameDay(d, selected) : false
               const isToday = sameDay(d, today)
-              const disabled = minStart ? startOfDay(d) < minStart : false
+              const beforeMin = minStart ? startOfDay(d) < minStart : false
+              // Days flagged unavailable (booked / host-blocked / would
+              // straddle a blocked span) are greyed out the same as past days.
+              const unavailable = !beforeMin && isDateDisabled
+                ? isDateDisabled(toISO(d))
+                : false
+              const disabled = beforeMin || unavailable
               return (
                 <button
                   key={toISO(d)}
@@ -303,6 +316,7 @@ export default function DatePickerField({
                   disabled={disabled}
                   onClick={() => pick(d)}
                   aria-pressed={isSelected}
+                  aria-disabled={disabled}
                   style={{
                     appearance: 'none',
                     border: isToday && !isSelected
@@ -314,6 +328,9 @@ export default function DatePickerField({
                     fontFamily: FONT,
                     fontWeight: isSelected ? 700 : 500,
                     cursor: disabled ? 'not-allowed' : 'pointer',
+                    // Unavailable days are struck through so they read as
+                    // "taken" rather than merely outside the range like past days.
+                    textDecoration: unavailable ? 'line-through' : 'none',
                     color: disabled
                       ? 'rgba(42,34,32,0.28)'
                       : isSelected

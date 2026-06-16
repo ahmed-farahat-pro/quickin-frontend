@@ -1,7 +1,13 @@
 'use client'
 
-import { useState } from 'react'
-import { API_URL } from '@/lib/api'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { API_URL, getAvailability, type AvailabilitySpan } from '@/lib/api'
+import {
+  firstBlockedDayAfter,
+  isDayUnavailable,
+  rangeOverlapsAny,
+  toRanges,
+} from '@/lib/availability'
 import DatePickerField from '../../_components/date-picker-field'
 import { useLanguage } from '@/lib/i18n/language-provider'
 
@@ -81,10 +87,64 @@ export default function ReservePanel({
   const [guests, setGuests] = useState(1)
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
 
+  // Unavailable spans (booked + host-blocked) for this listing. Fetched on
+  // mount and refreshed after a successful booking so the calendar greys out
+  // taken days and we can block straddling selections proactively.
+  const [spans, setSpans] = useState<AvailabilitySpan[]>([])
+
+  const loadAvailability = useCallback(
+    (signal?: AbortSignal) => {
+      getAvailability(listingId, signal).then((rows) => {
+        if (!signal?.aborted) setSpans(rows)
+      })
+    },
+    [listingId]
+  )
+
+  useEffect(() => {
+    const ac = new AbortController()
+    loadAvailability(ac.signal)
+    return () => ac.abort()
+  }, [loadAvailability])
+
+  const ranges = useMemo(() => toRanges(spans), [spans])
+
+  // Check-in day is unavailable if it sits inside any taken span.
+  const isCheckInDisabled = useCallback(
+    (iso: string) => isDayUnavailable(iso, ranges),
+    [ranges]
+  )
+
+  // Check-out day is invalid if, given the chosen check-in, it lies on/after
+  // the first taken night following check-in — that would straddle a blocked
+  // span. (`min={checkIn}` already forbids days at/before check-in.) With no
+  // check-in chosen yet, fall back to greying days inside a span.
+  const firstBlockedAfter = useMemo(
+    () => (checkIn ? firstBlockedDayAfter(checkIn, ranges) : null),
+    [checkIn, ranges]
+  )
+  const isCheckOutDisabled = useCallback(
+    (iso: string) => {
+      if (!checkIn) return isDayUnavailable(iso, ranges)
+      if (firstBlockedAfter && iso > firstBlockedAfter) return true
+      return false
+    },
+    [checkIn, firstBlockedAfter, ranges]
+  )
+
   const nights = nightsBetween(checkIn, checkOut)
   const total = nights * pricePerNight
+  // Proactive guard: does the current selection overlap a taken span?
+  const rangeBlocked = rangeOverlapsAny(checkIn, checkOut, ranges)
 
   async function handleReserve() {
+    // Proactively reject a selection that overlaps a taken span — the calendar
+    // already greys these out, this guards the typed/edge case.
+    if (rangeOverlapsAny(checkIn, checkOut, ranges)) {
+      setStatus({ kind: 'error', message: t('availability.unavailable') })
+      return
+    }
+
     // Auth is a bearer token stored in localStorage after login/signup.
     const token =
       typeof window !== 'undefined' ? localStorage.getItem('qk_token') : null
@@ -117,6 +177,9 @@ export default function ReservePanel({
       const data = await res.json().catch(() => ({}))
 
       if (res.status === 201) {
+        // The newly booked span now makes those nights unavailable — refresh
+        // so the calendar greys them out for the next selection.
+        loadAvailability()
         // Booking created (pending + unpaid). Show the mock payment step; the
         // 10% guest service fee mirrors what the /pay receipt returns.
         const subtotal = typeof data.total_price === 'number' ? data.total_price : total
@@ -185,7 +248,8 @@ export default function ReservePanel({
     }
   }
 
-  const canReserve = nights > 0 && guests >= 1 && status.kind !== 'loading'
+  const canReserve =
+    nights > 0 && guests >= 1 && !rangeBlocked && status.kind !== 'loading'
 
   return (
     <div>
@@ -209,10 +273,18 @@ export default function ReservePanel({
           value={checkIn}
           ariaLabel={t('reserve.checkIn')}
           compact
+          isDateDisabled={isCheckInDisabled}
           onChange={(iso) => {
             setCheckIn(iso)
-            // Keep checkout valid: clear it if it now precedes check-in.
-            if (iso && checkOut && checkOut < iso) setCheckOut('')
+            // Keep checkout valid: clear it if it now precedes check-in or if
+            // the existing checkout would now straddle a blocked span.
+            if (
+              iso &&
+              checkOut &&
+              (checkOut < iso || rangeOverlapsAny(iso, checkOut, ranges))
+            ) {
+              setCheckOut('')
+            }
             setStatus({ kind: 'idle' })
           }}
         />
@@ -222,6 +294,7 @@ export default function ReservePanel({
           ariaLabel={t('reserve.checkOut')}
           compact
           min={checkIn || undefined}
+          isDateDisabled={isCheckOutDisabled}
           onChange={(iso) => {
             setCheckOut(iso)
             setStatus({ kind: 'idle' })
@@ -320,6 +393,20 @@ export default function ReservePanel({
           }}
         >
           {t('reserve.pickDates')}
+        </p>
+      )}
+
+      {nights > 0 && rangeBlocked && status.kind === 'idle' && (
+        <p
+          style={{
+            margin: '10px 0 0',
+            fontSize: 13,
+            color: COLORS.burgundy,
+            fontWeight: 600,
+            textAlign: 'center',
+          }}
+        >
+          {t('availability.unavailable')}
         </p>
       )}
 

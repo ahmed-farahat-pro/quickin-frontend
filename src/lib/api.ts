@@ -110,6 +110,41 @@ export async function getListings(
   return Array.isArray(data) ? (data as Listing[]) : []
 }
 
+// ---- Availability -----------------------------------------------------------
+
+// One unavailable span on a listing's calendar. The range is HALF-OPEN
+// [start, end): the start day is taken but the `end` (check-out) day is free
+// again as a new check-in. `kind` distinguishes a guest booking from a
+// host-placed block (only blocks are removable by the host). Dates are
+// "YYYY-MM-DD". Mirrors GET /api/local/listings/:id/availability.
+export interface AvailabilitySpan {
+  id: string
+  start: string
+  end: string
+  kind: 'booked' | 'blocked'
+  note: string | null
+}
+
+// Fetch a listing's unavailable spans (public, no auth). `signal` lets callers
+// abort a stale request. Returns [] on any non-2xx / parse error so the UI can
+// degrade gracefully (calendar simply shows nothing disabled).
+export async function getAvailability(
+  listingId: string,
+  signal?: AbortSignal
+): Promise<AvailabilitySpan[]> {
+  try {
+    const res = await fetch(
+      `${API_URL}/api/local/listings/${encodeURIComponent(listingId)}/availability`,
+      { signal, cache: 'no-store' }
+    )
+    if (!res.ok) return []
+    const data = await res.json()
+    return Array.isArray(data) ? (data as AvailabilitySpan[]) : []
+  } catch {
+    return []
+  }
+}
+
 export interface Booking {
   id: string
   listing_id: string

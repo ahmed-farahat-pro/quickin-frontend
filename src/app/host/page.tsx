@@ -19,6 +19,8 @@ import {
 } from '@/lib/api'
 import BookingChat from '@/app/_components/booking-chat'
 import ImagePlaceholder from '@/app/_components/image-placeholder'
+import AvailabilityManager from './availability-manager'
+import { useLanguage } from '@/lib/i18n/language-provider'
 
 // Leaflet + OpenStreetMap pin-picker for the location step. Client-only (Leaflet
 // touches window) -> dynamic import with ssr:false, mirroring how the explore
@@ -221,6 +223,7 @@ type Gate =
   | { kind: 'ok'; firstName: string }
 
 export default function HostPage() {
+  const { t } = useLanguage()
   const [gate, setGate] = useState<Gate>({ kind: 'checking' })
 
   // Add-listing wizard
@@ -290,6 +293,8 @@ export default function HostPage() {
   const [listings, setListings] = useState<Listing[]>([])
   const [listingsLoading, setListingsLoading] = useState(true)
   const [listingsError, setListingsError] = useState(false)
+  // listing id whose inline "Manage availability" panel is expanded
+  const [openAvailId, setOpenAvailId] = useState<string | null>(null)
 
   // Reservation requests
   const [bookings, setBookings] = useState<HostBooking[]>([])
@@ -1389,79 +1394,122 @@ export default function HostPage() {
           >
             {listings.map((l) => {
               const cover = l.listing_images?.[0]?.url || null
+              const availOpen = openAvailId === l.id
               return (
-                <a
+                <div
                   key={l.id}
-                  href={`/explore/${l.id}`}
-                  className="qk-card"
                   style={{
-                    display: 'block',
                     background: '#fff',
                     borderRadius: 18,
                     overflow: 'hidden',
-                    textDecoration: 'none',
-                    color: 'inherit',
                     border: '1px solid rgba(42,34,32,0.06)',
                     boxShadow: '0 8px 22px rgba(42,34,32,0.08)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    // When the availability panel is open, let this card span the
+                    // whole grid row so the manager has room to breathe.
+                    gridColumn: availOpen ? '1 / -1' : 'auto',
                   }}
                 >
-                  <div
+                  <a
+                    href={`/explore/${l.id}`}
+                    className="qk-card"
                     style={{
-                      position: 'relative',
-                      width: '100%',
-                      aspectRatio: '4 / 3',
-                      overflow: 'hidden',
-                      background: COLORS.tan,
+                      display: 'block',
+                      textDecoration: 'none',
+                      color: 'inherit',
                     }}
                   >
-                    {cover ? (
-                      <img
-                        src={cover}
-                        alt={l.title}
-                        loading="lazy"
-                        className="qk-img-zoom"
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                          display: 'block',
-                        }}
-                      />
-                    ) : (
-                      <ImagePlaceholder iconSize={28} fontSize={12} />
-                    )}
-                  </div>
-                  <div style={{ padding: '12px 14px 16px' }}>
-                    <h3
+                    <div
                       style={{
-                        margin: 0,
-                        fontSize: 15,
-                        fontWeight: 700,
-                        color: COLORS.ink,
-                        lineHeight: 1.3,
+                        position: 'relative',
+                        width: '100%',
+                        aspectRatio: '4 / 3',
+                        overflow: 'hidden',
+                        background: COLORS.tan,
                       }}
                     >
-                      {l.title}
-                    </h3>
-                    {l.location && (
-                      <p
+                      {cover ? (
+                        <img
+                          src={cover}
+                          alt={l.title}
+                          loading="lazy"
+                          className="qk-img-zoom"
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            display: 'block',
+                          }}
+                        />
+                      ) : (
+                        <ImagePlaceholder iconSize={28} fontSize={12} />
+                      )}
+                    </div>
+                    <div style={{ padding: '12px 14px 8px' }}>
+                      <h3
                         style={{
-                          margin: '4px 0 0',
-                          fontSize: 13,
-                          color: COLORS.muted,
+                          margin: 0,
+                          fontSize: 15,
+                          fontWeight: 700,
+                          color: COLORS.ink,
+                          lineHeight: 1.3,
                         }}
                       >
-                        {l.location}
+                        {l.title}
+                      </h3>
+                      {l.location && (
+                        <p
+                          style={{
+                            margin: '4px 0 0',
+                            fontSize: 13,
+                            color: COLORS.muted,
+                          }}
+                        >
+                          {l.location}
+                        </p>
+                      )}
+                      <p style={{ margin: '10px 0 0', fontSize: 14 }}>
+                        <span style={{ fontWeight: 700, color: COLORS.burgundy }}>
+                          EGP {l.price_per_night}
+                        </span>{' '}
+                        <span style={{ color: COLORS.muted }}>/ night</span>
                       </p>
-                    )}
-                    <p style={{ margin: '10px 0 0', fontSize: 14 }}>
-                      <span style={{ fontWeight: 700, color: COLORS.burgundy }}>
-                        EGP {l.price_per_night}
-                      </span>{' '}
-                      <span style={{ color: COLORS.muted }}>/ night</span>
-                    </p>
+                    </div>
+                  </a>
+
+                  {/* Manage availability toggle + inline panel */}
+                  <div style={{ padding: '0 14px 14px', marginTop: 'auto' }}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setOpenAvailId((cur) => (cur === l.id ? null : l.id))
+                      }
+                      aria-expanded={availOpen}
+                      className="qk-press"
+                      style={{
+                        width: '100%',
+                        padding: '9px 14px',
+                        fontSize: 13.5,
+                        fontWeight: 700,
+                        fontFamily: FONT,
+                        color: availOpen ? '#fff' : COLORS.burgundy,
+                        background: availOpen ? GRAD_BURGUNDY : COLORS.tan,
+                        border: availOpen
+                          ? '1px solid transparent'
+                          : `1px solid ${COLORS.burgundy}`,
+                        borderRadius: 12,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {availOpen
+                        ? t('availability.hide')
+                        : t('availability.manage')}
+                    </button>
+
+                    {availOpen && <AvailabilityManager listingId={l.id} />}
                   </div>
-                </a>
+                </div>
               )
             })}
           </div>
