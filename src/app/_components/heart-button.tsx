@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 import { getToken } from '@/lib/api'
 import { fetchWishlistIds, toggleWishlist, type WishlistItemType } from '@/lib/wishlist'
 import { useLanguage } from '@/lib/i18n/language-provider'
+import { useToast } from './toast'
 
 const BURGUNDY = '#5B0F16'
 
@@ -38,6 +39,7 @@ export default function HeartButton({
   autoFetchSaved?: boolean
 }) {
   const { t } = useLanguage()
+  const toast = useToast()
   const [saved, setSaved] = useState(initialSaved)
   const [busy, setBusy] = useState(false)
 
@@ -62,8 +64,9 @@ export default function HeartButton({
     }
     if (busy) return
 
-    // Signed-out → send to login, preserving where they were.
+    // Signed-out → prompt, then send to login, preserving where they were.
     if (!getToken()) {
+      toast.show(t('wishlist.signInToSave'), { kind: 'info' })
       const here =
         typeof window !== 'undefined'
           ? window.location.pathname + window.location.search
@@ -81,10 +84,17 @@ export default function HeartButton({
         itemId,
         next ? 'add' : 'remove'
       )
+      // Reconcile with the server's authoritative result (never desync) and
+      // base the feedback on what the server actually did.
       setSaved(serverSaved)
       onChange?.(serverSaved)
+      toast.show(
+        serverSaved ? t('wishlist.added') : t('wishlist.removed'),
+        { kind: 'success' }
+      )
     } catch {
-      setSaved(!next) // roll back
+      setSaved(!next) // roll back the optimistic flip
+      toast.show(t('wishlist.actionFailed'), { kind: 'error' })
     } finally {
       setBusy(false)
     }

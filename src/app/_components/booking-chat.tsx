@@ -10,6 +10,8 @@
 // and auto-scroll to the newest message.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { API_URL, getStoredUser, getToken } from '@/lib/api'
+import { useLanguage } from '@/lib/i18n/language-provider'
+import { useToast } from './toast'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -58,6 +60,8 @@ type Load =
   | { kind: 'ready' }
 
 export default function BookingChat({ bookingId }: { bookingId: string }) {
+  const { t } = useLanguage()
+  const toast = useToast()
   const [load, setLoad] = useState<Load>({ kind: 'loading' })
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [draft, setDraft] = useState('')
@@ -155,14 +159,25 @@ export default function BookingChat({ bookingId }: { bookingId: string }) {
         setLoad({ kind: 'anon' })
         return
       }
-      if (res.status === 403) {
-        setSendError('You don’t have access to this conversation.')
+      if (res.status !== 201 && !res.ok) {
+        // Surface the server's explanation (e.g. the 400 "sharing phone numbers
+        // in chat isn't allowed" block) instead of a generic failure. Crucially
+        // we DON'T clear the draft, so the guest can edit and resend.
+        const data = (await res.json().catch(() => null)) as
+          | { error?: string }
+          | null
+        const serverMsg = data?.error?.trim()
+        const message =
+          serverMsg ||
+          (res.status === 403
+            ? t('chat.noAccess')
+            : t('chat.sendError'))
+        setSendError(message)
+        toast.show(message, { kind: 'error' })
         return
       }
-      if (res.status !== 201 && !res.ok) {
-        throw new Error(`Request failed: ${res.status}`)
-      }
       const created = (await res.json().catch(() => null)) as ChatMessage | null
+      // Only clear the input once the send actually succeeded.
       setDraft('')
       // Optimistically append, then a refresh reconciles with the server.
       if (created && created.id) {
@@ -172,7 +187,10 @@ export default function BookingChat({ bookingId }: { bookingId: string }) {
       }
       fetchMessages()
     } catch {
-      setSendError('Couldn’t send your message. Please try again.')
+      // Network / parse failure — keep the draft so they can retry.
+      const message = t('chat.sendError')
+      setSendError(message)
+      toast.show(message, { kind: 'error' })
     } finally {
       setSending(false)
     }
@@ -204,27 +222,27 @@ export default function BookingChat({ bookingId }: { bookingId: string }) {
       >
         {load.kind === 'loading' && (
           <p style={{ margin: 0, fontSize: 14, color: COLORS.muted }}>
-            Loading messages…
+            {t('chat.loading')}
           </p>
         )}
         {load.kind === 'anon' && (
           <p style={{ margin: 0, fontSize: 14, color: COLORS.muted }}>
-            Sign in to view and send messages.
+            {t('chat.signIn')}
           </p>
         )}
         {load.kind === 'forbidden' && (
           <p style={{ margin: 0, fontSize: 14, color: COLORS.muted }}>
-            You don’t have access to this conversation.
+            {t('chat.noAccess')}
           </p>
         )}
         {load.kind === 'error' && (
           <p style={{ margin: 0, fontSize: 14, color: COLORS.burgundy }}>
-            Couldn’t load messages. Retrying…
+            {t('chat.loadError')}
           </p>
         )}
         {load.kind === 'ready' && messages.length === 0 && (
           <p style={{ margin: 0, fontSize: 14, color: COLORS.muted }}>
-            No messages yet. Say hello to get the conversation started.
+            {t('chat.empty')}
           </p>
         )}
 
@@ -267,7 +285,8 @@ export default function BookingChat({ bookingId }: { bookingId: string }) {
                   color: COLORS.muted,
                 }}
               >
-                {mine ? 'You' : m.sender_name || 'Guest'} · {fmtTime(m.created_at)}
+                {mine ? t('chat.you') : m.sender_name || t('chat.guest')} ·{' '}
+                {fmtTime(m.created_at)}
               </span>
             </div>
           )
@@ -286,7 +305,7 @@ export default function BookingChat({ bookingId }: { bookingId: string }) {
               setDraft(e.target.value)
               setSendError(null)
             }}
-            placeholder="Write a message…"
+            placeholder={t('chat.placeholder')}
             style={{
               flex: 1,
               minWidth: 0,
@@ -318,7 +337,7 @@ export default function BookingChat({ bookingId }: { bookingId: string }) {
               whiteSpace: 'nowrap',
             }}
           >
-            {sending ? 'Sending…' : 'Send'}
+            {sending ? t('chat.sending') : t('chat.send')}
           </button>
         </form>
       )}

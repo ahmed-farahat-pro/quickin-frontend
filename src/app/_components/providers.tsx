@@ -5,6 +5,7 @@
 // powers i18n + RTL across the app.
 import { LanguageProvider } from '@/lib/i18n/language-provider'
 import { CurrencyProvider } from '@/lib/currency/currency-provider'
+import { ToastProvider } from './toast'
 import AIConcierge from './ai-concierge'
 
 export default function Providers({ children }: { children: React.ReactNode }) {
@@ -13,9 +14,12 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       {/* Multi-currency DISPLAY layer (EGP base + USD/EUR/GBP/SAR/AED). Converts
           shown prices only; bookings/payments always stay EGP. */}
       <CurrencyProvider>
-        {children}
-        {/* Floating AI travel-concierge button + chat, available site-wide. */}
-        <AIConcierge />
+        {/* App-wide transient toasts (wishlist feedback, chat errors, …). */}
+        <ToastProvider>
+          {children}
+          {/* Floating AI travel-concierge button + chat, available site-wide. */}
+          <AIConcierge />
+        </ToastProvider>
       </CurrencyProvider>
     </LanguageProvider>
   )

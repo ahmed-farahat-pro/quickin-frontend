@@ -71,56 +71,101 @@ export function HostedBy({
     }
   }, [hostId])
 
+  // Avatar (gold-gradient initial) + the "Hosted by / {name}" lines. When a
+  // hostId is known these are wrapped in a Link to the host's public profile;
+  // otherwise they render as static markup.
+  const avatar = (
+    <span
+      aria-hidden="true"
+      style={{
+        flex: '0 0 auto',
+        width: 52,
+        height: 52,
+        borderRadius: 999,
+        background: GRAD_GOLD,
+        color: '#fff',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 22,
+        fontWeight: 800,
+        boxShadow: '0 8px 20px rgba(176,122,42,0.35)',
+      }}
+    >
+      {initialOf(name)}
+    </span>
+  )
+
+  const nameLines = (
+    <div style={{ minWidth: 0 }}>
+      <p style={{ margin: 0, fontSize: 13, color: COLORS.muted }}>
+        {t('host.hostedByLabel')}
+      </p>
+      <p
+        style={{
+          margin: '2px 0 0',
+          fontSize: 19,
+          fontWeight: 700,
+          color: COLORS.ink,
+        }}
+      >
+        {display}
+      </p>
+      {hostId && (
+        <span
+          style={{
+            display: 'inline-block',
+            marginTop: 3,
+            fontSize: 13,
+            fontWeight: 700,
+            color: COLORS.gold,
+          }}
+        >
+          {t('host.viewProfile')} →
+        </span>
+      )}
+    </div>
+  )
+
   return (
     <div
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 14,
         marginTop: 30,
         paddingTop: 24,
         borderTop: `1px solid rgba(42,34,32,0.10)`,
       }}
     >
-      <span
-        aria-hidden="true"
-        style={{
-          flex: '0 0 auto',
-          width: 52,
-          height: 52,
-          borderRadius: 999,
-          background: GRAD_GOLD,
-          color: '#fff',
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 22,
-          fontWeight: 800,
-          boxShadow: '0 8px 20px rgba(176,122,42,0.35)',
-        }}
-      >
-        {initialOf(name)}
-      </span>
-      <div style={{ minWidth: 0 }}>
-        <p style={{ margin: 0, fontSize: 13, color: COLORS.muted }}>
-          {t('host.hostedByLabel')}
-        </p>
-        <p
-          style={{
-            margin: '2px 0 0',
-            fontSize: 19,
-            fontWeight: 700,
-            color: COLORS.ink,
-          }}
-        >
-          {display}
-        </p>
-        <TrustBadges
-          badges={badges}
-          verifiedOverride={!!hostVerified}
-          style={{ marginTop: 8 }}
-        />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        {hostId ? (
+          <a
+            href={`/host-profile/${encodeURIComponent(hostId)}`}
+            className="qk-pop"
+            aria-label={t('host.viewProfileOf', { name: display })}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              textDecoration: 'none',
+              color: 'inherit',
+              cursor: 'pointer',
+              borderRadius: 16,
+            }}
+          >
+            {avatar}
+            {nameLines}
+          </a>
+        ) : (
+          <>
+            {avatar}
+            {nameLines}
+          </>
+        )}
       </div>
+      <TrustBadges
+        badges={badges}
+        verifiedOverride={!!hostVerified}
+        style={{ marginTop: 12 }}
+      />
     </div>
   )
 }

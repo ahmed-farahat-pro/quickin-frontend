@@ -142,6 +142,28 @@ export const messages: Record<Lang, Dict> = {
     'host.hostedByLabel': 'Hosted by',
     'host.aHost': 'A QuickIn host',
     'host.moreFromHost': 'More from this host',
+    // ---- Host profile page -----------------------------------------------
+    'host.viewProfile': 'View profile',
+    'host.viewProfileOf': "View {name}'s profile",
+    'host.back': 'Back',
+    'host.eyebrow': 'QuickIn host',
+    'host.loading': 'Loading host profile…',
+    'host.memberSince': 'Member since {date}',
+    'host.completedStayOne': '{count} completed stay',
+    'host.completedStayMany': '{count} completed stays',
+    'host.reviewsTitle': 'Reviews',
+    'host.reviewsTitleOne': '{count} review',
+    'host.reviewsTitleMany': '{count} reviews',
+    'host.noReviews': 'No reviews yet for this host.',
+    'host.reviewOn': 'Stayed at {title}',
+    'host.listingsTitleOne': '{count} listing',
+    'host.listingsTitleMany': '{count} listings',
+    'host.notFoundTitle': 'Host not found',
+    'host.notFoundBody': "We couldn't find this host. They may no longer be on QuickIn.",
+    'host.browseStays': 'Browse stays',
+    'host.errorTitle': 'Something went wrong',
+    'host.errorBody': "We couldn't load this host profile. Please try again.",
+    'host.tryAgain': 'Try again',
 
     // ---- Reserve panel ----------------------------------------------------
     'reserve.pricesInEgp': 'Prices in EGP',
@@ -251,6 +273,11 @@ export const messages: Record<Lang, Dict> = {
     'wishlist.emptyTitle': 'Nothing saved yet',
     'wishlist.emptyBody': 'Tap the heart on any stay or experience to save it here.',
     'wishlist.browseStays': 'Browse stays',
+    // Heart-toggle feedback (toasts)
+    'wishlist.added': 'Added to wishlist',
+    'wishlist.removed': 'Removed from wishlist',
+    'wishlist.actionFailed': "Couldn't update your wishlist. Please try again.",
+    'wishlist.signInToSave': 'Sign in to save to your wishlist.',
 
     // ---- Share ------------------------------------------------------------
     'share.label': 'Share',
@@ -299,6 +326,19 @@ export const messages: Record<Lang, Dict> = {
     'reviews.guestRating': 'Guest rating',
     'reviews.noGuestReviews': 'No reviews yet.',
     'reviews.anonymousHost': 'A host',
+
+    // ---- Booking chat (host ↔ guest) -------------------------------------
+    'chat.loading': 'Loading messages…',
+    'chat.signIn': 'Sign in to view and send messages.',
+    'chat.noAccess': 'You don’t have access to this conversation.',
+    'chat.loadError': 'Couldn’t load messages. Retrying…',
+    'chat.empty': 'No messages yet. Say hello to get the conversation started.',
+    'chat.you': 'You',
+    'chat.guest': 'Guest',
+    'chat.placeholder': 'Write a message…',
+    'chat.send': 'Send',
+    'chat.sending': 'Sending…',
+    'chat.sendError': 'Couldn’t send your message. Please try again.',
 
     // ---- Auth: shared -----------------------------------------------------
     'auth.or': 'or',
@@ -829,6 +869,28 @@ export const messages: Record<Lang, Dict> = {
     'host.hostedByLabel': 'يستضيفك',
     'host.aHost': 'مضيف لدى QuickIn',
     'host.moreFromHost': 'المزيد من هذا المضيف',
+    // ---- Host profile page -----------------------------------------------
+    'host.viewProfile': 'عرض الملف الشخصي',
+    'host.viewProfileOf': 'عرض الملف الشخصي لـ {name}',
+    'host.back': 'رجوع',
+    'host.eyebrow': 'مضيف على كويك إن',
+    'host.loading': 'جارٍ تحميل ملف المضيف…',
+    'host.memberSince': 'عضو منذ {date}',
+    'host.completedStayOne': 'إقامة مكتملة واحدة',
+    'host.completedStayMany': '{count} إقامات مكتملة',
+    'host.reviewsTitle': 'التقييمات',
+    'host.reviewsTitleOne': 'تقييم واحد',
+    'host.reviewsTitleMany': '{count} تقييمات',
+    'host.noReviews': 'لا توجد تقييمات لهذا المضيف بعد.',
+    'host.reviewOn': 'أقام في {title}',
+    'host.listingsTitleOne': 'إقامة واحدة',
+    'host.listingsTitleMany': '{count} إقامات',
+    'host.notFoundTitle': 'المضيف غير موجود',
+    'host.notFoundBody': 'تعذّر العثور على هذا المضيف. ربما لم يعد على كويك إن.',
+    'host.browseStays': 'تصفّح الإقامات',
+    'host.errorTitle': 'حدث خطأ ما',
+    'host.errorBody': 'تعذّر تحميل ملف هذا المضيف. حاول مرة أخرى.',
+    'host.tryAgain': 'حاول مرة أخرى',
 
     // ---- Reserve panel ----------------------------------------------------
     'reserve.pricesInEgp': 'الأسعار بالجنيه المصري',
@@ -938,6 +1000,11 @@ export const messages: Record<Lang, Dict> = {
     'wishlist.emptyTitle': 'لا توجد عناصر محفوظة بعد',
     'wishlist.emptyBody': 'اضغط على القلب في أي إقامة أو تجربة لحفظها هنا.',
     'wishlist.browseStays': 'تصفّح الإقامات',
+    // Heart-toggle feedback (toasts)
+    'wishlist.added': 'تمت الإضافة إلى المفضلة',
+    'wishlist.removed': 'تمت الإزالة من المفضلة',
+    'wishlist.actionFailed': 'تعذّر تحديث مفضلتك. حاول مرة أخرى.',
+    'wishlist.signInToSave': 'سجّل الدخول لحفظها في مفضلتك.',
 
     // ---- Share ------------------------------------------------------------
     'share.label': 'مشاركة',
@@ -986,6 +1053,19 @@ export const messages: Record<Lang, Dict> = {
     'reviews.guestRating': 'تقييم الضيف',
     'reviews.noGuestReviews': 'لا توجد تقييمات بعد.',
     'reviews.anonymousHost': 'مضيف',
+
+    // ---- Booking chat (host ↔ guest) -------------------------------------
+    'chat.loading': 'جارٍ تحميل الرسائل…',
+    'chat.signIn': 'سجّل الدخول لعرض الرسائل وإرسالها.',
+    'chat.noAccess': 'ليس لديك صلاحية الوصول إلى هذه المحادثة.',
+    'chat.loadError': 'تعذّر تحميل الرسائل. جارٍ إعادة المحاولة…',
+    'chat.empty': 'لا توجد رسائل بعد. ابدأ المحادثة بإلقاء التحية.',
+    'chat.you': 'أنت',
+    'chat.guest': 'ضيف',
+    'chat.placeholder': 'اكتب رسالة…',
+    'chat.send': 'إرسال',
+    'chat.sending': 'جارٍ الإرسال…',
+    'chat.sendError': 'تعذّر إرسال رسالتك. حاول مرة أخرى.',
 
     // ---- Auth: shared -----------------------------------------------------
     'auth.or': 'أو',

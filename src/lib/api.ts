@@ -733,6 +733,59 @@ export async function getPublicProfile(
   }
 }
 
+// One review ABOUT a host's listings, as shown on the public host profile
+// (GET /api/local/users/:id/reviews). Aggregated across all of the host's
+// listings; each row carries which listing it was left on so the profile can
+// label it. `photos` is a list (≤6) of data:/http image URLs; may be empty.
+export interface HostReview {
+  id: string
+  rating: number
+  comment: string | null
+  photos: string[]
+  created_at: string
+  reviewer_name: string | null
+  listing_id: string
+  listing_title: string | null
+}
+
+// Fetch the reviews left across a host's listings (no auth). Returns [] on any
+// non-2xx / parse error so the host profile degrades gracefully.
+export async function getHostReviews(
+  userId: string,
+  signal?: AbortSignal
+): Promise<HostReview[]> {
+  try {
+    const res = await fetch(
+      `${API_URL}/api/local/users/${encodeURIComponent(userId)}/reviews`,
+      { signal }
+    )
+    if (!res.ok) return []
+    const data = await res.json()
+    return Array.isArray(data) ? (data as HostReview[]) : []
+  } catch {
+    return []
+  }
+}
+
+// Fetch a host's published listings (GET /api/local/listings?host=:id). Same
+// shape as the normal listings array. Returns [] on any non-2xx / parse error.
+export async function getHostListings(
+  hostId: string,
+  signal?: AbortSignal
+): Promise<Listing[]> {
+  try {
+    const res = await fetch(
+      `${API_URL}/api/local/listings?host=${encodeURIComponent(hostId)}`,
+      { signal }
+    )
+    if (!res.ok) return []
+    const data = await res.json()
+    return Array.isArray(data) ? (data as Listing[]) : []
+  } catch {
+    return []
+  }
+}
+
 // ---- Trust & safety: reporting ----------------------------------------------
 
 // What can be reported. Drives POST /api/local/reports { target_type }.
