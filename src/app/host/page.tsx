@@ -10,6 +10,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import {
   API_URL,
+  aiWriteDescription,
+  getHostAnalytics,
   getReviewableGuests,
   getStoredUser,
   getToken,
@@ -19,6 +21,7 @@ import {
   updateListingPolicy,
   type ApprovalStatus,
   type CancellationPolicy,
+  type HostAnalytics,
   type Listing,
   type HostBooking,
   type HostEarnings,
@@ -327,6 +330,12 @@ export default function HostPage() {
   const [earningsLoading, setEarningsLoading] = useState(true)
   const [earningsError, setEarningsError] = useState(false)
 
+  // Host analytics — bookings, revenue, rating, conversion, monthly trend, top
+  // listings (GET /api/local/host/analytics).
+  const [analytics, setAnalytics] = useState<HostAnalytics | null>(null)
+  const [analyticsLoading, setAnalyticsLoading] = useState(true)
+  const [analyticsError, setAnalyticsError] = useState(false)
+
   // Add-listing wizard
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [step, setStep] = useState(0) // 0..6
@@ -336,6 +345,13 @@ export default function HostPage() {
   // Hidden file input for the wizard's "Ownership" step + a localized read error.
   const ownershipInputRef = useRef<HTMLInputElement>(null)
   const [ownershipError, setOwnershipError] = useState<string | null>(null)
+
+  // AI listing-description writer (wizard "Basics" step). Tracks the in-flight
+  // request, a localized error, and whether the last fill came from a real model
+  // (vs the backend's template fallback) so we can badge it.
+  const [aiWriting, setAiWriting] = useState(false)
+  const [aiWriteError, setAiWriteError] = useState<string | null>(null)
+  const [aiWritten, setAiWritten] = useState<boolean | null>(null)
 
   // Parsed coordinate for the map pin-picker, derived from the lat/lng text
   // inputs so the marker, the "Selected:" caption and the POST body stay in
@@ -536,6 +552,23 @@ export default function HostPage() {
     }
   }, [])
 
+  const loadAnalytics = useCallback(async () => {
+    const token = getToken()
+    if (!token) return
+    setAnalyticsLoading(true)
+    setAnalyticsError(false)
+    try {
+      const data = await getHostAnalytics(token)
+      if (!data) {
+        setAnalyticsError(true)
+        return
+      }
+      setAnalytics(data)
+    } finally {
+      setAnalyticsLoading(false)
+    }
+  }, [])
+
   // Drop a stay from the "guests to review" list once its review lands.
   const onGuestReviewed = useCallback((bookingId: string) => {
     setReviewableGuests((prev) => prev.filter((g) => g.booking_id !== bookingId))
@@ -567,6 +600,7 @@ export default function HostPage() {
       loadServiceRequests()
       loadReviewableGuests()
       loadEarnings()
+      loadAnalytics()
     }
 
     const role = (user.role || '').toLowerCase()
@@ -606,7 +640,7 @@ export default function HostPage() {
     return () => {
       cancelled = true
     }
-  }, [loadListings, loadBookings, loadServices, loadServiceRequests, loadReviewableGuests, loadEarnings])
+  }, [loadListings, loadBookings, loadServices, loadServiceRequests, loadReviewableGuests, loadEarnings, loadAnalytics])
 
   function patch(p: Partial<FormState>) {
     setForm((prev) => ({ ...prev, ...p }))
@@ -636,6 +670,48 @@ export default function HostPage() {
       patch({ ownership_doc: dataUrl })
     } catch {
       setOwnershipError(t('approval.readError'))
+    }
+  }
+
+  // Generate a listing description from the facts the host has entered so far
+  // (POST /api/local/ai/listing-description). Fills the description textarea with
+  // the result and badges whether a real model or the template fallback wrote it.
+  // The host can freely edit the text afterwards.
+  async function handleWriteWithAI() {
+    const token = getToken()
+    if (!token) {
+      setGate({ kind: 'anon' })
+      return
+    }
+    if (!form.title.trim()) {
+      setAiWriteError(t('ai.writeNeedTitle'))
+      return
+    }
+    setAiWriting(true)
+    setAiWriteError(null)
+    try {
+      const { description, ai } = await aiWriteDescription(token, {
+        title: form.title.trim(),
+        location: form.location.trim() || undefined,
+        region: form.region || undefined,
+        propertyType: form.property_type || undefined,
+        bedrooms: Number(form.bedrooms) || undefined,
+        maxGuests: Number(form.max_guests) || undefined,
+        amenities: form.amenities,
+        notes: form.description.trim() || undefined,
+      })
+      if (description.trim()) {
+        // Use the raw setter (not patch) so we don't clear the AI badge we set
+        // immediately below — patch() resets form-level messages.
+        setForm((prev) => ({ ...prev, description }))
+        setAiWritten(ai)
+      } else {
+        setAiWriteError(t('ai.writeError'))
+      }
+    } catch {
+      setAiWriteError(t('ai.writeError'))
+    } finally {
+      setAiWriting(false)
     }
   }
 
@@ -950,6 +1026,14 @@ export default function HostPage() {
         Publish a stay, see your listings, and respond to reservation requests.
       </p>
 
+      {/* Analytics — bookings, revenue, rating, conversion, trend, top listings */}
+      <AnalyticsPanel
+        analytics={analytics}
+        loading={analyticsLoading}
+        error={analyticsError}
+        onRetry={loadAnalytics}
+      />
+
       {/* Earnings & payouts (mock) -------------------------------------------- */}
       <EarningsPanel
         earnings={earnings}
@@ -1062,14 +1146,103 @@ export default function HostPage() {
                   ))}
                 </select>
               </Field>
-              <Field label="Description">
+              <div>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                    flexWrap: 'wrap',
+                    marginBottom: 6,
+                  }}
+                >
+                  <span style={{ ...labelStyle, marginBottom: 0 }}>
+                    Description
+                  </span>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    {aiWritten !== null && !aiWriting && (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 5,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          letterSpacing: '0.04em',
+                          textTransform: 'uppercase',
+                          padding: '3px 9px',
+                          borderRadius: 999,
+                          color: aiWritten ? COLORS.gold : COLORS.muted,
+                          background: aiWritten
+                            ? 'rgba(176,122,42,0.14)'
+                            : 'rgba(42,34,32,0.06)',
+                        }}
+                      >
+                        {aiWritten ? t('ai.aiBadge') : t('ai.templateBadge')}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleWriteWithAI}
+                      disabled={aiWriting}
+                      className={aiWriting ? undefined : 'qk-press'}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 7,
+                        padding: '8px 16px',
+                        fontSize: 13.5,
+                        fontWeight: 700,
+                        fontFamily: FONT,
+                        color: '#fff',
+                        background: GRAD_BURGUNDY,
+                        border: 'none',
+                        borderRadius: 999,
+                        cursor: aiWriting ? 'wait' : 'pointer',
+                        opacity: aiWriting ? 0.7 : 1,
+                        boxShadow: aiWriting
+                          ? 'none'
+                          : '0 8px 20px rgba(91,15,22,0.22)',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {aiWriting
+                        ? t('ai.writing')
+                        : form.description.trim()
+                          ? t('ai.rewriteWithAI')
+                          : t('ai.writeWithAI')}
+                    </button>
+                  </div>
+                </div>
                 <textarea
                   style={{ ...inputStyle, minHeight: 110, resize: 'vertical' }}
                   value={form.description}
-                  onChange={(e) => patch({ description: e.target.value })}
+                  onChange={(e) => {
+                    patch({ description: e.target.value })
+                    // The host is editing — clear the AI/draft badge.
+                    setAiWritten(null)
+                  }}
                   placeholder="What makes this place special?"
                 />
-              </Field>
+                <p
+                  style={{
+                    margin: '6px 0 0',
+                    fontSize: 12.5,
+                    color: aiWriteError ? COLORS.burgundy : COLORS.muted,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {aiWriteError || t('ai.writeHint')}
+                </p>
+              </div>
             </div>
           )}
 
@@ -2616,6 +2789,373 @@ export default function HostPage() {
 // + a per-booking breakdown. All amounts come from the backend in EGP and are
 // rendered through the currency formatter so they follow the chosen display
 // currency. Lives at the top of the host dashboard (anchor #earnings).
+// ---- Analytics dashboard ----------------------------------------------------
+
+// Format a "YYYY-MM" month key into a short localized label (e.g. "Mar 2026").
+function fmtMonthLabel(month: string, locale: string): string {
+  const [y, m] = month.split('-').map((p) => Number(p))
+  if (!y || !m) return month
+  const date = new Date(y, m - 1, 1)
+  if (Number.isNaN(date.getTime())) return month
+  return date.toLocaleDateString(locale, { month: 'short', year: 'numeric' })
+}
+
+// The host analytics section: stat cards (listings, total/paid bookings,
+// revenue, avg rating, conversion %), a monthly revenue/bookings trend (a bar
+// list — no chart lib), and a "Top listings" leaderboard.
+function AnalyticsPanel({
+  analytics,
+  loading,
+  error,
+  onRetry,
+}: {
+  analytics: HostAnalytics | null
+  loading: boolean
+  error: boolean
+  onRetry: () => void
+}) {
+  const { t, lang } = useLanguage()
+  const { format } = useCurrency()
+  const locale = lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US'
+
+  // Has the host actually done anything yet? When everything is zero/empty we
+  // show the friendly "no data" note instead of a wall of zeros.
+  const hasData =
+    !!analytics &&
+    (analytics.totalBookings > 0 ||
+      analytics.revenue > 0 ||
+      analytics.listings > 0 ||
+      analytics.byMonth.length > 0)
+
+  // Largest monthly revenue → scales the trend bars (fallback to bookings, then
+  // to 1 so a divide-by-zero never produces NaN widths).
+  const maxMonthRevenue = analytics
+    ? Math.max(0, ...analytics.byMonth.map((m) => m.revenue))
+    : 0
+  const maxMonthBookings = analytics
+    ? Math.max(0, ...analytics.byMonth.map((m) => m.bookings))
+    : 0
+  const trendBasis =
+    maxMonthRevenue > 0 ? 'revenue' : maxMonthBookings > 0 ? 'bookings' : 'none'
+
+  const maxTopRevenue = analytics
+    ? Math.max(0, ...analytics.topListings.map((l) => l.revenue))
+    : 0
+
+  return (
+    <Section title={t('analytics.title')} id="analytics">
+      <p style={{ margin: '0 0 18px', fontSize: 14, color: COLORS.muted }}>
+        {t('analytics.subtitle')}
+      </p>
+
+      {loading ? (
+        <Muted>{t('money.loading')}</Muted>
+      ) : error || !analytics ? (
+        <RetryRow label={t('analytics.error')} onRetry={onRetry} />
+      ) : !hasData ? (
+        <Muted>{t('analytics.noData')}</Muted>
+      ) : (
+        <>
+          {/* Stat cards */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+              gap: 14,
+            }}
+          >
+            <StatCard
+              label={t('analytics.revenue')}
+              value={format(analytics.revenue)}
+              accent
+            />
+            <StatCard
+              label={t('analytics.bookings')}
+              value={String(analytics.totalBookings)}
+            />
+            <StatCard
+              label={t('analytics.paidBookings')}
+              value={String(analytics.paidBookings)}
+            />
+            <StatCard
+              label={t('analytics.listings')}
+              value={String(analytics.listings)}
+            />
+            <StatCard
+              label={t('analytics.avgRating')}
+              value={
+                analytics.reviewCount > 0
+                  ? `★ ${analytics.avgRating.toFixed(1)}`
+                  : '—'
+              }
+            />
+            <StatCard
+              label={t('analytics.conversion')}
+              value={`${Math.round(analytics.conversionRate * 100)}%`}
+            />
+          </div>
+
+          {analytics.reviewCount > 0 && (
+            <p style={{ margin: '14px 0 0', fontSize: 12.5, color: COLORS.muted }}>
+              {t('analytics.reviews', { count: analytics.reviewCount })}
+            </p>
+          )}
+
+          {/* Monthly trend — bar list sized by revenue (or bookings) */}
+          {analytics.byMonth.length > 0 && trendBasis !== 'none' && (
+            <>
+              <h3
+                style={{
+                  margin: '24px 0 4px',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: COLORS.ink,
+                }}
+              >
+                {t('analytics.monthlyTrend')}
+              </h3>
+              <p style={{ margin: '0 0 12px', fontSize: 12, color: COLORS.muted }}>
+                {trendBasis === 'revenue'
+                  ? t('analytics.byRevenue')
+                  : t('analytics.bookings')}
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {analytics.byMonth.map((m) => {
+                  const basisMax =
+                    trendBasis === 'revenue' ? maxMonthRevenue : maxMonthBookings
+                  const basisVal =
+                    trendBasis === 'revenue' ? m.revenue : m.bookings
+                  const pct =
+                    basisMax > 0
+                      ? Math.max(4, Math.round((basisVal / basisMax) * 100))
+                      : 0
+                  return (
+                    <div
+                      key={m.month}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '92px 1fr auto',
+                        alignItems: 'center',
+                        gap: 12,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: 600,
+                          color: COLORS.muted,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {fmtMonthLabel(m.month, locale)}
+                      </span>
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          position: 'relative',
+                          height: 14,
+                          borderRadius: 999,
+                          background: COLORS.tan,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <span
+                          style={{
+                            position: 'absolute',
+                            insetInlineStart: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: `${pct}%`,
+                            borderRadius: 999,
+                            background: GRAD_BURGUNDY,
+                          }}
+                        />
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: 700,
+                          color: COLORS.ink,
+                          textAlign: 'end',
+                          whiteSpace: 'nowrap',
+                          fontVariantNumeric: 'tabular-nums',
+                        }}
+                      >
+                        {format(m.revenue)}
+                        <span
+                          style={{
+                            color: COLORS.muted,
+                            fontWeight: 600,
+                            marginInlineStart: 6,
+                          }}
+                        >
+                          ·{' '}
+                          {t(
+                            m.bookings === 1
+                              ? 'analytics.bookingShort'
+                              : 'analytics.bookingsShort',
+                            { count: m.bookings }
+                          )}
+                        </span>
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
+
+          {/* Top listings leaderboard */}
+          {analytics.topListings.length > 0 && (
+            <>
+              <h3
+                style={{
+                  margin: '24px 0 12px',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: COLORS.ink,
+                }}
+              >
+                {t('analytics.topListings')}
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {analytics.topListings.map((l, i) => {
+                  const pct =
+                    maxTopRevenue > 0
+                      ? Math.max(4, Math.round((l.revenue / maxTopRevenue) * 100))
+                      : 0
+                  return (
+                    <div
+                      key={`${l.title}-${i}`}
+                      style={{
+                        background: COLORS.cream,
+                        border: '1px solid rgba(42,34,32,0.06)',
+                        borderRadius: 16,
+                        padding: '12px 16px',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 12,
+                        }}
+                      >
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 9,
+                            minWidth: 0,
+                          }}
+                        >
+                          <span
+                            aria-hidden="true"
+                            style={{
+                              flex: '0 0 auto',
+                              width: 22,
+                              height: 22,
+                              borderRadius: '50%',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 12,
+                              fontWeight: 800,
+                              color: '#fff',
+                              background:
+                                i === 0
+                                  ? 'linear-gradient(135deg,#B07A2A,#d8a55a)'
+                                  : COLORS.burgundy,
+                            }}
+                          >
+                            {i + 1}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 14,
+                              fontWeight: 700,
+                              color: COLORS.ink,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {l.title}
+                          </span>
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 14,
+                            fontWeight: 800,
+                            color: COLORS.burgundy,
+                            whiteSpace: 'nowrap',
+                            flex: '0 0 auto',
+                          }}
+                        >
+                          {format(l.revenue)}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr auto',
+                          alignItems: 'center',
+                          gap: 12,
+                          marginTop: 8,
+                        }}
+                      >
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            position: 'relative',
+                            height: 10,
+                            borderRadius: 999,
+                            background: COLORS.tan,
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <span
+                            style={{
+                              position: 'absolute',
+                              insetInlineStart: 0,
+                              top: 0,
+                              bottom: 0,
+                              width: `${pct}%`,
+                              borderRadius: 999,
+                              background:
+                                'linear-gradient(135deg,#B07A2A,#d8a55a)',
+                            }}
+                          />
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: COLORS.muted,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {t(
+                            l.bookings === 1
+                              ? 'analytics.bookingShort'
+                              : 'analytics.bookingsShort',
+                            { count: l.bookings }
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </Section>
+  )
+}
+
 function EarningsPanel({
   earnings,
   loading,

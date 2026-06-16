@@ -1205,3 +1205,171 @@ export function getToken(): string | null {
     return null
   }
 }
+
+// ---- AI: listing-description writer -----------------------------------------
+
+// The listing facts the AI writer turns into a polished description. Mirrors the
+// POST /api/local/ai/listing-description body. Everything is optional except the
+// title (the backend has a template fallback when no AI key is configured).
+export interface AiDescriptionInput {
+  title: string
+  location?: string
+  region?: string
+  propertyType?: string
+  bedrooms?: number
+  maxGuests?: number
+  amenities?: string[]
+  notes?: string
+}
+
+// Ask the AI to write a listing description from the given facts. Bearer = the
+// host. Resolves to the generated text (`ai` is true when a real model wrote it,
+// false when the template fallback did). Throws on a non-2xx response so the
+// caller can surface an error and let the host keep their own text.
+export async function aiWriteDescription(
+  token: string,
+  input: AiDescriptionInput,
+  signal?: AbortSignal
+): Promise<{ description: string; ai: boolean }> {
+  const res = await fetch(`${API_URL}/api/local/ai/listing-description`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + token,
+    },
+    body: JSON.stringify(input),
+    signal,
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error((data && data.error) || `Request failed: ${res.status}`)
+  }
+  const data = await res.json().catch(() => ({}))
+  return {
+    description: String((data && data.description) ?? ''),
+    ai: Boolean(data && data.ai),
+  }
+}
+
+// ---- AI: natural-language search --------------------------------------------
+
+// The structured filters the AI parsed out of a plain-language query. Every
+// field is optional (only the ones the model recognized are present). This is a
+// subset of ListingFilters with numeric guests/price (the explore filters keep
+// them as strings, so the search box maps them when wiring into that state).
+export interface AiSearchFilters {
+  q?: string
+  region?: string
+  guests?: number
+  minPrice?: number
+  maxPrice?: number
+  propertyType?: string
+  amenities?: string[]
+}
+
+// The AI search result: the parsed `filters` (rendered as chips), the matching
+// `listings` (same shape as GET /api/local/listings), and whether a real model
+// did the parsing (`ai`). Mirrors POST /api/local/ai/search.
+export interface AiSearchResult {
+  filters: AiSearchFilters
+  listings: Listing[]
+  ai: boolean
+}
+
+// Run a natural-language search ("beachfront villa in El Gouna for 6 under
+// 6000"). Public — no auth. `signal` lets callers abort a stale request. Throws
+// on a non-2xx response so the caller can show an error state.
+export async function aiSearch(
+  query: string,
+  signal?: AbortSignal
+): Promise<AiSearchResult> {
+  const res = await fetch(`${API_URL}/api/local/ai/search`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query }),
+    signal,
+  })
+  if (!res.ok) throw new Error(`Request failed: ${res.status}`)
+  const data = await res.json().catch(() => ({}))
+  const filters =
+    data && typeof data.filters === 'object' && data.filters
+      ? (data.filters as AiSearchFilters)
+      : {}
+  return {
+    filters,
+    listings: Array.isArray(data?.listings) ? (data.listings as Listing[]) : [],
+    ai: Boolean(data && data.ai),
+  }
+}
+
+// ---- Host analytics ---------------------------------------------------------
+
+// One month's totals in the analytics trend (`month` is "YYYY-MM"). `bookings`
+// is paid bookings that month; `revenue` is host-net EGP for that month.
+export interface AnalyticsMonth {
+  month: string
+  bookings: number
+  revenue: number
+}
+
+// One of the host's best-performing listings (by paid bookings / net revenue).
+export interface AnalyticsTopListing {
+  title: string
+  bookings: number
+  revenue: number
+}
+
+// The host analytics dashboard (GET /api/local/host/analytics, Bearer = host).
+// `revenue`/`avgRating` are lifetime; `conversionRate` is paid ÷ total bookings
+// (0..1); `byMonth` powers the trend; `topListings` the leaderboard. All money
+// is host-net EGP.
+export interface HostAnalytics {
+  currency: string
+  listings: number
+  totalBookings: number
+  paidBookings: number
+  cancelledBookings: number
+  revenue: number
+  avgRating: number
+  reviewCount: number
+  conversionRate: number
+  byMonth: AnalyticsMonth[]
+  topListings: AnalyticsTopListing[]
+}
+
+// Fetch the signed-in host's analytics. Bearer = host. Returns null on any
+// non-2xx / parse error so the dashboard can degrade gracefully (retry state).
+export async function getHostAnalytics(
+  token: string,
+  signal?: AbortSignal
+): Promise<HostAnalytics | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/local/host/analytics`, {
+      headers: { Authorization: 'Bearer ' + token },
+      cache: 'no-store',
+      signal,
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    if (!data || typeof data !== 'object') return null
+    return {
+      currency: String(data.currency ?? 'EGP'),
+      listings: Number(data.listings ?? 0),
+      totalBookings: Number(data.totalBookings ?? 0),
+      paidBookings: Number(data.paidBookings ?? 0),
+      cancelledBookings: Number(data.cancelledBookings ?? 0),
+      revenue: Number(data.revenue ?? 0),
+      avgRating: Number(data.avgRating ?? 0),
+      reviewCount: Number(data.reviewCount ?? 0),
+      conversionRate: Number(data.conversionRate ?? 0),
+      byMonth: Array.isArray(data.byMonth)
+        ? (data.byMonth as AnalyticsMonth[])
+        : [],
+      topListings: Array.isArray(data.topListings)
+        ? (data.topListings as AnalyticsTopListing[])
+        : [],
+    }
+  } catch {
+    return null
+  }
+}

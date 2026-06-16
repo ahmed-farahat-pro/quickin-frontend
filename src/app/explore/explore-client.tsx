@@ -8,8 +8,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import {
   API_URL,
+  aiSearch,
   buildListingQuery,
   getListings,
+  type AiSearchFilters,
   type ListingFilters,
   type Listing,
 } from '@/lib/api'
@@ -161,6 +163,19 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
   const [searchError, setSearchError] = useState(false)
   const [view, setView] = useState<View>('list')
 
+  // Natural-language ("Ask AI") search. Independent of the structured filters
+  // above: the host types a sentence, we POST it to /api/local/ai/search, then
+  // render the parsed filters as chips + the matching listings. `aiActive` flips
+  // the results section over to the AI result set; "Apply these filters" maps the
+  // parsed filters back into the structured state and returns to normal mode.
+  const [aiQuery, setAiQuery] = useState('')
+  const [aiSearching, setAiSearching] = useState(false)
+  const [aiError, setAiError] = useState(false)
+  const [aiActive, setAiActive] = useState(false)
+  const [aiFilters, setAiFilters] = useState<AiSearchFilters>({})
+  const [aiListings, setAiListings] = useState<Listing[]>([])
+  const aiAbortRef = useRef<AbortController | null>(null)
+
   // Canonical regions for the chip row (GET /api/local/regions). Fetched once on
   // mount; the row stays hidden until it loads (or silently if the call fails).
   const [regions, setRegions] = useState<RegionCount[]>([])
@@ -279,11 +294,83 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
     runSearch(filters)
   }, [filters, runSearch])
 
+  // Run the natural-language search. POSTs the typed sentence to the AI endpoint,
+  // then shows the parsed filters + matching listings. Non-fatal on error.
+  const runAiSearch = useCallback(async () => {
+    const query = aiQuery.trim()
+    if (!query) return
+    aiAbortRef.current?.abort()
+    const controller = new AbortController()
+    aiAbortRef.current = controller
+
+    setAiSearching(true)
+    setAiError(false)
+    try {
+      const result = await aiSearch(query, controller.signal)
+      if (controller.signal.aborted) return
+      setAiFilters(result.filters)
+      setAiListings(result.listings)
+      setAiActive(true)
+    } catch (err) {
+      if ((err as Error)?.name !== 'AbortError') {
+        console.error('AI search failed:', err)
+        setAiError(true)
+      }
+    } finally {
+      if (aiAbortRef.current === controller) {
+        setAiSearching(false)
+        aiAbortRef.current = null
+      }
+    }
+  }, [aiQuery])
+
+  // Exit AI mode and drop the AI result set (back to structured results).
+  const clearAiSearch = useCallback(() => {
+    aiAbortRef.current?.abort()
+    setAiActive(false)
+    setAiError(false)
+    setAiFilters({})
+    setAiListings([])
+    setAiQuery('')
+  }, [])
+
+  // Map the AI-parsed filters into the structured filter state and re-run the
+  // normal search, so the AI result becomes a regular, refinable filter set.
+  const applyAiFilters = useCallback(() => {
+    const next: Filters = {
+      ...EMPTY,
+      location: aiFilters.q?.trim() || '',
+      region: aiFilters.region?.trim() || '',
+      guests:
+        typeof aiFilters.guests === 'number' && aiFilters.guests > 0
+          ? String(aiFilters.guests)
+          : '',
+      minPrice:
+        typeof aiFilters.minPrice === 'number' && aiFilters.minPrice > 0
+          ? String(aiFilters.minPrice)
+          : '',
+      maxPrice:
+        typeof aiFilters.maxPrice === 'number' && aiFilters.maxPrice > 0
+          ? String(aiFilters.maxPrice)
+          : '',
+      propertyType: aiFilters.propertyType?.trim() || '',
+      amenities: Array.isArray(aiFilters.amenities)
+        ? aiFilters.amenities.filter(Boolean)
+        : [],
+    }
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    setFilters(next)
+    runSearch(next)
+    setAiActive(false)
+    setView('list')
+  }, [aiFilters, runSearch])
+
   // Cleanup timers/requests on unmount.
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
       abortRef.current?.abort()
+      aiAbortRef.current?.abort()
     }
   }, [])
 
@@ -354,6 +441,17 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
             height: 50px !important;
           }
           .qk-pill-search-label { display: inline !important; }
+          .qk-ai-search {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            border-radius: 22px !important;
+          }
+          .qk-ai-search > span { display: none !important; }
+          .qk-ai-search button {
+            width: 100% !important;
+            justify-content: center !important;
+            border-radius: 16px !important;
+          }
         }
         @media (max-width: 440px) {
           .qk-results-grid { grid-template-columns: 1fr !important; }
@@ -705,6 +803,110 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
             </div>
           </div>
 
+          {/* Natural-language ("Ask AI") search — a single sentence the AI turns
+              into structured filters + matching listings. Sits under the pill as
+              an additional search mode; the structured search keeps working. */}
+          <div
+            role="search"
+            className="qk-ai-search"
+            style={{
+              margin: '16px auto 0',
+              maxWidth: 860,
+              display: 'flex',
+              alignItems: 'stretch',
+              gap: 8,
+              background: '#fff',
+              borderRadius: 999,
+              border: '1px solid rgba(176,122,42,0.35)',
+              boxShadow: '0 10px 28px rgba(176,122,42,0.16)',
+              padding: 7,
+            }}
+          >
+            <span
+              aria-hidden="true"
+              style={{
+                flex: '0 0 auto',
+                display: 'inline-flex',
+                alignItems: 'center',
+                paddingInlineStart: 14,
+                fontSize: 18,
+                color: COLORS.gold,
+              }}
+            >
+              ✨
+            </span>
+            <input
+              type="text"
+              name="aiQuery"
+              autoComplete="off"
+              placeholder={t('ai.aiSearchPlaceholder')}
+              aria-label={t('ai.aiSearchTitle')}
+              value={aiQuery}
+              onChange={(e) => setAiQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') runAiSearch()
+              }}
+              style={{
+                flex: '1 1 0',
+                minWidth: 0,
+                border: 'none',
+                outline: 'none',
+                background: 'transparent',
+                fontFamily: FONT,
+                fontSize: 15,
+                color: COLORS.ink,
+                padding: '8px 6px',
+              }}
+            />
+            <button
+              type="button"
+              onClick={runAiSearch}
+              disabled={aiSearching || !aiQuery.trim()}
+              className={aiSearching || !aiQuery.trim() ? undefined : 'qk-press'}
+              style={{
+                flex: '0 0 auto',
+                height: 46,
+                padding: '0 22px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                borderRadius: 999,
+                border: 'none',
+                background: 'linear-gradient(135deg,#B07A2A,#d8a55a)',
+                color: '#fff',
+                fontFamily: FONT,
+                fontSize: 14.5,
+                fontWeight: 700,
+                cursor:
+                  aiSearching || !aiQuery.trim() ? 'not-allowed' : 'pointer',
+                opacity: aiSearching || !aiQuery.trim() ? 0.6 : 1,
+                boxShadow:
+                  aiSearching || !aiQuery.trim()
+                    ? 'none'
+                    : '0 10px 24px rgba(176,122,42,0.3)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {aiSearching ? t('ai.searching') : t('ai.aiSearch')}
+            </button>
+          </div>
+
+          {/* AI search error (non-blocking) */}
+          {aiError && (
+            <p
+              role="status"
+              style={{
+                margin: '10px auto 0',
+                maxWidth: 860,
+                fontSize: 13.5,
+                fontWeight: 600,
+                color: COLORS.burgundy,
+              }}
+            >
+              {t('ai.aiSearchError')}
+            </p>
+          )}
+
           {/* Region chips — an "All" chip plus one per region (with its listing
               count). Selecting a chip adds `region=` to the fetch; "All" clears
               it. Lives alongside the Where/dates/guests pill as an extra filter. */}
@@ -1051,6 +1253,155 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
         )}
       </section>
 
+      {/* AI search results — parsed filter chips + matching listings. Rendered
+          above the structured results when an AI search is active. */}
+      {aiActive && (
+        <section
+          style={{
+            maxWidth: 1200,
+            margin: '0 auto',
+            width: '100%',
+            boxSizing: 'border-box',
+            padding: '24px 24px 0',
+            flex: '0 0 auto',
+          }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              border: '1px solid rgba(176,122,42,0.3)',
+              borderRadius: 24,
+              boxShadow: '0 12px 32px rgba(176,122,42,0.12)',
+              padding: '22px 22px 26px',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                flexWrap: 'wrap',
+              }}
+            >
+              <h2
+                style={{
+                  margin: 0,
+                  fontFamily: SERIF,
+                  fontSize: 22,
+                  fontWeight: 700,
+                  color: COLORS.burgundy,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                <span aria-hidden="true">✨</span>
+                {t('ai.aiResults')}
+                <span
+                  style={{
+                    fontFamily: FONT,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: COLORS.muted,
+                  }}
+                >
+                  ·{' '}
+                  {t(
+                    aiListings.length === 1
+                      ? 'ai.aiResultCount'
+                      : 'ai.aiResultsCount',
+                    { count: aiListings.length }
+                  )}
+                </span>
+              </h2>
+              <button
+                type="button"
+                onClick={clearAiSearch}
+                style={{
+                  appearance: 'none',
+                  border: 'none',
+                  background: 'transparent',
+                  color: COLORS.burgundy,
+                  fontWeight: 700,
+                  fontSize: 14,
+                  fontFamily: FONT,
+                  cursor: 'pointer',
+                  padding: 0,
+                  textDecoration: 'underline',
+                }}
+              >
+                {t('ai.clearAiSearch')}
+              </button>
+            </div>
+
+            {/* Parsed filter chips */}
+            <AiFilterChips filters={aiFilters} />
+
+            {/* Apply-into-structured-filters action */}
+            <div style={{ marginTop: 16 }}>
+              <button
+                type="button"
+                onClick={applyAiFilters}
+                className="qk-press"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  color: '#fff',
+                  background: GRAD_BURGUNDY,
+                  border: 'none',
+                  fontFamily: FONT,
+                  fontSize: 14,
+                  fontWeight: 700,
+                  padding: '10px 20px',
+                  borderRadius: 999,
+                  cursor: 'pointer',
+                  boxShadow: '0 10px 24px rgba(91,15,22,0.24)',
+                }}
+              >
+                {t('ai.applyFilters')}
+              </button>
+            </div>
+
+            {/* AI listing grid */}
+            <div style={{ marginTop: 22 }}>
+              {aiListings.length === 0 ? (
+                <p
+                  style={{
+                    margin: 0,
+                    padding: '20px 0',
+                    textAlign: 'center',
+                    fontSize: 15,
+                    color: COLORS.muted,
+                  }}
+                >
+                  {t('ai.aiNoResults')}
+                </p>
+              ) : (
+                <div
+                  className="qk-results-grid"
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns:
+                      'repeat(auto-fill, minmax(280px, 1fr))',
+                    gap: 28,
+                  }}
+                >
+                  {aiListings.map((listing) => (
+                    <ListingCard
+                      key={listing.id}
+                      listing={listing}
+                      saved={savedIds.has(listing.id)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Results: list grid or map */}
       <section
         style={{
@@ -1260,6 +1611,83 @@ function ListingCard({ listing, saved }: { listing: Listing; saved: boolean }) {
         </p>
       </div>
     </a>
+  )
+}
+
+// The parsed-filter chips for an AI search ("El Gouna · 6 guests · Villa · Pool
+// · Under EGP 6,000"). Each present filter renders one boutique chip; region /
+// property type / amenity labels are localized while their canonical English
+// value drives the lookup. Money uses the active currency formatter.
+function AiFilterChips({ filters }: { filters: AiSearchFilters }) {
+  const { t } = useLanguage()
+  const { format } = useCurrency()
+
+  // Resolve a key only if a translation exists, else fall back to the raw value
+  // (so an unmapped region/type/amenity still shows its English label).
+  const labelFor = (prefix: string, value: string): string => {
+    const key = prefix + value
+    const resolved = t(key)
+    return resolved === key ? value : resolved
+  }
+
+  const chips: string[] = []
+  if (filters.q?.trim()) chips.push(filters.q.trim())
+  if (filters.region?.trim())
+    chips.push(labelFor('region.', filters.region.trim()))
+  if (typeof filters.guests === 'number' && filters.guests > 0)
+    chips.push(t('ai.filterGuests', { count: filters.guests }))
+  if (filters.propertyType?.trim())
+    chips.push(labelFor('propertyType.', filters.propertyType.trim()))
+  for (const a of filters.amenities ?? []) {
+    if (a?.trim()) chips.push(labelFor('amenity.', a.trim()))
+  }
+  if (typeof filters.maxPrice === 'number' && filters.maxPrice > 0)
+    chips.push(t('ai.filterUnder', { amount: format(filters.maxPrice) }))
+  if (typeof filters.minPrice === 'number' && filters.minPrice > 0)
+    chips.push(t('ai.filterOver', { amount: format(filters.minPrice) }))
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <span
+        style={{
+          display: 'block',
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: '0.05em',
+          textTransform: 'uppercase',
+          color: COLORS.muted,
+          marginBottom: 8,
+        }}
+      >
+        {t('ai.parsedFilters')}
+      </span>
+      {chips.length === 0 ? (
+        <span style={{ fontSize: 14, color: COLORS.muted }}>—</span>
+      ) : (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {chips.map((chip, i) => (
+            <span
+              key={`${chip}-${i}`}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                fontFamily: FONT,
+                fontSize: 13.5,
+                fontWeight: 600,
+                padding: '7px 14px',
+                borderRadius: 999,
+                color: COLORS.burgundy,
+                background: 'rgba(91,15,22,0.06)',
+                border: '1px solid rgba(91,15,22,0.16)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {chip}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 

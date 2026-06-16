@@ -639,6 +639,57 @@ export const messages: Record<Lang, Dict> = {
     'footer.press': 'Press',
     'footer.copyright': '© 2026 QuickIn. Crafted for the curious traveler.',
 
+    // ---- AI: listing-description writer ----------------------------------
+    'ai.writeWithAI': '✨ Write with AI',
+    'ai.rewriteWithAI': '✨ Rewrite with AI',
+    'ai.writing': 'Writing…',
+    'ai.writeHint':
+      'Fill in the details above, then let AI draft a description. You can edit it after.',
+    'ai.writeError': 'Couldn’t generate a description. Please try again.',
+    'ai.writeNeedTitle': 'Add a title first so AI knows what to write about.',
+    'ai.aiBadge': 'AI-written',
+    'ai.templateBadge': 'Draft',
+
+    // ---- AI: natural-language search -------------------------------------
+    'ai.aiSearch': 'Ask AI',
+    'ai.aiSearchTitle': 'Search with AI',
+    'ai.aiSearchHint': 'Describe your perfect stay in plain words.',
+    'ai.aiSearchPlaceholder':
+      'e.g. beachfront villa in El Gouna for 6 under 6000',
+    'ai.searching': 'Searching…',
+    'ai.aiResults': 'AI results',
+    'ai.aiResultsCount': '{count} stays match',
+    'ai.aiResultCount': '{count} stay matches',
+    'ai.parsedFilters': 'Understood as',
+    'ai.applyFilters': 'Apply these filters',
+    'ai.clearAiSearch': 'Clear AI search',
+    'ai.aiSearchError': 'Couldn’t run that search. Please try again.',
+    'ai.aiNoResults': 'No stays matched. Try rephrasing your search.',
+    'ai.filterGuests': '{count} guests',
+    'ai.filterUnder': 'Under {amount}',
+    'ai.filterOver': 'Over {amount}',
+
+    // ---- Host analytics --------------------------------------------------
+    'analytics.title': 'Analytics',
+    'analytics.subtitle':
+      'Your performance at a glance — bookings, revenue, and ratings.',
+    'analytics.listings': 'Listings',
+    'analytics.bookings': 'Total bookings',
+    'analytics.paidBookings': 'Paid bookings',
+    'analytics.cancelled': 'Cancelled',
+    'analytics.revenue': 'Revenue',
+    'analytics.avgRating': 'Avg. rating',
+    'analytics.conversion': 'Conversion',
+    'analytics.reviews': '{count} reviews',
+    'analytics.monthlyTrend': 'Monthly trend',
+    'analytics.topListings': 'Top listings',
+    'analytics.noData':
+      'No analytics yet. Once guests book your places, your stats appear here.',
+    'analytics.error': 'Couldn’t load your analytics. Please try again.',
+    'analytics.bookingsShort': '{count} bookings',
+    'analytics.bookingShort': '{count} booking',
+    'analytics.byRevenue': 'by revenue',
+
     // ---- Region display names (value sent to API stays English) ----------
     'region.North Coast': 'North Coast',
     'region.Ain Sokhna': 'Ain Sokhna',
@@ -1268,6 +1319,54 @@ export const messages: Record<Lang, Dict> = {
     'footer.careers': 'الوظائف',
     'footer.press': 'الصحافة',
     'footer.copyright': '© 2026 كويك إن. صُنع للمسافر الفضولي.',
+
+    // ---- AI: listing-description writer ----------------------------------
+    'ai.writeWithAI': '✨ اكتب بالذكاء الاصطناعي',
+    'ai.rewriteWithAI': '✨ أعد الكتابة بالذكاء الاصطناعي',
+    'ai.writing': 'جارٍ الكتابة…',
+    'ai.writeHint':
+      'املأ التفاصيل بالأعلى، ثم دع الذكاء الاصطناعي يكتب الوصف. يمكنك تعديله بعد ذلك.',
+    'ai.writeError': 'تعذّر إنشاء وصف. حاول مرة أخرى.',
+    'ai.writeNeedTitle': 'أضف عنوانًا أولًا ليعرف الذكاء الاصطناعي ما يكتب عنه.',
+    'ai.aiBadge': 'كُتب بالذكاء الاصطناعي',
+    'ai.templateBadge': 'مسودة',
+
+    // ---- AI: natural-language search -------------------------------------
+    'ai.aiSearch': 'اسأل الذكاء الاصطناعي',
+    'ai.aiSearchTitle': 'ابحث بالذكاء الاصطناعي',
+    'ai.aiSearchHint': 'صِف إقامتك المثالية بكلماتك الخاصة.',
+    'ai.aiSearchPlaceholder': 'مثال: فيلا على البحر في الجونة لستة أشخاص بأقل من 6000',
+    'ai.searching': 'جارٍ البحث…',
+    'ai.aiResults': 'نتائج الذكاء الاصطناعي',
+    'ai.aiResultsCount': '{count} إقامة مطابقة',
+    'ai.aiResultCount': '{count} إقامة مطابقة',
+    'ai.parsedFilters': 'فُهمت كالتالي',
+    'ai.applyFilters': 'طبّق عوامل التصفية هذه',
+    'ai.clearAiSearch': 'مسح بحث الذكاء الاصطناعي',
+    'ai.aiSearchError': 'تعذّر تنفيذ هذا البحث. حاول مرة أخرى.',
+    'ai.aiNoResults': 'لا توجد إقامات مطابقة. جرّب إعادة صياغة بحثك.',
+    'ai.filterGuests': '{count} ضيوف',
+    'ai.filterUnder': 'أقل من {amount}',
+    'ai.filterOver': 'أكثر من {amount}',
+
+    // ---- Host analytics --------------------------------------------------
+    'analytics.title': 'التحليلات',
+    'analytics.subtitle': 'أداؤك في لمحة — الحجوزات والإيرادات والتقييمات.',
+    'analytics.listings': 'الإعلانات',
+    'analytics.bookings': 'إجمالي الحجوزات',
+    'analytics.paidBookings': 'الحجوزات المدفوعة',
+    'analytics.cancelled': 'الملغاة',
+    'analytics.revenue': 'الإيرادات',
+    'analytics.avgRating': 'متوسط التقييم',
+    'analytics.conversion': 'معدّل التحويل',
+    'analytics.reviews': '{count} تقييمات',
+    'analytics.monthlyTrend': 'الاتجاه الشهري',
+    'analytics.topListings': 'أفضل الإعلانات',
+    'analytics.noData': 'لا توجد تحليلات بعد. بمجرد أن يحجز الضيوف أماكنك، ستظهر إحصاءاتك هنا.',
+    'analytics.error': 'تعذّر تحميل تحليلاتك. حاول مرة أخرى.',
+    'analytics.bookingsShort': '{count} حجوزات',
+    'analytics.bookingShort': '{count} حجز',
+    'analytics.byRevenue': 'حسب الإيرادات',
 
     // ---- Region display names (value sent to API stays English) ----------
     'region.North Coast': 'الساحل الشمالي',
