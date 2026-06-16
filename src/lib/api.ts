@@ -10,6 +10,11 @@ export const API_URL =
 // cancel (see getCancellationQuote). Mirrors the backend enum.
 export type CancellationPolicy = 'flexible' | 'moderate' | 'strict'
 
+// A listing's moderation state. New listings start `pending` (unpublished, not
+// shown publicly) until an admin approves them; `rejected` keeps them
+// unpublished. Mirrors the backend's `approval_status`.
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
+
 export interface ListingImage {
   url: string
   order: number
@@ -51,6 +56,14 @@ export interface Listing {
   // Whether the listing's host has a verified identity. Powers the "Verified"
   // trust chip on the host area without an extra profile fetch.
   host_verified?: boolean
+  // Moderation state. New listings are created `pending` (and unpublished) and
+  // only go public once an admin approves them. Typed optional for older cached
+  // shapes; the host listings + admin queue surface it as a badge.
+  approval_status?: ApprovalStatus
+  // The host-submitted ownership / right-to-rent document (a data:/http image
+  // URL). Only returned to the listing's host and to admins (in the moderation
+  // queue); absent on public listing responses.
+  ownership_doc?: string | null
 }
 
 // ---- Listing search filters -------------------------------------------------
@@ -443,6 +456,35 @@ export async function updateListingPolicy(
   return (await res.json()) as Listing
 }
 
+// ---- Listing approval: ownership document -----------------------------------
+
+// Host (re)submits the ownership / proof-of-right-to-rent document for a
+// listing. `doc` is a data:image/* URL (downscale via lib/image first). Bearer
+// must be the listing's host (403 otherwise). This re-queues the listing to
+// `pending`. Resolves to the refreshed listing; throws on non-2xx.
+export async function submitOwnershipDoc(
+  token: string,
+  listingId: string,
+  doc: string
+): Promise<Listing> {
+  const res = await fetch(
+    `${API_URL}/api/local/listings/${encodeURIComponent(listingId)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + token,
+      },
+      body: JSON.stringify({ ownership_doc: doc }),
+    }
+  )
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error((data && data.error) || `Request failed: ${res.status}`)
+  }
+  return (await res.json()) as Listing
+}
+
 // ---- Trust & safety: identity verification ----------------------------------
 
 // A user's identity-verification state. `unverified` (never submitted) →
@@ -693,6 +735,57 @@ export async function resolveReport(
       Authorization: 'Bearer ' + token,
     },
     body: JSON.stringify({ report_id: reportId, action }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error((data && data.error) || `Request failed: ${res.status}`)
+  }
+}
+
+// ---- Listing approval: admin moderation queue -------------------------------
+
+// One pending listing in the admin moderation queue
+// (GET /api/local/admin/listings). It's a full Listing object PLUS the host's
+// email and the submitted ownership document, both shown for the review.
+export interface AdminPendingListing extends Listing {
+  host_email: string | null
+  ownership_doc: string | null
+}
+
+// Fetch the listings awaiting moderation. Bearer = admin. Returns [] on any
+// non-2xx / parse error.
+export async function listPendingListings(
+  token: string,
+  signal?: AbortSignal
+): Promise<AdminPendingListing[]> {
+  try {
+    const res = await fetch(`${API_URL}/api/local/admin/listings`, {
+      headers: { Authorization: 'Bearer ' + token },
+      cache: 'no-store',
+      signal,
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    return Array.isArray(data) ? (data as AdminPendingListing[]) : []
+  } catch {
+    return []
+  }
+}
+
+// Approve or reject a pending listing. Approve publishes it; reject unpublishes
+// it. Bearer = admin. Throws on a non-2xx response so the caller can toast it.
+export async function moderateListing(
+  token: string,
+  listingId: string,
+  action: 'approve' | 'reject'
+): Promise<void> {
+  const res = await fetch(`${API_URL}/api/local/admin/listings`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + token,
+    },
+    body: JSON.stringify({ listing_id: listingId, action }),
   })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))

@@ -6,14 +6,16 @@
 //   a) Add a listing  -> POST /api/local/listings
 //   b) Your listings  -> GET  /api/local/host/listings
 //   c) Reservation requests -> GET /api/local/host/bookings  (+ confirm/reject)
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import {
   API_URL,
   getReviewableGuests,
   getStoredUser,
   getToken,
+  submitOwnershipDoc,
   updateListingPolicy,
+  type ApprovalStatus,
   type CancellationPolicy,
   type Listing,
   type HostBooking,
@@ -21,6 +23,7 @@ import {
   type ServiceRequest,
   type ReviewableGuest,
 } from '@/lib/api'
+import { downscaleToDataUrl } from '@/lib/image'
 import BookingChat from '@/app/_components/booking-chat'
 import GuestReviewForm from '@/app/_components/guest-review-form'
 import ImagePlaceholder from '@/app/_components/image-placeholder'
@@ -115,6 +118,48 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
+// Approval-status → badge colors. Pending reads gold ("under review"), approved
+// green ("live"), rejected burgundy. Labels are localized at the call site.
+function approvalStyle(status: ApprovalStatus): { bg: string; fg: string } {
+  if (status === 'approved') return { bg: 'rgba(15,81,50,0.12)', fg: '#0f5132' }
+  if (status === 'rejected')
+    return { bg: 'rgba(91,15,22,0.10)', fg: COLORS.burgundy }
+  return { bg: 'rgba(176,122,42,0.16)', fg: '#8a5a00' }
+}
+
+function ApprovalBadge({ status }: { status: ApprovalStatus }) {
+  const { t } = useLanguage()
+  const s = approvalStyle(status)
+  const label =
+    status === 'approved'
+      ? t('approval.approved')
+      : status === 'rejected'
+        ? t('approval.rejected')
+        : t('approval.pending')
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 5,
+        background: s.bg,
+        color: s.fg,
+        fontSize: 12,
+        fontWeight: 700,
+        padding: '4px 12px',
+        borderRadius: 999,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      <span
+        aria-hidden="true"
+        style={{ width: 6, height: 6, borderRadius: 999, background: s.fg }}
+      />
+      {label}
+    </span>
+  )
+}
+
 const PROPERTY_TYPES = [
   'Apartment',
   'Villa',
@@ -162,13 +207,15 @@ const CANCELLATION_POLICIES: {
   { value: 'strict', nameKey: 'cancel.strict', descKey: 'cancel.strictDesc' },
 ]
 
-// Add-listing wizard step labels (index 0..5).
+// Add-listing wizard step labels (index 0..6). The "Ownership" step collects the
+// proof-of-right-to-rent document required before a listing can be approved.
 const WIZARD_STEPS = [
   'Basics',
   'Location',
   'Details',
   'Amenities',
   'Cancellation',
+  'Ownership',
   'Photos & review',
 ]
 
@@ -186,6 +233,9 @@ interface FormState {
   property_type: string
   amenities: string[]
   cancellation_policy: CancellationPolicy
+  // Ownership / proof-of-right-to-rent document, downscaled to a data:image/*
+  // URL. Empty until the host picks one in the "Ownership" step.
+  ownership_doc: string
   lat: string
   lng: string
   image1: string
@@ -207,6 +257,7 @@ const EMPTY_FORM: FormState = {
   property_type: 'Apartment',
   amenities: [],
   cancellation_policy: 'moderate',
+  ownership_doc: '',
   lat: '',
   lng: '',
   image1: '',
@@ -255,10 +306,13 @@ export default function HostPage() {
 
   // Add-listing wizard
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
-  const [step, setStep] = useState(0) // 0..3
+  const [step, setStep] = useState(0) // 0..6
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [formOk, setFormOk] = useState<string | null>(null)
+  // Hidden file input for the wizard's "Ownership" step + a localized read error.
+  const ownershipInputRef = useRef<HTMLInputElement>(null)
+  const [ownershipError, setOwnershipError] = useState<string | null>(null)
 
   // Parsed coordinate for the map pin-picker, derived from the lat/lng text
   // inputs so the marker, the "Selected:" caption and the POST body stay in
@@ -530,6 +584,20 @@ export default function HostPage() {
     setFormOk(null)
   }
 
+  // Pick + downscale the ownership document for the wizard's "Ownership" step.
+  async function handlePickOwnership(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-picking the same file
+    if (!file) return
+    setOwnershipError(null)
+    try {
+      const dataUrl = await downscaleToDataUrl(file, 1200)
+      patch({ ownership_doc: dataUrl })
+    } catch {
+      setOwnershipError(t('approval.readError'))
+    }
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     setFormError(null)
@@ -573,6 +641,7 @@ export default function HostPage() {
           property_type: form.property_type,
           amenities: form.amenities,
           cancellation_policy: form.cancellation_policy,
+          ownership_doc: form.ownership_doc || undefined,
           lat: form.lat.trim() ? Number(form.lat) : null,
           lng: form.lng.trim() ? Number(form.lng) : null,
           images,
@@ -598,7 +667,8 @@ export default function HostPage() {
 
       setForm(EMPTY_FORM)
       setStep(0)
-      setFormOk('Listing published. It now appears in “Your listings” below.')
+      setOwnershipError(null)
+      setFormOk(t('approval.submittedForReview'))
       loadListings()
     } catch {
       setFormError('Network error. Please try again.')
@@ -1263,8 +1333,83 @@ export default function HostPage() {
             </div>
           )}
 
-          {/* STEP 6 — Photos & review ------------------------------------- */}
+          {/* STEP 6 — Ownership document ---------------------------------- */}
           {step === 5 && (
+            <div style={{ display: 'grid', gap: 14 }}>
+              <p style={{ margin: 0, fontSize: 14, color: COLORS.muted, lineHeight: 1.55 }}>
+                {t('approval.ownershipIntro')}
+              </p>
+
+              <input
+                ref={ownershipInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handlePickOwnership}
+                style={{ display: 'none' }}
+              />
+
+              {form.ownership_doc ? (
+                <div>
+                  <span style={labelStyle}>{t('approval.ownershipDoc')}</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={form.ownership_doc}
+                    alt={t('approval.ownershipDoc')}
+                    style={{
+                      display: 'block',
+                      maxWidth: '100%',
+                      width: 280,
+                      borderRadius: 14,
+                      border: `1px solid ${COLORS.tan}`,
+                      boxShadow: '0 6px 18px rgba(42,34,32,0.12)',
+                    }}
+                  />
+                </div>
+              ) : null}
+
+              {ownershipError && (
+                <div
+                  style={{
+                    padding: '11px 14px',
+                    borderRadius: 12,
+                    background: 'rgba(91,15,22,0.08)',
+                    border: '1px solid rgba(91,15,22,0.2)',
+                    fontSize: 14,
+                    color: COLORS.burgundy,
+                    fontWeight: 600,
+                  }}
+                >
+                  {ownershipError}
+                </div>
+              )}
+
+              <div>
+                <button
+                  type="button"
+                  onClick={() => ownershipInputRef.current?.click()}
+                  className="qk-press"
+                  style={{
+                    padding: '11px 20px',
+                    fontSize: 14.5,
+                    fontWeight: 700,
+                    fontFamily: FONT,
+                    color: COLORS.burgundy,
+                    background: '#fff',
+                    border: '1px solid rgba(91,15,22,0.3)',
+                    borderRadius: 14,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {form.ownership_doc
+                    ? t('approval.chooseAnother')
+                    : t('approval.uploadDoc')}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 7 — Photos & review ------------------------------------- */}
+          {step === 6 && (
             <div style={{ display: 'grid', gap: 16 }}>
               <Field label="Photo URL 1">
                 <input
@@ -1398,6 +1543,18 @@ export default function HostPage() {
                       )}
                     </span>
                   </p>
+                  <p
+                    style={{
+                      margin: '6px 0 0',
+                      fontSize: 12,
+                      color: COLORS.muted,
+                    }}
+                  >
+                    {t('approval.ownershipDoc')}:{' '}
+                    <span style={{ fontWeight: 700, color: COLORS.ink }}>
+                      {form.ownership_doc ? '✓' : '—'}
+                    </span>
+                  </p>
                 </div>
               </div>
             </div>
@@ -1510,7 +1667,7 @@ export default function HostPage() {
                   boxShadow: submitting ? 'none' : '0 10px 24px rgba(91,15,22,0.28)',
                 }}
               >
-                {submitting ? 'Publishing…' : 'Publish listing'}
+                {submitting ? t('approval.submitting') : t('approval.submit')}
               </button>
             )}
           </div>
@@ -1586,6 +1743,18 @@ export default function HostPage() {
                       ) : (
                         <ImagePlaceholder iconSize={28} fontSize={12} />
                       )}
+                      {/* Moderation status — overlaid so the whole card stays a
+                          single link. Defaults to approved for older rows that
+                          predate the approval queue. */}
+                      <span
+                        style={{
+                          position: 'absolute',
+                          top: 10,
+                          insetInlineStart: 10,
+                        }}
+                      >
+                        <ApprovalBadge status={l.approval_status ?? 'approved'} />
+                      </span>
                     </div>
                     <div style={{ padding: '12px 14px 8px' }}>
                       <h3
@@ -1628,6 +1797,17 @@ export default function HostPage() {
                       gap: 10,
                     }}
                   >
+                    {/* Re-upload ownership doc — only when pending or rejected,
+                        which re-queues the listing to pending. */}
+                    {(l.approval_status === 'pending' ||
+                      l.approval_status === 'rejected') && (
+                      <OwnershipDocEditor
+                        listingId={l.id}
+                        status={l.approval_status}
+                        onResubmitted={loadListings}
+                      />
+                    )}
+
                     <ListingPolicyEditor
                       listingId={l.id}
                       current={l.cancellation_policy ?? 'moderate'}
@@ -2681,6 +2861,128 @@ function ListingPolicyEditor({
           }}
         >
           {error ? error : saved ? `✓ ${t(desc)}` : t(desc)}
+        </p>
+      )}
+    </div>
+  )
+}
+
+// Inline ownership-document (re)uploader shown on a pending/rejected listing's
+// card. Picks an image, downscales it (~1200px), PATCHes /api/local/listings/:id
+// with { ownership_doc } — which re-queues the listing to pending — then asks the
+// parent to reload so the badge refreshes. A short note explains the current
+// state (rejected listings get a stronger nudge to re-submit).
+function OwnershipDocEditor({
+  listingId,
+  status,
+  onResubmitted,
+}: {
+  listingId: string
+  status: ApprovalStatus
+  onResubmitted: () => void
+}) {
+  const { t } = useLanguage()
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [ok, setOk] = useState(false)
+
+  async function handlePick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-picking the same file
+    if (!file) return
+    const token = getToken()
+    if (!token) {
+      setError(t('availability.signInRequired'))
+      return
+    }
+    setError(null)
+    setOk(false)
+    setSubmitting(true)
+    try {
+      const dataUrl = await downscaleToDataUrl(file, 1200)
+      await submitOwnershipDoc(token, listingId, dataUrl)
+      setOk(true)
+      onResubmitted()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : ''
+      setError(
+        /large|size|400/i.test(msg)
+          ? t('approval.tooLarge')
+          : t('approval.submitError')
+      )
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div
+      style={{
+        padding: '10px 12px',
+        borderRadius: 12,
+        background:
+          status === 'rejected' ? 'rgba(91,15,22,0.06)' : 'rgba(176,122,42,0.10)',
+        border: `1px solid ${
+          status === 'rejected'
+            ? 'rgba(91,15,22,0.20)'
+            : 'rgba(176,122,42,0.30)'
+        }`,
+      }}
+    >
+      <p
+        style={{
+          margin: '0 0 8px',
+          fontSize: 12,
+          lineHeight: 1.45,
+          color: status === 'rejected' ? COLORS.burgundy : '#8a5a00',
+          fontWeight: 600,
+        }}
+      >
+        {ok
+          ? t('approval.resubmitted')
+          : status === 'rejected'
+            ? t('approval.rejectedNote')
+            : t('approval.pendingNote')}
+      </p>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        onChange={handlePick}
+        style={{ display: 'none' }}
+      />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={submitting}
+        className={submitting ? undefined : 'qk-press'}
+        style={{
+          width: '100%',
+          padding: '8px 14px',
+          fontSize: 13,
+          fontWeight: 700,
+          fontFamily: FONT,
+          color: COLORS.burgundy,
+          background: '#fff',
+          border: `1px solid ${COLORS.burgundy}`,
+          borderRadius: 12,
+          cursor: submitting ? 'not-allowed' : 'pointer',
+          opacity: submitting ? 0.6 : 1,
+        }}
+      >
+        {submitting ? t('approval.submitting') : t('approval.reupload')}
+      </button>
+      {error && (
+        <p
+          style={{
+            margin: '6px 0 0',
+            fontSize: 12,
+            color: COLORS.burgundy,
+            fontWeight: 600,
+          }}
+        >
+          {error}
         </p>
       )}
     </div>

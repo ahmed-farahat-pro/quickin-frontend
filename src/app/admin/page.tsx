@@ -11,8 +11,11 @@ import {
   setVerification,
   listReports,
   resolveReport,
+  listPendingListings,
+  moderateListing,
   type AdminVerification,
   type AdminReport,
+  type AdminPendingListing,
 } from '@/lib/api'
 import { EyeIcon, EyeOffIcon } from '@/app/_components/password-eye'
 import { useLanguage } from '@/lib/i18n/language-provider'
@@ -238,10 +241,15 @@ export default function AdminPage() {
   const [reviewsModal, setReviewsModal] = useState<ReviewsModal | null>(null)
 
   // Trust & safety triage: pending verifications + open reports. null = not yet
-  // loaded. `docModal` holds an ID image shown full-size on demand.
+  // loaded. `docModal` holds an ID / ownership image shown full-size on demand.
   const [verifications, setVerifications] = useState<AdminVerification[] | null>(null)
   const [reports, setReports] = useState<AdminReport[] | null>(null)
   const [docModal, setDocModal] = useState<string | null>(null)
+
+  // Listing moderation queue: listings awaiting approval. null = not yet loaded.
+  const [pendingListings, setPendingListings] = useState<
+    AdminPendingListing[] | null
+  >(null)
 
   // "Send a notification" broadcast composer state.
   const [notifTitle, setNotifTitle] = useState('')
@@ -272,6 +280,8 @@ export default function AdminPage() {
     // Trust & safety queues — fetched alongside the overview (own endpoints).
     listVerifications(tok).then(setVerifications)
     listReports(tok, 'open').then(setReports)
+    // Listing moderation queue (pending listings).
+    listPendingListings(tok).then(setPendingListings)
   }, [])
 
   useEffect(() => {
@@ -368,6 +378,33 @@ export default function AdminPage() {
         message: action === 'approve' ? t('admin.verifyApproved') : t('admin.verifyRejected'),
         kind: 'success',
       })
+    } catch {
+      setToast({ message: t('admin.actionFailed'), kind: 'error' })
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  // Approve / reject a pending listing, then drop the row. Approve publishes it;
+  // reject keeps it unpublished. Refreshes the overview so the Listings table
+  // reflects the new published state.
+  async function decideListing(listingId: string, action: 'approve' | 'reject') {
+    if (!token) return
+    setBusyId(listingId)
+    try {
+      await moderateListing(token, listingId, action)
+      setPendingListings((prev) =>
+        prev ? prev.filter((l) => l.id !== listingId) : prev
+      )
+      setToast({
+        message:
+          action === 'approve'
+            ? t('admin.listingApproved')
+            : t('admin.listingRejected'),
+        kind: 'success',
+      })
+      // Keep the main Listings table's published state in sync.
+      await load(token)
     } catch {
       setToast({ message: t('admin.actionFailed'), kind: 'error' })
     } finally {
@@ -712,6 +749,84 @@ export default function AdminPage() {
                             style={{ appearance: 'none', border: `1px solid ${COLORS.burgundy}`, background: busyId === id ? COLORS.tan : '#fff', color: COLORS.burgundy, fontWeight: 700, fontSize: 12.5, fontFamily: FONT, borderRadius: 999, padding: '6px 14px', cursor: busyId === id ? 'default' : 'pointer' }}>
                             {busyId === id ? '…' : 'Delete'}
                           </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Listing moderation: pending listings awaiting approval. Each row
+            shows the title, host (name + email), the ownership document thumbnail
+            (click to enlarge) + Approve / Reject. */}
+        <div className="qk-card" style={{ background: '#fff', borderRadius: 22, border: `1px solid ${COLORS.tan}`, overflow: 'hidden', boxShadow: '0 8px 22px rgba(42,34,32,0.08)', marginTop: 22 }}>
+          <div style={{ background: GRAD_BURGUNDY, padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, borderRadius: 12, background: 'rgba(246,241,230,0.14)', border: '1px solid rgba(246,241,230,0.35)' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9.5 12 4l9 5.5" /><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9" /><path d="m9 14 2 2 4-4" />
+              </svg>
+            </span>
+            <div>
+              <p style={{ margin: 0, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, color: COLORS.gold, fontWeight: 700 }}>Moderation</p>
+              <h2 style={{ margin: '2px 0 0', fontSize: 18, color: '#fff' }}>{t('admin.pendingListings')} ({pendingListings?.length ?? 0})</h2>
+            </div>
+          </div>
+          {pendingListings && pendingListings.length === 0 ? (
+            <div style={{ padding: '34px 24px', textAlign: 'center', color: COLORS.muted, fontSize: 14 }}>
+              {t('admin.pendingListingsEmpty')}
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
+                <thead>
+                  <tr>
+                    <th style={th}>{t('approval.ownershipDoc')}</th>
+                    <th style={th}>{t('admin.listing')}</th>
+                    <th style={th}>{t('admin.host')}</th>
+                    <th style={{ ...th, textAlign: 'right' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(pendingListings ?? []).map((l) => {
+                    const id = String(l.id)
+                    return (
+                      <tr key={id} className="qk-row" style={{ borderTop: `1px solid ${COLORS.cream}` }}>
+                        <td style={td}>
+                          {l.ownership_doc ? (
+                            <button type="button" onClick={() => setDocModal(l.ownership_doc)} title={t('admin.viewDoc')}
+                              style={{ appearance: 'none', border: `1px solid ${COLORS.tan}`, background: '#fff', padding: 0, borderRadius: 10, cursor: 'pointer', display: 'inline-flex', overflow: 'hidden' }}>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={l.ownership_doc} alt={t('approval.ownershipDoc')} style={{ width: 64, height: 44, objectFit: 'cover', display: 'block' }} />
+                            </button>
+                          ) : (
+                            <span style={{ color: COLORS.muted }} title={t('admin.noOwnershipDoc')}>—</span>
+                          )}
+                        </td>
+                        <td style={{ ...td, whiteSpace: 'normal', maxWidth: 280 }}>
+                          <span style={{ fontWeight: 700, color: COLORS.ink }}>{l.title || '—'}</span>
+                          {l.location && <span style={{ display: 'block', marginTop: 3, fontSize: 12.5, color: COLORS.muted }}>{l.location}</span>}
+                          <span style={{ display: 'block', marginTop: 3, fontSize: 12.5, color: COLORS.burgundy, fontWeight: 700 }}>{money(l.price_per_night)}/night</span>
+                        </td>
+                        <td style={td}>
+                          <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 1 }}>
+                            <span style={{ fontWeight: 700, color: COLORS.ink }}>{l.host_name || '—'}</span>
+                            {l.host_email && <span style={{ fontSize: 12, color: COLORS.muted }}>{l.host_email}</span>}
+                          </span>
+                        </td>
+                        <td style={{ ...td, textAlign: 'right' }}>
+                          <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end' }}>
+                            <button type="button" onClick={() => decideListing(id, 'approve')} disabled={busyId === id} className="qk-press"
+                              style={{ appearance: 'none', border: 'none', background: busyId === id ? COLORS.tan : '#0f5132', color: '#fff', fontWeight: 700, fontSize: 12.5, fontFamily: FONT, borderRadius: 999, padding: '6px 14px', cursor: busyId === id ? 'default' : 'pointer' }}>
+                              {busyId === id ? '…' : t('admin.approve')}
+                            </button>
+                            <button type="button" onClick={() => decideListing(id, 'reject')} disabled={busyId === id}
+                              style={{ appearance: 'none', border: `1px solid ${COLORS.burgundy}`, background: busyId === id ? COLORS.tan : '#fff', color: COLORS.burgundy, fontWeight: 700, fontSize: 12.5, fontFamily: FONT, borderRadius: 999, padding: '6px 14px', cursor: busyId === id ? 'default' : 'pointer' }}>
+                              {busyId === id ? '…' : t('admin.reject')}
+                            </button>
+                          </span>
                         </td>
                       </tr>
                     )

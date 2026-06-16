@@ -468,6 +468,36 @@ export const messages: Record<Lang, Dict> = {
     'admin.reportResolved': 'Report resolved',
     'admin.reportDismissed': 'Report dismissed',
     'admin.actionFailed': 'Action failed. Please try again.',
+    'admin.pendingListings': 'Listings to review',
+    'admin.pendingListingsEmpty': 'No listings waiting for review.',
+    'admin.listingApproved': 'Listing approved and published',
+    'admin.listingRejected': 'Listing rejected',
+    'admin.host': 'Host',
+    'admin.listing': 'Listing',
+    'admin.noOwnershipDoc': 'No ownership document submitted.',
+
+    // ---- Listing approval (host + shared) --------------------------------
+    'approval.pending': 'Pending review',
+    'approval.approved': 'Approved',
+    'approval.rejected': 'Rejected',
+    'approval.ownershipDoc': 'Ownership document',
+    'approval.ownershipIntro':
+      'Upload a document that proves your right to rent this place (a title deed, lease, or utility bill). Our team reviews it before your listing goes live.',
+    'approval.uploadDoc': 'Upload document',
+    'approval.chooseAnother': 'Choose another document',
+    'approval.reupload': 'Re-upload ownership document',
+    'approval.submit': 'Submit for review',
+    'approval.submitting': 'Submitting…',
+    'approval.resubmitted': 'Document submitted — your listing is back under review.',
+    'approval.submittedForReview':
+      'Listing submitted for review. It will go live once our team approves it — you can track its status in “Your listings” below.',
+    'approval.pendingNote':
+      'This listing is under review and isn’t live yet. We’ll publish it once your ownership document is approved.',
+    'approval.rejectedNote':
+      'This listing wasn’t approved. Re-upload a valid ownership document to send it back for review.',
+    'approval.tooLarge': 'That image is too large. Please pick a smaller photo.',
+    'approval.submitError': 'Could not submit the document. Please try again.',
+    'approval.readError': 'Could not read that image. Please try another.',
 
     // ---- Footer (explore) -------------------------------------------------
     'footer.tagline': 'QuickIn — boutique stays for travelers who love the details.',
@@ -944,6 +974,36 @@ export const messages: Record<Lang, Dict> = {
     'admin.reportResolved': 'تم حلّ البلاغ',
     'admin.reportDismissed': 'تم تجاهل البلاغ',
     'admin.actionFailed': 'فشل الإجراء. حاول مرة أخرى.',
+    'admin.pendingListings': 'إعلانات بانتظار المراجعة',
+    'admin.pendingListingsEmpty': 'لا توجد إعلانات بانتظار المراجعة.',
+    'admin.listingApproved': 'تمت الموافقة على الإعلان ونشره',
+    'admin.listingRejected': 'تم رفض الإعلان',
+    'admin.host': 'المضيف',
+    'admin.listing': 'الإعلان',
+    'admin.noOwnershipDoc': 'لم يتم إرسال مستند إثبات الملكية.',
+
+    // ---- Listing approval (host + shared) --------------------------------
+    'approval.pending': 'قيد المراجعة',
+    'approval.approved': 'تمت الموافقة',
+    'approval.rejected': 'مرفوض',
+    'approval.ownershipDoc': 'مستند إثبات الملكية',
+    'approval.ownershipIntro':
+      'ارفع مستندًا يثبت حقك في تأجير هذا المكان (عقد ملكية أو إيجار أو فاتورة مرافق). يراجعه فريقنا قبل نشر إعلانك.',
+    'approval.uploadDoc': 'ارفع المستند',
+    'approval.chooseAnother': 'اختر مستندًا آخر',
+    'approval.reupload': 'إعادة رفع مستند إثبات الملكية',
+    'approval.submit': 'إرسال للمراجعة',
+    'approval.submitting': 'جارٍ الإرسال…',
+    'approval.resubmitted': 'تم إرسال المستند — عاد إعلانك إلى المراجعة.',
+    'approval.submittedForReview':
+      'تم إرسال الإعلان للمراجعة. سيُنشر فور موافقة فريقنا عليه — يمكنك متابعة حالته في «إعلاناتك» بالأسفل.',
+    'approval.pendingNote':
+      'هذا الإعلان قيد المراجعة ولم يُنشر بعد. سننشره فور الموافقة على مستند إثبات الملكية.',
+    'approval.rejectedNote':
+      'لم تتم الموافقة على هذا الإعلان. أعد رفع مستند إثبات ملكية صالح لإعادته إلى المراجعة.',
+    'approval.tooLarge': 'هذه الصورة كبيرة جدًا. يُرجى اختيار صورة أصغر.',
+    'approval.submitError': 'تعذّر إرسال المستند. حاول مرة أخرى.',
+    'approval.readError': 'تعذّرت قراءة هذه الصورة. جرّب صورة أخرى.',
 
     // ---- Footer (explore) -------------------------------------------------
     'footer.tagline': 'كويك إن — إقامات مميزة للمسافرين الذين يعشقون التفاصيل.',
