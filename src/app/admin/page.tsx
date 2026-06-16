@@ -99,6 +99,25 @@ const publishedBadge = (v: unknown) => {
   )
 }
 
+// Identity-verification badge for the users table. Maps the user's
+// verification_status (unverified | pending | verified | rejected) to a coloured
+// pill; a missing value reads as "unverified".
+const VERIFY_LABEL: Record<string, string> = {
+  unverified: 'Unverified', pending: 'Pending', verified: 'Verified', rejected: 'Rejected',
+}
+const VERIFY_COLOR: Record<string, { bg: string; fg: string }> = {
+  verified: { bg: '#0f5132', fg: '#fff' },
+  pending: { bg: COLORS.tan, fg: COLORS.burgundy },
+  rejected: { bg: 'rgba(91,15,22,0.10)', fg: COLORS.burgundy },
+  unverified: { bg: 'rgba(42,34,32,0.10)', fg: COLORS.muted },
+}
+const verificationStatusBadge = (v: unknown) => {
+  const s = String(v ?? 'unverified') || 'unverified'
+  const c = VERIFY_COLOR[s] || VERIFY_COLOR.unverified
+  const label = VERIFY_LABEL[s] || s
+  return <span style={{ background: c.bg, color: c.fg, fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>{label}</span>
+}
+
 // Gold ★ rating + "(N)" review count for the listings table.
 const ratingCell = (_v: unknown, r: Record<string, unknown>) => {
   const count = Number(r.review_count ?? 0)
@@ -201,9 +220,11 @@ const COLUMNS: Record<TabKey, Column[]> = {
   users: [
     { key: 'email', label: 'Email' },
     { key: 'full_name', label: 'Name' },
+    { key: 'country', label: 'Country', render: (v) => (v ? String(v) : '—') },
     { key: 'role', label: 'Role', render: (v) => <span style={{ fontWeight: 700, color: v === 'admin' ? COLORS.burgundy : v === 'host' ? '#0f5132' : COLORS.ink }}>{String(v)}</span> },
     { key: 'password_plain', label: 'Password', render: (v) => <PasswordCell value={v} /> },
     { key: 'email_verified', label: 'Verified', render: yn },
+    { key: 'verification_status', label: 'ID status', render: verificationStatusBadge },
   ],
   listings: [
     { key: 'title', label: 'Title' }, { key: 'location', label: 'Location' },

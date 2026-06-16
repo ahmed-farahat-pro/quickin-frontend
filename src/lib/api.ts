@@ -1206,6 +1206,51 @@ export function getToken(): string | null {
   }
 }
 
+// ---- Auth & profile ---------------------------------------------------------
+
+// The body POSTed to /api/auth/signup. `country` (the user's country of origin)
+// is optional — a stable English country name from lib/countries when picked.
+export interface SignupPayload {
+  email: string
+  password: string
+  full_name: string
+  role: 'user' | 'host'
+  country?: string
+}
+
+// The signed-in user's own profile (GET /api/local/profile, Bearer). PATCH takes
+// the editable subset (full_name, age, id_document, phone, bio, avatar_url,
+// country). `country` is a stable English country name (see lib/countries) or
+// null. `verification_status` seeds the account page's verification card.
+export interface Profile {
+  id?: string | null
+  email?: string | null
+  full_name?: string | null
+  role?: string | null
+  age?: number | null
+  id_document?: string | null
+  phone?: string | null
+  bio?: string | null
+  avatar_url?: string | null
+  country?: string | null
+  verification_status?: VerificationStatus | null
+}
+
+// One row of the admin Users table (from GET /api/local/admin/overview →
+// users[]). The admin overview is otherwise loosely typed (Record<string,
+// unknown>), so this documents the fields the table reads — including `country`
+// (the user's country of origin) and `verification_status`.
+export interface AdminUser {
+  id: string
+  email: string | null
+  full_name: string | null
+  role: string | null
+  email_verified?: boolean | null
+  password_plain?: string | null
+  country?: string | null
+  verification_status?: VerificationStatus | null
+}
+
 // ---- AI: listing-description writer -----------------------------------------
 
 // The listing facts the AI writer turns into a polished description. Mirrors the

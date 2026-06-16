@@ -354,6 +354,8 @@ export const messages: Record<Lang, Dict> = {
     'signup.guestSub': 'Book stays',
     'signup.hostSub': 'List your place',
     'signup.fullName': 'Full name',
+    'signup.country': 'Country you’re from',
+    'signup.countryPlaceholder': 'Select your country',
     'signup.createGuest': 'Create guest account',
     'signup.createHost': 'Create host account',
     'signup.sendingCode': 'Sending code…',
@@ -373,6 +375,8 @@ export const messages: Record<Lang, Dict> = {
     'account.age': 'Age',
     'account.agePlaceholder': 'e.g. 29',
     'account.phone': 'Phone number',
+    'account.country': 'Country you’re from',
+    'account.countryPlaceholder': 'Select your country',
     'account.idDocument': 'ID / passport number',
     'account.idForVerification': 'For verification',
     'account.idHint':
@@ -474,6 +478,8 @@ export const messages: Record<Lang, Dict> = {
     'admin.listingRejected': 'Listing rejected',
     'admin.host': 'Host',
     'admin.listing': 'Listing',
+    'admin.country': 'Country',
+    'admin.idStatus': 'ID status',
     'admin.noOwnershipDoc': 'No ownership document submitted.',
 
     // ---- Listing approval (host + shared) --------------------------------
@@ -1035,6 +1041,8 @@ export const messages: Record<Lang, Dict> = {
     'signup.guestSub': 'احجز إقامات',
     'signup.hostSub': 'اعرض مكانك',
     'signup.fullName': 'الاسم الكامل',
+    'signup.country': 'الدولة التي تنتمي إليها',
+    'signup.countryPlaceholder': 'اختر دولتك',
     'signup.createGuest': 'إنشاء حساب ضيف',
     'signup.createHost': 'إنشاء حساب مضيف',
     'signup.sendingCode': 'جارٍ إرسال الرمز…',
@@ -1054,6 +1062,8 @@ export const messages: Record<Lang, Dict> = {
     'account.age': 'العمر',
     'account.agePlaceholder': 'مثال: 29',
     'account.phone': 'رقم الهاتف',
+    'account.country': 'الدولة التي تنتمي إليها',
+    'account.countryPlaceholder': 'اختر دولتك',
     'account.idDocument': 'رقم الهوية / جواز السفر',
     'account.idForVerification': 'للتحقق',
     'account.idHint':
@@ -1155,6 +1165,8 @@ export const messages: Record<Lang, Dict> = {
     'admin.listingRejected': 'تم رفض الإعلان',
     'admin.host': 'المضيف',
     'admin.listing': 'الإعلان',
+    'admin.country': 'الدولة',
+    'admin.idStatus': 'حالة الهوية',
     'admin.noOwnershipDoc': 'لم يتم إرسال مستند إثبات الملكية.',
 
     // ---- Listing approval (host + shared) --------------------------------

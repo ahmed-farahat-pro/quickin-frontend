@@ -7,6 +7,7 @@ import { signInWithApple, APPLE_SERVICES_ID, APPLE_JS_SRC } from '@/lib/apple'
 import { EyeIcon, EyeOffIcon, eyeButtonStyle } from '@/app/_components/password-eye'
 import PasswordStrength, { passwordMeetsMin } from '@/app/_components/password-strength'
 import { useLanguage } from '@/lib/i18n/language-provider'
+import { COUNTRIES } from '@/lib/countries'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -60,6 +61,9 @@ export default function SignupPage() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [role, setRole] = useState<Role>('user')
+  // Optional "country you're from" — a stable English country name (lib/countries),
+  // forwarded to /api/auth/signup. Empty string = not selected (placeholder shown).
+  const [country, setCountry] = useState('')
   // Optional referral code — collected on the form, forwarded to verify-otp.
   const [referralCode, setReferralCode] = useState('')
   const [step, setStep] = useState<'form' | 'otp'>('form')
@@ -115,7 +119,7 @@ export default function SignupPage() {
     try {
       const res = await fetch(`${API_URL}/api/auth/signup`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, full_name: fullName, role }),
+        body: JSON.stringify({ email, password, full_name: fullName, role, country: country || undefined }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) { setError(data?.error || 'Unable to create account. Please try again.'); setLoading(false); return }
@@ -248,6 +252,20 @@ export default function SignupPage() {
               <label style={{ display: 'block', marginBottom: 16 }}>
                 <span style={labelStyle}>{t('signup.fullName')}</span>
                 <input type="text" required autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Layla Hassan" style={inputStyle} />
+              </label>
+              <label style={{ display: 'block', marginBottom: 16 }}>
+                <span style={labelStyle}>{t('signup.country')}</span>
+                <select
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  autoComplete="country-name"
+                  style={{ ...inputStyle, appearance: 'auto', cursor: 'pointer', color: country ? COLORS.ink : COLORS.muted }}
+                >
+                  <option value="">{t('signup.countryPlaceholder')}</option>
+                  {COUNTRIES.map((c) => (
+                    <option key={c} value={c} style={{ color: COLORS.ink }}>{c}</option>
+                  ))}
+                </select>
               </label>
               <label style={{ display: 'block', marginBottom: 16 }}>
                 <span style={labelStyle}>{t('auth.email')}</span>

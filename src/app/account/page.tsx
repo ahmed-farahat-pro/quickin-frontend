@@ -16,7 +16,9 @@ import {
   getGuestReviews,
   type GuestReview,
   type VerificationStatus,
+  type Profile,
 } from '@/lib/api'
+import { COUNTRIES } from '@/lib/countries'
 import AuthArea from '../_components/auth-area'
 import VerifyIdentity from './verify-identity'
 import ReferFriends from './refer-friends'
@@ -92,21 +94,6 @@ async function downscaleToDataUrl(file: File, max = 256, quality = 0.7): Promise
   return canvas.toDataURL('image/jpeg', quality)
 }
 
-interface Profile {
-  id?: string | null
-  email?: string | null
-  full_name?: string | null
-  role?: string | null
-  age?: number | null
-  id_document?: string | null
-  phone?: string | null
-  bio?: string | null
-  avatar_url?: string | null
-  // Self-profile now carries the identity-verification status; seeds the
-  // "Verify your identity" card to avoid a flash before its own fetch.
-  verification_status?: VerificationStatus | null
-}
-
 interface FormState {
   full_name: string
   age: string
@@ -114,6 +101,7 @@ interface FormState {
   phone: string
   bio: string
   avatar_url: string
+  country: string
 }
 
 type Gate = 'checking' | 'anon' | 'ok'
@@ -130,6 +118,7 @@ export default function AccountPage() {
     phone: '',
     bio: '',
     avatar_url: '',
+    country: '',
   })
   const [loadError, setLoadError] = useState(false)
   // Identity-verification status seeded from the self-profile (the card
@@ -180,6 +169,7 @@ export default function AccountPage() {
         phone: p.phone ?? '',
         bio: p.bio ?? '',
         avatar_url: p.avatar_url ?? '',
+        country: p.country ?? '',
       })
       setGate('ok')
 
@@ -257,6 +247,7 @@ export default function AccountPage() {
           phone: form.phone.trim(),
           bio: form.bio.trim() === '' ? null : form.bio.trim(),
           avatar_url: form.avatar_url === '' ? null : form.avatar_url,
+          country: form.country === '' ? null : form.country,
         }),
       })
 
@@ -280,6 +271,7 @@ export default function AccountPage() {
         phone: p.phone ?? form.phone,
         bio: p.bio ?? '',
         avatar_url: p.avatar_url ?? '',
+        country: p.country ?? form.country,
       })
       setSaveOk(true)
     } catch {
@@ -689,6 +681,21 @@ export default function AccountPage() {
                     />
                   </label>
                 </div>
+
+                <label style={{ display: 'block' }}>
+                  <span style={labelStyle}>{t('account.country')}</span>
+                  <select
+                    style={{ ...inputStyle, appearance: 'auto', cursor: 'pointer', color: form.country ? COLORS.ink : COLORS.muted }}
+                    value={form.country}
+                    onChange={(e) => patch({ country: e.target.value })}
+                    autoComplete="country-name"
+                  >
+                    <option value="">{t('account.countryPlaceholder')}</option>
+                    {COUNTRIES.map((c) => (
+                      <option key={c} value={c} style={{ color: COLORS.ink }}>{c}</option>
+                    ))}
+                  </select>
+                </label>
 
                 <label style={{ display: 'block' }}>
                   <span style={labelStyle}>{t('account.idDocument')}</span>
