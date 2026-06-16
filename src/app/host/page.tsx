@@ -10,14 +10,17 @@ import { useCallback, useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import {
   API_URL,
+  getReviewableGuests,
   getStoredUser,
   getToken,
   type Listing,
   type HostBooking,
   type Service,
   type ServiceRequest,
+  type ReviewableGuest,
 } from '@/lib/api'
 import BookingChat from '@/app/_components/booking-chat'
+import GuestReviewForm from '@/app/_components/guest-review-form'
 import ImagePlaceholder from '@/app/_components/image-placeholder'
 import AvailabilityManager from './availability-manager'
 import { useLanguage } from '@/lib/i18n/language-provider'
@@ -323,6 +326,10 @@ export default function HostPage() {
   // service-request ids currently being confirmed/rejected (disable buttons)
   const [svcActingId, setSvcActingId] = useState<string | null>(null)
 
+  // Guests the host can review (host → guest), for past stays.
+  const [reviewableGuests, setReviewableGuests] = useState<ReviewableGuest[]>([])
+  const [guestReviewsLoading, setGuestReviewsLoading] = useState(true)
+
   const loadListings = useCallback(async () => {
     const token = getToken()
     if (!token) return
@@ -399,6 +406,23 @@ export default function HostPage() {
     }
   }, [])
 
+  const loadReviewableGuests = useCallback(async () => {
+    const token = getToken()
+    if (!token) return
+    setGuestReviewsLoading(true)
+    try {
+      const data = await getReviewableGuests(token)
+      setReviewableGuests(data)
+    } finally {
+      setGuestReviewsLoading(false)
+    }
+  }, [])
+
+  // Drop a stay from the "guests to review" list once its review lands.
+  const onGuestReviewed = useCallback((bookingId: string) => {
+    setReviewableGuests((prev) => prev.filter((g) => g.booking_id !== bookingId))
+  }, [])
+
   // Gate on mount, then load data if allowed.
   useEffect(() => {
     const token = getToken()
@@ -423,6 +447,7 @@ export default function HostPage() {
       loadBookings()
       loadServices()
       loadServiceRequests()
+      loadReviewableGuests()
     }
 
     const role = (user.role || '').toLowerCase()
@@ -462,7 +487,7 @@ export default function HostPage() {
     return () => {
       cancelled = true
     }
-  }, [loadListings, loadBookings, loadServices, loadServiceRequests])
+  }, [loadListings, loadBookings, loadServices, loadServiceRequests, loadReviewableGuests])
 
   function patch(p: Partial<FormState>) {
     setForm((prev) => ({ ...prev, ...p }))
@@ -1716,6 +1741,51 @@ export default function HostPage() {
                 </article>
               )
             })}
+          </div>
+        )}
+      </Section>
+
+      {/* c2) Review your guests ---------------------------------------------- */}
+      <Section title={t('reviews.reviewGuests')} id="guest-reviews">
+        <p style={{ margin: '0 0 18px', fontSize: 14, color: COLORS.muted }}>
+          {t('reviews.reviewGuestsSub')}
+        </p>
+        {guestReviewsLoading ? (
+          <Muted>{t('reviews.loadingGuests')}</Muted>
+        ) : reviewableGuests.length === 0 ? (
+          <Muted>{t('reviews.noGuestsToReview')}</Muted>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {reviewableGuests.map((g) => (
+              <article
+                key={g.booking_id}
+                style={{
+                  background: '#fff',
+                  borderRadius: 18,
+                  border: '1px solid rgba(42,34,32,0.06)',
+                  boxShadow: '0 8px 22px rgba(42,34,32,0.08)',
+                  padding: '16px 18px',
+                }}
+              >
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: 16,
+                    fontWeight: 700,
+                    color: COLORS.ink,
+                  }}
+                >
+                  {g.guest_name || t('reviews.anonymous')}
+                </h3>
+                <p style={{ margin: '3px 0 12px', fontSize: 13, color: COLORS.muted }}>
+                  {g.title} · {fmtDate(g.check_out)}
+                </p>
+                <GuestReviewForm
+                  bookingId={g.booking_id}
+                  onSubmitted={() => onGuestReviewed(g.booking_id)}
+                />
+              </article>
+            ))}
           </div>
         )}
       </Section>

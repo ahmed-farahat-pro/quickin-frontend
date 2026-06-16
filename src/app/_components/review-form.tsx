@@ -1,13 +1,18 @@
 'use client'
 
 // "Leave a review" control for a completed stay. A 1–5 gold-star picker + a
-// comment textarea that POSTs to /api/local/reviews. On success it collapses to
-// a "thanks" summary showing the submitted rating. Shown for confirmed bookings
-// whose checkout has passed (the caller decides eligibility, typically via the
-// reviewable-stays list). Requires the bearer token in qk_token.
-import { useState } from 'react'
+// comment textarea + an optional photo picker (≤6) that POSTs to
+// /api/local/reviews. On success it collapses to a "thanks" summary showing the
+// submitted rating. Shown for confirmed bookings whose checkout has passed (the
+// caller decides eligibility, typically via the reviewable-stays list).
+// Requires the bearer token in qk_token.
+import { useRef, useState } from 'react'
 import { API_URL, getToken } from '@/lib/api'
+import { downscaleToDataUrl } from '@/lib/image'
 import { useLanguage } from '@/lib/i18n/language-provider'
+
+// How many photos a guest may attach (the backend caps at the same number).
+const MAX_PHOTOS = 6
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -88,7 +93,33 @@ export default function ReviewForm({
   const { t } = useLanguage()
   const [rating, setRating] = useState(0)
   const [comment, setComment] = useState('')
+  // Picked photos as JPEG data URLs (downscaled on a <canvas>), capped at
+  // MAX_PHOTOS. Sent as `photos[]`; previewed as a thumbnail row below.
+  const [photos, setPhotos] = useState<string[]>([])
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Downscale each picked file to a data URL and append, never exceeding
+  // MAX_PHOTOS. The input is reset so picking the same file again still fires.
+  async function handlePickPhotos(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    e.target.value = ''
+    if (files.length === 0) return
+    setStatus({ kind: 'idle' })
+    try {
+      const room = Math.max(0, MAX_PHOTOS - photos.length)
+      const picked = files.slice(0, room)
+      const urls = await Promise.all(picked.map((f) => downscaleToDataUrl(f)))
+      setPhotos((prev) => [...prev, ...urls].slice(0, MAX_PHOTOS))
+    } catch {
+      setStatus({ kind: 'error', message: t('reviews.photoError') })
+    }
+  }
+
+  function removePhoto(idx: number) {
+    setPhotos((prev) => prev.filter((_, i) => i !== idx))
+    setStatus({ kind: 'idle' })
+  }
 
   async function submit() {
     if (rating < 1 || rating > 5) {
@@ -112,6 +143,7 @@ export default function ReviewForm({
           booking_id: bookingId,
           rating,
           comment: comment.trim(),
+          photos,
         }),
       })
       if (res.status === 201) {
@@ -199,6 +231,104 @@ export default function ReviewForm({
           resize: 'vertical',
         }}
       />
+
+      {/* Photo picker — thumbnail row of picked images, each removable, plus an
+          "Add photos" tile while under the cap. Photos are optional. */}
+      <div style={{ marginTop: 12 }}>
+        <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700, color: COLORS.ink }}>
+          {t('reviews.addPhotos')}{' '}
+          <span style={{ fontWeight: 500, color: COLORS.muted }}>
+            {t('reviews.photosOptional')}
+          </span>
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+          {photos.map((src, i) => (
+            <div
+              key={i}
+              style={{
+                position: 'relative',
+                width: 72,
+                height: 72,
+                borderRadius: 12,
+                overflow: 'hidden',
+                border: '1px solid rgba(42,34,32,0.12)',
+                background: '#fff',
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={src}
+                alt={t('reviews.photoAlt', { n: i + 1 })}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              />
+              <button
+                type="button"
+                onClick={() => removePhoto(i)}
+                aria-label={t('reviews.removePhoto')}
+                style={{
+                  position: 'absolute',
+                  top: 3,
+                  insetInlineEnd: 3,
+                  width: 22,
+                  height: 22,
+                  borderRadius: '50%',
+                  border: 'none',
+                  background: 'rgba(42,34,32,0.72)',
+                  color: '#fff',
+                  fontSize: 14,
+                  lineHeight: 1,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+
+          {photos.length < MAX_PHOTOS && (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="qk-press"
+              style={{
+                width: 72,
+                height: 72,
+                borderRadius: 12,
+                border: `1px dashed ${COLORS.burgundy}`,
+                background: COLORS.tan,
+                color: COLORS.burgundy,
+                fontSize: 13,
+                fontWeight: 700,
+                fontFamily: FONT,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 2,
+                lineHeight: 1.1,
+              }}
+            >
+              <span style={{ fontSize: 20 }} aria-hidden="true">
+                +
+              </span>
+              {t('reviews.addPhotosShort')}
+            </button>
+          )}
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handlePickPhotos}
+          style={{ display: 'none' }}
+        />
+      </div>
 
       {status.kind === 'error' && (
         <p style={{ margin: '8px 0 0', fontSize: 13, color: COLORS.burgundy, fontWeight: 600 }}>

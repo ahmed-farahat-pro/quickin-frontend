@@ -2,8 +2,9 @@
 
 // Reviews list for the listing detail page. Fetches the public reviews
 // (GET /api/local/reviews?listing_id=ID) on mount and renders each as a small
-// card: a gold star row, the reviewer's name, the date, and the comment. Stays
-// quiet (renders nothing) while loading or when there are no reviews — the
+// card: a gold star row, the reviewer's name, the date, the comment, and any
+// photos the guest attached (a thumbnail row; clicking one opens a lightbox).
+// Stays quiet (renders nothing) while loading or when there are no reviews — the
 // summary rating shown next to the title already communicates "New".
 import { useEffect, useState } from 'react'
 import { API_URL, type Review } from '@/lib/api'
@@ -45,6 +46,8 @@ export default function ReviewsSection({
   const { t, lang: ctxLang } = useLanguage()
   const locale = (lang ?? ctxLang) === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US'
   const [reviews, setReviews] = useState<Review[] | null>(null)
+  // Currently zoomed photo (data:/http URL) shown in the lightbox, or null.
+  const [lightbox, setLightbox] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -159,9 +162,108 @@ export default function ReviewsSection({
                 {r.comment}
               </p>
             )}
+            {Array.isArray(r.photos) && r.photos.length > 0 && (
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 8,
+                  marginTop: 10,
+                }}
+              >
+                {r.photos.map((src, pi) => (
+                  <button
+                    key={pi}
+                    type="button"
+                    onClick={() => setLightbox(src)}
+                    aria-label={t('reviews.viewPhoto', { n: pi + 1 })}
+                    className="qk-press"
+                    style={{
+                      width: 64,
+                      height: 64,
+                      padding: 0,
+                      borderRadius: 10,
+                      overflow: 'hidden',
+                      border: '1px solid rgba(42,34,32,0.12)',
+                      background: '#fff',
+                      cursor: 'zoom-in',
+                    }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={src}
+                      alt={t('reviews.photoAlt', { n: pi + 1 })}
+                      loading="lazy"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        display: 'block',
+                      }}
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>
+
+      {/* Lightbox — full-bleed dim overlay with the zoomed photo. Click anywhere
+          (or the close button) to dismiss. */}
+      {lightbox && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('reviews.photo')}
+          onClick={() => setLightbox(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1000,
+            background: 'rgba(20,16,15,0.82)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setLightbox(null)}
+            aria-label={t('reviews.closePhoto')}
+            style={{
+              position: 'absolute',
+              top: 18,
+              insetInlineEnd: 18,
+              width: 44,
+              height: 44,
+              borderRadius: '50%',
+              border: 'none',
+              background: 'rgba(255,255,255,0.16)',
+              color: '#fff',
+              fontSize: 24,
+              lineHeight: 1,
+              cursor: 'pointer',
+            }}
+          >
+            ×
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lightbox}
+            alt={t('reviews.photo')}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '92vw',
+              maxHeight: '88vh',
+              borderRadius: 14,
+              boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
+              objectFit: 'contain',
+            }}
+          />
+        </div>
+      )}
     </div>
   )
 }

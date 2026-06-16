@@ -250,6 +250,28 @@ export const messages: Record<Lang, Dict> = {
     'reviews.submit': 'Submit review',
     'reviews.leaveReview': 'Leave a review',
     'reviews.leaveReviewSub': 'Your stay is complete — tell future guests what it was like.',
+    // Photos on stay reviews
+    'reviews.addPhotos': 'Add photos',
+    'reviews.addPhotosShort': 'Add',
+    'reviews.photosOptional': '(optional, up to 6)',
+    'reviews.photos': 'Photos',
+    'reviews.photo': 'Photo',
+    'reviews.photoAlt': 'Review photo {n}',
+    'reviews.viewPhoto': 'View photo {n}',
+    'reviews.closePhoto': 'Close photo',
+    'reviews.removePhoto': 'Remove photo',
+    'reviews.photoError': "We couldn't add that photo. Please try a different image.",
+    // Two-way reviews: host → guest
+    'reviews.reviewGuests': 'Review your guests',
+    'reviews.reviewGuestsSub': 'Stayed with you recently? Leave a note about your guests for other hosts.',
+    'reviews.loadingGuests': 'Loading guests to review…',
+    'reviews.noGuestsToReview': 'No guests to review yet. Completed stays will appear here.',
+    'reviews.guestCommentPlaceholder': 'How was hosting this guest? (optional)',
+    // Reviews about a guest (shown on the guest's own account)
+    'reviews.aboutYou': 'Reviews about you',
+    'reviews.guestRating': 'Guest rating',
+    'reviews.noGuestReviews': 'No reviews yet.',
+    'reviews.anonymousHost': 'A host',
 
     // ---- Auth: shared -----------------------------------------------------
     'auth.or': 'or',
@@ -605,6 +627,28 @@ export const messages: Record<Lang, Dict> = {
     'reviews.submit': 'إرسال التقييم',
     'reviews.leaveReview': 'اكتب تقييمًا',
     'reviews.leaveReviewSub': 'انتهت إقامتك — أخبر الضيوف القادمين عن تجربتك.',
+    // صور تقييمات الإقامة
+    'reviews.addPhotos': 'أضف صورًا',
+    'reviews.addPhotosShort': 'إضافة',
+    'reviews.photosOptional': '(اختياري، حتى 6 صور)',
+    'reviews.photos': 'الصور',
+    'reviews.photo': 'صورة',
+    'reviews.photoAlt': 'صورة التقييم {n}',
+    'reviews.viewPhoto': 'عرض الصورة {n}',
+    'reviews.closePhoto': 'إغلاق الصورة',
+    'reviews.removePhoto': 'إزالة الصورة',
+    'reviews.photoError': 'تعذّر إضافة هذه الصورة. جرّب صورة أخرى.',
+    // تقييمات متبادلة: المضيف يقيّم الضيف
+    'reviews.reviewGuests': 'قيّم ضيوفك',
+    'reviews.reviewGuestsSub': 'أقاموا لديك مؤخرًا؟ اترك ملاحظة عن ضيوفك ليستفيد منها بقية المضيفين.',
+    'reviews.loadingGuests': 'جارٍ تحميل الضيوف لتقييمهم…',
+    'reviews.noGuestsToReview': 'لا يوجد ضيوف لتقييمهم بعد. ستظهر الإقامات المكتملة هنا.',
+    'reviews.guestCommentPlaceholder': 'كيف كانت استضافة هذا الضيف؟ (اختياري)',
+    // التقييمات عن الضيف (تظهر في حساب الضيف نفسه)
+    'reviews.aboutYou': 'تقييمات عنك',
+    'reviews.guestRating': 'تقييم الضيف',
+    'reviews.noGuestReviews': 'لا توجد تقييمات بعد.',
+    'reviews.anonymousHost': 'مضيف',
 
     // ---- Auth: shared -----------------------------------------------------
     'auth.or': 'أو',

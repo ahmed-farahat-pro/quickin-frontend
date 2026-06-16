@@ -246,11 +246,14 @@ export interface WishlistResponse {
 // ---- Reviews ----------------------------------------------------------------
 
 // One public review of a listing (GET /api/local/reviews?listing_id=ID).
+// `photos` is a list (≤6) of data:/http image URLs the guest attached; may be
+// absent/empty on older rows or text-only reviews.
 export interface Review {
   rating: number
   comment: string | null
   reviewer_name: string | null
   created_at: string
+  photos?: string[]
 }
 
 // A stay the signed-in user can review (GET /api/local/reviews with Bearer):
@@ -260,6 +263,83 @@ export interface ReviewableStay {
   listing_id: string
   title: string
   check_out: string
+}
+
+// One public review a host left ABOUT a guest
+// (GET /api/local/guest-reviews?guest_id=ID).
+export interface GuestReview {
+  id: string
+  booking_id: string
+  guest_id: string
+  host_id: string
+  rating: number
+  comment: string | null
+  created_at: string
+  host_name: string | null
+}
+
+// A past stay the signed-in HOST can review the GUEST for
+// (GET /api/local/guest-reviews with Bearer).
+export interface ReviewableGuest {
+  booking_id: string
+  listing_id: string
+  title: string
+  guest_name: string | null
+  check_out: string
+}
+
+// Fetch the public reviews a guest has received (host → guest). Returns [] on
+// any non-2xx / parse error so callers can degrade gracefully.
+export async function getGuestReviews(
+  guestId: string,
+  signal?: AbortSignal
+): Promise<GuestReview[]> {
+  try {
+    const res = await fetch(
+      `${API_URL}/api/local/guest-reviews?guest_id=${encodeURIComponent(guestId)}`,
+      { signal }
+    )
+    if (!res.ok) return []
+    const data = await res.json()
+    return Array.isArray(data) ? (data as GuestReview[]) : []
+  } catch {
+    return []
+  }
+}
+
+// Fetch the past stays the signed-in host can review their guest for. Requires
+// the bearer token. Returns [] on any non-2xx / parse error.
+export async function getReviewableGuests(
+  token: string,
+  signal?: AbortSignal
+): Promise<ReviewableGuest[]> {
+  try {
+    const res = await fetch(`${API_URL}/api/local/guest-reviews`, {
+      headers: { Authorization: 'Bearer ' + token },
+      signal,
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    return Array.isArray(data) ? (data as ReviewableGuest[]) : []
+  } catch {
+    return []
+  }
+}
+
+// Host leaves (or replaces) a review about a guest for a past stay. Resolves to
+// the Response so callers can branch on res.ok / res.status themselves.
+export async function postGuestReview(
+  token: string,
+  body: { booking_id: string; rating: number; comment: string }
+): Promise<Response> {
+  return fetch(`${API_URL}/api/local/guest-reviews`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + token,
+    },
+    body: JSON.stringify(body),
+  })
 }
 
 // The shape persisted in localStorage 'qk_user' after login/signup.

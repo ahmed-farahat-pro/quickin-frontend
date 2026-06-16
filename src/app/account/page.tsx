@@ -9,7 +9,13 @@
 // Note: a host's phone is private. It's only ever shown here, to the user
 // themselves — never on a listing/detail page.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { API_URL, getToken } from '@/lib/api'
+import {
+  API_URL,
+  getStoredUser,
+  getToken,
+  getGuestReviews,
+  type GuestReview,
+} from '@/lib/api'
 import AuthArea from '../_components/auth-area'
 import { EyeIcon, EyeOffIcon, eyeButtonStyle } from '@/app/_components/password-eye'
 import PasswordStrength, { passwordMeetsMin } from '@/app/_components/password-strength'
@@ -84,6 +90,7 @@ async function downscaleToDataUrl(file: File, max = 256, quality = 0.7): Promise
 }
 
 interface Profile {
+  id?: string | null
   email?: string | null
   full_name?: string | null
   role?: string | null
@@ -119,6 +126,9 @@ export default function AccountPage() {
     avatar_url: '',
   })
   const [loadError, setLoadError] = useState(false)
+  // Reviews this user has received from hosts (host → guest), + the current
+  // user id used to fetch them. null guestReviews = not loaded / none yet.
+  const [guestReviews, setGuestReviews] = useState<GuestReview[] | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveOk, setSaveOk] = useState(false)
@@ -161,6 +171,13 @@ export default function AccountPage() {
         avatar_url: p.avatar_url ?? '',
       })
       setGate('ok')
+
+      // Load the reviews hosts have left about this guest. The id comes from the
+      // profile when present, else the user persisted at login (qk_user).
+      const myId = p.id ?? getStoredUser()?.id ?? null
+      if (myId) {
+        getGuestReviews(myId).then(setGuestReviews)
+      }
     } catch {
       setLoadError(true)
       setGate('ok')
@@ -905,7 +922,121 @@ export default function AccountPage() {
             </form>
           </div>
         )}
+
+        {/* Reviews about you — what hosts said about this guest (host → guest).
+            Shown only when at least one review exists. */}
+        {gate === 'ok' && guestReviews && guestReviews.length > 0 && (
+          <GuestReviewsAboutYou reviews={guestReviews} />
+        )}
       </section>
     </main>
+  )
+}
+
+// "Reviews about you" card — the average rating + the list of reviews a guest
+// has received from hosts. Rendered only when there's at least one review.
+function GuestReviewsAboutYou({ reviews }: { reviews: GuestReview[] }) {
+  const { t, lang } = useLanguage()
+  const locale = lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US'
+  const avg =
+    reviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0) / reviews.length
+
+  function fmtDate(iso: string): string {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return ''
+    return d.toLocaleDateString(locale, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+  }
+
+  function Stars({ n }: { n: number }) {
+    const full = Math.max(0, Math.min(5, Math.round(n)))
+    return (
+      <span aria-hidden="true" style={{ letterSpacing: 1 }}>
+        {Array.from({ length: 5 }).map((_, i) => (
+          <span
+            key={i}
+            style={{ color: i < full ? COLORS.gold : 'rgba(42,34,32,0.20)', fontSize: 15 }}
+          >
+            ★
+          </span>
+        ))}
+      </span>
+    )
+  }
+
+  return (
+    <div
+      style={{
+        marginTop: 24,
+        background: '#fff',
+        borderRadius: 22,
+        border: '1px solid rgba(42,34,32,0.06)',
+        boxShadow: '0 6px 24px rgba(42,34,32,0.06)',
+        padding: '26px 26px 28px',
+      }}
+    >
+      <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 700, color: COLORS.ink }}>
+        {t('reviews.aboutYou')}
+      </h2>
+      <p
+        style={{
+          margin: '0 0 18px',
+          fontSize: 14,
+          color: COLORS.muted,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          flexWrap: 'wrap',
+        }}
+      >
+        <Stars n={avg} />
+        <span style={{ fontWeight: 700, color: COLORS.ink }}>{avg.toFixed(1)}</span>
+        <span>
+          {t('reviews.guestRating')} ·{' '}
+          {t(reviews.length === 1 ? 'reviews.countOne' : 'reviews.countMany', {
+            count: reviews.length,
+          })}
+        </span>
+      </p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {reviews.map((r) => (
+          <div
+            key={r.id}
+            style={{
+              background: COLORS.cream,
+              borderRadius: 16,
+              border: '1px solid rgba(42,34,32,0.06)',
+              padding: '14px 16px',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+              }}
+            >
+              <Stars n={r.rating} />
+              {r.created_at && (
+                <span style={{ fontSize: 12, color: COLORS.muted }}>{fmtDate(r.created_at)}</span>
+              )}
+            </div>
+            <p style={{ margin: '8px 0 0', fontSize: 14, fontWeight: 700, color: COLORS.ink }}>
+              {r.host_name || t('reviews.anonymousHost')}
+            </p>
+            {r.comment && (
+              <p style={{ margin: '6px 0 0', fontSize: 14, lineHeight: 1.6, color: COLORS.ink }}>
+                {r.comment}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
