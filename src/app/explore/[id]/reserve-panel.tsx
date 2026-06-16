@@ -44,7 +44,10 @@ type Status =
   | { kind: 'loading' }
   | { kind: 'needsLogin' }
   | { kind: 'error'; message: string }
-  | { kind: 'success'; nights: number; total: number; reservationId: string | null }
+  // Booking created → show the (mock) payment step.
+  | { kind: 'pay'; nights: number; subtotal: number; fee: number; grand: number; reservationId: string | null; paying: boolean }
+  // Mock payment succeeded → confirmation + receipt.
+  | { kind: 'paid'; nights: number; subtotal: number; fee: number; grand: number; reservationId: string | null; reference: string | null }
 
 function nightsBetween(checkIn: string, checkOut: string): number {
   if (!checkIn || !checkOut) return 0
@@ -108,14 +111,18 @@ export default function ReservePanel({
       const data = await res.json().catch(() => ({}))
 
       if (res.status === 201) {
+        // Booking created (pending + unpaid). Show the mock payment step; the
+        // 10% guest service fee mirrors what the /pay receipt returns.
+        const subtotal = typeof data.total_price === 'number' ? data.total_price : total
+        const fee = Math.round(subtotal * 0.1)
         setStatus({
-          kind: 'success',
-          nights:
-            data.total_price && pricePerNight
-              ? Math.round(data.total_price / pricePerNight)
-              : nights,
-          total: typeof data.total_price === 'number' ? data.total_price : total,
+          kind: 'pay',
+          nights: subtotal && pricePerNight ? Math.round(subtotal / pricePerNight) : nights,
+          subtotal,
+          fee,
+          grand: subtotal + fee,
           reservationId: typeof data.id === 'string' ? data.id : null,
+          paying: false,
         })
         return
       }
@@ -130,6 +137,40 @@ export default function ReservePanel({
         kind: 'error',
         message: t('reserve.networkError'),
       })
+    }
+  }
+
+  // MOCK payment — POSTs to /bookings/:id/pay, which always succeeds for now
+  // (no real gateway yet). Swaps in the receipt + "paid" confirmation.
+  async function handlePay() {
+    if (status.kind !== 'pay' || !status.reservationId) return
+    const token = typeof window !== 'undefined' ? localStorage.getItem('qk_token') : null
+    if (!token) { setStatus({ kind: 'needsLogin' }); return }
+    const snap = status
+    setStatus({ ...snap, paying: true })
+    try {
+      const res = await fetch(`${API_URL}/api/local/bookings/${snap.reservationId}/pay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ method: 'mock' }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.ok) {
+        const r = data.receipt || {}
+        setStatus({
+          kind: 'paid',
+          nights: snap.nights,
+          subtotal: typeof r.subtotal === 'number' ? r.subtotal : snap.subtotal,
+          fee: typeof r.serviceFee === 'number' ? r.serviceFee : snap.fee,
+          grand: typeof r.total === 'number' ? r.total : snap.grand,
+          reservationId: snap.reservationId,
+          reference: typeof r.reference === 'string' ? r.reference : null,
+        })
+        return
+      }
+      setStatus({ kind: 'error', message: data.error || t('reserve.genericError') })
+    } catch {
+      setStatus({ kind: 'error', message: t('reserve.networkError') })
     }
   }
 
@@ -310,11 +351,11 @@ export default function ReservePanel({
         </div>
       )}
 
-      {status.kind === 'success' && (
+      {(status.kind === 'pay' || status.kind === 'paid') && (
           <div
             role="dialog"
             aria-modal="true"
-            aria-label={t('reserve.requestSent')}
+            aria-label={status.kind === 'paid' ? t('reserve.paidTitle') : t('reserve.payTitle')}
             onClick={() => setStatus({ kind: 'idle' })}
             style={{
               position: 'fixed',
@@ -399,14 +440,10 @@ export default function ReservePanel({
               </div>
 
               <h2 style={{ margin: '0 0 8px', fontSize: 22, fontWeight: 800, color: COLORS.ink }}>
-                {t('reserve.requestSent')}
+                {status.kind === 'paid' ? t('reserve.paidTitle') : t('reserve.payTitle')}
               </h2>
               <p style={{ margin: '0 0 18px', fontSize: 15, color: COLORS.muted, lineHeight: 1.45 }}>
-                {t('reserve.waitingHost', {
-                  nights: `${status.nights} ${
-                    status.nights === 1 ? t('reserve.night') : t('reserve.nights')
-                  }`,
-                })}
+                {status.kind === 'paid' ? t('reserve.paidBody') : t('reserve.paySubtitle')}
               </p>
 
               {/* Summary */}
@@ -427,6 +464,16 @@ export default function ReservePanel({
                     EGP {pricePerNight} {t('listing.perNight')}
                   </span>
                 </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: COLORS.muted, marginTop: 8 }}>
+                  <span>{t('reserve.serviceFee')}</span>
+                  <span>EGP {status.fee}</span>
+                </div>
+                {status.kind === 'paid' && status.reference && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: COLORS.muted, marginTop: 8 }}>
+                    <span>{t('reserve.reference')}</span>
+                    <span style={{ fontFamily: 'ui-monospace, monospace' }}>{status.reference}</span>
+                  </div>
+                )}
                 <div style={{ height: 1, background: 'rgba(42,34,32,0.10)', margin: '10px 0' }} />
                 <div
                   style={{
@@ -439,65 +486,74 @@ export default function ReservePanel({
                     {t('reserve.total')}
                   </span>
                   <span style={{ fontSize: 18, fontWeight: 800, color: COLORS.burgundy }}>
-                    EGP {status.total}
+                    EGP {status.grand}
                   </span>
                 </div>
               </div>
 
               {/* Actions */}
               <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {status.reservationId ? (
-                  <a
-                    href={`/reservation/${status.reservationId}`}
-                    className="qk-press"
-                    style={{
-                      display: 'block',
-                      padding: '13px',
-                      borderRadius: 14,
-                      background: 'linear-gradient(135deg,#5B0F16,#8a2530)',
-                      color: '#fff',
-                      fontWeight: 700,
-                      fontSize: 15,
-                      textDecoration: 'none',
-                      boxShadow: '0 10px 24px rgba(91,15,22,0.28)',
-                    }}
-                  >
-                    {t('reserve.viewReservation')}
-                  </a>
+                {status.kind === 'pay' ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handlePay}
+                      disabled={status.paying}
+                      className={status.paying ? undefined : 'qk-press'}
+                      style={{
+                        padding: '14px',
+                        borderRadius: 14,
+                        background: 'linear-gradient(135deg,#5B0F16,#8a2530)',
+                        color: '#fff',
+                        fontWeight: 700,
+                        fontSize: 15,
+                        border: 'none',
+                        cursor: status.paying ? 'default' : 'pointer',
+                        opacity: status.paying ? 0.7 : 1,
+                        fontFamily: FONT,
+                        boxShadow: '0 10px 24px rgba(91,15,22,0.28)',
+                      }}
+                    >
+                      {status.paying ? t('reserve.paying') : t('reserve.payNow', { amount: String(status.grand) })}
+                    </button>
+                    <span style={{ fontSize: 12, color: COLORS.muted }}>{t('reserve.demoNote')}</span>
+                  </>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => setStatus({ kind: 'idle' })}
-                    className="qk-press"
-                    style={{
-                      padding: '13px',
-                      borderRadius: 14,
-                      background: 'linear-gradient(135deg,#5B0F16,#8a2530)',
-                      color: '#fff',
-                      fontWeight: 700,
-                      fontSize: 15,
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontFamily: FONT,
-                      boxShadow: '0 10px 24px rgba(91,15,22,0.28)',
-                    }}
-                  >
-                    {t('reserve.done')}
-                  </button>
+                  <>
+                    {status.reservationId && (
+                      <a
+                        href={`/reservation/${status.reservationId}`}
+                        className="qk-press"
+                        style={{
+                          display: 'block',
+                          padding: '13px',
+                          borderRadius: 14,
+                          background: 'linear-gradient(135deg,#5B0F16,#8a2530)',
+                          color: '#fff',
+                          fontWeight: 700,
+                          fontSize: 15,
+                          textDecoration: 'none',
+                          boxShadow: '0 10px 24px rgba(91,15,22,0.28)',
+                        }}
+                      >
+                        {t('reserve.viewReservation')}
+                      </a>
+                    )}
+                    <a
+                      href="/reservations"
+                      style={{
+                        display: 'block',
+                        padding: '11px',
+                        color: COLORS.muted,
+                        fontWeight: 600,
+                        fontSize: 14,
+                        textDecoration: 'none',
+                      }}
+                    >
+                      {t('reserve.allReservations')}
+                    </a>
+                  </>
                 )}
-                <a
-                  href="/reservations"
-                  style={{
-                    display: 'block',
-                    padding: '11px',
-                    color: COLORS.muted,
-                    fontWeight: 600,
-                    fontSize: 14,
-                    textDecoration: 'none',
-                  }}
-                >
-                  {t('reserve.allReservations')}
-                </a>
               </div>
             </div>
 
