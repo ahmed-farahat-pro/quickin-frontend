@@ -8,7 +8,7 @@
 //
 // Note: a host's phone is private. It's only ever shown here, to the user
 // themselves — never on a listing/detail page.
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { API_URL, getToken } from '@/lib/api'
 import AuthArea from '../_components/auth-area'
 import { EyeIcon, EyeOffIcon, eyeButtonStyle } from '@/app/_components/password-eye'
@@ -52,6 +52,37 @@ const inputStyle: React.CSSProperties = {
   outline: 'none',
 }
 
+// Downscale a picked image to <=256px on its longest side and return a JPEG
+// data URL (~0.7 quality). Dependency-free — uses an offscreen <canvas>. The
+// resulting data: URL is small enough to store inline via PATCH avatar_url.
+async function downscaleToDataUrl(file: File, max = 256, quality = 0.7): Promise<string> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(reader.error ?? new Error('read failed'))
+    reader.readAsDataURL(file)
+  })
+
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new Image()
+    el.onload = () => resolve(el)
+    el.onerror = () => reject(new Error('decode failed'))
+    el.src = dataUrl
+  })
+
+  const scale = Math.min(1, max / Math.max(img.width, img.height))
+  const w = Math.max(1, Math.round(img.width * scale))
+  const h = Math.max(1, Math.round(img.height * scale))
+
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('canvas unsupported')
+  ctx.drawImage(img, 0, 0, w, h)
+  return canvas.toDataURL('image/jpeg', quality)
+}
+
 interface Profile {
   email?: string | null
   full_name?: string | null
@@ -59,6 +90,8 @@ interface Profile {
   age?: number | null
   id_document?: string | null
   phone?: string | null
+  bio?: string | null
+  avatar_url?: string | null
 }
 
 interface FormState {
@@ -66,6 +99,8 @@ interface FormState {
   age: string
   id_document: string
   phone: string
+  bio: string
+  avatar_url: string
 }
 
 type Gate = 'checking' | 'anon' | 'ok'
@@ -80,11 +115,14 @@ export default function AccountPage() {
     age: '',
     id_document: '',
     phone: '',
+    bio: '',
+    avatar_url: '',
   })
   const [loadError, setLoadError] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveOk, setSaveOk] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Change-password section state (independent of the profile form above).
   const [currentPassword, setCurrentPassword] = useState('')
@@ -119,6 +157,8 @@ export default function AccountPage() {
         age: p.age != null ? String(p.age) : '',
         id_document: p.id_document ?? '',
         phone: p.phone ?? '',
+        bio: p.bio ?? '',
+        avatar_url: p.avatar_url ?? '',
       })
       setGate('ok')
     } catch {
@@ -143,6 +183,19 @@ export default function AccountPage() {
     setForm((prev) => ({ ...prev, ...p }))
     setSaveError(null)
     setSaveOk(false)
+  }
+
+  async function handlePickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    // Reset the input so picking the same file again still fires onChange.
+    e.target.value = ''
+    if (!file) return
+    try {
+      const dataUrl = await downscaleToDataUrl(file)
+      patch({ avatar_url: dataUrl })
+    } catch {
+      setSaveError(t('account.saveError'))
+    }
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -174,6 +227,8 @@ export default function AccountPage() {
           age: form.age.trim() === '' ? null : Number(form.age),
           id_document: form.id_document.trim(),
           phone: form.phone.trim(),
+          bio: form.bio.trim() === '' ? null : form.bio.trim(),
+          avatar_url: form.avatar_url === '' ? null : form.avatar_url,
         }),
       })
 
@@ -195,6 +250,8 @@ export default function AccountPage() {
         age: p.age != null ? String(p.age) : '',
         id_document: p.id_document ?? form.id_document,
         phone: p.phone ?? form.phone,
+        bio: p.bio ?? '',
+        avatar_url: p.avatar_url ?? '',
       })
       setSaveOk(true)
     } catch {
@@ -485,6 +542,82 @@ export default function AccountPage() {
             )}
 
             <form onSubmit={handleSave}>
+              {/* Avatar uploader — circular preview + "Change photo". The picked
+                  image is downscaled to a JPEG data URL on a <canvas> and saved
+                  inline with the rest of the form. */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 12,
+                  marginBottom: 26,
+                }}
+              >
+                <span style={{ ...labelStyle, marginBottom: 0 }}>{t('account.photo')}</span>
+                {form.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={form.avatar_url}
+                    alt={form.full_name || email || 'Avatar'}
+                    width={96}
+                    height={96}
+                    style={{
+                      width: 96,
+                      height: 96,
+                      borderRadius: 48,
+                      objectFit: 'cover',
+                      display: 'block',
+                      boxShadow: '0 0 0 3px rgba(176,122,42,0.25)',
+                    }}
+                  />
+                ) : (
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      width: 96,
+                      height: 96,
+                      borderRadius: 48,
+                      background: 'linear-gradient(135deg,#B07A2A,#d8a55a)',
+                      color: '#fff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 34,
+                      fontWeight: 800,
+                      boxShadow: '0 0 0 3px rgba(176,122,42,0.25)',
+                    }}
+                  >
+                    {(form.full_name || email || '?').trim().charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePickPhoto}
+                  style={{ display: 'none' }}
+                />
+                <button
+                  type="button"
+                  className="qk-press"
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    padding: '9px 18px',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    fontFamily: FONT,
+                    color: COLORS.burgundy,
+                    background: '#fff',
+                    border: '1px solid rgba(91,15,22,0.3)',
+                    borderRadius: 12,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {t('account.changePhoto')}
+                </button>
+              </div>
+
               <div style={{ display: 'grid', gap: 18 }}>
                 <label style={{ display: 'block' }}>
                   <span style={labelStyle}>{t('account.fullName')}</span>
@@ -547,6 +680,17 @@ export default function AccountPage() {
                   >
                     {t('account.idHint')}
                   </span>
+                </label>
+
+                <label style={{ display: 'block' }}>
+                  <span style={labelStyle}>{t('account.bio')}</span>
+                  <textarea
+                    style={{ ...inputStyle, minHeight: 110, resize: 'vertical', lineHeight: 1.5 }}
+                    value={form.bio}
+                    onChange={(e) => patch({ bio: e.target.value })}
+                    placeholder={t('account.bioPlaceholder')}
+                    rows={4}
+                  />
                 </label>
               </div>
 

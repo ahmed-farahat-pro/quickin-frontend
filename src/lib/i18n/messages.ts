@@ -270,6 +270,10 @@ export const messages: Record<Lang, Dict> = {
     'account.idForVerification': 'For verification',
     'account.idHint':
       'Used to verify your identity. Kept private — never shown to hosts or guests.',
+    'account.bio': 'Bio',
+    'account.bioPlaceholder': 'Tell guests a little about yourself…',
+    'account.photo': 'Profile photo',
+    'account.changePhoto': 'Change photo',
     'account.invalidAge': 'Please enter a valid age.',
     'account.saved': 'Your account details were saved.',
     'account.saveError': 'Could not save your changes. Please try again.',
@@ -563,6 +567,10 @@ export const messages: Record<Lang, Dict> = {
     'account.idForVerification': 'للتحقق',
     'account.idHint':
       'يُستخدم للتحقق من هويتك. يبقى خاصًا — ولا يُعرض للمضيفين أو الضيوف أبدًا.',
+    'account.bio': 'نبذة',
+    'account.bioPlaceholder': 'عرّف الضيوف بنفسك قليلًا…',
+    'account.photo': 'صورة الملف الشخصي',
+    'account.changePhoto': 'تغيير الصورة',
     'account.invalidAge': 'يُرجى إدخال عمر صحيح.',
     'account.saved': 'تم حفظ بيانات حسابك.',
     'account.saveError': 'تعذّر حفظ تغييراتك. حاول مرة أخرى.',
