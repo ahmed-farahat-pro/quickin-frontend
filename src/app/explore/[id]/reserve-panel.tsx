@@ -4,10 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   API_URL,
   getAvailability,
+  getStayQuote,
   validatePromo,
   type AvailabilitySpan,
   type CancellationPolicy,
+  type MonthlyPrices,
   type PromoPreview,
+  type StayQuote,
 } from '@/lib/api'
 import {
   firstBlockedDayAfter,
@@ -25,6 +28,7 @@ const COLORS = {
   tan: '#EFE6D8',
   ink: '#2A2220',
   muted: '#6B6055',
+  gold: '#B07A2A',
 }
 
 const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
@@ -107,6 +111,8 @@ export default function ReservePanel({
   cancellationPolicy,
   weeklyDiscount = 0,
   monthlyDiscount = 0,
+  weekendPrice = null,
+  monthlyPrices = {},
 }: {
   listingId: string
   pricePerNight: number
@@ -115,6 +121,11 @@ export default function ReservePanel({
   cancellationPolicy: CancellationPolicy
   weeklyDiscount?: number
   monthlyDiscount?: number
+  // Seasonal pricing (host-set). `weekendPrice` is the nightly EGP for Fri/Sat
+  // (null → base price); `monthlyPrices` maps month "1".."12" → nightly EGP.
+  // Drive the "seasonal rates apply" note; the exact quote is fetched per range.
+  weekendPrice?: number | null
+  monthlyPrices?: MonthlyPrices
 }) {
   const { t } = useLanguage()
   const { format } = useCurrency()
@@ -129,6 +140,19 @@ export default function ReservePanel({
   const [promoInput, setPromoInput] = useState('')
   const [promoPreview, setPromoPreview] = useState<PromoPreview | null>(null)
   const [promoChecking, setPromoChecking] = useState(false)
+
+  // Whether this listing has any seasonal pricing (a weekend rate or at least
+  // one per-month override). Drives the "seasonal rates apply" note near the
+  // price and tells us a live quote is worth fetching.
+  const hasSeasonal =
+    (weekendPrice != null && weekendPrice > 0) ||
+    Object.keys(monthlyPrices ?? {}).length > 0
+
+  // The exact server quote for the chosen check-in/out (honors weekend + monthly
+  // pricing + length-of-stay discount). null until a valid range is picked and a
+  // quote returns; we fall back to the naive nights × base estimate meanwhile.
+  const [quote, setQuote] = useState<StayQuote | null>(null)
+  const [quoteLoading, setQuoteLoading] = useState(false)
 
   // Unavailable spans (booked + host-blocked) for this listing. Fetched on
   // mount and refreshed after a successful booking so the calendar greys out
@@ -151,6 +175,45 @@ export default function ReservePanel({
   }, [loadAvailability])
 
   const ranges = useMemo(() => toRanges(spans), [spans])
+
+  // Fetch the authoritative quote whenever a valid (non-zero, non-blocked) date
+  // range is chosen. Debounced (250ms) so dragging across the calendar doesn't
+  // spam the backend; aborts the in-flight request when the range changes or the
+  // component unmounts. On failure we clear the quote and fall back to the naive
+  // nights × base estimate. Runs for every listing (the base-only case still
+  // returns the correct subtotal/total + any length-of-stay discount).
+  useEffect(() => {
+    const validRange =
+      !!checkIn &&
+      !!checkOut &&
+      checkOut > checkIn &&
+      !rangeOverlapsAny(checkIn, checkOut, ranges)
+    if (!validRange) {
+      setQuote(null)
+      setQuoteLoading(false)
+      return
+    }
+    const ac = new AbortController()
+    setQuoteLoading(true)
+    const timer = setTimeout(() => {
+      getStayQuote(listingId, checkIn, checkOut, ac.signal)
+        .then((q) => {
+          if (ac.signal.aborted) return
+          setQuote(q)
+          setQuoteLoading(false)
+        })
+        .catch(() => {
+          if (!ac.signal.aborted) {
+            setQuote(null)
+            setQuoteLoading(false)
+          }
+        })
+    }, 250)
+    return () => {
+      ac.abort()
+      clearTimeout(timer)
+    }
+  }, [listingId, checkIn, checkOut, ranges])
 
   // Check-in day is unavailable if it sits inside any taken span.
   const isCheckInDisabled = useCallback(
@@ -176,7 +239,20 @@ export default function ReservePanel({
   )
 
   const nights = nightsBetween(checkIn, checkOut)
-  const total = nights * pricePerNight
+  // Naive estimate (nights × base) — the fallback shown before the quote lands
+  // or if the quote call fails.
+  const estimate = nights * pricePerNight
+  // The quote only counts once it matches the current selection's nights (guards
+  // against a stale quote from a previous range flashing the wrong total).
+  const quoteForRange = quote && quote.nights === nights ? quote : null
+  // Subtotal (pre length-of-stay discount) and the final total the guest pays.
+  // Prefer the server quote; fall back to the naive estimate.
+  const subtotal = quoteForRange ? quoteForRange.subtotal : estimate
+  const total = quoteForRange ? quoteForRange.total : estimate
+  // Per-night average to display (seasonal nights vary, so show the average).
+  const nightlyAvg =
+    quoteForRange && nights > 0 ? quoteForRange.nightlyAvg : pricePerNight
+  const discountPercent = quoteForRange ? quoteForRange.discountPercent : 0
   // Proactive guard: does the current selection overlap a taken span?
   const rangeBlocked = rangeOverlapsAny(checkIn, checkOut, ranges)
 
@@ -233,7 +309,9 @@ export default function ReservePanel({
         const fee = Math.round(subtotal * 0.1)
         setStatus({
           kind: 'pay',
-          nights: subtotal && pricePerNight ? Math.round(subtotal / pricePerNight) : nights,
+          // The selected range is the source of truth for the night count
+          // (deriving it from subtotal ÷ base is wrong under seasonal pricing).
+          nights,
           subtotal,
           fee,
           reservationId: typeof data.id === 'string' ? data.id : null,
@@ -353,6 +431,49 @@ export default function ReservePanel({
         {t('reserve.pricesInEgp')}
       </p>
 
+      {/* Seasonal pricing note — when the host set a weekend or any per-month
+          rate. Hints that the displayed base isn't the whole story; the exact
+          quote below reflects the real per-night rates for the chosen dates. */}
+      {hasSeasonal && (
+        <p
+          style={{
+            margin: '8px 0 0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 12.5,
+            fontWeight: 600,
+            color: COLORS.gold,
+          }}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 2v2" />
+            <path d="M12 20v2" />
+            <path d="m4.93 4.93 1.41 1.41" />
+            <path d="m17.66 17.66 1.41 1.41" />
+            <path d="M2 12h2" />
+            <path d="M20 12h2" />
+            <circle cx="12" cy="12" r="4" />
+          </svg>
+          {t('pricing.seasonalNote')}
+          {weekendPrice != null && weekendPrice > 0 && (
+            <span style={{ color: COLORS.muted, fontWeight: 600 }}>
+              · {t('pricing.weekend')} {format(weekendPrice)}
+            </span>
+          )}
+        </p>
+      )}
+
       {/* Length-of-stay discounts — shown near the price when the host set them.
           The backend applies them to the total automatically. */}
       {(weeklyDiscount > 0 || monthlyDiscount > 0) && (
@@ -435,7 +556,10 @@ export default function ReservePanel({
         />
       </div>
 
-      {/* Live total */}
+      {/* Live total — the exact quote when one has loaded for the chosen dates
+          (seasonal nights vary, so the first line shows the per-night AVERAGE),
+          else the naive nights × base estimate. A discount row appears when a
+          length-of-stay discount applied. */}
       <div
         style={{
           marginTop: 18,
@@ -452,11 +576,45 @@ export default function ReservePanel({
           }}
         >
           <span>
-            {format(pricePerNight)} × {nights}{' '}
-            {nights === 1 ? t('reserve.night') : t('reserve.nights')}
+            {quoteForRange ? (
+              <>
+                {format(nightlyAvg)} {t('pricing.perNightAvg')} × {nights}{' '}
+                {nights === 1 ? t('reserve.night') : t('reserve.nights')}
+              </>
+            ) : (
+              <>
+                {format(pricePerNight)} × {nights}{' '}
+                {nights === 1 ? t('reserve.night') : t('reserve.nights')}
+              </>
+            )}
           </span>
-          <span style={{ fontWeight: 700 }}>{format(total)}</span>
+          <span style={{ fontWeight: 700 }}>{format(subtotal)}</span>
         </div>
+
+        {/* Loading hint while a fresh quote is in flight for a valid range. */}
+        {quoteLoading && !quoteForRange && nights > 0 && !rangeBlocked && (
+          <p style={{ margin: '6px 0 0', fontSize: 12, color: COLORS.muted }}>
+            {t('pricing.calculating')}
+          </p>
+        )}
+
+        {/* Length-of-stay discount applied by the quote (− amount off subtotal). */}
+        {discountPercent > 0 && subtotal > total && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              marginTop: 10,
+              fontSize: 13.5,
+              fontWeight: 600,
+              color: '#0f5132',
+            }}
+          >
+            <span>{t('pricing.stayDiscount', { percent: discountPercent })}</span>
+            <span>−{format(subtotal - total)}</span>
+          </div>
+        )}
+
         <div
           style={{
             display: 'flex',
@@ -850,9 +1008,9 @@ export default function ReservePanel({
                     {status.nights}{' '}
                     {status.nights === 1 ? t('reserve.night') : t('reserve.nights')}
                   </span>
-                  <span>
-                    {format(pricePerNight)} {t('listing.perNight')}
-                  </span>
+                  {/* Show the stay subtotal (sum of the nightly rates) — correct
+                      whether or not seasonal pricing varied the per-night price. */}
+                  <span>{format(status.subtotal)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: COLORS.muted, marginTop: 8 }}>
                   <span>{t('reserve.serviceFee')}</span>

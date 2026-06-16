@@ -19,10 +19,12 @@ import {
   submitOwnershipDoc,
   updateListingDiscounts,
   updateListingPolicy,
+  updateListingPricing,
   type ApprovalStatus,
   type CancellationPolicy,
   type HostAnalytics,
   type Listing,
+  type MonthlyPrices,
   type HostBooking,
   type HostEarnings,
   type Service,
@@ -97,6 +99,48 @@ function clampPercent(value: string | number): number {
   const n = Math.round(Number(value))
   if (!Number.isFinite(n)) return 0
   return Math.max(0, Math.min(90, n))
+}
+
+// Parse a nightly-price input into a positive integer EGP, or null when the
+// field is blank / zero / invalid. Used by the seasonal-pricing inputs so an
+// empty box is omitted (weekend) / dropped from the monthly map (no override).
+function parsePriceOrNull(value: string | number): number | null {
+  const raw = String(value).trim()
+  if (!raw) return null
+  const n = Math.round(Number(raw))
+  if (!Number.isFinite(n) || n <= 0) return null
+  return n
+}
+
+// Build the { "1": 8500, … } monthly-prices object the backend expects from the
+// wizard/editor's 12 string inputs, keeping ONLY the months with a valid price
+// (blank/zero months are omitted so they fall back to the base nightly rate).
+function buildMonthlyPrices(values: string[]): MonthlyPrices {
+  const out: MonthlyPrices = {}
+  values.forEach((v, i) => {
+    const price = parsePriceOrNull(v)
+    if (price !== null) out[String(i + 1)] = price
+  })
+  return out
+}
+
+// Seed 12 string inputs (Jan..Dec) from a listing's monthly_prices map. A month
+// with no override becomes an empty string; a set month its integer as a string.
+function monthlyPricesToInputs(prices?: MonthlyPrices): string[] {
+  return Array.from({ length: 12 }, (_, i) => {
+    const v = prices?.[String(i + 1)]
+    return typeof v === 'number' && v > 0 ? String(v) : ''
+  })
+}
+
+// Compare two monthly-price maps for equality (same keys, same values) so the
+// inline editor's Save button can stay disabled until something actually
+// changed. Both maps only contain set months.
+function monthlyPricesEqual(a: MonthlyPrices, b: MonthlyPrices): boolean {
+  const ak = Object.keys(a)
+  const bk = Object.keys(b)
+  if (ak.length !== bk.length) return false
+  return ak.every((k) => a[k] === b[k])
 }
 
 // Reservation status → badge colors (shared look with /reservations + /reservation/[id]).
@@ -222,6 +266,24 @@ const CANCELLATION_POLICIES: {
   { value: 'strict', nameKey: 'cancel.strict', descKey: 'cancel.strictDesc' },
 ]
 
+// The 12 months for the seasonal-pricing grid, with the i18n key for each
+// month's short name (rendered as the input label). Index 0 = January → backend
+// month number "1"; the seasonal-pricing helpers key off this 1-based order.
+const MONTHS: { key: string }[] = [
+  { key: 'month.jan' },
+  { key: 'month.feb' },
+  { key: 'month.mar' },
+  { key: 'month.apr' },
+  { key: 'month.may' },
+  { key: 'month.jun' },
+  { key: 'month.jul' },
+  { key: 'month.aug' },
+  { key: 'month.sep' },
+  { key: 'month.oct' },
+  { key: 'month.nov' },
+  { key: 'month.dec' },
+]
+
 // Add-listing wizard step labels (index 0..6). The "Ownership" step collects the
 // proof-of-right-to-rent document required before a listing can be approved.
 const WIZARD_STEPS = [
@@ -250,6 +312,11 @@ interface FormState {
   // straight from the form inputs; parsed to ints on submit.
   weekly_discount: string
   monthly_discount: string
+  // Seasonal pricing (optional). `weekend_price` is the nightly EGP for Fri+Sat
+  // (blank → base price). `monthly_prices` is 12 strings (Jan..Dec); only the
+  // filled months are sent. Kept as strings so they bind straight to inputs.
+  weekend_price: string
+  monthly_prices: string[]
   amenities: string[]
   cancellation_policy: CancellationPolicy
   // Ownership / proof-of-right-to-rent document, downscaled to a data:image/*
@@ -276,6 +343,8 @@ const EMPTY_FORM: FormState = {
   property_type: 'Apartment',
   weekly_discount: '0',
   monthly_discount: '0',
+  weekend_price: '',
+  monthly_prices: Array(12).fill(''),
   amenities: [],
   cancellation_policy: 'moderate',
   ownership_doc: '',
@@ -759,6 +828,9 @@ export default function HostPage() {
           amenities: form.amenities,
           weekly_discount: clampPercent(form.weekly_discount),
           monthly_discount: clampPercent(form.monthly_discount),
+          // Seasonal pricing — null/empty when the host left them blank.
+          weekend_price: parsePriceOrNull(form.weekend_price),
+          monthly_prices: buildMonthlyPrices(form.monthly_prices),
           cancellation_policy: form.cancellation_policy,
           ownership_doc: form.ownership_doc || undefined,
           lat: form.lat.trim() ? Number(form.lat) : null,
@@ -999,6 +1071,7 @@ export default function HostPage() {
         @media (max-width: 720px) {
           .qk-host-form-grid { grid-template-columns: 1fr 1fr !important; }
           .qk-host-form-full { grid-column: 1 / -1 !important; }
+          .qk-month-grid { grid-template-columns: repeat(3, 1fr) !important; }
         }
         @media (max-width: 560px) {
           .qk-host-step-label { display: none !important; }
@@ -1007,6 +1080,7 @@ export default function HostPage() {
           .qk-host-form-grid { grid-template-columns: 1fr !important; }
           .qk-host-req-card { grid-template-columns: 1fr !important; }
           .qk-host-req-actions { justify-content: flex-start !important; }
+          .qk-month-grid { grid-template-columns: repeat(2, 1fr) !important; }
         }
       `}</style>
 
@@ -1437,6 +1511,50 @@ export default function HostPage() {
                     value={form.monthly_discount}
                     onChange={(v) => patch({ monthly_discount: v })}
                   />
+                </div>
+              </div>
+
+              {/* Seasonal / variable pricing — optional. Weekend (Fri/Sat)
+                  nightly + a 12-month grid of per-month nightly overrides. Blank
+                  months fall back to the base price; the backend's quote applies
+                  these per night. */}
+              <div className="qk-host-form-full">
+                <span style={labelStyle}>{t('pricing.seasonal')}</span>
+                <p style={{ margin: '0 0 10px', fontSize: 13, color: COLORS.muted, lineHeight: 1.5 }}>
+                  {t('pricing.seasonalHint')}
+                </p>
+                <div style={{ maxWidth: 220 }}>
+                  <PriceField
+                    label={t('pricing.weekendPrice')}
+                    value={form.weekend_price}
+                    onChange={(v) => patch({ weekend_price: v })}
+                  />
+                </div>
+                <span style={{ ...labelStyle, marginTop: 16 }}>
+                  {t('pricing.monthlyPrices')}
+                </span>
+                <div
+                  className="qk-month-grid"
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(4, 1fr)',
+                    gap: 10,
+                  }}
+                >
+                  {MONTHS.map((m, i) => (
+                    <PriceField
+                      key={m.key}
+                      label={t(m.key)}
+                      value={form.monthly_prices[i]}
+                      onChange={(v) =>
+                        patch({
+                          monthly_prices: form.monthly_prices.map((mv, j) =>
+                            j === i ? v : mv
+                          ),
+                        })
+                      }
+                    />
+                  ))}
                 </div>
               </div>
             </div>
@@ -2068,6 +2186,12 @@ export default function HostPage() {
                       listingId={l.id}
                       weekly={l.weekly_discount ?? 0}
                       monthly={l.monthly_discount ?? 0}
+                    />
+
+                    <ListingPricingEditor
+                      listingId={l.id}
+                      weekendPrice={l.weekend_price ?? null}
+                      monthlyPrices={l.monthly_prices ?? {}}
                     />
 
                     <button
@@ -3770,6 +3894,71 @@ function PercentField({
   )
 }
 
+// A small optional nightly-price input (EGP) used by the seasonal-pricing grid
+// in the wizard and the inline editor. Keeps the value as a string in the
+// parent; a blank box means "no override" (falls back to the base price). A
+// leading "EGP" affordance sits inside the field; the placeholder hints "Base".
+function PriceField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: string
+  onChange: (next: string) => void
+}) {
+  const { t } = useLanguage()
+  return (
+    <label style={{ display: 'block' }}>
+      <span
+        style={{
+          display: 'block',
+          fontSize: 11,
+          fontWeight: 700,
+          color: COLORS.muted,
+          marginBottom: 5,
+        }}
+      >
+        {label}
+      </span>
+      <div style={{ position: 'relative' }}>
+        <span
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            insetInlineStart: 11,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            fontSize: 11.5,
+            fontWeight: 700,
+            color: COLORS.muted,
+            pointerEvents: 'none',
+          }}
+        >
+          EGP
+        </span>
+        <input
+          style={{
+            ...inputStyle,
+            paddingInlineStart: 42,
+            paddingTop: 9,
+            paddingBottom: 9,
+            fontSize: 13.5,
+          }}
+          type="number"
+          min={0}
+          step={1}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={t('pricing.base')}
+          inputMode="numeric"
+          aria-label={label}
+        />
+      </div>
+    </label>
+  )
+}
+
 // Inline length-of-stay discount editor shown on each "Your listings" card. Two
 // "% off" inputs (weekly ≥7 nights, monthly ≥28 nights) with a Save button that
 // PATCHes /api/local/listings/:id. Mirrors the policy editor's inline feel and
@@ -3875,6 +4064,181 @@ function ListingDiscountsEditor({
         >
           {error ? error : `✓ ${t('growth.discountsSaved')}`}
         </p>
+      )}
+    </div>
+  )
+}
+
+// Inline seasonal-pricing editor shown (collapsed by default) on each "Your
+// listings" card. A weekend (Fri/Sat) nightly input + a 12-month grid of
+// optional per-month nightly overrides, with a Save button that PATCHes
+// /api/local/listings/:id via updateListingPricing. Mirrors the discounts
+// editor's inline feel and seeds from the loaded listing. Blank inputs clear the
+// override (weekend → null, that month dropped from the map).
+function ListingPricingEditor({
+  listingId,
+  weekendPrice,
+  monthlyPrices,
+}: {
+  listingId: string
+  weekendPrice: number | null
+  monthlyPrices: MonthlyPrices
+}) {
+  const { t } = useLanguage()
+  const [open, setOpen] = useState(false)
+  const [weekendVal, setWeekendVal] = useState(
+    weekendPrice != null && weekendPrice > 0 ? String(weekendPrice) : ''
+  )
+  const [monthVals, setMonthVals] = useState<string[]>(
+    monthlyPricesToInputs(monthlyPrices)
+  )
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Keep in sync if the parent list reloads with new values.
+  useEffect(() => {
+    setWeekendVal(
+      weekendPrice != null && weekendPrice > 0 ? String(weekendPrice) : ''
+    )
+    setMonthVals(monthlyPricesToInputs(monthlyPrices))
+  }, [weekendPrice, monthlyPrices])
+
+  const nextWeekend = parsePriceOrNull(weekendVal)
+  const currentWeekend = weekendPrice != null && weekendPrice > 0 ? weekendPrice : null
+  const nextMonthly = buildMonthlyPrices(monthVals)
+  const dirty =
+    nextWeekend !== currentWeekend ||
+    !monthlyPricesEqual(nextMonthly, monthlyPrices ?? {})
+
+  // How many month overrides are set — shown as a hint on the collapsed toggle.
+  const setCount = Object.keys(nextMonthly).length
+
+  async function save() {
+    if (saving || !dirty) return
+    const token = getToken()
+    if (!token) {
+      setError(t('availability.signInRequired'))
+      return
+    }
+    setSaving(true)
+    setSaved(false)
+    setError(null)
+    try {
+      await updateListingPricing(token, listingId, {
+        weekend_price: nextWeekend,
+        monthly_prices: nextMonthly,
+      })
+      // Normalize inputs to the saved values.
+      setWeekendVal(nextWeekend != null ? String(nextWeekend) : '')
+      setMonthVals(monthlyPricesToInputs(nextMonthly))
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch {
+      setError(t('pricing.error'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="qk-press"
+        style={{
+          width: '100%',
+          padding: '8px 12px',
+          fontSize: 12.5,
+          fontWeight: 700,
+          fontFamily: FONT,
+          color: COLORS.burgundy,
+          background: '#fff',
+          border: `1px solid ${COLORS.burgundy}`,
+          borderRadius: 12,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+        }}
+      >
+        <span>{t('pricing.seasonal')}</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.muted }}>
+          {open
+            ? '▾'
+            : currentWeekend || setCount > 0
+              ? t('pricing.activeBadge')
+              : '▸'}
+        </span>
+      </button>
+
+      {open && (
+        <div style={{ marginTop: 10 }}>
+          <div style={{ maxWidth: 200 }}>
+            <PriceField
+              label={t('pricing.weekendPrice')}
+              value={weekendVal}
+              onChange={setWeekendVal}
+            />
+          </div>
+          <span style={{ ...labelStyle, marginTop: 12 }}>
+            {t('pricing.monthlyPrices')}
+          </span>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: 8,
+            }}
+          >
+            {MONTHS.map((m, i) => (
+              <PriceField
+                key={m.key}
+                label={t(m.key)}
+                value={monthVals[i]}
+                onChange={(v) =>
+                  setMonthVals((prev) => prev.map((mv, j) => (j === i ? v : mv)))
+                }
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving || !dirty}
+            className={saving || !dirty ? undefined : 'qk-press'}
+            style={{
+              marginTop: 10,
+              width: '100%',
+              padding: '8px 14px',
+              fontSize: 13,
+              fontWeight: 700,
+              fontFamily: FONT,
+              color: saving || !dirty ? COLORS.muted : COLORS.burgundy,
+              background: '#fff',
+              border: `1px solid ${saving || !dirty ? 'rgba(42,34,32,0.16)' : COLORS.burgundy}`,
+              borderRadius: 12,
+              cursor: saving || !dirty ? 'default' : 'pointer',
+            }}
+          >
+            {saving ? t('growth.saving') : t('pricing.save')}
+          </button>
+          {(saved || error) && (
+            <p
+              style={{
+                margin: '6px 0 0',
+                fontSize: 12,
+                color: error ? COLORS.burgundy : '#0f5132',
+                fontWeight: 600,
+              }}
+            >
+              {error ? error : `✓ ${t('pricing.saved')}`}
+            </p>
+          )}
+        </div>
       )}
     </div>
   )

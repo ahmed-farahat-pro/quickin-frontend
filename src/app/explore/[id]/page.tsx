@@ -441,6 +441,8 @@ export default async function ListingDetailPage({
               cancellationPolicy={listing.cancellation_policy ?? 'moderate'}
               weeklyDiscount={listing.weekly_discount ?? 0}
               monthlyDiscount={listing.monthly_discount ?? 0}
+              weekendPrice={listing.weekend_price ?? null}
+              monthlyPrices={listing.monthly_prices ?? {}}
             />
             {listing.listing_code && (
               <div

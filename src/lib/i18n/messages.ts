@@ -562,6 +562,37 @@ export const messages: Record<Lang, Dict> = {
     'growth.saving': 'Saving…',
     'growth.percentRange': 'Use a percentage between 0 and 90.',
 
+    // ---- Seasonal / variable pricing -------------------------------------
+    'pricing.seasonal': 'Seasonal pricing (optional)',
+    'pricing.seasonalHint':
+      'Charge more (or less) on weekends and in peak months. Leave a field blank to use your base nightly price. Guests see the exact total for their dates.',
+    'pricing.weekendPrice': 'Weekend price (Fri & Sat)',
+    'pricing.monthlyPrices': 'Per-month nightly price',
+    'pricing.base': 'Base',
+    'pricing.weekend': 'Weekends',
+    'pricing.seasonalNote': 'Weekend & seasonal rates apply',
+    'pricing.perNightAvg': '/ night avg',
+    'pricing.stayDiscount': 'Length-of-stay discount −{percent}%',
+    'pricing.calculating': 'Calculating your exact price…',
+    'pricing.save': 'Save pricing',
+    'pricing.saved': 'Seasonal pricing saved.',
+    'pricing.error': 'Couldn’t save the pricing. Please try again.',
+    'pricing.activeBadge': 'On',
+
+    // ---- Month names (short) — seasonal-pricing grid ---------------------
+    'month.jan': 'Jan',
+    'month.feb': 'Feb',
+    'month.mar': 'Mar',
+    'month.apr': 'Apr',
+    'month.may': 'May',
+    'month.jun': 'Jun',
+    'month.jul': 'Jul',
+    'month.aug': 'Aug',
+    'month.sep': 'Sep',
+    'month.oct': 'Oct',
+    'month.nov': 'Nov',
+    'month.dec': 'Dec',
+
     // ---- Growth: promo codes (checkout) ----------------------------------
     'promo.code': 'Promo code',
     'promo.placeholder': 'Enter a code',
@@ -1288,6 +1319,37 @@ export const messages: Record<Lang, Dict> = {
     'growth.save': 'حفظ الخصومات',
     'growth.saving': 'جارٍ الحفظ…',
     'growth.percentRange': 'استخدم نسبة بين 0 و90.',
+
+    // ---- Seasonal / variable pricing -------------------------------------
+    'pricing.seasonal': 'تسعير موسمي (اختياري)',
+    'pricing.seasonalHint':
+      'حدّد سعرًا أعلى (أو أقل) في عطلات نهاية الأسبوع وأشهر الذروة. اترك الحقل فارغًا لاستخدام سعر الليلة الأساسي. يرى الضيوف الإجمالي الدقيق لتواريخهم.',
+    'pricing.weekendPrice': 'سعر عطلة الأسبوع (الجمعة والسبت)',
+    'pricing.monthlyPrices': 'سعر الليلة لكل شهر',
+    'pricing.base': 'الأساسي',
+    'pricing.weekend': 'عطلة الأسبوع',
+    'pricing.seasonalNote': 'تُطبَّق أسعار عطلات الأسبوع والمواسم',
+    'pricing.perNightAvg': '/ الليلة (متوسط)',
+    'pricing.stayDiscount': 'خصم حسب مدة الإقامة −{percent}٪',
+    'pricing.calculating': 'جارٍ حساب سعرك الدقيق…',
+    'pricing.save': 'حفظ التسعير',
+    'pricing.saved': 'تم حفظ التسعير الموسمي.',
+    'pricing.error': 'تعذّر حفظ التسعير. حاول مرة أخرى.',
+    'pricing.activeBadge': 'مُفعّل',
+
+    // ---- Month names (short) — seasonal-pricing grid ---------------------
+    'month.jan': 'يناير',
+    'month.feb': 'فبراير',
+    'month.mar': 'مارس',
+    'month.apr': 'أبريل',
+    'month.may': 'مايو',
+    'month.jun': 'يونيو',
+    'month.jul': 'يوليو',
+    'month.aug': 'أغسطس',
+    'month.sep': 'سبتمبر',
+    'month.oct': 'أكتوبر',
+    'month.nov': 'نوفمبر',
+    'month.dec': 'ديسمبر',
 
     // ---- Growth: promo codes (checkout) ----------------------------------
     'promo.code': 'كود الخصم',

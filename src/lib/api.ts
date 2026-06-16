@@ -69,7 +69,21 @@ export interface Listing {
   // 0 / absent means no discount. Typed optional for older cached shapes.
   weekly_discount?: number
   monthly_discount?: number
+  // Seasonal / variable pricing, set by the host. `weekend_price` is the nightly
+  // EGP charged for Friday + Saturday nights (null/absent → the base
+  // price_per_night applies). `monthly_prices` maps a month number ("1".."12")
+  // to that month's nightly EGP — only the months the host filled in are present.
+  // The backend's quote endpoint applies these per-night; the base price is the
+  // fallback for any night not covered. Typed optional for older cached shapes.
+  weekend_price?: number | null
+  monthly_prices?: MonthlyPrices
 }
+
+// Per-month nightly overrides. Keyed by month number as a STRING ("1" = January
+// … "12" = December) → nightly EGP. Mirrors the backend JSON (e.g.
+// { "7": 8500, "8": 9000 } — July & August cost more). Only the months the host
+// set are present; any missing month falls back to the base price_per_night.
+export type MonthlyPrices = Record<string, number>
 
 // ---- Listing search filters -------------------------------------------------
 
@@ -491,6 +505,96 @@ export async function updateListingDiscounts(
     throw new Error((data && data.error) || `Request failed: ${res.status}`)
   }
   return (await res.json()) as Listing
+}
+
+// ---- Growth: seasonal / variable pricing ------------------------------------
+
+// Host updates a listing's seasonal pricing. Bearer must be the listing's host
+// (403 otherwise). `weekend_price` is the nightly EGP for Fri+Sat (null clears
+// it → base price applies); `monthly_prices` maps month "1".."12" → nightly EGP
+// (pass only the months the host set; an empty object clears all overrides).
+// Resolves to the refreshed listing; throws on non-2xx.
+export async function updateListingPricing(
+  token: string,
+  listingId: string,
+  pricing: { weekend_price: number | null; monthly_prices: MonthlyPrices }
+): Promise<Listing> {
+  const res = await fetch(
+    `${API_URL}/api/local/listings/${encodeURIComponent(listingId)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + token,
+      },
+      body: JSON.stringify({
+        weekend_price: pricing.weekend_price,
+        monthly_prices: pricing.monthly_prices,
+      }),
+    }
+  )
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error((data && data.error) || `Request failed: ${res.status}`)
+  }
+  return (await res.json()) as Listing
+}
+
+// The authoritative price for a chosen date range, computed by the backend from
+// the listing's base + weekend + monthly pricing and any length-of-stay
+// discount. `subtotal` is the sum of each night's applicable nightly rate;
+// `nightlyAvg` is subtotal ÷ nights (what the UI shows as "≈ X / night");
+// `discountPercent` is the length-of-stay % applied (0 when none); `total` is
+// subtotal after that discount — the figure the guest proceeds to pay with.
+// `hasSeasonalPricing` is true when weekend/monthly rates affected the quote.
+// All amounts are EGP. Mirrors POST /api/local/listings/:id/quote.
+export interface StayQuote {
+  nights: number
+  subtotal: number
+  discountPercent: number
+  total: number
+  nightlyAvg: number
+  currency: string
+  hasSeasonalPricing: boolean
+}
+
+// Fetch the exact quote for a listing + date range (public, no auth). `checkIn`
+// / `checkOut` are "YYYY-MM-DD"; the range is half-open (checkout night not
+// charged). `signal` lets callers abort a stale request (debounced date edits).
+// Returns null on any non-2xx / parse error so callers can fall back to a naive
+// nights × base estimate.
+export async function getStayQuote(
+  listingId: string,
+  checkIn: string,
+  checkOut: string,
+  signal?: AbortSignal
+): Promise<StayQuote | null> {
+  try {
+    const res = await fetch(
+      `${API_URL}/api/local/listings/${encodeURIComponent(listingId)}/quote`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ checkIn, checkOut }),
+        cache: 'no-store',
+        signal,
+      }
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    if (!data || typeof data !== 'object') return null
+    return {
+      nights: Number(data.nights ?? 0),
+      subtotal: Number(data.subtotal ?? 0),
+      discountPercent: Number(data.discountPercent ?? 0),
+      total: Number(data.total ?? 0),
+      nightlyAvg: Number(data.nightlyAvg ?? 0),
+      currency: String(data.currency ?? 'EGP'),
+      hasSeasonalPricing: Boolean(data.hasSeasonalPricing),
+    }
+  } catch {
+    return null
+  }
 }
 
 // ---- Growth: promo codes ----------------------------------------------------
