@@ -72,6 +72,9 @@ export default async function ExplorePage({
     sort?: string
     minPrice?: string
     maxPrice?: string
+    propertyType?: string
+    amenities?: string
+    bbox?: string
   }>
 }) {
   const sp = await searchParams
@@ -89,6 +92,12 @@ export default async function ExplorePage({
   ) as 'recommended' | 'price_asc' | 'price_desc' | 'newest'
   const minPrice = sp.minPrice?.trim() || ''
   const maxPrice = sp.maxPrice?.trim() || ''
+  const propertyType = sp.propertyType?.trim() || ''
+  // Comma-separated canonical amenity strings; split + trim + drop blanks.
+  const amenities = (sp.amenities?.split(',') || [])
+    .map((a) => a.trim())
+    .filter(Boolean)
+  const bbox = sp.bbox?.trim() || ''
 
   const params = new URLSearchParams()
   if (location) params.set('location', location)
@@ -99,6 +108,9 @@ export default async function ExplorePage({
   if (sort !== 'recommended') params.set('sort', sort)
   if (minPrice) params.set('minPrice', minPrice)
   if (maxPrice) params.set('maxPrice', maxPrice)
+  if (propertyType) params.set('propertyType', propertyType)
+  if (amenities.length) params.set('amenities', amenities.join(','))
+  if (bbox) params.set('bbox', bbox)
 
   const listings = await fetchListings(params.toString())
 
@@ -188,6 +200,9 @@ export default async function ExplorePage({
           sort,
           minPrice,
           maxPrice,
+          propertyType,
+          amenities,
+          bbox,
         }}
       />
 

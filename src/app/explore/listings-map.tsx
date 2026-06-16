@@ -28,7 +28,15 @@ import GoogleListingsMap from './google-listings-map'
 const GOOGLE_MAPS_API_KEY =
   process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 'AIzaSyBigDJt5v66YrCqY-kd-V7AdU8fJl3N5_I'
 
-export default function ListingsMap({ listings }: { listings: Listing[] }) {
+export default function ListingsMap({
+  listings,
+  onSearchArea,
+}: {
+  listings: Listing[]
+  // Forwarded to whichever map renders: fired with the current viewport bbox
+  // ("minLng,minLat,maxLng,maxLat") when the user taps "Search this area".
+  onSearchArea?: (bbox: string) => void
+}) {
   const [googleFailed, setGoogleFailed] = useState(false)
   if (GOOGLE_MAPS_API_KEY && !googleFailed) {
     return (
@@ -36,8 +44,9 @@ export default function ListingsMap({ listings }: { listings: Listing[] }) {
         listings={listings}
         apiKey={GOOGLE_MAPS_API_KEY}
         onError={() => setGoogleFailed(true)}
+        onSearchArea={onSearchArea}
       />
     )
   }
-  return <LeafletListingsMap listings={listings} />
+  return <LeafletListingsMap listings={listings} onSearchArea={onSearchArea} />
 }

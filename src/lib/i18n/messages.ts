@@ -94,6 +94,36 @@ export const messages: Record<Lang, Dict> = {
     'explore.noResultsBody': 'Try widening your dates or location.',
     'explore.loadingMap': 'Loading map…',
 
+    // ---- Discovery filters (amenities, property type, search this area) ---
+    'filters.amenities': 'Amenities',
+    'filters.amenitiesSelected': '{count} selected',
+    'filters.propertyType': 'Property type',
+    'filters.anyType': 'Any type',
+    'filters.apply': 'Apply',
+    'filters.clear': 'Clear',
+    'filters.searchThisArea': 'Search this area',
+    // Property types (values sent to the API stay English-canonical)
+    'propertyType.Apartment': 'Apartment',
+    'propertyType.Chalet': 'Chalet',
+    'propertyType.House': 'House',
+    'propertyType.Villa': 'Villa',
+    // Amenity labels (values sent to the API stay English-canonical)
+    'amenity.WiFi': 'WiFi',
+    'amenity.Pool': 'Pool',
+    'amenity.Kitchen': 'Kitchen',
+    'amenity.Air conditioning': 'Air conditioning',
+    'amenity.Free parking': 'Free parking',
+    'amenity.Washer': 'Washer',
+    'amenity.TV': 'TV',
+    'amenity.Heating': 'Heating',
+    'amenity.Workspace': 'Workspace',
+    'amenity.Gym': 'Gym',
+    'amenity.Beach access': 'Beach access',
+    'amenity.Pets allowed': 'Pets allowed',
+    'amenity.Hot tub': 'Hot tub',
+    'amenity.BBQ grill': 'BBQ grill',
+    'amenity.Breakfast': 'Breakfast',
+
     // ---- Listing card -----------------------------------------------------
     'listing.perNight': '/ night',
     'listing.guestFavorite': 'Guest favorite',
@@ -390,6 +420,36 @@ export const messages: Record<Lang, Dict> = {
     'explore.noResultsTitle': 'لا توجد إقامات تطابق بحثك',
     'explore.noResultsBody': 'جرّب توسيع التواريخ أو الوجهة.',
     'explore.loadingMap': 'جارٍ تحميل الخريطة…',
+
+    // ---- Discovery filters (amenities, property type, search this area) ---
+    'filters.amenities': 'المرافق',
+    'filters.amenitiesSelected': 'تم اختيار {count}',
+    'filters.propertyType': 'نوع العقار',
+    'filters.anyType': 'كل الأنواع',
+    'filters.apply': 'تطبيق',
+    'filters.clear': 'مسح',
+    'filters.searchThisArea': 'ابحث في هذه المنطقة',
+    // أنواع العقارات (القيمة المرسلة للخادم تبقى بالإنجليزية)
+    'propertyType.Apartment': 'شقة',
+    'propertyType.Chalet': 'شاليه',
+    'propertyType.House': 'منزل',
+    'propertyType.Villa': 'فيلا',
+    // أسماء المرافق (القيمة المرسلة للخادم تبقى بالإنجليزية)
+    'amenity.WiFi': 'واي فاي',
+    'amenity.Pool': 'حمام سباحة',
+    'amenity.Kitchen': 'مطبخ',
+    'amenity.Air conditioning': 'تكييف',
+    'amenity.Free parking': 'موقف سيارات مجاني',
+    'amenity.Washer': 'غسالة',
+    'amenity.TV': 'تلفزيون',
+    'amenity.Heating': 'تدفئة',
+    'amenity.Workspace': 'مساحة عمل',
+    'amenity.Gym': 'صالة رياضية',
+    'amenity.Beach access': 'وصول إلى الشاطئ',
+    'amenity.Pets allowed': 'يُسمح بالحيوانات الأليفة',
+    'amenity.Hot tub': 'جاكوزي',
+    'amenity.BBQ grill': 'شواية',
+    'amenity.Breakfast': 'إفطار',
 
     // ---- Listing card -----------------------------------------------------
     'listing.perNight': '/ الليلة',

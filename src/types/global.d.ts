@@ -16,6 +16,10 @@ interface QkGLatLngBounds {
   extend(p: { lat: number; lng: number }): void
   isEmpty(): boolean
   getCenter(): QkGLatLng
+  // Corner accessors — used by the explore "Search this area" button to read the
+  // current viewport from map.getBounds().
+  getNorthEast(): QkGLatLng
+  getSouthWest(): QkGLatLng
 }
 interface QkGMap {
   fitBounds(bounds: QkGLatLngBounds, padding?: number): void
@@ -23,6 +27,9 @@ interface QkGMap {
   // Smooth recenter — used when a Places Autocomplete result is picked.
   panTo?: (p: { lat: number; lng: number }) => void
   setZoom(z: number): void
+  // Current viewport bounds — used by the explore "Search this area" button.
+  // Optional/undefined until the map has finished its first layout.
+  getBounds?: () => QkGLatLngBounds | null | undefined
   // Map clicks carry the clicked coordinate in `latLng`; used by the host
   // add-listing pin-picker (host/location-picker.tsx).
   addListener(event: string, handler: (e: QkGMapMouseEvent) => void): void

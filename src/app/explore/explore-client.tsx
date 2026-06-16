@@ -6,7 +6,13 @@
 // search re-fetches the backend API directly.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { API_URL, type Listing } from '@/lib/api'
+import {
+  API_URL,
+  buildListingQuery,
+  getListings,
+  type ListingFilters,
+  type Listing,
+} from '@/lib/api'
 import { fetchWishlistIds } from '@/lib/wishlist'
 import DatePickerField from '../_components/date-picker-field'
 import ImagePlaceholder from '../_components/image-placeholder'
@@ -77,6 +83,32 @@ const SORT_OPTIONS: { value: Sort; labelKey: string }[] = [
   { value: 'newest', labelKey: 'explore.sort.newest' },
 ]
 
+// Coarse property types the backend matches case-insensitively. Kept in sync
+// with the host add-listing vocabulary; the value is sent verbatim as
+// `propertyType=`. Each label is translated via `propertyType.<value>`.
+const PROPERTY_TYPES = ['Apartment', 'Chalet', 'House', 'Villa'] as const
+
+// Canonical amenity strings (identical to the host add-listing AMENITIES). The
+// English value is sent to the API as part of `amenities=`; the visible label is
+// translated via `amenity.<value>`. A listing must have ALL selected amenities.
+const AMENITIES = [
+  'WiFi',
+  'Pool',
+  'Kitchen',
+  'Air conditioning',
+  'Free parking',
+  'Washer',
+  'TV',
+  'Heating',
+  'Workspace',
+  'Gym',
+  'Beach access',
+  'Pets allowed',
+  'Hot tub',
+  'BBQ grill',
+  'Breakfast',
+] as const
+
 interface Filters {
   location: string
   checkIn: string
@@ -86,6 +118,12 @@ interface Filters {
   sort: Sort
   minPrice: string
   maxPrice: string
+  // Discovery filters. `propertyType` is one coarse type or '' (any); `amenities`
+  // is the set the listing must have ALL of; `bbox` is the map viewport set by
+  // "Search this area" ('' when not constrained to a viewport).
+  propertyType: string
+  amenities: string[]
+  bbox: string
 }
 
 interface Props {
@@ -93,17 +131,11 @@ interface Props {
   initialFilters: Filters
 }
 
+// Serialize the local Filters into the backend query string. The Filters fields
+// already mirror ListingFilters one-to-one, so we delegate to the shared builder
+// in lib/api (keeps param names + omit rules identical to the server fetch).
 function buildQuery(f: Filters): string {
-  const params = new URLSearchParams()
-  if (f.location.trim()) params.set('location', f.location.trim())
-  if (f.checkIn) params.set('checkIn', f.checkIn)
-  if (f.checkOut) params.set('checkOut', f.checkOut)
-  if (f.guests.trim()) params.set('guests', f.guests.trim())
-  if (f.region) params.set('region', f.region)
-  if (f.sort && f.sort !== 'recommended') params.set('sort', f.sort)
-  if (f.minPrice.trim()) params.set('minPrice', f.minPrice.trim())
-  if (f.maxPrice.trim()) params.set('maxPrice', f.maxPrice.trim())
-  return params.toString()
+  return buildListingQuery(f as ListingFilters)
 }
 
 const EMPTY: Filters = {
@@ -115,6 +147,9 @@ const EMPTY: Filters = {
   sort: 'recommended',
   minPrice: '',
   maxPrice: '',
+  propertyType: '',
+  amenities: [],
+  bbox: '',
 }
 
 export default function ExploreClient({ initialListings, initialFilters }: Props) {
@@ -153,12 +188,7 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
     setSearching(true)
     setSearchError(false)
     try {
-      const res = await fetch(
-        `${API_URL}/api/local/listings${query ? `?${query}` : ''}`,
-        { signal: controller.signal }
-      )
-      if (!res.ok) throw new Error(`Request failed: ${res.status}`)
-      const data: Listing[] = await res.json()
+      const data = await getListings(f as ListingFilters, controller.signal)
       // Ignore stale responses that lost the race.
       if (!controller.signal.aborted) setListings(data)
     } catch (err) {
@@ -177,10 +207,19 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
   }, [])
 
   // Debounce location typing (~300ms); fire dates/guests immediately.
+  // A "Search this area" bbox is tied to a specific viewport, so changing a broad
+  // filter (where/dates/guests/region/sort/price) drops it — amenities and
+  // property type are allowed to compose with an active area, so they keep it.
   const updateFilter = useCallback(
     (patch: Partial<Filters>, opts?: { debounce?: boolean }) => {
+      const composesWithArea =
+        'bbox' in patch ||
+        Object.keys(patch).every(
+          (k) => k === 'amenities' || k === 'propertyType'
+        )
       setFilters((prev) => {
         const next = { ...prev, ...patch }
+        if (!composesWithArea) next.bbox = ''
         if (debounceRef.current) clearTimeout(debounceRef.current)
         if (opts?.debounce) {
           debounceRef.current = setTimeout(() => runSearch(next), 300)
@@ -192,6 +231,40 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
     },
     [runSearch]
   )
+
+  // Toggle a single amenity on/off (keeps any active "Search this area" bbox).
+  const toggleAmenity = useCallback(
+    (amenity: string) => {
+      setFilters((prev) => {
+        const has = prev.amenities.includes(amenity)
+        const amenities = has
+          ? prev.amenities.filter((a) => a !== amenity)
+          : [...prev.amenities, amenity]
+        const next = { ...prev, amenities }
+        if (debounceRef.current) clearTimeout(debounceRef.current)
+        runSearch(next)
+        return next
+      })
+    },
+    [runSearch]
+  )
+
+  // Reset only the discovery filters (amenities + property type). Other filters
+  // (region/dates/guests/price/sort) and any active area are preserved.
+  const clearDiscoveryFilters = useCallback(() => {
+    setFilters((prev) => {
+      const next = { ...prev, amenities: [], propertyType: '' }
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      runSearch(next)
+      return next
+    })
+  }, [runSearch])
+
+  // "Search this area" — refetch listings within the map's current viewport,
+  // merged with every other active filter (amenities/propertyType/region/…).
+  const searchThisArea = useCallback((bbox: string) => {
+    updateFilter({ bbox })
+  }, [updateFilter])
 
   const clearAll = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -754,6 +827,109 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
         </div>
       </section>
 
+      {/* Discovery filters: property type (single-select, "Any type" default) +
+          amenities (multi-select chips). Both merge with the existing filters and
+          refetch on change; the "Clear" link resets just these two. */}
+      <section style={{ background: COLORS.page, padding: '20px 24px 0' }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+          {/* Property type */}
+          <div>
+            <span style={controlLabel}>{t('filters.propertyType')}</span>
+            <div
+              role="tablist"
+              aria-label={t('filters.propertyType')}
+              style={{
+                display: 'inline-flex',
+                flexWrap: 'wrap',
+                background: COLORS.tan,
+                borderRadius: 999,
+                padding: 4,
+                gap: 4,
+              }}
+            >
+              <ToggleButton
+                label={t('filters.anyType')}
+                active={filters.propertyType === ''}
+                onClick={() => updateFilter({ propertyType: '' })}
+                role="tab"
+              />
+              {PROPERTY_TYPES.map((pt) => (
+                <ToggleButton
+                  key={pt}
+                  label={t('propertyType.' + pt)}
+                  active={filters.propertyType === pt}
+                  onClick={() =>
+                    updateFilter({
+                      propertyType: filters.propertyType === pt ? '' : pt,
+                    })
+                  }
+                  role="tab"
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Amenities (multi-select chips) */}
+          <div style={{ marginTop: 18 }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'baseline',
+                gap: 12,
+                flexWrap: 'wrap',
+                marginBottom: 6,
+              }}
+            >
+              <span style={{ ...controlLabel, marginBottom: 0 }}>
+                {t('filters.amenities')}
+              </span>
+              {filters.amenities.length > 0 && (
+                <span style={{ fontSize: 13, color: COLORS.muted }}>
+                  {t('filters.amenitiesSelected', {
+                    count: filters.amenities.length,
+                  })}
+                </span>
+              )}
+              {(filters.amenities.length > 0 || filters.propertyType !== '') && (
+                <button
+                  type="button"
+                  onClick={clearDiscoveryFilters}
+                  style={{
+                    appearance: 'none',
+                    border: 'none',
+                    background: 'transparent',
+                    color: COLORS.burgundy,
+                    fontWeight: 700,
+                    fontSize: 13,
+                    fontFamily: FONT,
+                    cursor: 'pointer',
+                    padding: 0,
+                    textDecoration: 'underline',
+                    marginInlineStart: 'auto',
+                  }}
+                >
+                  {t('filters.clear')}
+                </button>
+              )}
+            </div>
+            <div
+              role="group"
+              aria-label={t('filters.amenities')}
+              style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}
+            >
+              {AMENITIES.map((a) => (
+                <AmenityChip
+                  key={a}
+                  label={t('amenity.' + a)}
+                  active={filters.amenities.includes(a)}
+                  onClick={() => toggleAmenity(a)}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Status row: result count + searching indicator + clear + List/Map toggle */}
       <section style={{ background: COLORS.page, padding: '18px 24px 4px' }}>
         <div
@@ -886,7 +1062,7 @@ export default function ExploreClient({ initialListings, initialFilters }: Props
         }}
       >
         {view === 'map' ? (
-          <ListingsMap listings={listings} />
+          <ListingsMap listings={listings} onSearchArea={searchThisArea} />
         ) : listings.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '64px 24px', color: COLORS.muted }}>
             <p style={{ margin: 0, fontSize: 20, fontWeight: 600, color: COLORS.ink }}>
@@ -1257,6 +1433,66 @@ function RegionChip({
           · {count}
         </span>
       )}
+    </button>
+  )
+}
+
+// A toggleable amenity chip for the multi-select. Mirrors the host add-listing
+// amenity chips (a leading ✓ when on, + when off) and the boutique burgundy
+// fill. `aria-pressed` exposes the toggle state to assistive tech.
+function AmenityChip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className="qk-chip"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 8,
+        appearance: 'none',
+        cursor: 'pointer',
+        fontFamily: FONT,
+        fontSize: 14,
+        fontWeight: 600,
+        padding: '9px 16px',
+        borderRadius: 999,
+        whiteSpace: 'nowrap',
+        color: active ? '#fff' : COLORS.ink,
+        background: active ? GRAD_BURGUNDY : '#fff',
+        border: active
+          ? '1px solid transparent'
+          : '1px solid rgba(42,34,32,0.14)',
+        boxShadow: active
+          ? '0 8px 20px rgba(91,15,22,0.22)'
+          : '0 2px 8px rgba(42,34,32,0.06)',
+      }}
+    >
+      <span
+        aria-hidden="true"
+        style={{
+          display: 'inline-flex',
+          width: 16,
+          height: 16,
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 13,
+          fontWeight: 800,
+          color: active ? '#fff' : COLORS.burgundy,
+        }}
+      >
+        {active ? '✓' : '+'}
+      </span>
+      {label}
     </button>
   )
 }

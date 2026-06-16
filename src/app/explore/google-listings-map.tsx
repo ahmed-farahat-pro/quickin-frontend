@@ -6,8 +6,9 @@
 // "EGP price" pill per listing. Clicking a pill opens an InfoWindow with a photo
 // thumbnail + title + location + price + a link to /explore/[id]. The map fits
 // its bounds to the markers and rebuilds them whenever the listings change.
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Listing } from '@/lib/api'
+import SearchThisAreaButton from './search-this-area-button'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -153,18 +154,37 @@ export default function GoogleListingsMap({
   listings,
   apiKey,
   onError,
+  onSearchArea,
 }: {
   listings: Listing[]
   apiKey: string
   // Called when Google Maps can't be used (bad/restricted key, billing off,
   // or the script fails to load) so the parent can fall back to Leaflet.
   onError?: () => void
+  // Called with the current viewport bbox ("minLng,minLat,maxLng,maxLat") when
+  // the user taps "Search this area". Omit to hide the button.
+  onSearchArea?: (bbox: string) => void
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<GMap | null>(null)
   const apiRef = useRef<GMapsApi | null>(null)
   const infoRef = useRef<GInfoWindow | null>(null)
   const markersRef = useRef<GMarkerLike[]>([])
+  // Flips true once the map has booted so the "Search this area" overlay only
+  // appears when there's a real viewport to read.
+  const [mapReady, setMapReady] = useState(false)
+
+  // Read the live viewport from the map and hand the parent a GeoJSON-order bbox
+  // (west,south,east,north = minLng,minLat,maxLng,maxLat).
+  const handleSearchArea = () => {
+    const map = mapRef.current
+    if (!map || !onSearchArea || typeof map.getBounds !== 'function') return
+    const b = map.getBounds()
+    if (!b) return
+    const sw = b.getSouthWest()
+    const ne = b.getNorthEast()
+    onSearchArea(`${sw.lng()},${sw.lat()},${ne.lng()},${ne.lat()}`)
+  }
 
   // Only listings with real coordinates can be placed on the map.
   const points = useMemo<GeoListing[]>(
@@ -281,6 +301,7 @@ export default function GoogleListingsMap({
           })
         }
         renderMarkers(api, mapRef.current)
+        setMapReady(true)
       })
       .catch((err) => {
         // Expected when the Maps key is invalid/restricted or billing is off.
@@ -307,6 +328,7 @@ export default function GoogleListingsMap({
   return (
     <div
       style={{
+        position: 'relative',
         height: '70vh',
         width: '100%',
         borderRadius: 22,
@@ -315,6 +337,9 @@ export default function GoogleListingsMap({
         boxShadow: '0 6px 24px rgba(42,34,32,0.08)',
       }}
     >
+      {onSearchArea && mapReady && (
+        <SearchThisAreaButton onClick={handleSearchArea} />
+      )}
       <div ref={containerRef} style={{ height: '100%', width: '100%' }} />
     </div>
   )

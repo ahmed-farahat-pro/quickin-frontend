@@ -7,12 +7,13 @@
 // Each listing is drawn as a rounded burgundy "EGP price" pill (an L.divIcon)
 // instead of the default teardrop marker. Clicking a pill opens a popup with a
 // photo thumbnail + title + location + price + a link to /explore/[id].
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { Listing } from '@/lib/api'
 import ImagePlaceholder from '../_components/image-placeholder'
+import SearchThisAreaButton from './search-this-area-button'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -86,7 +87,38 @@ function FitBounds({ points }: { points: GeoListing[] }) {
   return null
 }
 
-export default function LeafletListingsMap({ listings }: { listings: Listing[] }) {
+// Grabs the Leaflet map instance into the parent via a setter. Lives inside
+// MapContainer so useMap() resolves; renders nothing. We read bounds off this
+// instance when "Search this area" is clicked.
+function MapInstanceCapture({ onReady }: { onReady: (map: L.Map) => void }) {
+  const map = useMap()
+  useEffect(() => {
+    onReady(map)
+  }, [map, onReady])
+  return null
+}
+
+export default function LeafletListingsMap({
+  listings,
+  onSearchArea,
+}: {
+  listings: Listing[]
+  // Called with the current viewport bbox ("minLng,minLat,maxLng,maxLat") when
+  // the user taps "Search this area". Omit to hide the button.
+  onSearchArea?: (bbox: string) => void
+}) {
+  const [mapInstance, setMapInstance] = useState<L.Map | null>(null)
+
+  // Read the live viewport from the captured map instance and hand the parent a
+  // GeoJSON-order bbox (west,south,east,north = minLng,minLat,maxLng,maxLat).
+  const handleSearchArea = () => {
+    if (!mapInstance || !onSearchArea) return
+    const b = mapInstance.getBounds()
+    const sw = b.getSouthWest()
+    const ne = b.getNorthEast()
+    onSearchArea(`${sw.lng},${sw.lat},${ne.lng},${ne.lat}`)
+  }
+
   // Only listings with real coordinates can be placed on the map.
   const points = useMemo<GeoListing[]>(
     () =>
@@ -110,6 +142,7 @@ export default function LeafletListingsMap({ listings }: { listings: Listing[] }
   return (
     <div
       style={{
+        position: 'relative',
         height: '70vh',
         width: '100%',
         borderRadius: 22,
@@ -118,12 +151,16 @@ export default function LeafletListingsMap({ listings }: { listings: Listing[] }
         boxShadow: '0 6px 24px rgba(42,34,32,0.08)',
       }}
     >
+      {onSearchArea && mapInstance && (
+        <SearchThisAreaButton onClick={handleSearchArea} />
+      )}
       <MapContainer
         center={initialCenter}
         zoom={initialZoom}
         scrollWheelZoom
         style={{ height: '100%', width: '100%' }}
       >
+        <MapInstanceCapture onReady={setMapInstance} />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

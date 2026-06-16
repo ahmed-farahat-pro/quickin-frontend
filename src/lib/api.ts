@@ -42,6 +42,74 @@ export interface Listing {
   host_name?: string | null
 }
 
+// ---- Listing search filters -------------------------------------------------
+
+// The full set of query filters GET /api/local/listings accepts. All fields are
+// optional; only the populated ones are serialized into the query string by
+// buildListingQuery() below. `amenities` is a list (a listing must have ALL of
+// them); `propertyType` is a single coarse type (matched case-insensitively);
+// `bbox` is a viewport "minLng,minLat,maxLng,maxLat" used by "Search this area".
+export interface ListingFilters {
+  // Free-text destination search. NB: the backend param is `location`.
+  location?: string
+  checkIn?: string
+  checkOut?: string
+  guests?: string
+  region?: string
+  sort?: 'recommended' | 'price_asc' | 'price_desc' | 'newest'
+  minPrice?: string
+  maxPrice?: string
+  // One of: Apartment, Chalet, House, Villa (case-insensitive on the backend).
+  propertyType?: string
+  // Canonical amenity strings (see host AMENITIES). A listing must have ALL.
+  amenities?: string[]
+  // Map viewport as GeoJSON order: west,south,east,north (minLng,minLat,maxLng,maxLat).
+  bbox?: string
+}
+
+// Serialize ListingFilters into a query string for GET /api/local/listings.
+// Empty/whitespace-only/default values are omitted so the URL stays clean and
+// equal filter states produce equal strings (used to skip redundant fetches).
+export function buildListingQuery(f: ListingFilters): string {
+  const params = new URLSearchParams()
+  const loc = f.location?.trim()
+  if (loc) params.set('location', loc)
+  if (f.checkIn) params.set('checkIn', f.checkIn)
+  if (f.checkOut) params.set('checkOut', f.checkOut)
+  const guests = f.guests?.trim()
+  if (guests) params.set('guests', guests)
+  if (f.region) params.set('region', f.region)
+  if (f.sort && f.sort !== 'recommended') params.set('sort', f.sort)
+  const minPrice = f.minPrice?.trim()
+  if (minPrice) params.set('minPrice', minPrice)
+  const maxPrice = f.maxPrice?.trim()
+  if (maxPrice) params.set('maxPrice', maxPrice)
+  const propertyType = f.propertyType?.trim()
+  if (propertyType) params.set('propertyType', propertyType)
+  const amenities = (f.amenities ?? []).map((a) => a.trim()).filter(Boolean)
+  if (amenities.length) params.set('amenities', amenities.join(','))
+  const bbox = f.bbox?.trim()
+  if (bbox) params.set('bbox', bbox)
+  return params.toString()
+}
+
+// Fetch listings from the backend with the given filters. `signal` lets callers
+// abort a stale in-flight request (live search). Throws on a non-2xx response so
+// callers can show an error; returns the parsed Listing[] otherwise.
+export async function getListings(
+  filters: ListingFilters,
+  signal?: AbortSignal
+): Promise<Listing[]> {
+  const query = buildListingQuery(filters)
+  const res = await fetch(
+    `${API_URL}/api/local/listings${query ? `?${query}` : ''}`,
+    { signal }
+  )
+  if (!res.ok) throw new Error(`Request failed: ${res.status}`)
+  const data = await res.json()
+  return Array.isArray(data) ? (data as Listing[]) : []
+}
+
 export interface Booking {
   id: string
   listing_id: string
