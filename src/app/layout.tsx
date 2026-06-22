@@ -1,113 +1,134 @@
-import type { Metadata } from 'next'
-import {
-  DM_Sans,
-  Playfair_Display,
-  Geist_Mono,
-} from 'next/font/google'
-import './globals.css'
-import { JsonLd, organizationLd, webSiteLd } from './_components/structured-data'
-import Providers from './_components/providers'
+import type { Metadata } from "next";
+import { DM_Sans, Playfair_Display, Noto_Sans_Arabic, Amiri, Geist_Mono } from "next/font/google";
+import { NextIntlClientProvider } from 'next-intl'
+import "./globals.css";
+import { Toaster } from "@/components/ui/sonner";
+import { GlobalLoadingBar } from "@/components/ui/global-loading-bar";
+import { RouteProgressBar } from "@/components/ui/route-progress-bar";
+import { getDirection, type Locale } from '@/i18n/config'
+import { getMessages } from '@/i18n/messages'
+import { getRequestLocale } from '@/i18n/request-locale'
+import { AppDirectionProvider } from '@/components/providers/app-direction-provider'
+import { AuthNotification } from '@/components/features/auth/auth-notification'
+import { getBaseUrl } from "@/lib/utils";
 
-// Body font
+// Body fonts
 const dmSans = DM_Sans({
-  variable: '--font-dm-sans',
-  subsets: ['latin'],
-  display: 'swap',
-})
+  variable: "--font-dm-sans",
+  subsets: ["latin"],
+  display: "swap",
+});
 
-// Hero headline font
+const notoSansArabic = Noto_Sans_Arabic({
+  variable: "--font-noto-sans-arabic",
+  subsets: ["arabic", "latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  display: "swap",
+});
+
+// Hero headline fonts
 const playfair = Playfair_Display({
-  variable: '--font-playfair',
-  subsets: ['latin'],
-  display: 'swap',
-})
+  variable: "--font-playfair",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const amiri = Amiri({
+  variable: "--font-amiri",
+  subsets: ["arabic", "latin"],
+  weight: ["400", "700"],
+  display: "swap",
+});
 
 // Mono font
 const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-})
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
 
-// Resolves relative OG/Twitter image URLs (e.g. /logo.png) and canonical URLs.
-// Override by setting NEXT_PUBLIC_SITE_URL to the deployed frontend URL.
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL || 'https://quickin-frontend.vercel.app'
-
-const DESCRIPTION =
-  'QuickIn is a boutique vacation-rental marketplace for Egypt — handpicked stays in the North Coast, Ain Sokhna, El Gouna and Cairo. Search by area, book instantly, pay in EGP. Find it. Book it. Live it.'
+const baseUrl = getBaseUrl();
 
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  metadataBase: new URL(baseUrl),
   title: {
-    default: 'QuickIn — Boutique Vacation Rentals in Egypt',
-    template: '%s | QuickIn',
+    default: "QuickIn - Find It. Book It. Live It.",
+    template: "%s | QuickIn",
   },
-  description: DESCRIPTION,
-  applicationName: 'QuickIn',
-  keywords: [
-    'vacation rentals Egypt',
-    'North Coast rentals',
-    'Ain Sokhna chalets',
-    'El Gouna villas',
-    'Cairo apartments',
-    'boutique stays',
-    'Sahel rentals',
-    'holiday homes Egypt',
-    'book a stay Egypt',
-    'إيجار شاليهات',
-    'إيجار فيلات الساحل الشمالي',
-    'العين السخنة',
-    'الجونة',
-  ],
-  authors: [{ name: 'QuickIn' }],
-  creator: 'QuickIn',
-  publisher: 'QuickIn',
-  category: 'travel',
-  alternates: {
-    canonical: '/',
-    languages: { en: '/', ar: '/' },
+  description: "Curated stays for slow travelers. Handpicked homes designed for comfort, beauty, and calm.",
+  keywords: ["vacation rentals", "boutique stays", "travel", "accommodation", "curated homes", "Egypt"],
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: baseUrl,
+    title: "QuickIn - Find It. Book It. Live It.",
+    description: "Curated stays for slow travelers. Handpicked homes designed for comfort, beauty, and calm.",
+    siteName: "QuickIn",
+    images: [
+      {
+        url: "/logo-icon.png",
+        width: 800,
+        height: 600,
+        alt: "QuickIn Logo",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "QuickIn - Find It. Book It. Live It.",
+    description: "Curated stays for slow travelers. Handpicked homes designed for comfort, beauty, and calm.",
+    images: ["/logo-icon.png"],
   },
   robots: {
     index: true,
     follow: true,
-    googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 },
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
   },
-  icons: { icon: '/logo-icon.png', apple: '/logo-icon.png' },
-  openGraph: {
-    type: 'website',
-    locale: 'en_US',
-    alternateLocale: ['ar_EG'],
-    url: siteUrl,
-    title: 'QuickIn — Boutique Vacation Rentals in Egypt',
-    description: DESCRIPTION,
-    siteName: 'QuickIn',
-    images: [{ url: '/logo-icon.png', width: 800, height: 600, alt: 'QuickIn' }],
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'QuickIn — Boutique Vacation Rentals in Egypt',
-    description: DESCRIPTION,
-    images: ['/logo-icon.png'],
-  },
-}
+};
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode
-}>) {
+  children: React.ReactNode;
+}>)
+{
+  const localePromise = getRequestLocale()
+
+  return <RootLayoutInner localePromise={localePromise}>{children}</RootLayoutInner>
+}
+
+async function RootLayoutInner({
+  children,
+  localePromise,
+}: Readonly<{
+  children: React.ReactNode;
+  localePromise: Promise<Locale>;
+}>)
+{
+  const locale = await localePromise
+  const messages = getMessages(locale)
+  const dir = getDirection(locale)
+
   return (
-    <html
-      lang="en"
-      className={`${dmSans.variable} ${playfair.variable} ${geistMono.variable}`}
-    >
-      <body className="antialiased">
-        {/* Site-wide structured data for SEO rich results + AEO (AI answer engines). */}
-        <JsonLd data={organizationLd()} />
-        <JsonLd data={webSiteLd()} />
-        {/* Client i18n + RTL provider (sets <html lang/dir> after mount). */}
-        <Providers>{children}</Providers>
+    <html lang={locale} dir={dir} className={`${dmSans.variable} ${notoSansArabic.variable} ${playfair.variable} ${amiri.variable} ${geistMono.variable}`}>
+      <body
+        className="font-sans antialiased min-h-screen flex flex-col"
+      >
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <AppDirectionProvider dir={dir}>
+            <RouteProgressBar />
+            <GlobalLoadingBar />
+            <AuthNotification />
+            {children}
+            <Toaster position="top-center" />
+          </AppDirectionProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
-  )
+  );
 }

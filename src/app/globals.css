@@ -1,111 +1,398 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+@import "tw-animate-css";
+
 /* =============================================================================
-   QUICKIN DESIGN SYSTEM (frontend UI-only build)
-   =============================================================================
-   Warm boutique booking-platform aesthetic.
-   The pages style themselves with inline styles + the literal font-family names
-   "DM Sans" / "Playfair Display" / "Geist Mono", which next/font/google exposes
-   via the CSS variables wired up in layout.tsx. This stylesheet keeps the design
-   tokens, base resets, scrollbar styling and Leaflet popup overrides — without
-   pulling in the Tailwind build pipeline (the UI doesn't use Tailwind classes).
+   QUICKIN DESIGN SYSTEM
+   ============================================================================= 
+   Warm boutique booking platform aesthetic
+   "Browsing a travel magazine, not filling a booking form."
    ============================================================================= */
 
+@custom-variant dark (&:is(.dark *));
+
+/* -----------------------------------------------------------------------------
+   QUICKIN THEME - Tailwind v4 Configuration
+   ----------------------------------------------------------------------------- */
+@theme inline {
+  /* QuickIn Color Palette */
+  --color-background: #F6F1E6;
+  --color-background-secondary: #EFE6D8;
+  --color-foreground: #2B2B2B;
+
+  /* Primary - Burgundy */
+  --color-primary: #5B0F16;
+  --color-primary-foreground: #F6F1E6;
+
+  /* Secondary */
+  --color-secondary: #EFE6D8;
+  --color-secondary-foreground: #2B2B2B;
+
+  /* Card */
+  --color-card: #FFFFFF;
+  --color-card-foreground: #2B2B2B;
+
+  /* Popover */
+  --color-popover: #FFFFFF;
+  --color-popover-foreground: #2B2B2B;
+
+  /* Muted */
+  --color-muted: #EFE6D8;
+  --color-muted-foreground: #7A746A;
+
+  /* Accent */
+  --color-accent: #EFE6D8;
+  --color-accent-foreground: #2B2B2B;
+
+  /* Destructive */
+  --color-destructive: #DC2626;
+
+  /* Border & Input */
+  --color-border: #E2D8C8;
+  --color-input: #E2D8C8;
+  --color-ring: #5B0F16;
+
+  /* Chart colors */
+  --color-chart-1: #5B0F16;
+  --color-chart-2: #8B4513;
+  --color-chart-3: #A0522D;
+  --color-chart-4: #CD853F;
+  --color-chart-5: #DEB887;
+
+  /* Sidebar */
+  --color-sidebar: #F6F1E6;
+  --color-sidebar-foreground: #2B2B2B;
+  --color-sidebar-primary: #5B0F16;
+  --color-sidebar-primary-foreground: #F6F1E6;
+  --color-sidebar-accent: #EFE6D8;
+  --color-sidebar-accent-foreground: #2B2B2B;
+  --color-sidebar-border: #E2D8C8;
+  --color-sidebar-ring: #5B0F16;
+
+  /* Typography */
+  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-noto-sans-arabic: var(--font-noto-sans-arabic), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-playfair), Georgia, serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Radius tokens - QuickIn Design Spec */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.625rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
+  --radius-3xl: 1.5rem;
+  --radius-4xl: 2rem;
+  --radius-card: 1.75rem;    /* 28px - for cards */
+  --radius-button: 1.25rem;  /* 20px - for buttons */
+  --radius-input: 1.125rem;  /* 18px - for inputs */
+  --radius-modal: 2rem;      /* 32px - for modals */
+}
+
+/* -----------------------------------------------------------------------------
+   CSS Custom Properties for JS access (Shadcn components)
+   ----------------------------------------------------------------------------- */
 :root {
-  /* QuickIn palette — warm boutique (redesign) */
-  --background: #e4decf; /* page base cream */
-  --surface: #f6f1e6; /* cards / surfaces */
-  --surface-2: #faf6ee; /* row hover */
-  --background-secondary: #efe6d8;
-  --foreground: #2a2220;
-  --card: #ffffff;
-  --primary: #5b0f16;
-  --primary-dark: #45070d;
-  --primary-light: #8a2530;
-  --primary-foreground: #f6f1e6;
-  /* Gold accent — ratings, eyebrows, avatar rings, premium badges */
-  --gold: #b07a2a;
-  --gold-bright: #f3c969;
-  --gold-soft: #d8a55a;
-  --gold-deep: #8a5a00;
-  --secondary: #efe6d8;
-  --muted: #efe6d8;
-  --muted-foreground: #6b6055;
-  --ink-muted: #6b6055;
-  --border: #e2d8c8;
-  --ring: #5b0f16;
+  --radius: 0.625rem;
+  --background: #F6F1E6;
+  --background-secondary: #EFE6D8;
+  --foreground: #2B2B2B;
+  --card: #FFFFFF;
+  --card-foreground: #2B2B2B;
+  --popover: #FFFFFF;
+  --popover-foreground: #2B2B2B;
+  --primary: #5B0F16;
+  --primary-foreground: #F6F1E6;
+  --secondary: #EFE6D8;
+  --secondary-foreground: #2B2B2B;
+  --muted: #EFE6D8;
+  --muted-foreground: #7A746A;
+  --accent: #EFE6D8;
+  --accent-foreground: #2B2B2B;
+  --destructive: #DC2626;
+  --border: #E2D8C8;
+  --input: #E2D8C8;
+  --ring: #5B0F16;
+  --chart-1: #5B0F16;
+  --chart-2: #8B4513;
+  --chart-3: #A0522D;
+  --chart-4: #CD853F;
+  --chart-5: #DEB887;
+  --sidebar: #F6F1E6;
+  --sidebar-foreground: #2B2B2B;
+  --sidebar-primary: #5B0F16;
+  --sidebar-primary-foreground: #F6F1E6;
+  --sidebar-accent: #EFE6D8;
+  --sidebar-accent-foreground: #2B2B2B;
+  --sidebar-border: #E2D8C8;
+  --sidebar-ring: #5B0F16;
+}
 
-  /* Gradients (redesign) */
-  --grad-burgundy: linear-gradient(135deg, #5b0f16, #8a2530);
-  --grad-burgundy-deep: linear-gradient(180deg, #5b0f16, #45070d);
-  --grad-gold: linear-gradient(135deg, #b07a2a, #d8a55a);
-  --grad-tan: linear-gradient(135deg, #e7ddcb, #d8cdb8);
-
-  /* Shadows (redesign) */
-  --shadow-card: 0 8px 22px rgba(42, 34, 32, 0.1);
-  --shadow-card-hover: 0 22px 48px rgba(42, 34, 32, 0.18);
-  --shadow-btn: 0 10px 24px rgba(91, 15, 22, 0.28);
-
-  /* Typography — next/font/google sets these vars in layout.tsx. The fallbacks
-     also expose the literal family names used by the pages' inline styles. */
-  --font-sans: var(--font-dm-sans), 'DM Sans', ui-sans-serif, system-ui,
-    -apple-system, sans-serif;
-  --font-serif: var(--font-playfair), 'Playfair Display', Georgia, serif;
-  --font-mono: var(--font-geist-mono), 'Geist Mono', ui-monospace, monospace;
-
-  /* Radius tokens */
-  --radius-card: 1.75rem;
-  --radius-button: 1.25rem;
-  --radius-input: 1.125rem;
-  --radius-modal: 2rem;
+/* Dark mode kept for compatibility */
+.dark {
+  --background: #1A1512;
+  --background-secondary: #242018;
+  --foreground: #F6F1E6;
+  --card: #242018;
+  --card-foreground: #F6F1E6;
+  --popover: #242018;
+  --popover-foreground: #F6F1E6;
+  --primary: #D4A574;
+  --primary-foreground: #1A1512;
+  --secondary: #2D2820;
+  --secondary-foreground: #F6F1E6;
+  --muted: #2D2820;
+  --muted-foreground: #A09080;
+  --accent: #2D2820;
+  --accent-foreground: #F6F1E6;
+  --destructive: #EF4444;
+  --border: rgba(246, 241, 230, 0.1);
+  --input: rgba(246, 241, 230, 0.15);
+  --ring: #D4A574;
+  --sidebar: hsl(240 5.9% 10%);
+  --sidebar-foreground: hsl(240 4.8% 95.9%);
+  --sidebar-primary: hsl(224.3 76.3% 48%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-accent: hsl(240 3.7% 15.9%);
+  --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
+  --sidebar-border: hsl(240 3.7% 15.9%);
+  --sidebar-ring: hsl(217.2 91.2% 59.8%);
 }
 
 /* -----------------------------------------------------------------------------
    BASE STYLES
    ----------------------------------------------------------------------------- */
-* {
-  box-sizing: border-box;
-}
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
 
-html,
-body {
-  margin: 0;
-  padding: 0;
-  background-color: #e4decf;
-  color: #2a2220;
-  font-family: var(--font-sans);
-}
+  /* Locale-aware font stacks */
 
-body {
-  min-height: 100vh;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  font-feature-settings: 'rlig' 1, 'calt' 1;
-}
+  html[lang='ar'] body,
+  html[lang='ar'] .font-sans {
+    font-family: var(--font-noto-sans-arabic), ui-sans-serif, system-ui, sans-serif !important;
+  }
 
-.antialiased {
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+  html[lang='ar'] .font-serif,
+  html[lang='ar'] .text-hero {
+    font-family: var(--font-amiri), Georgia, serif !important;
+  }
 
-/* Proper cursors for interactive elements */
-button,
-[role='button'],
-[type='button'],
-[type='submit'],
-[type='reset'],
-a[href],
-select,
-[tabindex]:not([tabindex='-1']) {
-  cursor: pointer;
-}
+  .ar-font-hero {
+    font-family: var(--font-amiri), Georgia, serif;
+  }
 
-button:disabled,
-[role='button'][aria-disabled='true'],
-[disabled] {
-  cursor: not-allowed;
+  .ar-font-body {
+    font-family: var(--font-noto-sans-arabic), ui-sans-serif, system-ui, sans-serif;
+  }
+
+  html, body {
+    background-color: #F6F1E6;
+    color: #2B2B2B;
+  }
+
+  body {
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Ensure proper cursor for interactive elements */
+  button,
+  [role="button"],
+  [type="button"],
+  [type="submit"],
+  [type="reset"],
+  a[href],
+  select,
+  [tabindex]:not([tabindex="-1"]) {
+    cursor: pointer;
+  }
+
+  /* Disabled elements */
+  button:disabled,
+  [role="button"][aria-disabled="true"],
+  [disabled] {
+    cursor: not-allowed;
+  }
 }
 
 /* -----------------------------------------------------------------------------
-   SCROLLBAR — custom QuickIn styling
+   QUICKIN UTILITIES
+   ----------------------------------------------------------------------------- */
+@layer utilities {
+  /* Glass UI - for floating elements (search bar, sticky nav, modals) */
+  .glass {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+  }
+
+  .glass-strong {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+  }
+
+  /* Card shadow - per design spec */
+  .card-shadow {
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+  }
+
+  /* Glass card wrapper - outer frosted glass border */
+  .glass-card-wrapper {
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2rem;
+    box-shadow: 
+      0 8px 32px rgba(0, 0, 0, 0.08),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+  }
+
+  /* Inner solid card - ivory/cream background */
+  .glass-card-inner {
+    background: #FDFBF7;
+    border-radius: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+
+  /* Hero text styling - Playfair Display (EN) / Amiri (AR) */
+  .text-hero {
+    font-family: var(--font-serif);
+  }
+
+  /* QuickIn specific border radius */
+  .rounded-card {
+    border-radius: 1.75rem;
+  }
+
+  .rounded-button {
+    border-radius: 1.25rem;
+  }
+
+  .rounded-input {
+    border-radius: 1.125rem;
+  }
+
+  .rounded-modal {
+    border-radius: 2rem;
+  }
+
+  /* Cream background override */
+  .bg-background {
+    background-color: #F6F1E6;
+  }
+
+  /* Primary button override */
+  .bg-primary {
+    background-color: #5B0F16;
+  }
+
+  .text-primary {
+    color: #5B0F16;
+  }
+
+  .border-primary {
+    border-color: #5B0F16;
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   COMPONENT OVERRIDES - Ensure warm theme applies
+   ----------------------------------------------------------------------------- */
+/* Header/Navbar */
+header {
+  background-color: #F6F1E6;
+}
+
+/* Category bar */
+.sticky.top-20 {
+  background-color: rgba(246, 241, 230, 0.95);
+}
+
+/* Cards should be white on cream background */
+.bg-card {
+  background-color: #FFFFFF;
+}
+
+/* Muted backgrounds */
+.bg-muted {
+  background-color: #EFE6D8;
+}
+
+.bg-secondary {
+  background-color: #EFE6D8;
+}
+
+/* Border color */
+.border-border {
+  border-color: #E2D8C8;
+}
+
+/* -----------------------------------------------------------------------------
+   REACT PHONE NUMBER INPUT - QuickIn Theme
+   ----------------------------------------------------------------------------- */
+.PhoneInput {
+  --PhoneInputCountrySelectArrow-color: #7A746A;
+  --PhoneInput-color--focus: #5B0F16;
+}
+
+.PhoneInputInput {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.PhoneInputInput::placeholder {
+  color: #7A746A;
+}
+
+.PhoneInputCountry {
+  display: flex;
+  align-items: center;
+  margin-right: 0.5rem;
+  padding-right: 0.5rem;
+  border-right: 1px solid #E2D8C8;
+}
+
+.PhoneInputCountryIcon {
+  width: 1.25rem;
+  height: auto;
+  border-radius: 2px;
+}
+
+.PhoneInputCountrySelect {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.PhoneInputCountrySelectArrow {
+  width: 0.35rem;
+  margin-left: 0.35rem;
+}
+
+/* -----------------------------------------------------------------------------
+   LOADING BAR ANIMATION
+   ----------------------------------------------------------------------------- */
+@keyframes loading-bar {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(100%); }
+  100% { transform: translateX(300%); }
+}
+
+/* -----------------------------------------------------------------------------
+   SCROLLBAR - Custom QuickIn Styling
    ----------------------------------------------------------------------------- */
 ::-webkit-scrollbar {
   width: 8px;
@@ -117,17 +404,18 @@ button:disabled,
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #e2d8c8;
+  background: #E2D8C8; /* border color */
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #7a746a;
+  background: #7A746A; /* muted-foreground */
 }
 
+/* For Firefox */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #e2d8c8 transparent;
+  scrollbar-color: #E2D8C8 transparent;
 }
 
 /* -----------------------------------------------------------------------------
@@ -143,83 +431,7 @@ button:disabled,
   margin: 0 !important;
 }
 
-/* =============================================================================
-   ANIMATION KIT (redesign) — keyframes + interaction classes (verbatim spec)
-   ============================================================================= */
-@keyframes qkSwap { from { transform: translateX(14px); } to { transform: translateX(0); } }
-@keyframes qkOver { from { transform: translateX(34px); } to { transform: translateX(0); } }
-@keyframes qkZoom { from { transform: scale(1); } to { transform: scale(1.09); } }
-@keyframes qkPop { 0% { transform: scale(0.5); } 60% { transform: scale(1.1); } 100% { transform: scale(1); } }
-@keyframes qkDraw { from { stroke-dashoffset: 40; } to { stroke-dashoffset: 0; } }
-@keyframes qkSlideUp { from { transform: translateY(36px); } to { transform: translateY(0); } }
-@keyframes qkPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(91,15,22,0.30); } 50% { box-shadow: 0 0 0 10px rgba(91,15,22,0); } }
-.qk-screen { animation: qkSwap 0.42s cubic-bezier(0.22,1,0.36,1) both; }
-.qk-over { animation: qkOver 0.4s cubic-bezier(0.22,1,0.36,1) both; }
-.qk-card { transition: transform 0.4s cubic-bezier(0.22,1,0.36,1), box-shadow 0.4s ease; }
-.qk-card:hover { transform: translateY(-6px); box-shadow: 0 22px 48px rgba(42,34,32,0.18); }
-.qk-img-zoom { transition: transform 1.5s cubic-bezier(0.22,1,0.36,1); }
-.qk-card:hover .qk-img-zoom { transform: scale(1.07); }
-.qk-kenburns { animation: qkZoom 14s ease-in-out infinite alternate; }
-.qk-heart { transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); }
-.qk-heart:hover { transform: scale(1.16); }
-.qk-press { transition: transform 0.22s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.3s ease, filter 0.2s ease; }
-.qk-press:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(91,15,22,0.3); }
-.qk-press:active { transform: scale(0.97); }
-.qk-tap { transition: transform 0.2s ease, background 0.25s ease; cursor: pointer; }
-.qk-tap:active { transform: scale(0.98); }
-.qk-chip { transition: transform 0.25s ease, background 0.3s ease, color 0.3s ease, border-color 0.3s ease; cursor: pointer; }
-.qk-chip:hover { transform: translateY(-2px); }
-.qk-row { transition: background 0.25s ease; cursor: pointer; }
-.qk-row:hover { background: #faf6ee; }
-
-/* Pulsing CTA ring — applied to primary call-to-action buttons. */
-.qk-pulse { animation: qkPulse 2.4s ease-out infinite; }
-/* Pop-in for badges / hearts / confirmed checks. */
-.qk-pop { animation: qkPop 0.6s cubic-bezier(0.34,1.56,0.64,1) both; }
-
-/* Travel "boarding pass" motif (mirrors the iOS header): a plane climbs in along
-   a dashed gold contrail that draws left→right, then the hero text is delivered
-   with a soft rise. Stagger entrances with an inline animation-delay. */
-@keyframes qkFly {
-  0%   { transform: translateX(-180px) translateY(12px) rotate(-12deg); opacity: 0; }
-  55%  { opacity: 1; }
-  100% { transform: translateX(0) translateY(0) rotate(0deg); opacity: 1; }
-}
-@keyframes qkContrail { from { clip-path: inset(0 100% 0 0); opacity: 0; } to { clip-path: inset(0 0 0 0); opacity: 1; } }
-@keyframes qkReveal { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
-.qk-fly { animation: qkFly 1.5s cubic-bezier(0.22,1,0.36,1) both; }
-.qk-contrail { animation: qkContrail 1.6s cubic-bezier(0.22,1,0.36,1) both; }
-.qk-reveal { animation: qkReveal 0.7s cubic-bezier(0.22,1,0.36,1) both; }
-
-/* Respect reduced-motion preferences — keep transforms/transitions calm. */
-@media (prefers-reduced-motion: reduce) {
-  .qk-kenburns,
-  .qk-pulse,
-  .qk-pop,
-  .qk-fly,
-  .qk-contrail,
-  .qk-reveal,
-  .qk-screen,
-  .qk-over { animation: none !important; }
-  .qk-card,
-  .qk-img-zoom,
-  .qk-heart,
-  .qk-press,
-  .qk-tap,
-  .qk-chip { transition: none !important; }
-}
-
 /* -----------------------------------------------------------------------------
-   RTL-SAFE HELPERS
-   The i18n layer flips <html dir="rtl"> for Arabic. The qk-screen / qk-over
-   enter animations slide in from the inline-end; mirror their X translate under
-   RTL so content still flies in from the correct edge. Other classes are
-   transform-symmetric (scale / translateY) and need no mirroring.
+   Arabic Custom Variant
    ----------------------------------------------------------------------------- */
-[dir='rtl'] .qk-screen { animation-name: qkSwapRtl; }
-[dir='rtl'] .qk-over { animation-name: qkOverRtl; }
-@keyframes qkSwapRtl { from { transform: translateX(-14px); } to { transform: translateX(0); } }
-@keyframes qkOverRtl { from { transform: translateX(-34px); } to { transform: translateX(0); } }
-
-/* Gold star used for ratings (kept crisp regardless of UI lang). */
-.qk-star { color: #b07a2a; }
+@custom-variant ar (&:is(html[lang="ar"] *));

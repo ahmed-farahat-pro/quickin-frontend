@@ -2,8 +2,8 @@
 // GLOBAL ERROR BOUNDARY
 // =============================================================================
 // Friendly, brand-styled error screen shown when a route throws. Uses
-// self-contained inline styles (boutique palette) so it renders even if global
-// CSS context is unavailable.
+// self-contained inline styles (boutique palette) so it renders even if
+// Tailwind / i18n context is unavailable — important for launch resilience.
 // =============================================================================
 
 'use client'
@@ -13,7 +13,6 @@ import { useEffect } from 'react'
 const COLORS = {
   burgundy: '#5B0F16',
   cream: '#F6F1E6',
-  page: '#E4DECF',
   tan: '#EFE6D8',
   ink: '#2A2220',
   muted: '#6B6055',
@@ -36,7 +35,7 @@ export default function Error({
     <main
       style={{
         minHeight: '100vh',
-        background: COLORS.page,
+        background: COLORS.cream,
         color: COLORS.ink,
         fontFamily: FONT,
         display: 'flex',
@@ -79,25 +78,22 @@ export default function Error({
           <button
             type="button"
             onClick={() => reset()}
-            className="qk-press"
             style={{
               fontFamily: FONT,
               fontSize: 15,
               fontWeight: 700,
               color: '#fff',
-              background: 'linear-gradient(135deg,#5B0F16,#8a2530)',
+              background: COLORS.burgundy,
               border: 'none',
               borderRadius: 999,
               padding: '12px 28px',
               cursor: 'pointer',
-              boxShadow: '0 10px 24px rgba(91,15,22,0.28)',
             }}
           >
             Try again
           </button>
           <a
             href="/explore"
-            className="qk-press"
             style={{
               fontFamily: FONT,
               fontSize: 15,

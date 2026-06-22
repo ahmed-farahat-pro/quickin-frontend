@@ -1,36 +1,11 @@
-// Listing detail (UI-only) — boutique stay view. Data is fetched from the
-// backend API; a missing/unknown id renders the friendly 404.
+// Local listing detail (no Supabase, no auth) — boutique stay view.
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { API_URL, type Listing } from '@/lib/api'
+import { getTranslations } from 'next-intl/server'
+import { getListingById, getListingReviews } from '@/lib/local/db'
 import ReservePanel from './reserve-panel'
-import ReviewsSection from './reviews-section'
-import { HostedBy, MoreFromHost } from './host-section'
-import ReportListing from './report-listing'
-import ImagePlaceholder from '../../_components/image-placeholder'
-import AmenityIcon from '../../_components/amenity-icon'
-import HeartButton from '../../_components/heart-button'
-import ShareButton from '../../_components/share-button'
-import RatingStars from '../../_components/rating-stars'
-import { JsonLd, listingLd, breadcrumbLd } from '../../_components/structured-data'
-import { T, BackToExplore, GuestFavoriteBadge } from './detail-text'
 
 export const dynamic = 'force-dynamic'
-
-// Fetch a single listing from the backend. Returns null on 404 / error.
-async function fetchListing(id: string): Promise<Listing | null> {
-  try {
-    const res = await fetch(
-      `${API_URL}/api/local/listings/${encodeURIComponent(id)}`,
-      { cache: 'no-store' }
-    )
-    if (!res.ok) return null
-    const data = await res.json()
-    return data && typeof data === 'object' ? (data as Listing) : null
-  } catch {
-    return null
-  }
-}
 
 export async function generateMetadata({
   params,
@@ -38,13 +13,13 @@ export async function generateMetadata({
   params: Promise<{ id: string }>
 }): Promise<Metadata> {
   const { id } = await params
-  const listing = await fetchListing(id)
+  const t = await getTranslations('listingPage')
+  const listing = await getListingById(id).catch(() => null)
 
   if (!listing) {
     return {
-      title: 'Stay not found',
-      description:
-        'This boutique stay could not be found. Browse other curated homes on QuickIn.',
+      title: t('meta.notFoundTitle'),
+      description: t('meta.notFoundDescription'),
       robots: { index: false, follow: true },
     }
   }
@@ -52,7 +27,9 @@ export async function generateMetadata({
   const place = [listing.location, listing.country].filter(Boolean).join(', ')
   const description =
     listing.description?.trim() ||
-    `A boutique stay${place ? ` in ${place}` : ''} from EGP ${listing.price_per_night} / night on QuickIn.`
+    (place
+      ? t('meta.descriptionWithPlace', { place, price: listing.price_per_night })
+      : t('meta.description', { price: listing.price_per_night }))
   const cover = listing.listing_images[0]?.url || '/logo.png'
 
   return {
@@ -76,17 +53,18 @@ export async function generateMetadata({
   }
 }
 
+const FALLBACK_IMG =
+  'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=1600&q=80'
+
 const COLORS = {
   burgundy: '#5B0F16',
   cream: '#F6F1E6',
-  page: '#E4DECF',
   tan: '#EFE6D8',
   ink: '#2A2220',
   muted: '#6B6055',
-  gold: '#B07A2A',
 }
 
-function Spec({ labelKey, value }: { labelKey: string; value: number | null }) {
+function Spec({ label, value }: { label: string; value: number | null }) {
   if (value == null) return null
   return (
     <div
@@ -100,9 +78,7 @@ function Spec({ labelKey, value }: { labelKey: string; value: number | null }) {
       <span style={{ fontSize: 20, fontWeight: 700, color: COLORS.ink }}>
         {value}
       </span>
-      <span style={{ fontSize: 13, color: COLORS.muted }}>
-        <T k={labelKey} />
-      </span>
+      <span style={{ fontSize: 13, color: COLORS.muted }}>{label}</span>
     </div>
   )
 }
@@ -113,33 +89,29 @@ export default async function ListingDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const listing = await fetchListing(id)
+  const t = await getTranslations('listingPage')
+  const listing = await getListingById(id)
   if (!listing) notFound()
 
+  const reviews = await getListingReviews(listing.id)
+  const avgRating = reviews.length
+    ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
+    : null
+
   const images = listing.listing_images
-  const hero = images[0]?.url || null
+  const hero = images[0]?.url || FALLBACK_IMG
   const thumbs = images.slice(1)
-  const amenities = (listing.amenities || []).filter(Boolean)
 
   return (
     <main
       style={{
         minHeight: '100vh',
-        background: COLORS.page,
+        background: COLORS.cream,
         color: COLORS.ink,
         fontFamily:
           '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif',
       }}
     >
-      {/* Rich-result + AEO structured data for this stay. */}
-      <JsonLd data={listingLd(listing)} />
-      <JsonLd
-        data={breadcrumbLd([
-          { name: 'Home', url: '/' },
-          { name: 'Explore', url: '/explore' },
-          { name: listing.title, url: `/explore/${listing.id}` },
-        ])}
-      />
       {/* On phones the details + reserve panel stack into one column and the
           sticky panel becomes static. Inline styles can't hold media queries. */}
       <style>{`
@@ -152,56 +124,48 @@ export default async function ListingDetailPage({
             top: auto !important;
           }
         }
-        @media (max-width: 440px) {
-          .qk-amenity-grid {
-            grid-template-columns: 1fr !important;
-          }
-        }
       `}</style>
 
       <div style={{ maxWidth: 1040, margin: '0 auto', padding: '28px 24px 72px' }}>
-        {/* Back link (localized client helper) */}
-        <BackToExplore />
+        {/* Back link */}
+        <a
+          href="/explore"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            fontSize: 14,
+            fontWeight: 600,
+            color: COLORS.burgundy,
+            textDecoration: 'none',
+            marginBottom: 22,
+          }}
+        >
+          <span style={{ fontSize: 18, lineHeight: 1 }}>&larr;</span>
+          {t('backToExplore')}
+        </a>
 
-        {/* Hero — slow Ken Burns drift on the cover, photo overlay for depth. */}
+        {/* Hero */}
         <div
           style={{
-            position: 'relative',
             width: '100%',
             aspectRatio: '16 / 9',
             borderRadius: 24,
             overflow: 'hidden',
             background: COLORS.tan,
-            boxShadow: '0 22px 48px rgba(42,34,32,0.18)',
+            boxShadow: '0 10px 36px rgba(42,34,32,0.12)',
           }}
         >
-          {hero ? (
-            <>
-              <img
-                src={hero}
-                alt={listing.title}
-                className="qk-kenburns"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  display: 'block',
-                }}
-              />
-              <span
-                aria-hidden="true"
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  background:
-                    'linear-gradient(180deg, transparent 55%, rgba(42,34,32,0.45))',
-                  pointerEvents: 'none',
-                }}
-              />
-            </>
-          ) : (
-            <ImagePlaceholder iconSize={52} fontSize={15} />
-          )}
+          <img
+            src={hero}
+            alt={listing.title}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              display: 'block',
+            }}
+          />
         </div>
 
         {/* Thumbnail strip */}
@@ -218,7 +182,7 @@ export default async function ListingDetailPage({
               <img
                 key={`${img.url}-${i}`}
                 src={img.url}
-                alt={`${listing.title} photo ${i + 2}`}
+                alt={t('photoAlt', { title: listing.title, index: i + 2 })}
                 loading="lazy"
                 style={{
                   width: 132,
@@ -237,57 +201,36 @@ export default async function ListingDetailPage({
         {/* Title + location */}
         <div style={{ marginTop: 34 }}>
           {listing.is_guest_favorite && (
-            <GuestFavoriteBadge background={COLORS.tan} />
-          )}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              justifyContent: 'space-between',
-              gap: 16,
-            }}
-          >
-            <h1
+            <span
               style={{
-                margin: 0,
-                fontFamily:
-                  '"Playfair Display", Georgia, "Times New Roman", serif',
-                fontSize: 'clamp(28px, 4.5vw, 42px)',
-                fontWeight: 700,
-                letterSpacing: '-0.02em',
-                lineHeight: 1.15,
+                display: 'inline-block',
+                background: COLORS.tan,
                 color: COLORS.burgundy,
+                fontSize: 12,
+                fontWeight: 600,
+                padding: '5px 12px',
+                borderRadius: 999,
+                marginBottom: 12,
               }}
             >
-              {listing.title}
-            </h1>
-            {/* Share + wishlist heart — stand alone here (no parent link). */}
-            <span
-              style={{ flex: '0 0 auto', marginTop: 4, display: 'flex', gap: 10 }}
-            >
-              <ShareButton
-                path={`/explore/${listing.id}`}
-                title={`${listing.title} | QuickIn`}
-                size={44}
-              />
-              <HeartButton
-                itemType="listing"
-                itemId={listing.id}
-                size={44}
-                stopPropagation={false}
-                autoFetchSaved
-              />
+              ★ {t('guestFavorite')}
             </span>
-          </div>
-          {/* Real rating: gold ★ + average + count, or "New" when no reviews. */}
-          <div style={{ marginTop: 10 }}>
-            <RatingStars
-              rating={listing.rating ?? 0}
-              reviewCount={listing.review_count ?? 0}
-              size={15}
-            />
-          </div>
-          <p style={{ margin: '8px 0 0', fontSize: 16, color: COLORS.muted }}>
+          )}
+          <h1
+            style={{
+              margin: 0,
+              fontFamily:
+                '"Playfair Display", Georgia, "Times New Roman", serif',
+              fontSize: 'clamp(28px, 4.5vw, 42px)',
+              fontWeight: 700,
+              letterSpacing: '-0.02em',
+              lineHeight: 1.15,
+              color: COLORS.burgundy,
+            }}
+          >
+            {listing.title}
+          </h1>
+          <p style={{ margin: '10px 0 0', fontSize: 16, color: COLORS.muted }}>
             {[listing.location, listing.country].filter(Boolean).join(', ')}
             {listing.property_type ? ` · ${listing.property_type}` : ''}
           </p>
@@ -316,10 +259,10 @@ export default async function ListingDetailPage({
                 borderBottom: `1px solid rgba(42,34,32,0.10)`,
               }}
             >
-              <Spec labelKey="listing.spec.guests" value={listing.max_guests} />
-              <Spec labelKey="listing.spec.bedrooms" value={listing.bedrooms} />
-              <Spec labelKey="listing.spec.beds" value={listing.beds} />
-              <Spec labelKey="listing.spec.baths" value={listing.bathrooms} />
+              <Spec label={t('specs.guests')} value={listing.max_guests} />
+              <Spec label={t('specs.bedrooms')} value={listing.bedrooms} />
+              <Spec label={t('specs.beds')} value={listing.beds} />
+              <Spec label={t('specs.baths')} value={listing.bathrooms} />
             </div>
 
             {/* Description */}
@@ -333,7 +276,7 @@ export default async function ListingDetailPage({
                     color: COLORS.ink,
                   }}
                 >
-                  <T k="listing.aboutThisStay" />
+                  {t('aboutThisStay')}
                 </h2>
                 <p
                   style={{
@@ -348,76 +291,34 @@ export default async function ListingDetailPage({
               </div>
             )}
 
-            {/* What this place offers (amenities) */}
-            {amenities.length > 0 && (
-              <div style={{ marginTop: 30 }}>
-                <h2
-                  style={{
-                    margin: '0 0 16px',
-                    fontSize: 19,
-                    fontWeight: 700,
-                    color: COLORS.ink,
-                  }}
-                >
-                  <T k="listing.whatThisPlaceOffers" />
-                </h2>
-                <div
-                  className="qk-amenity-grid"
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                    gap: '14px 24px',
-                  }}
-                >
-                  {amenities.map((a) => (
-                    <div
-                      key={a}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
-                        fontSize: 15,
-                        color: COLORS.ink,
-                      }}
-                    >
-                      <span
-                        style={{
-                          flex: '0 0 auto',
-                          width: 38,
-                          height: 38,
-                          borderRadius: 12,
-                          background: 'linear-gradient(135deg,#e7ddcb,#d8cdb8)',
-                          color: COLORS.burgundy,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <AmenityIcon name={a} />
-                      </span>
-                      <span>{a}</span>
+            {/* Guest reviews */}
+            <div style={{ marginTop: 26 }}>
+              <h2 style={{ margin: '0 0 12px', fontSize: 19, fontWeight: 700, color: COLORS.ink }}>
+                {avgRating ? `★ ${avgRating} · ` : ''}
+                {reviews.length ? t('reviewsWithCount', { count: reviews.length }) : t('reviews')}
+              </h2>
+              {reviews.length === 0 ? (
+                <p style={{ margin: 0, fontSize: 15, color: COLORS.muted }}>
+                  {t('noReviews')}
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {reviews.map((r, i) => (
+                    <div key={i} style={{ background: '#fff', border: '1px solid rgba(42,34,32,0.06)', borderRadius: 14, padding: '14px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <strong style={{ fontSize: 14.5, color: COLORS.ink }}>{r.reviewer_name || t('guest')}</strong>
+                        <span style={{ fontSize: 13 }}>
+                          <span style={{ color: '#f5a623' }}>{'★'.repeat(r.rating)}</span>
+                          <span style={{ color: '#d8d2c8' }}>{'★'.repeat(5 - r.rating)}</span>
+                        </span>
+                        {r.created_at && <span style={{ fontSize: 12, color: COLORS.muted, marginLeft: 'auto' }}>{r.created_at}</span>}
+                      </div>
+                      {r.comment && <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.6, color: COLORS.ink }}>{r.comment}</p>}
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-
-            {/* Host — "Hosted by {name}" with a gold-gradient avatar + trust
-                badges (Verified ✓, Superhost, New host). */}
-            {(listing.host_name || listing.host_id) && (
-              <HostedBy
-                name={listing.host_name}
-                hostId={listing.host_id}
-                hostVerified={listing.host_verified}
-              />
-            )}
-
-            {/* Report this listing — opens a small dialog (sign-in required). */}
-            <ReportListing listingId={listing.id} />
-
-            {/* Guest reviews (client-fetched). Renders nothing until it has at
-                least one review — the "New" badge by the title covers empty. */}
-            <ReviewsSection listingId={listing.id} />
+              )}
+            </div>
           </div>
 
           {/* Reserve panel */}
@@ -427,7 +328,7 @@ export default async function ListingDetailPage({
               background: '#fff',
               borderRadius: 22,
               border: `1px solid rgba(42,34,32,0.06)`,
-              boxShadow: '0 22px 48px rgba(42,34,32,0.14)',
+              boxShadow: '0 8px 28px rgba(42,34,32,0.10)',
               padding: '24px 24px 26px',
               position: 'sticky',
               top: 24,
@@ -438,11 +339,6 @@ export default async function ListingDetailPage({
               pricePerNight={listing.price_per_night}
               currency={listing.currency}
               maxGuests={listing.max_guests}
-              cancellationPolicy={listing.cancellation_policy ?? 'moderate'}
-              weeklyDiscount={listing.weekly_discount ?? 0}
-              monthlyDiscount={listing.monthly_discount ?? 0}
-              weekendPrice={listing.weekend_price ?? null}
-              monthlyPrices={listing.monthly_prices ?? {}}
             />
             {listing.listing_code && (
               <div
@@ -454,7 +350,7 @@ export default async function ListingDetailPage({
                   color: COLORS.muted,
                 }}
               >
-                <T k="listing.listingCode" />{' '}
+                {t('listingCode')}{' '}
                 <span
                   style={{
                     fontFamily:
@@ -469,13 +365,6 @@ export default async function ListingDetailPage({
             )}
           </aside>
         </div>
-
-        {/* More from this host — full-width below the two-column area. Fetches
-            the host's other published listings and hides itself if there are
-            none (or no host id is known). */}
-        {listing.host_id && (
-          <MoreFromHost hostId={listing.host_id} currentListingId={listing.id} />
-        )}
       </div>
     </main>
   )
