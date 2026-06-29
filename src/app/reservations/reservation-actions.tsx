@@ -68,15 +68,20 @@ export function ReservationActions(props: {
     if (status !== 'confirmed' || paid) return
     setPaying(true); setPayErr(null)
     try {
-      const res = await fetch(`/api/local/bookings/${bookingId}/pay`, {
+      const res = await fetch(`/api/local/bookings/${bookingId}/pay-init`, {
         method: 'POST', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: 'card' }),
       })
-      if (!res.ok) {
-        const e = await res.json().catch(() => ({}))
-        throw new Error(e.error || t('payError'))
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || t('payError'))
+      if (data.checkout_url) {
+        // Real Paymob: hand off to the hosted checkout. The webhook marks the booking
+        // paid; the return page brings the guest back to /reservations afterwards.
+        window.location.href = data.checkout_url
+        return // navigating away — keep the button in its "paying" state
       }
+      // Mock fallback (no gateway configured): already settled server-side.
       router.refresh()
     } catch (e) {
       setPaying(false)
