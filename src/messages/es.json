@@ -1640,6 +1640,12 @@
     "waitingForApproval": "Esperando aprobación",
     "approved": "Aprobado",
     "payError": "El pago falló. Inténtalo de nuevo.",
+    "paymentConfirming": "Confirmando tu pago…",
+    "paymentReceived": "Pago recibido: tu reserva está confirmada.",
+    "paymentProcessing": "Tu pago se está procesando. Esta página se actualizará cuando se confirme.",
+    "paymentFailed": "El pago no se completó. Puedes intentarlo de nuevo.",
+    "paymentPending": "Procesando el pago…",
+    "retryPayment": "Reintentar el pago",
     "errors": {
       "cancelFailed": "No se pudo cancelar",
       "reviewFailed": "No se pudo enviar la reseña"

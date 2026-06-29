@@ -1640,6 +1640,12 @@
     "waitingForApproval": "En attente d'approbation",
     "approved": "Approuvé",
     "payError": "Échec du paiement. Veuillez réessayer.",
+    "paymentConfirming": "Confirmation de votre paiement…",
+    "paymentReceived": "Paiement reçu — votre réservation est confirmée.",
+    "paymentProcessing": "Votre paiement est en cours de traitement. Cette page se mettra à jour une fois confirmé.",
+    "paymentFailed": "Le paiement n'a pas abouti. Vous pouvez réessayer.",
+    "paymentPending": "Paiement en cours…",
+    "retryPayment": "Réessayer le paiement",
     "errors": {
       "cancelFailed": "Annulation impossible",
       "reviewFailed": "Impossible d'envoyer l'avis"

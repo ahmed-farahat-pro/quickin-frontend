@@ -28,8 +28,9 @@ export function ReservationActions(props: {
   paid: boolean
   checkIn: string
   checkOut: string
+  paymentState?: string
 }) {
-  const { bookingId, status, paid, checkIn, checkOut } = props
+  const { bookingId, status, paid, checkIn, checkOut, paymentState } = props
   const t = useTranslations('reservationsLocal')
   const router = useRouter()
   const [busy, setBusy] = useState(false)
@@ -67,6 +68,9 @@ export function ReservationActions(props: {
   async function pay() {
     if (status !== 'confirmed' || paid) return
     setPaying(true); setPayErr(null)
+    // Open the checkout tab synchronously, inside the click gesture, so the popup blocker
+    // allows it — we can't open it after the await below (the gesture would be spent).
+    const checkoutTab = window.open('', '_blank')
     try {
       const res = await fetch(`/api/local/bookings/${bookingId}/pay-init`, {
         method: 'POST', credentials: 'same-origin',
@@ -76,14 +80,20 @@ export function ReservationActions(props: {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || t('payError'))
       if (data.checkout_url) {
-        // Real Paymob: hand off to the hosted checkout. The webhook marks the booking
-        // paid; the return page brings the guest back to /reservations afterwards.
-        window.location.href = data.checkout_url
-        return // navigating away — keep the button in its "paying" state
+        // Real Paymob: open the hosted checkout in the new tab (or this tab if the popup
+        // was blocked). The webhook marks the booking paid; Paymob returns the guest to
+        // /reservations, where the banner polls until the paid state shows.
+        if (checkoutTab) checkoutTab.location.href = data.checkout_url
+        else window.location.href = data.checkout_url
+        setPaying(false)
+        return
       }
       // Mock fallback (no gateway configured): already settled server-side.
+      checkoutTab?.close()
       router.refresh()
+      setPaying(false)
     } catch (e) {
+      checkoutTab?.close()
       setPaying(false)
       setPayErr(e instanceof Error ? e.message : t('payError'))
     }
@@ -101,13 +111,18 @@ export function ReservationActions(props: {
         </span>
       )}
 
-      {status === 'confirmed' && !paid && (
+      {/* A pending gateway transaction: don't offer Pay again (avoids a double charge). */}
+      {status === 'confirmed' && !paid && paymentState === 'pending' && (
+        <span style={{ fontSize: 13, color: C.muted }}>{t('paymentPending')}</span>
+      )}
+
+      {status === 'confirmed' && !paid && paymentState !== 'pending' && (
         <button
           onClick={pay}
           disabled={paying}
           style={{ background: C.burgundy, color: '#fff', border: 'none', borderRadius: 10, padding: '7px 16px', fontWeight: 700, fontSize: 13.5, cursor: paying ? 'default' : 'pointer', opacity: paying ? 0.7 : 1, fontFamily: 'inherit' }}
         >
-          {paying ? t('paying') : t('payNow')}
+          {paying ? t('paying') : paymentState === 'failed' ? t('retryPayment') : t('payNow')}
         </button>
       )}
 

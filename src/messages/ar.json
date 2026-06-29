@@ -1640,6 +1640,12 @@
     "waitingForApproval": "في انتظار الموافقة",
     "approved": "تمت الموافقة",
     "payError": "فشل الدفع. حاول مرة أخرى.",
+    "paymentConfirming": "جارٍ تأكيد دفعتك…",
+    "paymentReceived": "تم استلام الدفع — تم تأكيد حجزك.",
+    "paymentProcessing": "تتم معالجة دفعتك. ستتحدّث هذه الصفحة بمجرد تأكيدها.",
+    "paymentFailed": "لم يكتمل الدفع. يمكنك المحاولة مرة أخرى.",
+    "paymentPending": "جارٍ معالجة الدفع…",
+    "retryPayment": "إعادة محاولة الدفع",
     "errors": {
       "cancelFailed": "تعذّر الإلغاء",
       "reviewFailed": "تعذّر إرسال التقييم"

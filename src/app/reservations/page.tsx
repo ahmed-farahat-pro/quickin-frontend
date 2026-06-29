@@ -7,6 +7,7 @@ import { verifyToken, getUserRowByEmail } from '@/lib/local/auth'
 import { localeToBcp47, type Locale } from '@/i18n/config'
 import { formatPrice } from '@/lib/utils'
 import { ReservationActions } from './reservation-actions'
+import { PaymentReturnBanner } from './payment-return-banner'
 
 export const dynamic = 'force-dynamic'
 
@@ -213,6 +214,7 @@ async function ReservationsList({
 
   return (
     <>
+      <PaymentReturnBanner />
       <h1
         style={{
           margin: '0 0 6px',
@@ -343,6 +345,7 @@ async function ReservationsList({
                   bookingId={b.id}
                   status={b.status}
                   paid={b.payment_status === 'paid'}
+                  paymentState={b.payment_state}
                   checkIn={b.check_in}
                   checkOut={b.check_out}
                 />

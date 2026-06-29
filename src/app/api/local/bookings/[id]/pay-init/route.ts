@@ -29,17 +29,27 @@ function callerToken(req: Request): string | null {
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params
+
+  // 1) Frontend-side auth: does THIS app accept the caller's session?
   const me = await getUserFromRequest(req)
-  if (!me) return NextResponse.json({ error: 'Please sign in to pay' }, { status: 401 })
+  if (!me) {
+    console.warn('[pay-init proxy] frontend rejected the session (no/invalid qk_token)')
+    // x-pay-init-source:frontend → your web session is stale; sign out and back in.
+    return NextResponse.json({ error: 'Please sign in to pay' }, { status: 401, headers: { 'x-pay-init-source': 'frontend' } })
+  }
 
   // No backend configured (pure local frontend dev) → mock-settle so the flow completes.
   if (!BACKEND_BASE) return mockSettle(id, me.id)
 
   const token = callerToken(req)
-  if (!token) return NextResponse.json({ error: 'Please sign in to pay' }, { status: 401 })
+  if (!token) {
+    return NextResponse.json({ error: 'Please sign in to pay' }, { status: 401, headers: { 'x-pay-init-source': 'frontend' } })
+  }
 
-  // Where Paymob should send the browser back after checkout (the backend allowlists this).
-  const redirectUrl = `${new URL(req.url).origin}/reservations?paid=1`
+  // Where Paymob sends the browser back after checkout (the backend allowlists this and
+  // appends ?booking=<id>). Truth comes from the webhook → DB, not these params, so the
+  // /reservations banner polls the booking rather than trusting the redirect.
+  const redirectUrl = `${new URL(req.url).origin}/reservations`
 
   try {
     const upstream = await fetch(`${BACKEND_BASE}/api/local/bookings/${encodeURIComponent(id)}/pay-init`, {
@@ -49,12 +59,21 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       cache: 'no-store',
     })
     const data = await upstream.json().catch(() => ({}))
-    return NextResponse.json(data, { status: upstream.status })
+    if (upstream.status === 401) {
+      // The frontend accepted you but the backend rejected the SAME token → AUTH_SECRET
+      // differs between the two Vercel projects. Make them identical, redeploy, re-login.
+      console.error(`[pay-init proxy] backend returned 401 for user ${me.id} — AUTH_SECRET parity? base=${BACKEND_BASE}`)
+      return NextResponse.json(
+        { error: 'Payment service could not verify your session — AUTH_SECRET likely differs between the web and backend projects.' },
+        { status: 401, headers: { 'x-pay-init-source': 'backend' } }
+      )
+    }
+    return NextResponse.json(data, { status: upstream.status, headers: { 'x-pay-init-source': 'backend' } })
   } catch (err) {
     // Backend unreachable. In local dev fall back to the mock; in prod surface the error.
     if (isLocalBackend) return mockSettle(id, me.id)
     console.error('pay-init proxy failed:', err)
-    return NextResponse.json({ error: 'Payment service unavailable' }, { status: 502 })
+    return NextResponse.json({ error: 'Payment service unavailable' }, { status: 502, headers: { 'x-pay-init-source': 'proxy' } })
   }
 }
 

@@ -1697,6 +1697,12 @@
     "waitingForApproval": "Waiting for approval",
     "approved": "Approved",
     "payError": "Payment failed. Please try again.",
+    "paymentConfirming": "Confirming your payment…",
+    "paymentReceived": "Payment received — your booking is confirmed.",
+    "paymentProcessing": "Your payment is being processed. This page will update once it's confirmed.",
+    "paymentFailed": "Payment was not completed. You can try again.",
+    "paymentPending": "Payment processing…",
+    "retryPayment": "Retry payment",
     "errors": {
       "cancelFailed": "Could not cancel",
       "reviewFailed": "Could not submit review"

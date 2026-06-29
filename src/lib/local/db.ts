@@ -62,6 +62,9 @@ export interface Booking {
   total_price: number
   status: string
   payment_status: 'paid' | 'unpaid'
+  /** Raw gateway outcome from the shared bookings.payment_status column: 'paid' | 'unpaid' |
+   *  'pending' | 'failed' | 'refunded' | 'voided'. Written by the backend Paymob webhook. */
+  payment_state?: string
   paid_at: string | null
   created_at: string
   title: string
@@ -136,6 +139,7 @@ const BOOKING_COLS = `
   b.guests, b.adults, b.children, b.infants, b.pets,
   b.total_price::float8 AS total_price, b.status,
   CASE WHEN b.paid_at IS NULL THEN 'unpaid' ELSE 'paid' END AS payment_status,
+  COALESCE(b.payment_status, 'unpaid') AS payment_state,
   to_char(b.paid_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS paid_at,
   to_char(b.cancelled_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS cancelled_at,
   b.refund_percent, b.host_notes,
