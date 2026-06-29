@@ -57,16 +57,35 @@ export function ApplyForm({ initialName }: { initialName: string }) {
     e.preventDefault()
     setError(null)
 
-    if (!nationalId.trim()) {
+    // National ID: 14 digits (Egyptian). Phone: optional leading +, 7–15 digits
+    // once spacing/punctuation is stripped. Mirror these checks server-side in
+    // submitHostApplication so the rules can't be bypassed.
+    const nationalIdDigits = nationalId.replace(/\s/g, '')
+    const phoneDigits = phone.replace(/[\s()-]/g, '')
+    const addressTrimmed = address.trim()
+
+    if (!nationalIdDigits) {
       setError(t('errors.nationalIdRequired'))
       return
     }
-    if (!phone.trim()) {
+    if (!/^\d{14}$/.test(nationalIdDigits)) {
+      setError(t('errors.nationalIdInvalid'))
+      return
+    }
+    if (!phoneDigits) {
       setError(t('errors.phoneRequired'))
       return
     }
-    if (!address.trim()) {
+    if (!/^\+?\d{7,15}$/.test(phoneDigits)) {
+      setError(t('errors.phoneInvalid'))
+      return
+    }
+    if (!addressTrimmed) {
       setError(t('errors.addressRequired'))
+      return
+    }
+    if (addressTrimmed.length < 5) {
+      setError(t('errors.addressInvalid'))
       return
     }
 
@@ -78,9 +97,9 @@ export function ApplyForm({ initialName }: { initialName: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           full_name: fullName.trim() || undefined,
-          national_id: nationalId.trim(),
+          national_id: nationalIdDigits,
           phone: phone.trim(),
-          address: address.trim(),
+          address: addressTrimmed,
           company: company.trim() || undefined,
           notes: notes.trim() || undefined,
         }),
@@ -189,6 +208,8 @@ export function ApplyForm({ initialName }: { initialName: string }) {
           value={nationalId}
           onChange={(e) => setNationalId(e.target.value)}
           placeholder={t('placeholders.nationalId')}
+          inputMode="numeric"
+          maxLength={14}
           required
         />
       </div>
@@ -201,6 +222,7 @@ export function ApplyForm({ initialName }: { initialName: string }) {
           id="apply-phone"
           style={input}
           type="tel"
+          inputMode="tel"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           placeholder={t('placeholders.phone')}

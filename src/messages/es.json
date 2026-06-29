@@ -1370,6 +1370,7 @@
     "logoAlt": "QuickIn",
     "nav": {
       "becomeHost": "Conviértete en anfitrión",
+      "hosting": "Modo anfitrión",
       "greeting": "Hola, {name}",
       "logout": "Cerrar sesión",
       "login": "Iniciar sesión",
@@ -1979,8 +1980,11 @@
     "cancel": "Cancelar",
     "errors": {
       "nationalIdRequired": "Introduce tu documento de identidad.",
+      "nationalIdInvalid": "Introduce un documento de identidad válido de 14 dígitos.",
       "phoneRequired": "Introduce tu número de teléfono.",
+      "phoneInvalid": "Introduce un número de teléfono válido.",
       "addressRequired": "Introduce tu dirección.",
+      "addressInvalid": "Introduce una dirección completa.",
       "submitFailed": "No se pudo enviar tu solicitud. Inténtalo de nuevo."
     },
     "pending": {

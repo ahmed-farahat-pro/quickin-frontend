@@ -1370,6 +1370,7 @@
     "logoAlt": "QuickIn",
     "nav": {
       "becomeHost": "Devenir hôte",
+      "hosting": "Mode hôte",
       "greeting": "Bonjour, {name}",
       "logout": "Déconnexion",
       "login": "Connexion",
@@ -1979,8 +1980,11 @@
     "cancel": "Annuler",
     "errors": {
       "nationalIdRequired": "Veuillez saisir votre numéro d’identité.",
+      "nationalIdInvalid": "Veuillez saisir un numéro national valide à 14 chiffres.",
       "phoneRequired": "Veuillez saisir votre numéro de téléphone.",
+      "phoneInvalid": "Veuillez saisir un numéro de téléphone valide.",
       "addressRequired": "Veuillez saisir votre adresse.",
+      "addressInvalid": "Veuillez saisir une adresse complète.",
       "submitFailed": "Impossible d’envoyer votre candidature. Veuillez réessayer."
     },
     "pending": {

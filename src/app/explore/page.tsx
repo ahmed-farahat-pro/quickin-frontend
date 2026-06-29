@@ -39,19 +39,19 @@ export async function generateMetadata(): Promise<Metadata> {
 // Read the qk_token cookie and resolve the signed-in user's first name + saved
 // listing ids (both null/empty when signed out). One DB round-trip for the user
 // row, then a second for the wishlist when signed in.
-async function getCurrentUser(): Promise<{ firstName: string | null; savedIds: string[] }> {
+async function getCurrentUser(): Promise<{ firstName: string | null; savedIds: string[]; isHost: boolean }> {
   const token = (await cookies()).get('qk_token')?.value
-  if (!token) return { firstName: null, savedIds: [] }
+  if (!token) return { firstName: null, savedIds: [], isHost: false }
   const claims = verifyToken(token)
-  if (!claims?.email) return { firstName: null, savedIds: [] }
+  if (!claims?.email) return { firstName: null, savedIds: [], isHost: false }
   try {
     const row = await getUserRowByEmail(claims.email)
     const name = row?.full_name?.trim() || claims.email.split('@')[0]
     const firstName = name ? name.split(' ')[0] : null
     const savedIds = row?.id ? await getWishlistIds(row.id).catch(() => []) : []
-    return { firstName, savedIds }
+    return { firstName, savedIds, isHost: !!row?.is_host }
   } catch {
-    return { firstName: null, savedIds: [] }
+    return { firstName: null, savedIds: [], isHost: false }
   }
 }
 
@@ -92,7 +92,7 @@ export default async function ExplorePage({
     }),
     getCurrentUser(),
   ])
-  const { firstName, savedIds } = currentUser
+  const { firstName, savedIds, isHost } = currentUser
 
   return (
     <main
@@ -168,7 +168,7 @@ export default async function ExplorePage({
                 fontWeight: 600,
               }}
             >
-              {t('nav.becomeHost')}
+              {isHost ? t('nav.hosting') : t('nav.becomeHost')}
             </a>
             {firstName ? (
               <>
@@ -233,7 +233,7 @@ export default async function ExplorePage({
           {/* Right side (mobile <820px): bell + hamburger that slides out the rest */}
           <div className="qk-header-mobile">
             <NotificationsBell />
-            <MobileMenu firstName={firstName} />
+            <MobileMenu firstName={firstName} isHost={isHost} />
           </div>
         </div>
       </header>

@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/sheet'
 import { LocaleSwitcher } from '@/components/layout/locale-switcher'
 
-export function MobileMenu({ firstName }: { firstName: string | null }) {
+export function MobileMenu({ firstName, isHost = false }: { firstName: string | null; isHost?: boolean }) {
   const t = useTranslations('explorePage')
   const [open, setOpen] = useState(false)
   const close = () => setOpen(false)
@@ -37,7 +37,7 @@ export function MobileMenu({ firstName }: { firstName: string | null }) {
         </SheetHeader>
         <nav className="mt-6 flex flex-col gap-1 text-[15px]">
           <a href="/host" onClick={close} className="rounded-xl px-3 py-3 font-semibold text-[#2A2220] hover:bg-black/5">
-            {t('nav.becomeHost')}
+            {isHost ? t('nav.hosting') : t('nav.becomeHost')}
           </a>
           {firstName ? (
             <>

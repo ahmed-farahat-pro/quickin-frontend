@@ -1370,6 +1370,7 @@
     "logoAlt": "QuickIn",
     "nav": {
       "becomeHost": "Become a host",
+      "hosting": "Hosting",
       "greeting": "Hi, {name}",
       "logout": "Logout",
       "login": "Log in",
@@ -1979,8 +1980,11 @@
     "cancel": "Cancel",
     "errors": {
       "nationalIdRequired": "Please enter your national ID.",
+      "nationalIdInvalid": "Please enter a valid 14-digit national ID.",
       "phoneRequired": "Please enter your phone number.",
+      "phoneInvalid": "Please enter a valid phone number.",
       "addressRequired": "Please enter your address.",
+      "addressInvalid": "Please enter a complete address.",
       "submitFailed": "Could not submit your application. Please try again."
     },
     "pending": {

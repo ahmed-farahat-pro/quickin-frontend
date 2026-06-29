@@ -795,7 +795,15 @@ export async function submitHostApplication(
   if (!f.national_id || !f.phone || !f.address) {
     throw new Error('national_id, phone and address are required')
   }
-  const vals = [userId, f.full_name || null, f.national_id, f.phone, f.address, f.company || null, f.notes || null]
+  // Format checks mirror the client form (apply-form.tsx) so the rules hold even
+  // if the client validation is bypassed. National ID = 14 digits (Egyptian);
+  // phone = optional leading +, 7–15 digits; address = at least 5 chars.
+  const nationalIdDigits = String(f.national_id).replace(/\s/g, '')
+  const phoneDigits = String(f.phone).replace(/[\s()-]/g, '')
+  if (!/^\d{14}$/.test(nationalIdDigits)) throw new Error('Invalid national_id')
+  if (!/^\+?\d{7,15}$/.test(phoneDigits)) throw new Error('Invalid phone')
+  if (String(f.address).trim().length < 5) throw new Error('Invalid address')
+  const vals = [userId, f.full_name || null, nationalIdDigits, f.phone, f.address, f.company || null, f.notes || null]
   const upd = await pool.query(
     `UPDATE host_applications
         SET full_name=$2, national_id=$3, phone=$4, address=$5, company=$6, notes=$7,

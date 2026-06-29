@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-type Notif = { id: string; title: string; body?: string | null; read: boolean }
+type Notif = { id: string; title: string; body?: string | null; read: boolean; link?: string | null }
 
 export function NotificationsBell({ className }: { className?: string }) {
   const t = useTranslations('explorePage')
@@ -39,6 +39,19 @@ export function NotificationsBell({ className }: { className?: string }) {
     setUnread(0)
     setItems((prev) => prev.map((i) => ({ ...i, read: true })))
     try { await fetch('/api/local/notifications/read-all', { method: 'POST', credentials: 'same-origin' }) } catch { /* ignore */ }
+  }
+
+  // Click → mark that one read (optimistically) and let the <a> follow its link.
+  // keepalive lets the PATCH finish even though the anchor triggers a navigation.
+  function markOneRead(n: Notif) {
+    if (n.read) return
+    setItems((prev) => prev.map((i) => (i.id === n.id ? { ...i, read: true } : i)))
+    setUnread((u) => Math.max(0, u - 1))
+    fetch(`/api/local/notifications/${n.id}`, {
+      method: 'PATCH',
+      credentials: 'same-origin',
+      keepalive: true,
+    }).catch(() => { /* ignore */ })
   }
 
   if (!signedIn) return null
@@ -72,8 +85,8 @@ export function NotificationsBell({ className }: { className?: string }) {
           <div className="px-4 py-8 text-center text-sm text-muted-foreground">{t('nav.noNotifications')}</div>
         ) : (
           <ul className="divide-y">
-            {items.map((n) => (
-              <li key={n.id} className={`px-4 py-3 ${n.read ? '' : 'bg-[#5B0F16]/5'}`}>
+            {items.map((n) => {
+              const body = (
                 <div className="flex gap-2">
                   {!n.read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#5B0F16]" />}
                   <div className="min-w-0">
@@ -81,8 +94,29 @@ export function NotificationsBell({ className }: { className?: string }) {
                     {n.body && <p className="mt-0.5 text-xs text-muted-foreground">{n.body}</p>}
                   </div>
                 </div>
-              </li>
-            ))}
+              )
+              return (
+                <li key={n.id} className={n.read ? '' : 'bg-[#5B0F16]/5'}>
+                  {n.link ? (
+                    <a
+                      href={n.link}
+                      onClick={() => markOneRead(n)}
+                      className="block px-4 py-3 transition-colors hover:bg-black/5"
+                    >
+                      {body}
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => markOneRead(n)}
+                      className="block w-full px-4 py-3 text-left transition-colors hover:bg-black/5"
+                    >
+                      {body}
+                    </button>
+                  )}
+                </li>
+              )
+            })}
           </ul>
         )}
       </DropdownMenuContent>

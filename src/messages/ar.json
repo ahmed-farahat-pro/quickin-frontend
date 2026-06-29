@@ -1370,6 +1370,7 @@
     "logoAlt": "QuickIn",
     "nav": {
       "becomeHost": "كن مضيفًا",
+      "hosting": "الاستضافة",
       "greeting": "أهلًا، {name}",
       "logout": "تسجيل الخروج",
       "login": "تسجيل الدخول",
@@ -1979,8 +1980,11 @@
     "cancel": "إلغاء",
     "errors": {
       "nationalIdRequired": "يرجى إدخال الرقم القومي.",
+      "nationalIdInvalid": "يرجى إدخال رقم قومي صحيح مكوّن من 14 رقمًا.",
       "phoneRequired": "يرجى إدخال رقم هاتفك.",
+      "phoneInvalid": "يرجى إدخال رقم هاتف صحيح.",
       "addressRequired": "يرجى إدخال عنوانك.",
+      "addressInvalid": "يرجى إدخال عنوان كامل.",
       "submitFailed": "تعذّر إرسال طلبك. حاول مرة أخرى."
     },
     "pending": {
