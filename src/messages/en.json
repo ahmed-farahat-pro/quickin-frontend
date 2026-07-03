@@ -1410,7 +1410,8 @@
       "checkInLabel": "Check-in",
       "checkOutLabel": "Check-out",
       "guestsLabel": "Guests",
-      "clear": "Clear"
+      "clear": "Clear",
+      "search": "Search"
     },
     "results": {
       "countFound": "{count, plural, one {# stay} other {# stays}} found",

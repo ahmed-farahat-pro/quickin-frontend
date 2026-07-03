@@ -1410,7 +1410,8 @@
       "checkInLabel": "Arrivée",
       "checkOutLabel": "Départ",
       "guestsLabel": "Voyageurs",
-      "clear": "Effacer"
+      "clear": "Effacer",
+      "search": "Rechercher"
     },
     "results": {
       "countFound": "{count, plural, one {# séjour trouvé} other {# séjours trouvés}}",

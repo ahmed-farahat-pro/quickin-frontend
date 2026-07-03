@@ -1410,7 +1410,8 @@
       "checkInLabel": "تسجيل الوصول",
       "checkOutLabel": "تسجيل المغادرة",
       "guestsLabel": "الضيوف",
-      "clear": "مسح"
+      "clear": "مسح",
+      "search": "بحث"
     },
     "results": {
       "countFound": "{count, plural, one {تم العثور على إقامة #} other {تم العثور على # إقامات}}",

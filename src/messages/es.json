@@ -1410,7 +1410,8 @@
       "checkInLabel": "Llegada",
       "checkOutLabel": "Salida",
       "guestsLabel": "Huéspedes",
-      "clear": "Borrar"
+      "clear": "Borrar",
+      "search": "Buscar"
     },
     "results": {
       "countFound": "{count, plural, one {# alojamiento encontrado} other {# alojamientos encontrados}}",
