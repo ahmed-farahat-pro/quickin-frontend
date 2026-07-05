@@ -1411,7 +1411,8 @@
       "checkOutLabel": "Départ",
       "guestsLabel": "Voyageurs",
       "clear": "Effacer",
-      "search": "Rechercher"
+      "search": "Rechercher",
+      "popular": "Destinations populaires"
     },
     "results": {
       "countFound": "{count, plural, one {# séjour trouvé} other {# séjours trouvés}}",
@@ -1540,6 +1541,13 @@
       "individual": "Particulier",
       "company": "Entreprise",
       "brokerage": "Agence"
+    },
+    "gallery": {
+      "close": "Fermer",
+      "prev": "Photo précédente",
+      "next": "Photo suivante",
+      "counter": "{current} / {total}",
+      "viewPhotos": "Voir toutes les photos"
     }
   },
   "loginLocal": {
@@ -2025,7 +2033,10 @@
       "notesOptional": "Notes (facultatif)",
       "hostType": "Êtes-vous un particulier, une entreprise ou une agence ?",
       "companyName": "Nom de l'entreprise",
-      "brokerageName": "Nom de l'agence"
+      "brokerageName": "Nom de l'agence",
+      "idFront": "Recto de la pièce d'identité",
+      "idBack": "Verso de la pièce d'identité",
+      "idPhotos": "Vérifiez votre identité"
     },
     "placeholders": {
       "fullName": "Votre nom",
@@ -2045,7 +2056,8 @@
       "phoneInvalid": "Veuillez saisir un numéro de téléphone valide.",
       "addressRequired": "Veuillez saisir votre adresse.",
       "addressInvalid": "Veuillez saisir une adresse complète.",
-      "submitFailed": "Impossible d’envoyer votre candidature. Veuillez réessayer."
+      "submitFailed": "Impossible d’envoyer votre candidature. Veuillez réessayer.",
+      "idRequired": "Veuillez ajouter le recto et le verso de votre pièce d'identité."
     },
     "pending": {
       "subtitle": "Votre candidature est en cours d’examen par notre équipe.",
@@ -2063,7 +2075,10 @@
       "individual": "Particulier",
       "company": "Entreprise",
       "brokerage": "Agence"
-    }
+    },
+    "idHint": "Téléchargez des photos nettes du recto et du verso de votre pièce d'identité. Notre équipe les vérifie.",
+    "idChoose": "Choisir ou prendre une photo",
+    "idRemove": "Supprimer"
   },
   "contact": {
     "whatsappAria": "Contactez-nous sur WhatsApp"
