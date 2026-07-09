@@ -1978,7 +1978,18 @@
       },
       "approve": "Approuver",
       "working": "En cours…",
-      "decline": "Refuser"
+      "decline": "Refuser",
+      "payment": {
+        "awaitingReview": "En attente de votre examen",
+        "paid": "Payé",
+        "declined": "Paiement refusé",
+        "disputeOpen": "Litige ouvert",
+        "viewScreenshot": "Voir la capture du virement",
+        "hideScreenshot": "Masquer la capture",
+        "loadingProof": "Chargement de la capture…",
+        "proofError": "Impossible de charger la capture",
+        "declinePrompt": "Pourquoi refusez-vous ce virement ? (facultatif)"
+      }
     },
     "create": {
       "meta": {

@@ -1978,7 +1978,18 @@
       },
       "approve": "Approve",
       "working": "Working…",
-      "decline": "Decline"
+      "decline": "Decline",
+      "payment": {
+        "awaitingReview": "Awaiting your review",
+        "paid": "Paid",
+        "declined": "Payment declined",
+        "disputeOpen": "Dispute open",
+        "viewScreenshot": "View transfer screenshot",
+        "hideScreenshot": "Hide screenshot",
+        "loadingProof": "Loading screenshot…",
+        "proofError": "Could not load the screenshot",
+        "declinePrompt": "Why are you declining this transfer? (optional)"
+      }
     },
     "create": {
       "meta": {

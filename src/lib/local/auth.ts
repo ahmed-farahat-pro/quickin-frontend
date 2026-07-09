@@ -166,6 +166,35 @@ export async function getUserFromRequest(
   return row ? { id: row.id, email: row.email } : null
 }
 
+/** Resolve the signed-in user AND their role (`admin | host | user`) from a request.
+ *  World-1 has no dedicated admin token, so the role is read from the (tolerant)
+ *  `users.role` column when present — the host-approval flow keeps it in sync and an
+ *  operator's row can be set to 'admin' — otherwise it's derived from `is_host`.
+ *  Used by the Instapay routes that need `{ id, role }` (payment proof, admin gates). */
+export async function getUserWithRole(
+  req: Request
+): Promise<{ id: string; email: string; role: 'admin' | 'host' | 'user' } | null> {
+  const base = await getUserFromRequest(req)
+  if (!base) return null
+  // Read the explicit role if the column exists (added by the host-approval sync);
+  // fall back to the is_host-derived role when it doesn't, so this never 500s on a
+  // frontend-only dev DB that predates the column.
+  let role: 'admin' | 'host' | 'user' = 'user'
+  try {
+    const { rows } = await pool.query(`SELECT role FROM users WHERE id = $1`, [base.id])
+    const r = String(rows[0]?.role ?? '').toLowerCase()
+    if (r === 'admin') role = 'admin'
+    else if (r === 'host') role = 'host'
+  } catch {
+    // role column absent — derive from is_host below.
+  }
+  if (role === 'user') {
+    const row = await getUserRowByEmail(base.email)
+    if (row?.is_host) role = 'host'
+  }
+  return { id: base.id, email: base.email, role }
+}
+
 // ---- User operations (parameterized pg) -------------------------------------
 // NB: deliberately excludes is_host so INSERT…RETURNING keeps working even before
 // the is_host migration has run. getUserRowByEmail resolves is_host separately

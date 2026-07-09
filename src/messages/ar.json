@@ -1978,7 +1978,18 @@
       },
       "approve": "موافقة",
       "working": "جارٍ التنفيذ…",
-      "decline": "رفض"
+      "decline": "رفض",
+      "payment": {
+        "awaitingReview": "بانتظار مراجعتك",
+        "paid": "مدفوع",
+        "declined": "تم رفض الدفع",
+        "disputeOpen": "نزاع مفتوح",
+        "viewScreenshot": "عرض لقطة التحويل",
+        "hideScreenshot": "إخفاء اللقطة",
+        "loadingProof": "جارٍ تحميل اللقطة…",
+        "proofError": "تعذّر تحميل اللقطة",
+        "declinePrompt": "لماذا ترفض هذا التحويل؟ (اختياري)"
+      }
     },
     "create": {
       "meta": {

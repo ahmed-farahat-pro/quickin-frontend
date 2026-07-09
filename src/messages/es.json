@@ -1978,7 +1978,18 @@
       },
       "approve": "Aprobar",
       "working": "Procesando…",
-      "decline": "Rechazar"
+      "decline": "Rechazar",
+      "payment": {
+        "awaitingReview": "Pendiente de tu revisión",
+        "paid": "Pagado",
+        "declined": "Pago rechazado",
+        "disputeOpen": "Disputa abierta",
+        "viewScreenshot": "Ver captura de la transferencia",
+        "hideScreenshot": "Ocultar captura",
+        "loadingProof": "Cargando captura…",
+        "proofError": "No se pudo cargar la captura",
+        "declinePrompt": "¿Por qué rechazas esta transferencia? (opcional)"
+      }
     },
     "create": {
       "meta": {
