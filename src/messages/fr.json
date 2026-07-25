@@ -1384,7 +1384,8 @@
     "logoAlt": "QuickIn",
     "nav": {
       "becomeHost": "Devenir hôte",
-      "hosting": "Mode hôte",
+      "hosting": "Espace hôte",
+      "addListing": "Ajouter une annonce",
       "greeting": "Bonjour, {name}",
       "logout": "Déconnexion",
       "login": "Connexion",
@@ -1397,8 +1398,7 @@
       "saved": "Favoris",
       "account": "Compte",
       "messages": "Messages",
-      "contact": "Contact",
-      "addListing": "Ajouter une annonce"
+      "contact": "Contact"
     },
     "hero": {
       "title": "Trouvez votre prochain séjour de charme",
@@ -1685,12 +1685,6 @@
     "waitingForApproval": "En attente d'approbation",
     "approved": "Approuvé",
     "payError": "Échec du paiement. Veuillez réessayer.",
-    "paymentConfirming": "Confirmation de votre paiement…",
-    "paymentReceived": "Paiement reçu — votre réservation est confirmée.",
-    "paymentProcessing": "Votre paiement est en cours de traitement. Cette page se mettra à jour une fois confirmé.",
-    "paymentFailed": "Le paiement n'a pas abouti. Vous pouvez réessayer.",
-    "paymentPending": "Paiement en cours…",
-    "retryPayment": "Réessayer le paiement",
     "errors": {
       "cancelFailed": "Annulation impossible",
       "reviewFailed": "Impossible d'envoyer l'avis"
@@ -1916,9 +1910,9 @@
       "noListings": "Vous n’avez encore aucune annonce.",
       "countPublished": "{count, plural, one {# annonce publiée.} other {# annonces publiées.}}",
       "createListing": "Créer une annonce",
-      "emptyHint": "Publiez votre premier espace pour commencer à accueillir des voyageurs.",
       "view": "Voir",
-      "edit": "Modifier"
+      "edit": "Modifier",
+      "emptyHint": "Publiez votre premier espace pour commencer à accueillir des voyageurs."
     },
     "reservations": {
       "heading": "Réservations entrantes",
@@ -2054,11 +2048,8 @@
     "cancel": "Annuler",
     "errors": {
       "nationalIdRequired": "Veuillez saisir votre numéro d’identité.",
-      "nationalIdInvalid": "Veuillez saisir un numéro national valide à 14 chiffres.",
       "phoneRequired": "Veuillez saisir votre numéro de téléphone.",
-      "phoneInvalid": "Veuillez saisir un numéro de téléphone valide.",
       "addressRequired": "Veuillez saisir votre adresse.",
-      "addressInvalid": "Veuillez saisir une adresse complète.",
       "submitFailed": "Impossible d’envoyer votre candidature. Veuillez réessayer.",
       "idRequired": "Veuillez ajouter le recto et le verso de votre pièce d'identité."
     },

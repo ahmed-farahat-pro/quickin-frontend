@@ -1385,6 +1385,7 @@
     "nav": {
       "becomeHost": "كن مضيفًا",
       "hosting": "الاستضافة",
+      "addListing": "إضافة قائمة",
       "greeting": "أهلًا، {name}",
       "logout": "تسجيل الخروج",
       "login": "تسجيل الدخول",
@@ -1397,8 +1398,7 @@
       "saved": "المحفوظات",
       "account": "الحساب",
       "messages": "الرسائل",
-      "contact": "اتصل بنا",
-      "addListing": "إضافة قائمة"
+      "contact": "اتصل بنا"
     },
     "hero": {
       "title": "اعثر على إقامة البوتيك التالية",
@@ -1685,12 +1685,6 @@
     "waitingForApproval": "في انتظار الموافقة",
     "approved": "تمت الموافقة",
     "payError": "فشل الدفع. حاول مرة أخرى.",
-    "paymentConfirming": "جارٍ تأكيد دفعتك…",
-    "paymentReceived": "تم استلام الدفع — تم تأكيد حجزك.",
-    "paymentProcessing": "تتم معالجة دفعتك. ستتحدّث هذه الصفحة بمجرد تأكيدها.",
-    "paymentFailed": "لم يكتمل الدفع. يمكنك المحاولة مرة أخرى.",
-    "paymentPending": "جارٍ معالجة الدفع…",
-    "retryPayment": "إعادة محاولة الدفع",
     "errors": {
       "cancelFailed": "تعذّر الإلغاء",
       "reviewFailed": "تعذّر إرسال التقييم"
@@ -1916,9 +1910,9 @@
       "noListings": "ليس لديك أي قوائم بعد.",
       "countPublished": "{count, plural, zero {لا قوائم منشورة.} one {قائمة واحدة منشورة.} two {قائمتان منشورتان.} few {# قوائم منشورة.} many {# قائمة منشورة.} other {# قائمة منشورة.}}",
       "createListing": "إنشاء قائمة",
-      "emptyHint": "أدرج مساحتك الأولى لتبدأ في استقبال الضيوف.",
       "view": "عرض",
-      "edit": "تعديل"
+      "edit": "تعديل",
+      "emptyHint": "أدرج مساحتك الأولى لتبدأ في استقبال الضيوف."
     },
     "reservations": {
       "heading": "الحجوزات الواردة",
@@ -2054,11 +2048,8 @@
     "cancel": "إلغاء",
     "errors": {
       "nationalIdRequired": "يرجى إدخال الرقم القومي.",
-      "nationalIdInvalid": "يرجى إدخال رقم قومي صحيح مكوّن من 14 رقمًا.",
       "phoneRequired": "يرجى إدخال رقم هاتفك.",
-      "phoneInvalid": "يرجى إدخال رقم هاتف صحيح.",
       "addressRequired": "يرجى إدخال عنوانك.",
-      "addressInvalid": "يرجى إدخال عنوان كامل.",
       "submitFailed": "تعذّر إرسال طلبك. حاول مرة أخرى.",
       "idRequired": "يرجى إضافة مقدمة وخلفية هويتك."
     },

@@ -1385,6 +1385,7 @@
     "nav": {
       "becomeHost": "Become a host",
       "hosting": "Hosting",
+      "addListing": "Add listing",
       "greeting": "Hi, {name}",
       "logout": "Logout",
       "login": "Log in",
@@ -1397,8 +1398,7 @@
       "saved": "Saved",
       "account": "Account",
       "messages": "Messages",
-      "contact": "Contact",
-      "addListing": "Add listing"
+      "contact": "Contact"
     },
     "hero": {
       "title": "Find your next boutique stay",
@@ -1742,12 +1742,6 @@
     "waitingForApproval": "Waiting for approval",
     "approved": "Approved",
     "payError": "Payment failed. Please try again.",
-    "paymentConfirming": "Confirming your payment…",
-    "paymentReceived": "Payment received — your booking is confirmed.",
-    "paymentProcessing": "Your payment is being processed. This page will update once it's confirmed.",
-    "paymentFailed": "Payment was not completed. You can try again.",
-    "paymentPending": "Payment processing…",
-    "retryPayment": "Retry payment",
     "errors": {
       "cancelFailed": "Could not cancel",
       "reviewFailed": "Could not submit review"
@@ -1916,9 +1910,9 @@
       "noListings": "You have no listings yet.",
       "countPublished": "{count, plural, one {# listing published.} other {# listings published.}}",
       "createListing": "Create a listing",
-      "emptyHint": "List your first space to start welcoming guests.",
       "view": "View",
-      "edit": "Edit"
+      "edit": "Edit",
+      "emptyHint": "List your first space to start welcoming guests."
     },
     "reservations": {
       "heading": "Incoming reservations",
@@ -2054,11 +2048,8 @@
     "cancel": "Cancel",
     "errors": {
       "nationalIdRequired": "Please enter your national ID.",
-      "nationalIdInvalid": "Please enter a valid 14-digit national ID.",
       "phoneRequired": "Please enter your phone number.",
-      "phoneInvalid": "Please enter a valid phone number.",
       "addressRequired": "Please enter your address.",
-      "addressInvalid": "Please enter a complete address.",
       "submitFailed": "Could not submit your application. Please try again.",
       "idRequired": "Please add the front and back of your ID."
     },

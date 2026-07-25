@@ -1384,7 +1384,8 @@
     "logoAlt": "QuickIn",
     "nav": {
       "becomeHost": "Conviértete en anfitrión",
-      "hosting": "Modo anfitrión",
+      "hosting": "Anfitrión",
+      "addListing": "Añadir anuncio",
       "greeting": "Hola, {name}",
       "logout": "Cerrar sesión",
       "login": "Iniciar sesión",
@@ -1397,8 +1398,7 @@
       "saved": "Guardados",
       "account": "Cuenta",
       "messages": "Mensajes",
-      "contact": "Contacto",
-      "addListing": "Añadir anuncio"
+      "contact": "Contacto"
     },
     "hero": {
       "title": "Encuentra tu próximo alojamiento boutique",
@@ -1685,12 +1685,6 @@
     "waitingForApproval": "Esperando aprobación",
     "approved": "Aprobado",
     "payError": "El pago falló. Inténtalo de nuevo.",
-    "paymentConfirming": "Confirmando tu pago…",
-    "paymentReceived": "Pago recibido: tu reserva está confirmada.",
-    "paymentProcessing": "Tu pago se está procesando. Esta página se actualizará cuando se confirme.",
-    "paymentFailed": "El pago no se completó. Puedes intentarlo de nuevo.",
-    "paymentPending": "Procesando el pago…",
-    "retryPayment": "Reintentar el pago",
     "errors": {
       "cancelFailed": "No se pudo cancelar",
       "reviewFailed": "No se pudo enviar la reseña"
@@ -1916,9 +1910,9 @@
       "noListings": "Aún no tienes anuncios.",
       "countPublished": "{count, plural, one {# anuncio publicado.} other {# anuncios publicados.}}",
       "createListing": "Crear un anuncio",
-      "emptyHint": "Publica tu primer espacio para empezar a recibir huéspedes.",
       "view": "Ver",
-      "edit": "Editar"
+      "edit": "Editar",
+      "emptyHint": "Publica tu primer espacio para empezar a recibir huéspedes."
     },
     "reservations": {
       "heading": "Reservas entrantes",
@@ -2054,11 +2048,8 @@
     "cancel": "Cancelar",
     "errors": {
       "nationalIdRequired": "Introduce tu documento de identidad.",
-      "nationalIdInvalid": "Introduce un documento de identidad válido de 14 dígitos.",
       "phoneRequired": "Introduce tu número de teléfono.",
-      "phoneInvalid": "Introduce un número de teléfono válido.",
       "addressRequired": "Introduce tu dirección.",
-      "addressInvalid": "Introduce una dirección completa.",
       "submitFailed": "No se pudo enviar tu solicitud. Inténtalo de nuevo.",
       "idRequired": "Añade el anverso y el reverso de tu documento."
     },
