@@ -117,6 +117,13 @@ export default async function HostPage() {
             width: 100% !important; height: 170px !important;
           }
         }
+        /* The whole photo/title area of a host card is a link to its editor —
+           give it clear hover affordance so it reads as clickable. */
+        .qk-host-listing-card { transition: box-shadow .2s ease, transform .2s ease; }
+        .qk-host-listing-card:hover { transform: translateY(-3px); box-shadow: 0 14px 34px rgba(42,34,32,0.14); }
+        .qk-host-card-open .qk-host-listing-img img { transition: transform .4s ease; }
+        .qk-host-card-open:hover .qk-host-listing-img img { transform: scale(1.04); }
+        .qk-host-card-open:hover h3 { color: ${COLORS.burgundy}; }
       `}</style>
 
       <Header backLabel={t('backToExplore')} />
@@ -384,7 +391,7 @@ async function HostDashboard({ userId, firstName, t }: { userId: string; firstNa
           }}
         >
           {listings.map((l) => (
-            <ListingCard key={l.id} listing={l} perNight={t('perNight')} />
+            <ListingCard key={l.id} listing={l} perNight={t('perNight')} viewLabel={t('dashboard.view')} editLabel={t('dashboard.edit')} />
           ))}
         </div>
       )}
@@ -406,12 +413,14 @@ async function HostDashboard({ userId, firstName, t }: { userId: string; firstNa
   )
 }
 
-function ListingCard({ listing, perNight }: { listing: Listing; perNight: string }) {
+function ListingCard({ listing, perNight, viewLabel, editLabel }: { listing: Listing; perNight: string; viewLabel: string; editLabel: string }) {
   const img =
     listing.image_url ||
     listing.listing_images?.[0]?.url ||
     FALLBACK_IMG
   const priceLabel = formatPrice(listing.price_per_night, listing.currency)
+
+  const editHref = `/host/${listing.id}/edit`
 
   return (
     <article
@@ -426,26 +435,71 @@ function ListingCard({ listing, perNight }: { listing: Listing; perNight: string
         gridTemplateColumns: '1fr',
       }}
     >
-      <div className="qk-host-listing-img" style={{ width: '100%', height: 160, background: COLORS.tan }}>
-        <img
-          src={img}
-          alt={listing.title}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-        />
-      </div>
-      <div style={{ padding: '14px 16px 16px' }}>
-        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: COLORS.ink }}>
-          {listing.title}
-        </h3>
-        {listing.location && (
-          <p style={{ margin: '3px 0 0', fontSize: 13.5, color: COLORS.muted }}>
-            {listing.location}
+      {/* Tapping the photo / title / price opens this listing's editor. Kept as a
+          single link (not the whole <article>, which also holds the buttons) so we
+          never nest one clickable inside another. */}
+      <a
+        href={editHref}
+        className="qk-host-card-open"
+        aria-label={`${editLabel}: ${listing.title}`}
+        style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}
+      >
+        <div className="qk-host-listing-img" style={{ width: '100%', height: 160, background: COLORS.tan, overflow: 'hidden' }}>
+          <img
+            src={img}
+            alt={listing.title}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          />
+        </div>
+        <div style={{ padding: '14px 16px 2px' }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: COLORS.ink, transition: 'color .16s ease' }}>
+            {listing.title}
+          </h3>
+          {listing.location && (
+            <p style={{ margin: '3px 0 0', fontSize: 13.5, color: COLORS.muted }}>
+              {listing.location}
+            </p>
+          )}
+          <p style={{ margin: '10px 0 0', fontSize: 14.5, color: COLORS.burgundy, fontWeight: 700 }}>
+            {priceLabel}
+            <span style={{ color: COLORS.muted, fontWeight: 500 }}> {perNight}</span>
           </p>
-        )}
-        <p style={{ margin: '10px 0 0', fontSize: 14.5, color: COLORS.burgundy, fontWeight: 700 }}>
-          {priceLabel}
-          <span style={{ color: COLORS.muted, fontWeight: 500 }}> {perNight}</span>
-        </p>
+        </div>
+      </a>
+      <div style={{ display: 'flex', gap: 10, padding: '12px 16px 16px' }}>
+        <a
+          href={`/explore/${listing.id}`}
+          style={{
+            flex: 1,
+            textAlign: 'center',
+            textDecoration: 'none',
+            color: COLORS.burgundy,
+            background: COLORS.cream,
+            border: `1px solid ${COLORS.tan}`,
+            borderRadius: 999,
+            padding: '9px 12px',
+            fontSize: 13.5,
+            fontWeight: 700,
+          }}
+        >
+          {viewLabel}
+        </a>
+        <a
+          href={editHref}
+          style={{
+            flex: 1,
+            textAlign: 'center',
+            textDecoration: 'none',
+            color: '#fff',
+            background: COLORS.burgundy,
+            borderRadius: 999,
+            padding: '9px 12px',
+            fontSize: 13.5,
+            fontWeight: 700,
+          }}
+        >
+          {editLabel}
+        </a>
       </div>
     </article>
   )

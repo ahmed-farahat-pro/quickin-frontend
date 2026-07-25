@@ -1397,7 +1397,8 @@
       "saved": "Saved",
       "account": "Account",
       "messages": "Messages",
-      "contact": "Contact"
+      "contact": "Contact",
+      "addListing": "Add listing"
     },
     "hero": {
       "title": "Find your next boutique stay",
@@ -1915,7 +1916,9 @@
       "noListings": "You have no listings yet.",
       "countPublished": "{count, plural, one {# listing published.} other {# listings published.}}",
       "createListing": "Create a listing",
-      "emptyHint": "List your first space to start welcoming guests."
+      "emptyHint": "List your first space to start welcoming guests.",
+      "view": "View",
+      "edit": "Edit"
     },
     "reservations": {
       "heading": "Incoming reservations",

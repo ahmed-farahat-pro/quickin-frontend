@@ -1397,7 +1397,8 @@
       "saved": "Guardados",
       "account": "Cuenta",
       "messages": "Mensajes",
-      "contact": "Contacto"
+      "contact": "Contacto",
+      "addListing": "Añadir anuncio"
     },
     "hero": {
       "title": "Encuentra tu próximo alojamiento boutique",
@@ -1915,7 +1916,9 @@
       "noListings": "Aún no tienes anuncios.",
       "countPublished": "{count, plural, one {# anuncio publicado.} other {# anuncios publicados.}}",
       "createListing": "Crear un anuncio",
-      "emptyHint": "Publica tu primer espacio para empezar a recibir huéspedes."
+      "emptyHint": "Publica tu primer espacio para empezar a recibir huéspedes.",
+      "view": "Ver",
+      "edit": "Editar"
     },
     "reservations": {
       "heading": "Reservas entrantes",

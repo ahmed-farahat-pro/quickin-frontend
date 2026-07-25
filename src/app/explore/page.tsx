@@ -168,16 +168,46 @@ export default async function ExplorePage({
           <nav className="qk-nav-desktop">
             <NotificationsBell />
             <LocaleSwitcher className="font-semibold text-[color:var(--qk-ink,#3a2a23)]" />
-            <a
-              href="/host"
-              style={{
-                color: COLORS.ink,
-                textDecoration: 'none',
-                fontWeight: 600,
-              }}
-            >
-              {isHost ? t('nav.hosting') : t('nav.becomeHost')}
-            </a>
+            {isHost ? (
+              <>
+                {/* A host is also a guest — give them a one-tap "Add listing"
+                    right from the home page, plus a link to manage/edit them. */}
+                <a
+                  href="/host"
+                  style={{ color: COLORS.ink, textDecoration: 'none', fontWeight: 600 }}
+                >
+                  {t('nav.hosting')}
+                </a>
+                <a
+                  href="/host/new"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    color: '#fff',
+                    background: COLORS.burgundy,
+                    textDecoration: 'none',
+                    fontWeight: 700,
+                    padding: '9px 18px',
+                    borderRadius: 999,
+                  }}
+                >
+                  <span aria-hidden style={{ fontSize: 17, lineHeight: 1, marginTop: -1 }}>+</span>
+                  {t('nav.addListing')}
+                </a>
+              </>
+            ) : (
+              <a
+                href="/host"
+                style={{
+                  color: COLORS.ink,
+                  textDecoration: 'none',
+                  fontWeight: 600,
+                }}
+              >
+                {t('nav.becomeHost')}
+              </a>
+            )}
             {firstName ? (
               <>
                 <a

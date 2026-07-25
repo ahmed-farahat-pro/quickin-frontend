@@ -1397,7 +1397,8 @@
       "saved": "Favoris",
       "account": "Compte",
       "messages": "Messages",
-      "contact": "Contact"
+      "contact": "Contact",
+      "addListing": "Ajouter une annonce"
     },
     "hero": {
       "title": "Trouvez votre prochain séjour de charme",
@@ -1915,7 +1916,9 @@
       "noListings": "Vous n’avez encore aucune annonce.",
       "countPublished": "{count, plural, one {# annonce publiée.} other {# annonces publiées.}}",
       "createListing": "Créer une annonce",
-      "emptyHint": "Publiez votre premier espace pour commencer à accueillir des voyageurs."
+      "emptyHint": "Publiez votre premier espace pour commencer à accueillir des voyageurs.",
+      "view": "Voir",
+      "edit": "Modifier"
     },
     "reservations": {
       "heading": "Réservations entrantes",

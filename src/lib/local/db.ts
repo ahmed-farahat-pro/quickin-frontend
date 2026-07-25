@@ -1572,3 +1572,69 @@ export async function getPlaceSuggestions(q: string): Promise<string[]> {
 
   return out.slice(0, 8)
 }
+
+export async function updateListing(
+  id: string,
+  hostId: string,
+  data: {
+    title?: string
+    description?: string | null
+    location?: string | null
+    country?: string | null
+    price_per_night?: number | string
+    weekend_price?: number | string | null
+    currency?: string
+    bedrooms?: number | string
+    beds?: number | string
+    bathrooms?: number | string
+    max_guests?: number | string
+    property_type?: string | null
+  }
+): Promise<Listing | null> {
+  if (!isUuid(id) || !isUuid(hostId)) return null
+
+  const sets: string[] = []
+  const vals: unknown[] = [id, hostId]
+  const put = (col: string, val: unknown) => { vals.push(val); sets.push(`${col} = $${vals.length}`) }
+  const intAtLeast = (v: unknown, min: number) => {
+    const n = Math.floor(Number(v))
+    return Number.isFinite(n) && n >= min ? n : min
+  }
+
+  if (data.title !== undefined) {
+    const title = String(data.title).trim()
+    if (!title) throw new Error('Title is required')
+    put('title', title)
+  }
+  if (data.description !== undefined) put('description', data.description?.toString().trim() || null)
+  if (data.location !== undefined) put('location', data.location?.toString().trim() || null)
+  if (data.country !== undefined) put('country', data.country?.toString().trim() || null)
+  if (data.price_per_night !== undefined) {
+    const price = Number(data.price_per_night)
+    if (!Number.isFinite(price) || price <= 0) throw new Error('Price must be greater than 0')
+    put('price_per_night', price)
+  }
+  if (data.weekend_price !== undefined) {
+    const wp = Number(data.weekend_price)
+    put('weekend_price', Number.isFinite(wp) && wp > 0 ? wp : null)
+  }
+  if (data.currency !== undefined) put('currency', String(data.currency).trim() || 'USD')
+  if (data.bedrooms !== undefined) put('bedrooms', intAtLeast(data.bedrooms, 0))
+  if (data.beds !== undefined) put('beds', intAtLeast(data.beds, 1))
+  if (data.bathrooms !== undefined) put('bathrooms', intAtLeast(data.bathrooms, 1))
+  if (data.max_guests !== undefined) put('max_guests', intAtLeast(data.max_guests, 1))
+  if (data.property_type !== undefined) put('property_type', data.property_type?.toString() || null)
+
+  // Nothing to change → just confirm ownership and echo the current row.
+  if (!sets.length) {
+    const owned = await pool.query(`SELECT id FROM listings WHERE id = $1 AND host_id = $2`, [id, hostId])
+    return owned.rows[0] ? getListingById(id) : null
+  }
+
+  const { rows } = await pool.query(
+    `UPDATE listings SET ${sets.join(', ')} WHERE id = $1 AND host_id = $2 RETURNING id`,
+    vals
+  )
+  if (!rows[0]) return null // not found or not owned by this host
+  return getListingById(id)
+}
