@@ -1,16 +1,16 @@
 import { NextResponse } from 'next/server'
-import { isAdminKey } from '@/lib/local/auth'
+import { requireStaff } from '@/lib/local/staff'
 import { getPendingHostApplications, reviewHostApplication } from '@/lib/local/db'
 
-// Admin (key-gated): GET ?key=[&status=]  → host applications (default: pending).
-//                    POST ?key= { id, action: 'approve'|'reject', note? } → decide.
+// Admin (staff session + 'applications' module): GET [?status=]  → host applications (default: pending).
+//                    POST { id, action: 'approve'|'reject', note? } → decide.
 // Approving flips users.is_host (transactionally) and notifies the applicant.
 export const dynamic = 'force-dynamic'
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' }
-const keyOf = (req: Request) => new URL(req.url).searchParams.get('key') || req.headers.get('x-admin-key')
 
 export async function GET(req: Request) {
-  if (!isAdminKey(keyOf(req))) return NextResponse.json({ error: 'forbidden' }, { status: 403, headers: CORS })
+  const gate = await requireStaff(req, 'applications')
+  if ('error' in gate) return gate.error
   try {
     const status = new URL(req.url).searchParams.get('status') || 'pending'
     return NextResponse.json({ applications: await getPendingHostApplications(status) }, { headers: CORS })
@@ -21,7 +21,8 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  if (!isAdminKey(keyOf(req))) return NextResponse.json({ error: 'forbidden' }, { status: 403, headers: CORS })
+  const gate = await requireStaff(req, 'applications')
+  if ('error' in gate) return gate.error
   try {
     const body = await req.json().catch(() => null)
     const id = body?.id

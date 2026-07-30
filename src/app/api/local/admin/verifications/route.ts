@@ -1,15 +1,15 @@
 import { NextResponse } from 'next/server'
-import { isAdminKey } from '@/lib/local/auth'
+import { requireStaff } from '@/lib/local/staff'
 import { getPendingVerifications, reviewVerification } from '@/lib/local/db'
 
-// Admin (key-gated): GET ?key=  → pending ID verifications.
-//                    POST ?key= { id, action: 'verify'|'reject', note? } → decide.
+// Admin (staff session + module permission): GET  → pending ID verifications.
+//                    POST { id, action: 'verify'|'reject', note? } → decide.
 export const dynamic = 'force-dynamic'
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' }
-const keyOf = (req: Request) => new URL(req.url).searchParams.get('key') || req.headers.get('x-admin-key')
 
 export async function GET(req: Request) {
-  if (!isAdminKey(keyOf(req))) return NextResponse.json({ error: 'forbidden' }, { status: 403, headers: CORS })
+  const gate = await requireStaff(req, 'verifications')
+  if ('error' in gate) return gate.error
   try {
     return NextResponse.json({ verifications: await getPendingVerifications() }, { headers: CORS })
   } catch (err) {
@@ -19,7 +19,8 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  if (!isAdminKey(keyOf(req))) return NextResponse.json({ error: 'forbidden' }, { status: 403, headers: CORS })
+  const gate = await requireStaff(req, 'verifications')
+  if ('error' in gate) return gate.error
   try {
     const body = await req.json().catch(() => null)
     const id = body?.id

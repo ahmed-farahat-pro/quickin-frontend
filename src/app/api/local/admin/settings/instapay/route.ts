@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getPaymentConfig, setSetting } from '@/lib/local/db'
-import { getUserWithRole } from '@/lib/local/auth'
+import { requireStaff, staffActor } from '@/lib/local/staff'
 
 // Admin-controlled Instapay destination (World 1 — cookie auth, non-Supabase).
 //   GET /api/local/admin/settings/instapay  → { instapay_handle, instructions }
 //   PUT /api/local/admin/settings/instapay {instapay_handle, instructions?}
-// Signed-in admins only (role='admin').
+// Requires a staff session with the 'payments' module.
 export const dynamic = 'force-dynamic'
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -24,15 +24,8 @@ export async function OPTIONS() {
   })
 }
 
-async function requireAdmin(req: Request) {
-  const user = await getUserWithRole(req)
-  if (!user) return { error: NextResponse.json({ error: 'Not signed in' }, { status: 401, headers: CORS }) }
-  if (user.role !== 'admin') return { error: NextResponse.json({ error: 'Admins only' }, { status: 403, headers: CORS }) }
-  return { user }
-}
-
 export async function GET(req: Request) {
-  const gate = await requireAdmin(req)
+  const gate = await requireStaff(req, 'payments')
   if ('error' in gate) return gate.error
   try {
     return NextResponse.json(await getPaymentConfig(), { headers: CORS })
@@ -42,15 +35,15 @@ export async function GET(req: Request) {
 }
 
 export async function PUT(req: Request) {
-  const gate = await requireAdmin(req)
+  const gate = await requireStaff(req, 'payments')
   if ('error' in gate) return gate.error
   try {
     const body = await req.json().catch(() => ({}))
     if (typeof body.instapay_handle === 'string') {
-      await setSetting('instapay_handle', body.instapay_handle.trim().slice(0, 200), gate.user.id)
+      await setSetting('instapay_handle', body.instapay_handle.trim().slice(0, 200), staffActor(gate.staff))
     }
     if (typeof body.instructions === 'string') {
-      await setSetting('instapay_instructions', body.instructions.trim().slice(0, 2000), gate.user.id)
+      await setSetting('instapay_instructions', body.instructions.trim().slice(0, 2000), staffActor(gate.staff))
     }
     return NextResponse.json(await getPaymentConfig(), { headers: CORS })
   } catch (err) {

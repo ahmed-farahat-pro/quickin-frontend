@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server'
-import { isAdminKey } from '@/lib/local/auth'
+import { requireStaff } from '@/lib/local/staff'
 import { adminStats } from '@/lib/local/db'
 
-// Admin (key-gated): GET ?key=  → top-line dashboard counts.
+// Admin (staff session + module permission): GET  → top-line dashboard counts.
 export const dynamic = 'force-dynamic'
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' }
-const keyOf = (req: Request) => new URL(req.url).searchParams.get('key') || req.headers.get('x-admin-key')
 
 export async function GET(req: Request) {
-  if (!isAdminKey(keyOf(req))) return NextResponse.json({ error: 'forbidden' }, { status: 403, headers: CORS })
+  const gate = await requireStaff(req, 'overview')
+  if ('error' in gate) return gate.error
   try {
     return NextResponse.json({ stats: await adminStats() }, { headers: CORS })
   } catch (err) {

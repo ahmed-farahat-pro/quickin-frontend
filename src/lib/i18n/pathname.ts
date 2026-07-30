@@ -1,6 +1,9 @@
 import { defaultLocale, isLocale, type Locale } from '@/i18n/config'
 
-const UNLOCALIZED_PREFIXES = ['/api', '/_next']
+// '/ops' is the admin console: English-only, and its session gate redirects to
+// /ops/login. Locale-prefixing it would turn every one of those redirects into two
+// (/ops/login → /en/ops/login), doubling history entries on sign-out.
+const UNLOCALIZED_PREFIXES = ['/api', '/_next', '/ops']
 const UNLOCALIZED_EXACT = ['/favicon.ico']
 
 function isAbsoluteUrl(value: string): boolean {

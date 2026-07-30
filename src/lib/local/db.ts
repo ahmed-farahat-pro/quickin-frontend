@@ -2692,3 +2692,299 @@ export async function adminResolveDispute(
   delete row._hid
   return row as Booking
 }
+
+// ---- Staff RBAC (admin panel accounts) --------------------------------------
+// Management CRUD for the super admin's /ops/staff screen. Auth, sessions and the
+// permission checks themselves live in src/lib/local/staff.ts (which owns its own
+// SQL, the same way auth.ts does). These helpers exist only in this repo — the
+// backend needs the gate, not the management screens.
+
+export type StaffAccount = {
+  id: string
+  email: string
+  full_name: string
+  role: 'super_admin' | 'moderator'
+  is_active: boolean
+  last_login_at: string | null
+  locked_until: string | null
+  failed_login_attempts: number
+  created_at: string
+  created_by_email: string | null
+  modules: string[]
+  active_sessions: number
+}
+
+const STAFF_SELECT = `
+  SELECT a.id, a.email, a.full_name, a.role, a.is_active, a.last_login_at,
+         a.locked_until, a.failed_login_attempts, a.created_at,
+         c.email AS created_by_email,
+         COALESCE(array_agg(DISTINCT p.module) FILTER (WHERE p.module IS NOT NULL), '{}') AS modules,
+         (SELECT count(*)::int FROM staff_sessions s
+           WHERE s.staff_id = a.id AND s.revoked_at IS NULL AND s.expires_at > now()) AS active_sessions
+    FROM staff_accounts a
+    LEFT JOIN staff_accounts c ON c.id = a.created_by
+    LEFT JOIN staff_permissions p ON p.staff_id = a.id`
+
+/** Newest-last list for the staff screen: super admins first, then by creation. */
+export async function listStaffAccounts(): Promise<StaffAccount[]> {
+  const { rows } = await pool.query<StaffAccount>(
+    `${STAFF_SELECT}
+      GROUP BY a.id, c.email
+      ORDER BY (a.role = 'super_admin') DESC, a.created_at`
+  )
+  return rows
+}
+
+export async function getStaffAccount(id: string): Promise<StaffAccount | null> {
+  if (!isUuid(id)) return null
+  const { rows } = await pool.query<StaffAccount>(
+    `${STAFF_SELECT} WHERE a.id = $1 GROUP BY a.id, c.email`,
+    [id]
+  )
+  return rows[0] ?? null
+}
+
+/** Login lookup. Returns the hash and lockout state; case-insensitive on email. */
+export async function getStaffByEmail(email: string): Promise<{
+  id: string
+  email: string
+  password_hash: string
+  full_name: string
+  role: 'super_admin' | 'moderator'
+  is_active: boolean
+  failed_login_attempts: number
+  locked_until: string | null
+} | null> {
+  const { rows } = await pool.query(
+    `SELECT id, email, password_hash, full_name, role, is_active,
+            failed_login_attempts, locked_until
+       FROM staff_accounts WHERE lower(email) = lower($1)`,
+    [email]
+  )
+  return rows[0] ?? null
+}
+
+/** How many super admins could still sign in — the last-one-standing guard. */
+export async function countActiveSuperAdmins(excludeId?: string): Promise<number> {
+  const { rows } = await pool.query<{ n: number }>(
+    `SELECT count(*)::int AS n FROM staff_accounts
+      WHERE role = 'super_admin' AND is_active AND ($1::uuid IS NULL OR id <> $1::uuid)`,
+    [excludeId ?? null]
+  )
+  return rows[0]?.n ?? 0
+}
+
+export async function createStaffAccount(input: {
+  email: string
+  passwordHash: string
+  fullName: string
+  role: 'super_admin' | 'moderator'
+  createdBy: string | null
+  modules: string[]
+}): Promise<StaffAccount> {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const { rows } = await client.query<{ id: string }>(
+      `INSERT INTO staff_accounts (email, password_hash, full_name, role, created_by)
+       VALUES (lower($1), $2, $3, $4, $5) RETURNING id`,
+      [input.email.trim(), input.passwordHash, input.fullName.trim().slice(0, 120), input.role,
+       input.createdBy && isUuid(input.createdBy) ? input.createdBy : null]
+    )
+    const id = rows[0].id
+    if (input.role === 'moderator' && input.modules.length) {
+      await client.query(
+        `INSERT INTO staff_permissions (staff_id, module, granted_by)
+         SELECT $1, m, $2 FROM unnest($3::text[]) AS m
+         ON CONFLICT (staff_id, module) DO NOTHING`,
+        [id, input.createdBy && isUuid(input.createdBy) ? input.createdBy : null, input.modules]
+      )
+    }
+    await client.query('COMMIT')
+    return (await getStaffAccount(id))!
+  } catch (err) {
+    await client.query('ROLLBACK')
+    throw err
+  } finally {
+    client.release()
+  }
+}
+
+/** Partial update of the editable profile fields. Role is intentionally included so
+ *  a super admin can promote/demote, but callers must run the last-super-admin guard. */
+export async function updateStaffAccount(
+  id: string,
+  fields: { fullName?: string; role?: 'super_admin' | 'moderator'; isActive?: boolean }
+): Promise<StaffAccount | null> {
+  if (!isUuid(id)) return null
+  const { rowCount } = await pool.query(
+    `UPDATE staff_accounts
+        SET full_name = COALESCE($2, full_name),
+            role      = COALESCE($3, role),
+            is_active = COALESCE($4, is_active),
+            updated_at = now()
+      WHERE id = $1`,
+    [id, fields.fullName?.trim().slice(0, 120) ?? null, fields.role ?? null,
+     fields.isActive === undefined ? null : fields.isActive]
+  )
+  if (!rowCount) return null
+  return getStaffAccount(id)
+}
+
+/** Replace a moderator's module set wholesale (the checkbox grid posts the full list).
+ *  Takes effect on the moderator's next request — no re-login needed, since
+ *  getStaffFromRequest re-reads permissions every time. */
+export async function setStaffModules(id: string, modules: string[], grantedBy: string | null): Promise<void> {
+  if (!isUuid(id)) throw new Error('Invalid id')
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    await client.query(`DELETE FROM staff_permissions WHERE staff_id = $1 AND NOT (module = ANY($2::text[]))`, [id, modules])
+    if (modules.length) {
+      await client.query(
+        `INSERT INTO staff_permissions (staff_id, module, granted_by)
+         SELECT $1, m, $2 FROM unnest($3::text[]) AS m
+         ON CONFLICT (staff_id, module) DO NOTHING`,
+        [id, grantedBy && isUuid(grantedBy) ? grantedBy : null, modules]
+      )
+    }
+    await client.query('COMMIT')
+  } catch (err) {
+    await client.query('ROLLBACK')
+    throw err
+  } finally {
+    client.release()
+  }
+}
+
+/** Set a new password and clear any lockout. Callers must also revoke sessions. */
+export async function setStaffPassword(id: string, passwordHash: string): Promise<boolean> {
+  if (!isUuid(id)) return false
+  const { rowCount } = await pool.query(
+    `UPDATE staff_accounts
+        SET password_hash = $2, password_changed_at = now(), updated_at = now(),
+            failed_login_attempts = 0, locked_until = NULL
+      WHERE id = $1`,
+    [id, passwordHash]
+  )
+  return (rowCount ?? 0) > 0
+}
+
+export async function deleteStaffAccount(id: string): Promise<boolean> {
+  if (!isUuid(id)) return false
+  const { rowCount } = await pool.query(`DELETE FROM staff_accounts WHERE id = $1`, [id])
+  return (rowCount ?? 0) > 0
+}
+
+/** Count a failed sign-in and lock the account once the threshold is hit.
+ *  Per-account columns rather than the in-memory limiter, which dies on cold start
+ *  and isn't shared across serverless instances. Returns the post-update state. */
+export async function noteStaffLoginFailure(
+  id: string,
+  maxAttempts: number,
+  lockoutMs: number
+): Promise<{ attempts: number; lockedUntil: string | null }> {
+  const { rows } = await pool.query<{ failed_login_attempts: number; locked_until: string | null }>(
+    `UPDATE staff_accounts
+        SET failed_login_attempts = failed_login_attempts + 1,
+            locked_until = CASE WHEN failed_login_attempts + 1 >= $2
+                                THEN now() + ($3 || ' milliseconds')::interval
+                                ELSE locked_until END,
+            updated_at = now()
+      WHERE id = $1
+      RETURNING failed_login_attempts, locked_until`,
+    [id, maxAttempts, String(lockoutMs)]
+  )
+  return { attempts: rows[0]?.failed_login_attempts ?? 0, lockedUntil: rows[0]?.locked_until ?? null }
+}
+
+/** Clear the failure counter and stamp the successful sign-in. */
+export async function noteStaffLoginSuccess(id: string): Promise<void> {
+  await pool.query(
+    `UPDATE staff_accounts
+        SET failed_login_attempts = 0, locked_until = NULL, last_login_at = now(), updated_at = now()
+      WHERE id = $1`,
+    [id]
+  )
+}
+
+// ---- Staff password resets ---------------------------------------------------
+// The HubDrives PasswordResetRequest contract: 6-digit code, single-use, short TTL,
+// and locked after too many wrong guesses.
+
+/** Invalidates any outstanding codes for the account, then issues a fresh one. */
+export async function createStaffReset(input: {
+  staffId: string
+  email: string
+  code: string
+  ttlMs: number
+  ip: string | null
+}): Promise<void> {
+  if (!isUuid(input.staffId)) throw new Error('Invalid id')
+  await pool.query(
+    `UPDATE staff_password_resets SET used_at = now()
+      WHERE staff_id = $1 AND used_at IS NULL`,
+    [input.staffId]
+  )
+  await pool.query(
+    `INSERT INTO staff_password_resets (staff_id, email, code, expires_at, request_ip)
+     VALUES ($1, lower($2), $3, now() + ($4 || ' milliseconds')::interval, $5)`,
+    [input.staffId, input.email, input.code, String(input.ttlMs), input.ip]
+  )
+}
+
+/**
+ * Verify a reset code without consuming it. A wrong code increments the attempt
+ * counter (so guessing is bounded); the row is only marked used once the password
+ * has actually been changed — same ordering as HubDrives' Verify()/MarkUsed().
+ */
+export async function checkStaffReset(
+  email: string,
+  code: string,
+  maxAttempts: number
+): Promise<{ ok: true; id: string; staffId: string } | { ok: false; reason: 'not_found' | 'expired' | 'used' | 'locked' | 'mismatch' }> {
+  const { rows } = await pool.query<{
+    id: string
+    staff_id: string
+    code: string
+    used_at: string | null
+    failed_attempts: number
+    expired: boolean
+  }>(
+    `SELECT id, staff_id, code, used_at, failed_attempts, (expires_at <= now()) AS expired
+       FROM staff_password_resets
+      WHERE lower(email) = lower($1)
+      ORDER BY created_at DESC LIMIT 1`,
+    [email]
+  )
+  const row = rows[0]
+  if (!row) return { ok: false, reason: 'not_found' }
+  if (row.used_at) return { ok: false, reason: 'used' }
+  if (row.failed_attempts >= maxAttempts) return { ok: false, reason: 'locked' }
+  if (row.expired) return { ok: false, reason: 'expired' }
+  if (row.code !== String(code).trim()) {
+    await pool.query(
+      `UPDATE staff_password_resets SET failed_attempts = failed_attempts + 1 WHERE id = $1`,
+      [row.id]
+    )
+    return { ok: false, reason: 'mismatch' }
+  }
+  return { ok: true, id: row.id, staffId: row.staff_id }
+}
+
+/** Consume the code. Call only after the new password is committed. */
+export async function markStaffResetUsed(id: string): Promise<void> {
+  await pool.query(`UPDATE staff_password_resets SET used_at = now() WHERE id = $1`, [id])
+}
+
+/** Housekeeping for the daily cron — sessions and reset codes accumulate forever. */
+export async function purgeStaffExpired(): Promise<{ sessions: number; resets: number }> {
+  const s = await pool.query(
+    `DELETE FROM staff_sessions WHERE expires_at < now() - interval '30 days'`
+  )
+  const r = await pool.query(
+    `DELETE FROM staff_password_resets
+      WHERE created_at < now() - interval '30 days' AND (used_at IS NOT NULL OR expires_at < now())`
+  )
+  return { sessions: s.rowCount ?? 0, resets: r.rowCount ?? 0 }
+}

@@ -294,12 +294,11 @@ export async function publicUserWithHost(row: {
 // NB: there is deliberately no "promote me to host" helper here. Host is granted
 // only by an admin decision — `reviewHostApplication` / `adminSetHost` in db.ts.
 
-/** Shared-secret check for the local-stack admin (host-application + ID review).
- *  Configure ADMIN_OPS_KEY in the environment; falls back to a dev default. */
-export function isAdminKey(key: string | null | undefined): boolean {
-  const expected = process.env.ADMIN_OPS_KEY || 'QuickInAdmin2026'
-  return typeof key === 'string' && key.length > 0 && key === expected
-}
+// REMOVED: isAdminKey / ADMIN_OPS_KEY — the shared admin secret that used to gate the
+// /ops console and six admin routes (including DELETE user and DELETE listing) with a
+// hardcoded default and no attribution. Replaced by per-account staff sessions and
+// per-module permissions in src/lib/local/staff.ts. ADMIN_OPS_KEY can be deleted from
+// both Vercel projects.
 
 export async function createUser(args: {
   email: string

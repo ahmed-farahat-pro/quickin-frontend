@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server'
-import { isAdminKey } from '@/lib/local/auth'
+import { requireStaff } from '@/lib/local/staff'
 import { getAppLinks, setAppLinks } from '@/lib/local/db'
 
-// Admin (key-gated): GET returns the current app store links; POST { ios, android }
-// saves them. Backs the "App download links" card in the /ops console.
+// Admin: GET returns the current app store links; POST { ios, android } saves them.
+// Backs the "App download links" card in the /ops console. That card lives on the
+// console shell rather than a tab of its own, so it follows the 'overview' module.
 export const dynamic = 'force-dynamic'
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' }
-const keyOf = (req: Request) => new URL(req.url).searchParams.get('key') || req.headers.get('x-admin-key')
-
 // Store only valid http(s) URLs; anything else (incl. empty) clears the link.
 function cleanUrl(v: unknown): string | null {
   const s = String(v ?? '').trim()
@@ -21,7 +20,8 @@ function cleanUrl(v: unknown): string | null {
 }
 
 export async function GET(req: Request) {
-  if (!isAdminKey(keyOf(req))) return NextResponse.json({ error: 'forbidden' }, { status: 403, headers: CORS })
+  const gate = await requireStaff(req, 'overview')
+  if ('error' in gate) return gate.error
   try {
     return NextResponse.json(await getAppLinks(), { headers: CORS })
   } catch (err) {
@@ -31,7 +31,8 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  if (!isAdminKey(keyOf(req))) return NextResponse.json({ error: 'forbidden' }, { status: 403, headers: CORS })
+  const gate = await requireStaff(req, 'overview')
+  if ('error' in gate) return gate.error
   try {
     const body = await req.json().catch(() => ({}))
     await setAppLinks(cleanUrl(body.ios), cleanUrl(body.android))

@@ -1,13 +1,14 @@
 // QuickIn — Instapay payments ops (World 1, no Supabase).
-// Server component: reads the qk_token cookie, resolves the signed-in user's role
-// the same tolerant way the API routes do, and only renders for role='admin'.
+// Server component: the (console) layout has already established the staff session;
+// this adds the per-module check, so only a super admin or a moderator holding the
+// 'payments' module sees the panels. The API routes behind them re-check the same
+// permission independently.
 // Two panels live in the 'use client' component below: the Instapay handle settings
 // form and the payment-disputes queue. Strings are hardcoded English (this ops page
 // is intentionally not wired into next-intl to keep the change contained).
 import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
-import { verifyToken, getUserRowByEmail } from '@/lib/local/auth'
-import { pool } from '@/lib/local/pool'
+import { resolveStaffSession, staffCan, STAFF_COOKIE } from '@/lib/local/staff'
 import { OpsPayments } from './ops-payments'
 
 export const dynamic = 'force-dynamic'
@@ -27,35 +28,9 @@ const COLORS = {
 
 const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
 
-/** Resolve the signed-in user + role from the qk_token cookie (tolerant of a
- *  missing users.role column, exactly like getUserWithRole on the API side). */
-async function getAdminUser(): Promise<{ id: string; role: 'admin' | 'host' | 'user' } | null> {
-  const token = (await cookies()).get('qk_token')?.value
-  if (!token) return null
-  const claims = verifyToken(token)
-  if (!claims?.email) return null
-  try {
-    const row = await getUserRowByEmail(claims.email)
-    if (!row) return null
-    let role: 'admin' | 'host' | 'user' = 'user'
-    try {
-      const { rows } = await pool.query(`SELECT role FROM users WHERE id = $1`, [row.id])
-      const r = String(rows[0]?.role ?? '').toLowerCase()
-      if (r === 'admin') role = 'admin'
-      else if (r === 'host') role = 'host'
-    } catch {
-      /* role column absent */
-    }
-    if (role === 'user' && row.is_host) role = 'host'
-    return { id: row.id, role }
-  } catch {
-    return null
-  }
-}
-
 export default async function OpsPaymentsPage() {
-  const user = await getAdminUser()
-  const isAdmin = user?.role === 'admin'
+  const staff = await resolveStaffSession((await cookies()).get(STAFF_COOKIE)?.value)
+  const allowed = Boolean(staff && staffCan(staff, 'payments'))
 
   return (
     <main
@@ -107,7 +82,7 @@ export default async function OpsPaymentsPage() {
           Set the Instapay destination guests transfer to, and resolve payment disputes.
         </p>
 
-        {!isAdmin ? (
+        {!allowed ? (
           <div
             style={{
               background: '#fff',
@@ -120,12 +95,12 @@ export default async function OpsPaymentsPage() {
             }}
           >
             <p style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: COLORS.ink }}>
-              Admins only
+              No access to payments
             </p>
             <p style={{ margin: 0, fontSize: 14 }}>
-              {user
-                ? 'Your account does not have the admin role.'
-                : 'Please sign in with an admin account to manage payments.'}
+              {staff
+                ? 'Your account does not have the Payments module. Ask a super admin to grant it.'
+                : 'Please sign in to manage payments.'}
             </p>
           </div>
         ) : (

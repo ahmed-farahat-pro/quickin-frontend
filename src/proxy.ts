@@ -34,10 +34,29 @@ function buildRequestHeaders(
   return requestHeaders
 }
 
+/** Paths under /ops that must stay reachable without a staff session. */
+const OPS_PUBLIC = ['/ops/login', '/ops/forgot']
+
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   const search = request.nextUrl.search
   const preferredLocale = resolvePreferredLocale(request)
+
+  // Admin console fast path. The real gate is src/app/ops/(console)/layout.tsx —
+  // this only short-circuits the obvious signed-out case so the visitor gets a clean
+  // 307 instead of a streamed shell plus a client-side redirect. Cookie PRESENCE
+  // only: validating it needs a DB round trip, which the proxy runtime can't do, so
+  // a stale or revoked cookie still falls through to the layout for the real check.
+  if (pathname === '/ops' || pathname.startsWith('/ops/')) {
+    if (!OPS_PUBLIC.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+      if (!request.cookies.get('qk_staff')?.value) {
+        const loginUrl = request.nextUrl.clone()
+        loginUrl.pathname = '/ops/login'
+        loginUrl.search = ''
+        return NextResponse.redirect(loginUrl)
+      }
+    }
+  }
   const { locale: localeFromPath, pathname: strippedPath } =
     stripLocaleFromPath(pathname)
 

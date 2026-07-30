@@ -1,12 +1,21 @@
 'use client'
 
 // QuickIn — operations console (local-stack admin).
-// Self-contained client page: operator types an admin key (stored in
-// localStorage 'qk_ops_key', never hardcoded), then runs a full admin
-// dashboard against the real (Neon) data — overview stats, users,
-// listings (with publish/hide/delete), bookings, host applications and
-// ID verifications. Every request is key-gated (?key= and x-admin-key).
-import { useCallback, useEffect, useState } from 'react'
+// Runs a full admin dashboard against the real (Neon) data — overview stats, users,
+// listings (with publish/hide/delete), bookings, host applications and ID
+// verifications.
+//
+// Access control (A1/A4): the (console)/layout.tsx server gate has already proven a
+// valid staff session before this renders, and every request below rides the httpOnly
+// qk_staff cookie. The tab strip is filtered to the modules this operator holds, and
+// the matching API route re-checks the same permission — so hiding a tab is a
+// convenience, not the boundary.
+//
+// This replaced a shared admin key typed into a prompt and kept in
+// localStorage['qk_ops_key'], which gave anyone holding the string full delete rights
+// with no attribution.
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useOpsSession, OpsHeader } from './ops-session'
 
 // Boutique palette.
 const BURGUNDY = '#5B0F16'
@@ -15,8 +24,13 @@ const TAN = '#EFE6D8'
 const INK = '#2A2220'
 const MUTED = '#6B6055'
 const GREEN = '#2E7D5B'
-const KEY_STORAGE = 'qk_ops_key'
 
+// Shown when the API returns 403 — the tab was visible but the permission was
+// revoked mid-session, so the server (correctly) refused.
+const NO_ACCESS = 'Your access to this section has been removed.'
+
+// Each TabId is also a STAFF_MODULES key, so a tab maps 1:1 to the permission that
+// guards its API route — no lookup table needed.
 type TabId = 'overview' | 'users' | 'listings' | 'bookings' | 'applications' | 'verifications'
 
 const TABS: Array<{ id: TabId; label: string }> = [
@@ -62,22 +76,16 @@ type AdminListing = {
   currency: string
   price_per_night: number
   is_published: boolean
-  approval_status: string
   host_id: string | null
   host_name: string | null
   created_at: string
   booking_count: number
   image: string | null
-  // Proof of ownership. The image itself only comes down for listings awaiting
-  // review (that's where it has to be looked at); elsewhere just the flag.
-  has_ownership_doc?: boolean
-  ownership_doc?: string | null
 }
 
 type AdminBooking = {
   id: string
-  // Issued when the booking is confirmed — pending requests have none.
-  reservation_code: string | null
+  reservation_code: string
   status: string
   payment_status: string
   total_price: number
@@ -99,7 +107,6 @@ type HostApplication = {
   phone?: string | null
   address?: string | null
   company?: string | null
-  host_type?: string | null
   notes?: string | null
   status?: string | null
   submitted_at?: string | null
@@ -139,10 +146,20 @@ function fmtMoney(value: number, currency: string): string {
 }
 
 export default function OpsPage() {
-  const [adminKey, setAdminKey] = useState<string | null>(null)
-  const [keyInput, setKeyInput] = useState('')
-  const [ready, setReady] = useState(false)
-  const [tab, setTab] = useState<TabId>('overview')
+  const { can, signOut } = useOpsSession()
+
+  // A4 (hide): only the modules this operator holds. The server enforces the same
+  // thing on every request, so this is presentation.
+  const visibleTabs = useMemo(() => TABS.filter((t) => can(t.id)), [can])
+  const [tab, setTab] = useState<TabId>(() => visibleTabs[0]?.id ?? 'overview')
+
+  // If permissions changed under us (the super admin edited them mid-session), the
+  // current tab may no longer be allowed — fall back to the first one that is.
+  useEffect(() => {
+    if (visibleTabs.length && !visibleTabs.some((t) => t.id === tab)) {
+      setTab(visibleTabs[0].id)
+    }
+  }, [visibleTabs, tab])
 
   // Per-section data.
   const [stats, setStats] = useState<AdminStats | null>(null)
@@ -179,7 +196,6 @@ export default function OpsPage() {
   })
 
   const [busyId, setBusyId] = useState<string | null>(null)
-  const [keyError, setKeyError] = useState<string | null>(null)
 
   // App download links (admin-editable; surfaced by the web "download the app" bar).
   const [appIos, setAppIos] = useState('')
@@ -188,54 +204,30 @@ export default function OpsPage() {
   const [savingLinks, setSavingLinks] = useState(false)
   const [linksMsg, setLinksMsg] = useState<string | null>(null)
 
-  // Restore a previously-saved key on first mount.
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(KEY_STORAGE)
-      if (saved) setAdminKey(saved)
-    } catch {
-      /* localStorage may be unavailable */
-    }
-    setReady(true)
-  }, [])
-
-  const wrongKey = useCallback(() => {
-    try {
-      localStorage.removeItem(KEY_STORAGE)
-    } catch {
-      /* ignore */
-    }
-    setAdminKey(null)
-    setStats(null)
-    setUsers([])
-    setListings([])
-    setBookings([])
-    setApps([])
-    setVerifs([])
-    setLoaded({
-      overview: false,
-      users: false,
-      listings: false,
-      bookings: false,
-      applications: false,
-      verifications: false,
-    })
-    setKeyError('Wrong key — please try again.')
-  }, [])
-
   const setSectionLoading = (id: TabId, v: boolean) =>
     setLoading((prev) => ({ ...prev, [id]: v }))
   const setSectionError = (id: TabId, v: string | null) =>
     setErrors((prev) => ({ ...prev, [id]: v }))
 
-  // Generic GET against a key-gated admin endpoint.
+  /** A 401 means the session died (expired, idle, revoked, or the account was
+   *  deactivated) — leave the console rather than showing a half-broken screen. */
+  const sessionEnded = useCallback(() => {
+    window.location.href = '/ops/login?reason=expired'
+  }, [])
+
+  // Generic GET against an admin endpoint. Auth is the httpOnly qk_staff cookie, so
+  // there is no secret for this page to hold, store, or leak.
   const adminGet = useCallback(
-    async <T,>(key: string, path: string): Promise<T | 'forbidden' | null> => {
+    async <T,>(path: string): Promise<T | 'forbidden' | null> => {
       try {
-        const res = await fetch(`/api/local/admin/${path}?key=${encodeURIComponent(key)}`, {
-          headers: { 'x-admin-key': key },
+        const res = await fetch(`/api/local/admin/${path}`, {
+          credentials: 'same-origin',
           cache: 'no-store',
         })
+        if (res.status === 401) {
+          sessionEnded()
+          return null
+        }
         if (res.status === 403) return 'forbidden'
         if (!res.ok) return null
         return (await res.json()) as T
@@ -243,57 +235,57 @@ export default function OpsPage() {
         return null
       }
     },
-    [],
+    [sessionEnded],
   )
 
   const loadSection = useCallback(
-    async (id: TabId, key: string) => {
+    async (id: TabId) => {
       setSectionLoading(id, true)
       setSectionError(id, null)
       try {
         if (id === 'overview') {
-          const json = await adminGet<{ stats?: AdminStats }>(key, 'stats')
-          if (json === 'forbidden') return wrongKey()
+          const json = await adminGet<{ stats?: AdminStats }>('stats')
+          if (json === 'forbidden') return setSectionError(id, NO_ACCESS)
           if (!json || !json.stats) {
             setSectionError(id, 'Could not load stats. Please retry.')
             return
           }
           setStats(json.stats)
         } else if (id === 'users') {
-          const json = await adminGet<{ users?: AdminUser[] }>(key, 'users')
-          if (json === 'forbidden') return wrongKey()
+          const json = await adminGet<{ users?: AdminUser[] }>('users')
+          if (json === 'forbidden') return setSectionError(id, NO_ACCESS)
           if (!json) {
             setSectionError(id, 'Could not load users. Please retry.')
             return
           }
           setUsers(Array.isArray(json.users) ? json.users : [])
         } else if (id === 'listings') {
-          const json = await adminGet<{ listings?: AdminListing[] }>(key, 'listings')
-          if (json === 'forbidden') return wrongKey()
+          const json = await adminGet<{ listings?: AdminListing[] }>('listings')
+          if (json === 'forbidden') return setSectionError(id, NO_ACCESS)
           if (!json) {
             setSectionError(id, 'Could not load listings. Please retry.')
             return
           }
           setListings(Array.isArray(json.listings) ? json.listings : [])
         } else if (id === 'bookings') {
-          const json = await adminGet<{ bookings?: AdminBooking[] }>(key, 'bookings')
-          if (json === 'forbidden') return wrongKey()
+          const json = await adminGet<{ bookings?: AdminBooking[] }>('bookings')
+          if (json === 'forbidden') return setSectionError(id, NO_ACCESS)
           if (!json) {
             setSectionError(id, 'Could not load bookings. Please retry.')
             return
           }
           setBookings(Array.isArray(json.bookings) ? json.bookings : [])
         } else if (id === 'applications') {
-          const json = await adminGet<{ applications?: HostApplication[] }>(key, 'host-applications')
-          if (json === 'forbidden') return wrongKey()
+          const json = await adminGet<{ applications?: HostApplication[] }>('host-applications')
+          if (json === 'forbidden') return setSectionError(id, NO_ACCESS)
           if (!json) {
             setSectionError(id, 'Could not load applications. Please retry.')
             return
           }
           setApps(Array.isArray(json.applications) ? json.applications : [])
         } else if (id === 'verifications') {
-          const json = await adminGet<{ verifications?: Verification[] }>(key, 'verifications')
-          if (json === 'forbidden') return wrongKey()
+          const json = await adminGet<{ verifications?: Verification[] }>('verifications')
+          if (json === 'forbidden') return setSectionError(id, NO_ACCESS)
           if (!json) {
             setSectionError(id, 'Could not load verifications. Please retry.')
             return
@@ -305,21 +297,22 @@ export default function OpsPage() {
         setSectionLoading(id, false)
       }
     },
-    [adminGet, wrongKey],
+    [adminGet],
   )
 
   // Lazy-fetch the active tab on first open.
   useEffect(() => {
-    if (!adminKey) return
-    if (!loaded[tab] && !loading[tab]) void loadSection(tab, adminKey)
-  }, [adminKey, tab, loaded, loading, loadSection])
+    if (!loaded[tab] && !loading[tab]) void loadSection(tab)
+  }, [tab, loaded, loading, loadSection])
 
-  // Load the app download links once the console is unlocked.
+
+  // Load the app download links once. They sit on the console shell above the tabs,
+  // so they follow the 'overview' module rather than having a tab of their own.
   useEffect(() => {
-    if (!adminKey || linksLoaded) return
+    if (linksLoaded || !can('overview')) return
     let cancelled = false
     void (async () => {
-      const json = await adminGet<{ ios?: string | null; android?: string | null }>(adminKey, 'app-links')
+      const json = await adminGet<{ ios?: string | null; android?: string | null }>('app-links')
       if (cancelled || !json || json === 'forbidden') return
       setAppIos(json.ios ?? '')
       setAppAndroid(json.android ?? '')
@@ -328,61 +321,28 @@ export default function OpsPage() {
     return () => {
       cancelled = true
     }
-  }, [adminKey, linksLoaded, adminGet])
+  }, [linksLoaded, adminGet, can])
 
   const refresh = () => {
-    if (adminKey) void loadSection(tab, adminKey)
+    void loadSection(tab)
   }
 
-  const unlock = (e: React.FormEvent) => {
-    e.preventDefault()
-    const key = keyInput.trim()
-    if (!key) return
-    try {
-      localStorage.setItem(KEY_STORAGE, key)
-    } catch {
-      /* ignore */
-    }
-    setKeyError(null)
-    setAdminKey(key)
-    setKeyInput('')
-  }
-
-  const lock = () => {
-    try {
-      localStorage.removeItem(KEY_STORAGE)
-    } catch {
-      /* ignore */
-    }
-    setAdminKey(null)
-    setStats(null)
-    setUsers([])
-    setListings([])
-    setBookings([])
-    setApps([])
-    setVerifs([])
-    setLoaded({
-      overview: false,
-      users: false,
-      listings: false,
-      bookings: false,
-      applications: false,
-      verifications: false,
-    })
-    setKeyError(null)
-  }
-
-  // POST to a key-gated admin endpoint. Returns true on success.
+  // POST to an admin endpoint (cookie-authenticated). Returns true on success.
   const post = async (path: string, body: Record<string, unknown>): Promise<boolean> => {
-    if (!adminKey) return false
     try {
-      const res = await fetch(`/api/local/admin/${path}?key=${encodeURIComponent(adminKey)}`, {
+      const res = await fetch(`/api/local/admin/${path}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
+      if (res.status === 401) {
+        sessionEnded()
+        return false
+      }
       if (res.status === 403) {
-        wrongKey()
+        // The module was revoked mid-session; surface it rather than failing silently.
+        setSectionError(tab, NO_ACCESS)
         return false
       }
       return res.ok
@@ -425,20 +385,6 @@ export default function OpsPage() {
     }
   }
 
-  // Directly flip a user's host role (unified account — a host is also a guest).
-  // Removing host asks first, since it revokes their ability to list.
-  const setHost = async (u: AdminUser, makeHost: boolean) => {
-    if (!makeHost && !window.confirm(`Remove host from ${u.email}? Their existing listings stay but they can no longer create new ones.`)) return
-    setBusyId(u.id)
-    const ok = await post('users', { id: u.id, action: makeHost ? 'make-host' : 'remove-host' })
-    setBusyId(null)
-    if (ok) {
-      setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, is_host: makeHost } : x)))
-    } else {
-      setSectionError('users', 'Could not update the host role. Please retry.')
-    }
-  }
-
   // ---- listings actions ----
   const togglePublish = async (l: AdminListing) => {
     setBusyId(l.id)
@@ -463,29 +409,6 @@ export default function OpsPage() {
       setListings((prev) => prev.filter((x) => x.id !== l.id))
     } else {
       setSectionError('listings', 'Could not delete the listing. Please retry.')
-    }
-  }
-
-  // Approve / reject a pending (under-review) listing. Approving publishes it and
-  // notifies the host; rejecting keeps it unpublished with an optional note.
-  const decideListing = async (l: AdminListing, action: 'approve' | 'reject') => {
-    let note: string | null = null
-    if (action === 'reject') {
-      note = window.prompt('Optional note for the host (what to fix):') ?? null
-    }
-    setBusyId(l.id)
-    const ok = await post('listings', { id: l.id, action, note })
-    setBusyId(null)
-    if (ok) {
-      setListings((prev) =>
-        prev.map((x) =>
-          x.id === l.id
-            ? { ...x, approval_status: action === 'approve' ? 'approved' : 'rejected', is_published: action === 'approve' }
-            : x,
-        ),
-      )
-    } else {
-      setSectionError('listings', 'Could not update the listing. Please retry.')
     }
   }
 
@@ -548,17 +471,6 @@ export default function OpsPage() {
     border: `1px solid ${BURGUNDY}`,
   }
   const labelStyle: React.CSSProperties = { fontSize: 12, color: MUTED, marginBottom: 2 }
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    boxSizing: 'border-box',
-    border: `1px solid ${TAN}`,
-    borderRadius: 12,
-    padding: '9px 12px',
-    fontSize: 14,
-    color: INK,
-    background: '#fff',
-    outline: 'none',
-  }
   const thStyle: React.CSSProperties = {
     textAlign: 'left',
     fontSize: 12,
@@ -608,65 +520,20 @@ export default function OpsPage() {
     return badge(status || '—', TAN, MUTED)
   }
 
-  // Avoid SSR/client mismatch while reading localStorage.
-  if (!ready) {
+  // A moderator with no modules at all can sign in but has nothing to show.
+  if (visibleTabs.length === 0) {
     return (
       <main style={pageStyle}>
-        <div style={{ maxWidth: 1080, margin: '0 auto', padding: '48px 20px', color: MUTED }}>
-          Loading…
-        </div>
-      </main>
-    )
-  }
-
-  // ---- locked: key prompt ----
-  if (!adminKey) {
-    return (
-      <main style={pageStyle}>
-        <div
-          style={{
-            minHeight: '100vh',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 20,
-          }}
-        >
-          <form onSubmit={unlock} style={{ ...cardStyle, width: '100%', maxWidth: 380 }}>
-            <h1 style={{ color: BURGUNDY, fontSize: 22, fontWeight: 700, margin: 0 }}>
-              QuickIn — operations
-            </h1>
-            <p style={{ color: MUTED, fontSize: 13, margin: '8px 0 18px' }}>
-              Enter the admin key to open the dashboard.
+        <OpsHeader title="Operations" />
+        <div style={{ maxWidth: 1080, margin: '0 auto', padding: '48px 20px' }}>
+          <div style={{ ...cardStyle, textAlign: 'center', padding: '44px 24px' }}>
+            <p style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: INK }}>
+              No modules assigned
             </p>
-            <input
-              type="password"
-              value={keyInput}
-              onChange={(e) => setKeyInput(e.target.value)}
-              placeholder="Admin key"
-              autoFocus
-              style={{
-                width: '100%',
-                boxSizing: 'border-box',
-                border: `1px solid ${TAN}`,
-                borderRadius: 12,
-                padding: '10px 14px',
-                fontSize: 15,
-                marginBottom: 12,
-                background: CREAM,
-                color: INK,
-              }}
-            />
-            {keyError ? (
-              <p style={{ color: BURGUNDY, fontSize: 13, margin: '0 0 12px' }}>{keyError}</p>
-            ) : null}
-            <button
-              type="submit"
-              style={{ ...btnBase, background: BURGUNDY, color: '#fff', width: '100%' }}
-            >
-              Unlock
-            </button>
-          </form>
+            <p style={{ margin: 0, fontSize: 14, color: MUTED }}>
+              Your account has no sections enabled yet. Ask a super admin to grant access.
+            </p>
+          </div>
         </div>
       </main>
     )
@@ -675,10 +542,11 @@ export default function OpsPage() {
   const sectionLoading = loading[tab]
   const sectionError = errors[tab]
 
-  // ---- unlocked: dashboard ----
+  // ---- dashboard ----
   return (
     <main style={pageStyle}>
-      <div style={{ maxWidth: 1080, margin: '0 auto', padding: '36px 20px 64px' }}>
+      <OpsHeader title="Operations" />
+      <div style={{ maxWidth: 1080, margin: '0 auto', padding: '28px 20px 64px' }}>
         <header
           style={{
             display: 'flex',
@@ -701,47 +569,46 @@ export default function OpsPage() {
             <button onClick={refresh} style={outlineBtn} disabled={sectionLoading}>
               {sectionLoading ? 'Refreshing…' : 'Refresh'}
             </button>
-            <button onClick={lock} style={outlineBtn}>
-              Lock
-            </button>
           </div>
         </header>
 
-        {/* App download links — surfaced by the mobile "download the app" bar. */}
-        <section style={{ ...cardStyle, marginBottom: 20 }}>
-          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: BURGUNDY }}>App download links</h2>
-          <p style={{ margin: '4px 0 14px', fontSize: 13, color: MUTED }}>
-            Shown on phones as a “Get the app” bar. Leave a field empty to show “coming soon” for that platform.
-          </p>
-          <div style={{ display: 'grid', gap: 12 }}>
-            <div>
-              <label style={labelStyle}>Google Play (Android) URL</label>
-              <input
-                value={appAndroid}
-                onChange={(e) => setAppAndroid(e.target.value)}
-                placeholder="https://play.google.com/store/apps/details?id=…"
-                style={inputStyle}
-              />
+        {can('overview') && (
+          {/* App download links — surfaced by the mobile "download the app" bar. */}
+          <section style={{ ...cardStyle, marginBottom: 20 }}>
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: BURGUNDY }}>App download links</h2>
+            <p style={{ margin: '4px 0 14px', fontSize: 13, color: MUTED }}>
+              Shown on phones as a “Get the app” bar. Leave a field empty to show “coming soon” for that platform.
+            </p>
+            <div style={{ display: 'grid', gap: 12 }}>
+              <div>
+                <label style={labelStyle}>Google Play (Android) URL</label>
+                <input
+                  value={appAndroid}
+                  onChange={(e) => setAppAndroid(e.target.value)}
+                  placeholder="https://play.google.com/store/apps/details?id=…"
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>App Store (iOS) URL</label>
+                <input
+                  value={appIos}
+                  onChange={(e) => setAppIos(e.target.value)}
+                  placeholder="https://apps.apple.com/app/… (leave empty until iOS is live)"
+                  style={inputStyle}
+                />
+              </div>
             </div>
-            <div>
-              <label style={labelStyle}>App Store (iOS) URL</label>
-              <input
-                value={appIos}
-                onChange={(e) => setAppIos(e.target.value)}
-                placeholder="https://apps.apple.com/app/… (leave empty until iOS is live)"
-                style={inputStyle}
-              />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14, flexWrap: 'wrap' }}>
+              <button onClick={saveLinks} disabled={savingLinks} style={approveBtn}>
+                {savingLinks ? 'Saving…' : 'Save links'}
+              </button>
+              {linksMsg ? <span style={{ fontSize: 13, color: MUTED }}>{linksMsg}</span> : null}
             </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14, flexWrap: 'wrap' }}>
-            <button onClick={saveLinks} disabled={savingLinks} style={approveBtn}>
-              {savingLinks ? 'Saving…' : 'Save links'}
-            </button>
-            {linksMsg ? <span style={{ fontSize: 13, color: MUTED }}>{linksMsg}</span> : null}
-          </div>
-        </section>
+          </section>
+        )}
 
-        {/* Tabs */}
+        {/* Tabs — only the modules this operator holds (A4). */}
         <nav
           style={{
             display: 'flex',
@@ -752,7 +619,7 @@ export default function OpsPage() {
             marginBottom: 24,
           }}
         >
-          {TABS.map((t) => {
+          {visibleTabs.map((t) => {
             const active = t.id === tab
             return (
               <button
@@ -868,18 +735,9 @@ export default function OpsPage() {
                       <td style={{ ...tdStyle, fontWeight: 600 }}>{u.full_name || '—'}</td>
                       <td style={tdStyle}>{u.email}</td>
                       <td style={tdStyle}>
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                          {u.is_host
-                            ? badge('Host', BURGUNDY, '#fff')
-                            : badge('Guest', TAN, MUTED)}
-                          <button
-                            style={u.is_host ? dangerBtn : approveBtn}
-                            disabled={busyId === u.id}
-                            onClick={() => setHost(u, !u.is_host)}
-                          >
-                            {busyId === u.id ? 'Working…' : u.is_host ? 'Remove host' : 'Make host'}
-                          </button>
-                        </div>
+                        {u.is_host
+                          ? badge('Host', BURGUNDY, '#fff')
+                          : badge('Guest', TAN, MUTED)}
                       </td>
                       <td style={tdStyle}>
                         <div
@@ -984,11 +842,7 @@ export default function OpsPage() {
                       }}
                     >
                       <span style={{ fontSize: 16, fontWeight: 700, color: INK }}>{l.title}</span>
-                      {l.approval_status === 'pending'
-                        ? badge('Under review', '#FBECC9', '#8A6D1B')
-                        : l.approval_status === 'rejected'
-                        ? badge('Rejected', '#F6D9D6', '#8A2B23')
-                        : l.is_published
+                      {l.is_published
                         ? badge('Published', '#E2F0E9', GREEN)
                         : badge('Hidden', TAN, MUTED)}
                     </div>
@@ -1013,24 +867,6 @@ export default function OpsPage() {
                       alignItems: 'center',
                     }}
                   >
-                    {l.approval_status === 'pending' && (
-                      <>
-                        <button
-                          style={{ ...outlineBtn, borderColor: GREEN, color: GREEN, fontWeight: 700 }}
-                          disabled={busyId === l.id}
-                          onClick={() => decideListing(l, 'approve')}
-                        >
-                          {busyId === l.id ? 'Working…' : 'Approve'}
-                        </button>
-                        <button
-                          style={dangerBtn}
-                          disabled={busyId === l.id}
-                          onClick={() => decideListing(l, 'reject')}
-                        >
-                          Reject
-                        </button>
-                      </>
-                    )}
                     <button
                       style={outlineBtn}
                       disabled={busyId === l.id}
@@ -1046,33 +882,6 @@ export default function OpsPage() {
                       Delete
                     </button>
                   </div>
-                  {/* Proof of ownership — shown in full for listings awaiting
-                      review so it can actually be checked before approving. */}
-                  {l.approval_status === 'pending' ? (
-                    <div style={{ flexBasis: '100%' }}>
-                      <div style={labelStyle}>Ownership document</div>
-                      {l.ownership_doc ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={l.ownership_doc}
-                          alt="Ownership document"
-                          style={{
-                            maxHeight: 220,
-                            maxWidth: '100%',
-                            borderRadius: 12,
-                            border: `1px solid ${TAN}`,
-                            display: 'block',
-                          }}
-                        />
-                      ) : (
-                        <div style={{ fontSize: 13, color: MUTED }}>Not provided</div>
-                      )}
-                    </div>
-                  ) : l.has_ownership_doc ? (
-                    <div style={{ flexBasis: '100%', fontSize: 12, color: MUTED }}>
-                      Ownership document on file
-                    </div>
-                  ) : null}
                 </div>
               ))}
             </div>
@@ -1101,7 +910,7 @@ export default function OpsPage() {
                   {bookings.map((b) => (
                     <tr key={b.id}>
                       <td style={{ ...tdStyle, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
-                        {b.reservation_code || '—'}
+                        {b.reservation_code}
                       </td>
                       <td style={tdStyle}>
                         <div style={{ fontWeight: 600 }}>{b.guest_name || '—'}</div>
@@ -1175,12 +984,6 @@ export default function OpsPage() {
                       <div>
                         <div style={labelStyle}>Phone</div>
                         <div style={{ fontSize: 14 }}>{a.phone}</div>
-                      </div>
-                    ) : null}
-                    {a.host_type ? (
-                      <div>
-                        <div style={labelStyle}>Host type</div>
-                        <div style={{ fontSize: 14 }}>{a.host_type}</div>
                       </div>
                     ) : null}
                     {a.company ? (
