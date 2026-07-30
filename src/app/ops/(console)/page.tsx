@@ -471,6 +471,18 @@ export default function OpsPage() {
     border: `1px solid ${BURGUNDY}`,
   }
   const labelStyle: React.CSSProperties = { fontSize: 12, color: MUTED, marginBottom: 2 }
+  // Used by the app-download-links panel above the tabs.
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    boxSizing: 'border-box',
+    border: `1px solid ${TAN}`,
+    borderRadius: 12,
+    padding: '9px 12px',
+    fontSize: 14,
+    color: INK,
+    background: '#fff',
+    outline: 'none',
+  }
   const thStyle: React.CSSProperties = {
     textAlign: 'left',
     fontSize: 12,
@@ -572,8 +584,8 @@ export default function OpsPage() {
           </div>
         </header>
 
+        {/* App download links — surfaced by the mobile "download the app" bar. */}
         {can('overview') && (
-          {/* App download links — surfaced by the mobile "download the app" bar. */}
           <section style={{ ...cardStyle, marginBottom: 20 }}>
             <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: BURGUNDY }}>App download links</h2>
             <p style={{ margin: '4px 0 14px', fontSize: 13, color: MUTED }}>

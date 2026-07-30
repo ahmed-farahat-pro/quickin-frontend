@@ -2462,6 +2462,8 @@ export async function setAppLinks(ios: string | null, android: string | null): P
   }
   await upsert('app_ios_url', ios)
   await upsert('app_android_url', android)
+}
+
 // ---- Instapay manual payment (app_settings + payment_proofs) -----------------
 // Mirrors the backend Instapay flow (both projects share one Neon DB). Guest
 // transfers via Instapay and uploads a screenshot at booking time (handled by the
