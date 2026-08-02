@@ -242,14 +242,21 @@ export function Footer({ config }: FooterProps)
             </div>
 
             {socialLinks.length > 0 && (
-              <div className='flex items-center gap-4 justify-center'>
+              <div className='flex items-center gap-1 justify-center'>
                 {socialLinks.map((link) => (
+                  // Hover fills the circle with the brand burgundy and flips the
+                  // icon to cream — the same primary/primary-foreground pair the
+                  // buttons use, so this reads as part of the system rather than
+                  // a one-off. gap-1 (not gap-4) because each button now carries
+                  // its own padding: the icons stay optically spaced while the
+                  // clickable area grows to 40px.
                   <Link
                     key={link.id || link.platform}
                     href={link.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    title={link.platform}
+                    className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary hover:text-primary-foreground hover:shadow-[0_6px_16px_rgba(91,15,22,0.28)] focus-visible:-translate-y-0.5 focus-visible:bg-primary focus-visible:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:translate-y-0 active:scale-95 motion-reduce:transform-none motion-reduce:transition-none"
                   >
                     <span className="sr-only">{link.platform}</span>
                     {getSocialIcon(link)}

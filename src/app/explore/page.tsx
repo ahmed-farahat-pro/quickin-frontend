@@ -431,7 +431,7 @@ export default async function ExplorePage({
             {/* The same three accounts /links and the (main) footer list, from
                 @/lib/social. Rendered inline rather than via the CMS-driven
                 Footer component because this page ships its own footer. */}
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginInlineStart: 4 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, marginInlineStart: 2 }}>
               {SOCIAL_LINKS.map(({ platform, label, url }) => {
                 const Icon =
                   platform === 'instagram'
@@ -440,13 +440,20 @@ export default async function ExplorePage({
                       ? IconBrandTiktok
                       : IconBrandFacebook
                 return (
+                  // Hover inverts to the cream-on-burgundy pill this footer
+                  // already uses for "Chat on WhatsApp" two elements along, so
+                  // the whole bottom bar reacts in one visual language. 36px
+                  // hit area — the icon is 18px, the rest is padding you can
+                  // still click. Tailwind (not the inline styles around it)
+                  // because :hover and :focus-visible need real CSS.
                   <a
                     key={platform}
                     href={url}
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={label}
-                    style={{ color: 'rgba(246,241,230,0.85)', display: 'inline-flex' }}
+                    title={label}
+                    className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-[#F6F1E6]/85 transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#F6F1E6] hover:text-[#5B0F16] focus-visible:-translate-y-0.5 focus-visible:bg-[#F6F1E6] focus-visible:text-[#5B0F16] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F6F1E6]/60 active:translate-y-0 active:scale-95 motion-reduce:transform-none motion-reduce:transition-none"
                   >
                     <Icon size={18} stroke={1.8} aria-hidden />
                   </a>
