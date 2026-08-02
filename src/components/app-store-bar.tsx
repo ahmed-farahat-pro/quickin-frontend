@@ -7,11 +7,16 @@
 // always offers both stores, so a desktop visitor can still find the apps.
 // Dismissible; the choice is remembered locally.
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 
 const COLORS = { burgundy: '#5B0F16', cream: '#F6F1E6', tan: '#EFE6D8' }
 const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
 const DISMISS_KEY = 'qk_app_bar_dismissed'
+
+// /links is the bio linktree: it already lists both stores as full rows, so the
+// bar would be the same two links stacked directly above them.
+const HIDDEN_PREFIXES = ['/links']
 
 interface AppLinks {
   ios: string | null
@@ -41,10 +46,14 @@ function GooglePlayIcon() {
 
 export default function AppStoreBar() {
   const t = useTranslations('appBanner')
+  const pathname = usePathname() || '/'
+  const path = pathname.replace(/^\/(en|ar|fr|es)(?=\/|$)/, '') || '/'
+  const hidden = HIDDEN_PREFIXES.some((p) => path === p || path.startsWith(p + '/'))
   const [show, setShow] = useState(false)
   const [links, setLinks] = useState<AppLinks | null>(null)
 
   useEffect(() => {
+    if (hidden) return // don't even fetch the links we aren't going to render
     try {
       if (localStorage.getItem(DISMISS_KEY) === '1') return
     } catch {
@@ -57,9 +66,9 @@ export default function AppStoreBar() {
         if (j) setLinks({ ios: j.ios ?? null, android: j.android ?? null })
       })
       .catch(() => {})
-  }, [])
+  }, [hidden])
 
-  if (!show || !links) return null
+  if (hidden || !show || !links) return null
   const { ios, android } = links
   if (!ios && !android) return null // nothing configured yet
 

@@ -1,12 +1,15 @@
 'use client'
 
 // Payments ops (World 1) — two panels:
-//  1. Instapay settings: GET/PUT /api/local/admin/settings/instapay (handle + instructions).
+//  1. Instapay destination: GET/PUT /api/local/admin/settings/instapay — the
+//     handle/number, the deep link, the QR image and the instructions guests see.
 //  2. Disputes queue: GET /api/local/admin/payments (open disputes) with a per-row
 //     "view screenshot" (GET /api/local/bookings/:id/payment-proof) and Approve / Uphold
 //     (POST /api/local/admin/payments). All fetches are cookie-authed (same-origin) and
 //     admin-gated server-side. Strings are hardcoded English to keep the change contained.
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
+import { MAX_QR_CHARS, qrPayload } from '@/lib/local/payment-config-core'
 
 const C = {
   burgundy: '#5B0F16',
@@ -81,23 +84,72 @@ export function OpsPayments() {
   )
 }
 
-// ---- Instapay settings ------------------------------------------------------
+// ---- Instapay destination ---------------------------------------------------
+
+/**
+ * Re-encode a picked file as a PNG data URL, downscaled so the stored value
+ * stays small (it travels inline in every payment-config response).
+ *
+ * PNG rather than JPEG on purpose: JPEG ringing around the QR modules is exactly
+ * the kind of artifact that stops a banking app from scanning the code. The
+ * white fill flattens transparency for the same reason.
+ */
+async function fileToQrDataUrl(file: File): Promise<string> {
+  const MAX_EDGE = 640
+  let bitmap: ImageBitmap
+  try {
+    bitmap = await createImageBitmap(file)
+  } catch {
+    throw new Error('Could not read that image — try a PNG or JPEG screenshot')
+  }
+  const longEdge = Math.max(bitmap.width, bitmap.height)
+  const scale = longEdge > MAX_EDGE ? MAX_EDGE / longEdge : 1
+  const w = Math.max(1, Math.round(bitmap.width * scale))
+  const h = Math.max(1, Math.round(bitmap.height * scale))
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Could not read that image')
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, w, h)
+  ctx.drawImage(bitmap, 0, 0, w, h)
+  bitmap.close()
+  return canvas.toDataURL('image/png')
+}
 
 function InstapaySettings() {
   const [handle, setHandle] = useState('')
+  const [link, setLink] = useState('')
+  const [qrImage, setQrImage] = useState('')
   const [instructions, setInstructions] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  // What a guest's app would encode if no QR image is uploaded. Kept in sync
+  // with the server by importing the same helper the API uses.
+  const generated = qrPayload(handle, link)
+
+  function apply(data: {
+    instapay_handle?: string
+    instapay_link?: string
+    instapay_qr_image?: string
+    instructions?: string
+  }) {
+    setHandle(data.instapay_handle ?? '')
+    setLink(data.instapay_link ?? '')
+    setQrImage(data.instapay_qr_image ?? '')
+    setInstructions(data.instructions ?? '')
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const res = await fetch('/api/local/admin/settings/instapay', { credentials: 'same-origin' })
       if (!res.ok) throw new Error('Failed to load settings')
-      const data = await res.json()
-      setHandle(data.instapay_handle ?? '')
-      setInstructions(data.instructions ?? '')
+      apply(await res.json())
     } catch (e) {
       setMsg({ kind: 'err', text: e instanceof Error ? e.message : 'Failed to load settings' })
     } finally {
@@ -109,6 +161,23 @@ function InstapaySettings() {
     load()
   }, [load])
 
+  async function pickQr(file: File | undefined) {
+    if (!file) return
+    setMsg(null)
+    try {
+      const url = await fileToQrDataUrl(file)
+      if (url.length > MAX_QR_CHARS) {
+        throw new Error('That QR image is too large — crop it to just the code and try again')
+      }
+      setQrImage(url)
+    } catch (e) {
+      setMsg({ kind: 'err', text: e instanceof Error ? e.message : 'Could not read that image' })
+    } finally {
+      // Let the same file be re-picked after a failure.
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
   async function save() {
     setSaving(true)
     setMsg(null)
@@ -117,15 +186,18 @@ function InstapaySettings() {
         method: 'PUT',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ instapay_handle: handle, instructions }),
+        body: JSON.stringify({
+          instapay_handle: handle,
+          instapay_link: link,
+          instapay_qr_image: qrImage,
+          instructions,
+        }),
       })
       if (!res.ok) {
         const e = await res.json().catch(() => ({}))
         throw new Error(e.error || 'Failed to save')
       }
-      const data = await res.json()
-      setHandle(data.instapay_handle ?? '')
-      setInstructions(data.instructions ?? '')
+      apply(await res.json())
       setMsg({ kind: 'ok', text: 'Saved' })
     } catch (e) {
       setMsg({ kind: 'err', text: e instanceof Error ? e.message : 'Failed to save' })
@@ -136,24 +208,100 @@ function InstapaySettings() {
 
   return (
     <section style={card}>
-      <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 700, color: C.ink }}>Instapay handle</h2>
+      <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 700, color: C.ink }}>Instapay destination</h2>
       <p style={{ margin: '0 0 16px', fontSize: 13.5, color: C.muted }}>
-        The destination guests transfer to, shown at checkout.
+        The number, QR code and link guests pay to. Shown at checkout in the app and on the web.
       </p>
 
       {loading ? (
         <p style={{ fontSize: 14, color: C.muted }}>Loading…</p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 520 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 560 }}>
           <label style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>
-            Instapay handle
+            Instapay number or handle
             <input
               value={handle}
               onChange={(e) => setHandle(e.target.value)}
-              placeholder="yourname@instapay"
+              placeholder="yourname@instapay or 01xxxxxxxxx"
               style={{ ...inputStyle, marginTop: 6 }}
             />
           </label>
+
+          <label style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>
+            Instapay link (optional)
+            <input
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              placeholder="https://ipn.eg/S/yourname/instapay/ABC123"
+              style={{ ...inputStyle, marginTop: 6 }}
+            />
+            <span style={{ display: 'block', marginTop: 5, fontSize: 12.5, fontWeight: 400, color: C.muted }}>
+              Opens Instapay straight to your account. Must start with https://
+            </span>
+          </label>
+
+          <div>
+            <span style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>QR code</span>
+            <div style={{ display: 'flex', gap: 16, marginTop: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              <div
+                style={{
+                  width: 148,
+                  height: 148,
+                  flexShrink: 0,
+                  borderRadius: 14,
+                  border: `1px solid ${C.tan}`,
+                  background: '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 8,
+                  boxSizing: 'border-box',
+                }}
+              >
+                {qrImage ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={qrImage}
+                    alt="Instapay QR code"
+                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }}
+                  />
+                ) : generated ? (
+                  <QRCodeSVG value={generated} size={128} level="M" marginSize={1} title="Instapay QR code" />
+                ) : (
+                  <span style={{ fontSize: 12, color: C.muted, textAlign: 'center', padding: 8 }}>
+                    Add a number or link
+                  </span>
+                )}
+              </div>
+
+              <div style={{ flex: '1 1 240px', minWidth: 220 }}>
+                <p style={{ margin: '0 0 10px', fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>
+                  {qrImage
+                    ? 'Your uploaded QR. Guests see exactly this image.'
+                    : generated
+                      ? `Generated automatically from the ${link.trim() ? 'link' : 'number'} above. Upload the official QR from the Instapay app if you want guests to scan that instead.`
+                      : 'Upload the official QR from the Instapay app, or fill in the number or link above to generate one.'}
+                </p>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp"
+                  onChange={(e) => pickQr(e.target.files?.[0])}
+                  style={{ fontSize: 13, fontFamily: 'inherit', color: C.ink, maxWidth: '100%' }}
+                />
+                {qrImage && (
+                  <button
+                    type="button"
+                    onClick={() => setQrImage('')}
+                    style={{ ...ghostBtn, marginTop: 10, fontSize: 13, padding: '6px 14px' }}
+                  >
+                    Remove uploaded QR
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
           <label style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>
             Instructions (optional)
             <textarea
@@ -164,6 +312,7 @@ function InstapaySettings() {
               style={{ ...inputStyle, marginTop: 6, resize: 'vertical' }}
             />
           </label>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <button onClick={save} disabled={saving} style={{ ...primaryBtn, opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Saving…' : 'Save'}

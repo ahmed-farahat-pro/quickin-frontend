@@ -57,8 +57,6 @@
     },
     "companyLinks": {
       "about": "About Us",
-      "newsroom": "Newsroom",
-      "careers": "Careers",
       "contact": "Contact"
     }
   },
@@ -1457,9 +1455,7 @@
       },
       "about": {
         "title": "About",
-        "ourStory": "Our story",
-        "careers": "Careers",
-        "press": "Press"
+        "ourStory": "Our story"
       },
       "copyright": "© 2026 QuickIn. Crafted for the curious traveler.",
       "legal": {
@@ -1712,6 +1708,19 @@
     "footer": {
       "source": "Source of truth: <code>LAUNCH-PLAN.md</code> · deploy steps: <code>DEPLOY-VERCEL.md</code> · keys: <code>SETUP.md</code>."
     }
+  },
+  "instapay": {
+    "title": "Instapay QR code",
+    "show": "How to pay",
+    "hide": "Hide payment details",
+    "loading": "Loading payment details…",
+    "loadFailed": "Couldn't load the payment details. Please try again.",
+    "notConfigured": "Instapay payments aren't set up yet. Please check back soon.",
+    "sendTo": "Send to",
+    "copy": "Copy",
+    "copied": "Copied",
+    "openInstapay": "Open in Instapay",
+    "scanHint": "Scan with your banking app"
   },
   "reservationsLocal": {
     "meta": {
@@ -2016,7 +2025,8 @@
         "weekendPrice": "Weekend price (optional)",
         "weekendDays": "Which days count as the weekend?",
         "region": "Area",
-        "amenities": "Amenities"
+        "amenities": "Amenities",
+        "resort": "Resort / compound"
       },
       "placeholders": {
         "title": "Sunlit loft by the Nile",
@@ -2097,7 +2107,12 @@
       "photosMoveEarlier": "Move photo earlier",
       "photosMoveLater": "Move photo later",
       "photosSetCover": "Make this the cover photo",
-      "photosReorderHint": "Use the arrows to reorder, or ★ to make a photo the cover. The first photo is the one guests see first."
+      "photosReorderHint": "Use the arrows to reorder, or ★ to make a photo the cover. The first photo is the one guests see first.",
+      "resortNone": "Not in a resort or compound",
+      "resortOther": "Other — not listed",
+      "resortOtherPlaceholder": "Type the resort or compound name",
+      "resortHint": "Pick the compound your place is in. Choosing one also sets the area.",
+      "resortOtherHint": "We'll show what you type to guests, and our team will add it to the list."
     },
     "edit": {
       "meta": {
@@ -2360,5 +2375,23 @@
         "file": "Couldn't read that file. Try another."
       }
     }
+  },
+  "linksPage": {
+    "meta": {
+      "title": "QuickIn — All our links",
+      "description": "Follow QuickIn, get the app, and book your next stay in Egypt."
+    },
+    "tagline": "Curated stays across Egypt — booked in a few taps.",
+    "book": "Book your stay",
+    "appStore": "Download on the App Store",
+    "appStoreSub": "iPhone & iPad",
+    "googlePlay": "Get it on Google Play",
+    "googlePlaySub": "Android",
+    "whatsapp": "Chat on WhatsApp",
+    "whatsappSub": "We usually reply in minutes",
+    "email": "Email us",
+    "comingSoon": "Coming soon",
+    "followUs": "Follow us",
+    "rights": "All rights reserved."
   }
 }
