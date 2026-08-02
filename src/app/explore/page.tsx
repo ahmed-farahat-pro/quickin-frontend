@@ -13,6 +13,8 @@ import { Heart, MessageCircle } from 'lucide-react'
 import ExploreClient from './explore-client'
 import AddListingFab from './add-listing-fab'
 import { whatsappHref } from '@/lib/contact'
+import { SOCIAL_LINKS } from '@/lib/social'
+import { IconBrandInstagram, IconBrandTiktok, IconBrandFacebook } from '@tabler/icons-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -426,6 +428,31 @@ export default async function ExplorePage({
             <a href={loc('/privacy')} style={{ color: 'rgba(246,241,230,0.85)', textDecoration: 'none' }}>{t('footer.legal.privacy')}</a>
             <span aria-hidden>·</span>
             <a href={loc('/sitemap')} style={{ color: 'rgba(246,241,230,0.85)', textDecoration: 'none' }}>{t('footer.legal.sitemap')}</a>
+            {/* The same three accounts /links and the (main) footer list, from
+                @/lib/social. Rendered inline rather than via the CMS-driven
+                Footer component because this page ships its own footer. */}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginInlineStart: 4 }}>
+              {SOCIAL_LINKS.map(({ platform, label, url }) => {
+                const Icon =
+                  platform === 'instagram'
+                    ? IconBrandInstagram
+                    : platform === 'tiktok'
+                      ? IconBrandTiktok
+                      : IconBrandFacebook
+                return (
+                  <a
+                    key={platform}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={label}
+                    style={{ color: 'rgba(246,241,230,0.85)', display: 'inline-flex' }}
+                  >
+                    <Icon size={18} stroke={1.8} aria-hidden />
+                  </a>
+                )
+              })}
+            </span>
             <a
               href={whatsappHref()}
               target="_blank"

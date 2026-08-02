@@ -9,6 +9,7 @@ import { LocaleSwitcher } from '@/components/layout/locale-switcher'
 import { IconBrandFacebook, IconBrandX, IconBrandInstagram, IconBrandLinkedin, IconBrandYoutube, IconBrandTiktok, IconLink } from '@tabler/icons-react'
 import type { Locale } from '@/i18n/config'
 import type { FooterConfig } from '@/types/site-settings'
+import { SOCIAL_LINKS } from '@/lib/social'
 import { DynamicIcon } from '@/components/ui/dynamic-icon'
 import ReactMarkdown from 'react-markdown'
 
@@ -56,9 +57,14 @@ export function Footer({ config }: FooterProps)
   const customBottomLinks = config?.bottom_links || [];
   const hasCustomBottomLinks = customBottomLinks.length > 0;
 
-  // Social links logic
-  const customSocialLinks = config?.social_links || [];
-  const hasCustomSocialLinks = customSocialLinks.length > 0;
+  // Social links logic. The CMS wins where it has been filled in; otherwise we
+  // fall back to the accounts in @/lib/social — the same three the /links bio
+  // page lists — so the footer is never silently social-less just because the
+  // CMS config is empty, which is how it shipped before.
+  const socialLinks: NonNullable<FooterConfig['social_links']> =
+    config?.social_links && config.social_links.length > 0
+      ? config.social_links
+      : SOCIAL_LINKS.map(({ platform, url }) => ({ platform, url }));
 
   const getSocialIcon = (link: NonNullable<FooterConfig['social_links']>[0]) => {
     const cl = link.className || "h-5 w-5";
@@ -235,9 +241,9 @@ export function Footer({ config }: FooterProps)
               )}
             </div>
 
-            {hasCustomSocialLinks && (
+            {socialLinks.length > 0 && (
               <div className='flex items-center gap-4 justify-center'>
-                {customSocialLinks.map((link) => (
+                {socialLinks.map((link) => (
                   <Link
                     key={link.id || link.platform}
                     href={link.url}
