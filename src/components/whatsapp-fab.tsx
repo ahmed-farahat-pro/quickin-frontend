@@ -2,17 +2,15 @@
 
 // Floating WhatsApp contact button, shown on public pages. Hidden inside the
 // admin consoles + auth + checkout so it doesn't clutter those flows. The
-// number comes from NEXT_PUBLIC_WHATSAPP (placeholder default — swap in Vercel).
+// number comes from @/lib/contact.
 import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { whatsappHref } from '@/lib/contact'
 
-// PLACEHOLDER — replace with the real WhatsApp business number (digits only,
-// with country code), e.g. via NEXT_PUBLIC_WHATSAPP in Vercel.
-const RAW = process.env.NEXT_PUBLIC_WHATSAPP || '201000000000'
-const NUMBER = RAW.replace(/[^\d]/g, '')
-
-// Locale prefixes we strip before matching hidden routes.
-const HIDDEN_PREFIXES = ['/ops', '/admin', '/login', '/signup']
+// Locale prefixes we strip before matching hidden routes. /links is the bio
+// linktree, which lists the WhatsApp chat as one of its rows — the floating
+// button would be the same link twice on one short page.
+const HIDDEN_PREFIXES = ['/ops', '/admin', '/login', '/signup', '/links']
 
 export default function WhatsAppFab() {
   const t = useTranslations('contact')
@@ -23,7 +21,7 @@ export default function WhatsAppFab() {
     /checkout|\/pay(\/|$)/.test(path)
   if (hidden) return null
 
-  const href = `https://wa.me/${NUMBER}?text=${encodeURIComponent('Hello QuickIn 👋')}`
+  const href = whatsappHref('Hello QuickIn 👋')
 
   return (
     <>

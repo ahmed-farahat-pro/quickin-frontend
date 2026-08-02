@@ -94,9 +94,19 @@ export function OpsSessionProvider({
   return <OpsSessionContext.Provider value={value}>{children}</OpsSessionContext.Provider>
 }
 
+/** Console pages beyond the tabbed dashboard, each gated by its own module.
+ *  'staff' is super-admin-only, which staffCan() already enforces — so listing it
+ *  here needs no extra role check. */
+const NAV: Array<{ href: string; label: string; module: StaffModule }> = [
+  { href: '/ops/analytics', label: 'Analytics', module: 'analytics' },
+  { href: '/ops/payments', label: 'Payments', module: 'payments' },
+  { href: '/ops/resorts', label: 'Resorts', module: 'resorts' },
+  { href: '/ops/staff', label: 'Staff', module: 'staff' },
+]
+
 /** Shared header strip for the console pages: logo, who's signed in, sign out. */
 export function OpsHeader({ title }: { title: string }) {
-  const { session, signOut } = useOpsSession()
+  const { session, can, signOut } = useOpsSession()
   const router = useRouter()
 
   return (
@@ -131,10 +141,14 @@ export function OpsHeader({ title }: { title: string }) {
               {session.legacy ? ' · legacy' : ''}
             </div>
           </div>
-          {session.role === 'super_admin' && (
+          {/* Module-gated nav. Each entry is hidden unless the operator holds the
+              module — the page and its API re-check independently, so this is
+              convenience, not the boundary. */}
+          {NAV.filter((n) => can(n.module)).map((n) => (
             <button
+              key={n.href}
               type="button"
-              onClick={() => router.push('/ops/staff')}
+              onClick={() => router.push(n.href)}
               style={{
                 padding: '8px 14px',
                 borderRadius: 12,
@@ -146,9 +160,9 @@ export function OpsHeader({ title }: { title: string }) {
                 cursor: 'pointer',
               }}
             >
-              Staff
+              {n.label}
             </button>
-          )}
+          ))}
           <button
             type="button"
             onClick={signOut}

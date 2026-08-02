@@ -1,13 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { CONTACT_EMAIL } from '@/lib/contact'
 
 // Public account-deletion page. Doubles as:
 //  - the publicly-reachable deletion URL required by Google Play (linkable without the app), and
 //  - an in-app deletion path (Apple 5.1.1(v) / Play) when the visitor is signed in.
 const C = { burgundy: '#5B0F16', cream: '#F6F1E6', tan: '#EFE6D8', ink: '#2A2220', muted: '#6B6055' }
 const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
-const SUPPORT_EMAIL = 'tech@problem-x.com'
+// The manual fallback for guests who can't sign in. Must be an inbox we actually
+// read: the stores treat this page as the deletion request channel.
+const SUPPORT_EMAIL = CONTACT_EMAIL
 
 export default function DeleteAccountPage() {
   const [email, setEmail] = useState<string | null>(null)
