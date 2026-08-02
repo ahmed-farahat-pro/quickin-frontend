@@ -41,8 +41,8 @@ This app is configured with a single public environment variable:
 | ------------------------------- | ------------------------------------------------------------ |
 | `NEXT_PUBLIC_GOOGLE_CLIENT_ID`  | If set, enables the Google Identity Services sign-in button. |
 | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | If set, the Explore map upgrades from Leaflet to Google Maps. |
-| `NEXT_PUBLIC_WHATSAPP`          | Overrides the support number in international digits, e.g. `201044448477` — what `wa.me`/`tel:` need. |
-| `NEXT_PUBLIC_CONTACT_PHONE`     | Overrides how that number is *printed*, e.g. `01044448477`.   |
+| `NEXT_PUBLIC_WHATSAPP`          | Overrides the support number in international digits, e.g. `201013010119` — what `wa.me`/`tel:` need. |
+| `NEXT_PUBLIC_CONTACT_PHONE`     | Overrides how that number is *printed*, e.g. `01013010119`.   |
 | `NEXT_PUBLIC_CONTACT_EMAIL`     | Overrides the support inbox.                                  |
 | `NEXT_PUBLIC_SOCIAL_INSTAGRAM`  | Overrides the Instagram profile linked from `/links`.         |
 | `NEXT_PUBLIC_SOCIAL_TIKTOK`     | Overrides the TikTok profile linked from `/links`.            |

@@ -14,14 +14,14 @@
  */
 
 /** The number as we print it for guests — local Egyptian format. */
-export const CONTACT_PHONE_DISPLAY = process.env.NEXT_PUBLIC_CONTACT_PHONE || '01044448477'
+export const CONTACT_PHONE_DISPLAY = process.env.NEXT_PUBLIC_CONTACT_PHONE || '01013010119'
 
 /**
  * The same line in international digits (Egypt +20, leading 0 dropped) — the
  * form wa.me and tel: require, and the form that works when a guest calls from
  * outside Egypt.
  */
-export const CONTACT_PHONE_E164 = (process.env.NEXT_PUBLIC_WHATSAPP || '201044448477').replace(
+export const CONTACT_PHONE_E164 = (process.env.NEXT_PUBLIC_WHATSAPP || '201013010119').replace(
   /\D/g,
   '',
 )
