@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { InstapayDetails } from '@/components/instapay-details'
 
 const C = { burgundy: '#5B0F16', tan: '#EFE6D8', ink: '#2A2220', muted: '#6B6055' }
 
@@ -32,7 +31,6 @@ export function ReservationActions(props: {
 }) {
   const { bookingId, status, paid, checkIn, checkOut } = props
   const t = useTranslations('reservationsLocal')
-  const tPay = useTranslations('instapay')
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
@@ -40,9 +38,6 @@ export function ReservationActions(props: {
   const [reviewed, setReviewed] = useState(false)
   const [paying, setPaying] = useState(false)
   const [payErr, setPayErr] = useState<string | null>(null)
-  // Collapsed by default: an admin-uploaded QR arrives inline as a base64 data
-  // URL, so InstapayDetails only fetches once the guest asks to see it.
-  const [showInstapay, setShowInstapay] = useState(false)
 
   const today = new Date().toISOString().slice(0, 10)
   const isPast = checkOut < today
@@ -89,10 +84,7 @@ export function ReservationActions(props: {
     }
   }
 
-  const awaitingPayment = status === 'confirmed' && !paid
-
   return (
-    <>
     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, marginTop: 12 }}>
       <span style={{ background: chip.bg, color: chip.fg, fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999 }}>
         {chipLabel}
@@ -104,19 +96,13 @@ export function ReservationActions(props: {
         </span>
       )}
 
-      {awaitingPayment && (
+      {status === 'confirmed' && !paid && (
         <button
           onClick={pay}
           disabled={paying}
           style={{ background: C.burgundy, color: '#fff', border: 'none', borderRadius: 10, padding: '7px 16px', fontWeight: 700, fontSize: 13.5, cursor: paying ? 'default' : 'pointer', opacity: paying ? 0.7 : 1, fontFamily: 'inherit' }}
         >
           {paying ? t('paying') : t('payNow')}
-        </button>
-      )}
-
-      {awaitingPayment && (
-        <button onClick={() => setShowInstapay((v) => !v)} style={linkBtn}>
-          {showInstapay ? tPay('hide') : tPay('show')}
         </button>
       )}
 
@@ -140,13 +126,6 @@ export function ReservationActions(props: {
       {note && <span style={{ fontSize: 13, color: '#b3261e' }}>{note}</span>}
       {payErr && <span style={{ fontSize: 13, color: '#b3261e' }}>{payErr}</span>}
     </div>
-
-    {awaitingPayment && showInstapay && (
-      <div style={{ marginTop: 12 }}>
-        <InstapayDetails />
-      </div>
-    )}
-    </>
   )
 }
 

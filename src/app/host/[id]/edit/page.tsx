@@ -12,7 +12,6 @@ import { getListingById, hostListingHasOwnershipDoc } from '@/lib/local/db'
 import { verifyToken, getUserRowByEmail } from '@/lib/local/auth'
 import { ListingStatusChip } from '../../listing-status-chip'
 import type { HostListingStatus } from '../../host-tabs'
-import { listActiveResorts } from '@/lib/local/resorts'
 import { EditListingForm } from './edit-listing-form'
 
 export const dynamic = 'force-dynamic'
@@ -41,13 +40,6 @@ function listingStatus(approval: string | null | undefined): HostListingStatus {
 }
 
 export default async function EditListingPage({ params }: { params: Promise<{ id: string }> }) {
-  // Server-side, like the create page: no client fetch needed.
-  let resorts: Awaited<ReturnType<typeof listActiveResorts>> = []
-  try {
-    resorts = await listActiveResorts()
-  } catch (err) {
-    console.error('host/edit resorts:', err)
-  }
   const { id } = await params
 
   const token = (await cookies()).get('qk_token')?.value
@@ -110,7 +102,7 @@ export default async function EditListingPage({ params }: { params: Promise<{ id
         <p style={{ margin: '0 0 24px', fontSize: 15, color: COLORS.muted, lineHeight: 1.55 }}>
           {t('subtitle')}
         </p>
-        <EditListingForm listing={listing} hasOwnershipDoc={hasOwnershipDoc} resorts={resorts} />
+        <EditListingForm listing={listing} hasOwnershipDoc={hasOwnershipDoc} />
       </section>
     </main>
   )

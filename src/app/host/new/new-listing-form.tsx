@@ -108,12 +108,7 @@ const dropdownStyle: React.CSSProperties = {
   overflowY: 'auto',
 }
 
-/** Sentinel for the "my resort isn't listed" option. */
-const OTHER_RESORT = '__other__'
-
-export type ResortOption = { id: string; name: string; region: string }
-
-export function NewListingForm({ resorts = [] }: { resorts?: ResortOption[] }) {
+export function NewListingForm() {
   const router = useRouter()
   const t = useTranslations('hostPage.create')
   const [busy, setBusy] = useState(false)
@@ -125,11 +120,6 @@ export function NewListingForm({ resorts = [] }: { resorts?: ResortOption[] }) {
   const [location, setLocation] = useState('')
   const [country, setCountry] = useState('Egypt')
   const [region, setRegion] = useState('')
-  // Resort catalog + the host's choice. OTHER_RESORT is the sentinel that swaps the
-  // dropdown for a free-text box; the typed name is saved as-is and queued for an
-  // admin, so the host is never blocked waiting on moderation.
-  const [resortId, setResortId] = useState('')
-  const [resortOther, setResortOther] = useState('')
   const [lat, setLat] = useState<number | null>(null)
   const [lng, setLng] = useState<number | null>(null)
   const [geo, setGeo] = useState<'idle' | 'locating' | 'fail'>('idle')
@@ -325,8 +315,6 @@ export function NewListingForm({ resorts = [] }: { resorts?: ResortOption[] }) {
           max_guests: num(maxGuests, 2),
           property_type: propertyType || undefined,
           region: region || undefined,
-          resort_id: resortId && resortId !== OTHER_RESORT ? resortId : undefined,
-          resort_name: resortId === OTHER_RESORT ? resortOther.trim() || undefined : undefined,
           amenities,
           images: photos,
           ownership_doc: ownershipDoc || undefined,
@@ -466,38 +454,6 @@ export function NewListingForm({ resorts = [] }: { resorts?: ResortOption[] }) {
           ))}
         </select>
         <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.muted }}>{t('regionHint')}</p>
-      </div>
-
-      {/* Resort / compound. Narrowed to the chosen region so the two can't disagree —
-          picking one also sets the region server-side. */}
-      <div style={fieldWrap}>
-        <label style={label} htmlFor="resort">{t('fields.resort')}</label>
-        <select
-          id="resort"
-          style={input}
-          value={resortId}
-          onChange={(e) => setResortId(e.target.value)}
-        >
-          <option value="">{t('resortNone')}</option>
-          {resorts
-            .filter((r) => !region || r.region === region)
-            .map((r) => (
-              <option key={r.id} value={r.id}>{r.name}</option>
-            ))}
-          <option value={OTHER_RESORT}>{t('resortOther')}</option>
-        </select>
-        {resortId === OTHER_RESORT && (
-          <input
-            style={{ ...input, marginTop: 8 }}
-            value={resortOther}
-            onChange={(e) => setResortOther(e.target.value)}
-            placeholder={t('resortOtherPlaceholder')}
-            maxLength={120}
-          />
-        )}
-        <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.muted }}>
-          {resortId === OTHER_RESORT ? t('resortOtherHint') : t('resortHint')}
-        </p>
       </div>
 
       {/* Map pin — sets lat/lng; guests see an approximate area, not the exact pin. */}

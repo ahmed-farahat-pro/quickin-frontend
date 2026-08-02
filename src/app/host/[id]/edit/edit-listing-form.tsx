@@ -138,21 +138,14 @@ function sameSet(a: readonly string[], b: readonly string[]): boolean {
   return x.every((v, i) => v === y[i])
 }
 
-/** Sentinel for the "my resort isn't listed" option. */
-const OTHER_RESORT = '__other__'
-
-export type ResortOption = { id: string; name: string; region: string }
-
 export function EditListingForm({
   listing,
   hasOwnershipDoc,
-  resorts = [],
 }: {
   listing: Listing
   /** A proof-of-ownership document is already stored for this listing. Its bytes
    *  stay admin-only, so the host only ever sees this flag. */
   hasOwnershipDoc: boolean
-  resorts?: ResortOption[]
 }) {
   const router = useRouter()
   const t = useTranslations('hostPage.create')
@@ -165,14 +158,6 @@ export function EditListingForm({
   const [location, setLocation] = useState(listing.location ?? '')
   const [country, setCountry] = useState(listing.country?.trim() || 'Egypt')
   const [region, setRegion] = useState(listing.region?.trim() || '')
-  // Resort: seed from whichever column the listing uses. A catalog listing starts on
-  // its resort id; a free-text one starts on "Other" with the typed name showing, so
-  // the host sees what guests see rather than an empty box.
-  const [resortId, setResortId] = useState(
-    listing.resort_id ? String(listing.resort_id) : listing.resort ? OTHER_RESORT : ''
-  )
-  const [resortOther, setResortOther] = useState(listing.resort_id ? '' : (listing.resort ?? ''))
-
   const [lat, setLat] = useState<number | null>(listing.lat ?? null)
   const [lng, setLng] = useState<number | null>(listing.lng ?? null)
   const [geo, setGeo] = useState<'idle' | 'locating' | 'fail'>('idle')
@@ -412,13 +397,6 @@ export function EditListingForm({
     if (text(location) !== (listing.location ?? '').trim()) patch.location = text(location) || null
     if (text(country) !== (listing.country ?? '').trim()) patch.country = text(country) || null
     if (text(region) !== (listing.region ?? '').trim()) patch.region = text(region) || null
-    // Resort is one logical field; the server turns it into resort_id/resort_name/region.
-    const startedAt = listing.resort_id ? String(listing.resort_id) : listing.resort ? OTHER_RESORT : ''
-    const startedOther = listing.resort_id ? '' : (listing.resort ?? '')
-    if (resortId !== startedAt || (resortId === OTHER_RESORT && text(resortOther) !== startedOther.trim())) {
-      patch.resort_id = resortId && resortId !== OTHER_RESORT ? resortId : null
-      patch.resort_name = resortId === OTHER_RESORT ? text(resortOther) || null : null
-    }
     if ((lat ?? null) !== (listing.lat ?? null)) patch.lat = lat ?? null
     if ((lng ?? null) !== (listing.lng ?? null)) patch.lng = lng ?? null
 
@@ -639,37 +617,6 @@ export function EditListingForm({
           ))}
         </select>
         <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.muted }}>{t('regionHint')}</p>
-      </div>
-
-      {/* Resort / compound — narrowed to the chosen region. */}
-      <div style={fieldWrap}>
-        <label style={label} htmlFor="edit-resort">{t('fields.resort')}</label>
-        <select
-          id="edit-resort"
-          style={input}
-          value={resortId}
-          onChange={(e) => setResortId(e.target.value)}
-        >
-          <option value="">{t('resortNone')}</option>
-          {resorts
-            .filter((r) => !region || r.region === region)
-            .map((r) => (
-              <option key={r.id} value={r.id}>{r.name}</option>
-            ))}
-          <option value={OTHER_RESORT}>{t('resortOther')}</option>
-        </select>
-        {resortId === OTHER_RESORT && (
-          <input
-            style={{ ...input, marginTop: 8 }}
-            value={resortOther}
-            onChange={(e) => setResortOther(e.target.value)}
-            placeholder={t('resortOtherPlaceholder')}
-            maxLength={120}
-          />
-        )}
-        <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.muted }}>
-          {resortId === OTHER_RESORT ? t('resortOtherHint') : t('resortHint')}
-        </p>
       </div>
 
       {/* Map pin — sets lat/lng; guests see an approximate area, not the exact pin. */}

@@ -79,8 +79,6 @@ export async function POST(req: Request) {
       property_type: body.property_type ?? undefined,
       // Curated area + amenity chips — same catalogs the edit form uses.
       region: body.region ?? undefined,
-      resort_id: body.resort_id ?? body.resortId ?? undefined,
-      resort_name: body.resort_name ?? body.resortName ?? undefined,
       amenities: Array.isArray(body.amenities) ? body.amenities : undefined,
       images: Array.isArray(body.images)
         ? body.images.filter(isImageSrc).map((u: string) => u.trim())

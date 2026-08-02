@@ -12,7 +12,6 @@ import { verifyToken, getUserRowByEmail } from '@/lib/local/auth'
 import { Heart, MessageCircle } from 'lucide-react'
 import ExploreClient from './explore-client'
 import AddListingFab from './add-listing-fab'
-import { whatsappHref } from '@/lib/contact'
 
 export const dynamic = 'force-dynamic'
 
@@ -109,6 +108,7 @@ export default async function ExplorePage({
   // Locale-prefix internal links so footer links land on the right page without
   // an extra middleware redirect.
   const loc = (href: string) => `/${locale}${href}`
+  const waNumber = (process.env.NEXT_PUBLIC_WHATSAPP || '201000000000').replace(/[^\d]/g, '')
   const sp = await searchParams
   const location = sp.location?.trim() || ''
   const checkIn = sp.checkIn?.trim() || ''
@@ -399,6 +399,8 @@ export default async function ExplorePage({
             title={t('footer.about.title')}
             links={[
               { label: t('footer.about.ourStory'), href: loc('/about') },
+              { label: t('footer.about.careers'), href: loc('/careers') },
+              { label: t('footer.about.press'), href: loc('/newsroom') },
             ]}
           />
         </div>
@@ -427,7 +429,7 @@ export default async function ExplorePage({
             <span aria-hidden>·</span>
             <a href={loc('/sitemap')} style={{ color: 'rgba(246,241,230,0.85)', textDecoration: 'none' }}>{t('footer.legal.sitemap')}</a>
             <a
-              href={whatsappHref()}
+              href={`https://wa.me/${waNumber}`}
               target="_blank"
               rel="noopener noreferrer"
               style={{

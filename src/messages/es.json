@@ -57,6 +57,8 @@
     },
     "companyLinks": {
       "about": "Sobre nosotros",
+      "newsroom": "Sala de prensa",
+      "careers": "Empleo",
       "contact": "Contacto"
     }
   },
@@ -1455,7 +1457,9 @@
       },
       "about": {
         "title": "Acerca de",
-        "ourStory": "Nuestra historia"
+        "ourStory": "Nuestra historia",
+        "careers": "Empleo",
+        "press": "Prensa"
       },
       "copyright": "© 2026 QuickIn. Creado para el viajero curioso.",
       "legal": {
@@ -1651,19 +1655,6 @@
       "description": "Únete a QuickIn para descubrir y reservar una colección seleccionada de alojamientos vacacionales con encanto.",
       "ogTitle": "Crea tu cuenta | QuickIn"
     }
-  },
-  "instapay": {
-    "title": "Código QR de Instapay",
-    "show": "Cómo pagar",
-    "hide": "Ocultar los datos de pago",
-    "loading": "Cargando los datos de pago…",
-    "loadFailed": "No se pudieron cargar los datos de pago. Inténtalo de nuevo.",
-    "notConfigured": "Los pagos con Instapay aún no están configurados. Vuelve a intentarlo pronto.",
-    "sendTo": "Enviar a",
-    "copy": "Copiar",
-    "copied": "Copiado",
-    "openInstapay": "Abrir en Instapay",
-    "scanHint": "Escanéalo con tu app bancaria"
   },
   "reservationsLocal": {
     "meta": {
@@ -2025,8 +2016,7 @@
         "weekendPrice": "Precio de fin de semana (opcional)",
         "weekendDays": "¿Qué días son fin de semana?",
         "region": "Zona",
-        "amenities": "Servicios",
-        "resort": "Resort / complejo"
+        "amenities": "Servicios"
       },
       "placeholders": {
         "title": "Loft soleado junto al Nilo",
@@ -2107,12 +2097,7 @@
       "photosMoveEarlier": "Mover la foto antes",
       "photosMoveLater": "Mover la foto después",
       "photosSetCover": "Usar como foto de portada",
-      "photosReorderHint": "Usa las flechas para reordenar, o ★ para elegir la portada. La primera foto es la que ven primero los huéspedes.",
-      "resortNone": "No está en un resort o complejo",
-      "resortOther": "Otro — no está en la lista",
-      "resortOtherPlaceholder": "Escribe el nombre del resort o complejo",
-      "resortHint": "Elige el complejo donde está tu alojamiento. Al elegirlo también se define la zona.",
-      "resortOtherHint": "Mostraremos lo que escribas a los huéspedes y nuestro equipo lo añadirá a la lista."
+      "photosReorderHint": "Usa las flechas para reordenar, o ★ para elegir la portada. La primera foto es la que ven primero los huéspedes."
     },
     "edit": {
       "meta": {
@@ -2375,23 +2360,5 @@
         "file": "No se pudo leer ese archivo. Prueba con otro."
       }
     }
-  },
-  "linksPage": {
-    "meta": {
-      "title": "QuickIn — Todos nuestros enlaces",
-      "description": "Sigue a QuickIn, descarga la app y reserva tu próxima estancia en Egipto."
-    },
-    "tagline": "Alojamientos seleccionados en Egipto — reservados en unos toques.",
-    "book": "Reserva tu estancia",
-    "appStore": "Descárgalo en el App Store",
-    "appStoreSub": "iPhone y iPad",
-    "googlePlay": "Consíguelo en Google Play",
-    "googlePlaySub": "Android",
-    "whatsapp": "Chatea por WhatsApp",
-    "whatsappSub": "Respondemos en minutos",
-    "email": "Escríbenos",
-    "comingSoon": "Próximamente",
-    "followUs": "Síguenos",
-    "rights": "Todos los derechos reservados."
   }
 }

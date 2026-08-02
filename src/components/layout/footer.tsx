@@ -40,6 +40,8 @@ export function Footer({ config }: FooterProps)
     ],
     company: [
       { label: t('companyLinks.about'), href: '/about' },
+      { label: t('companyLinks.newsroom'), href: '/newsroom' },
+      { label: t('companyLinks.careers'), href: '/careers' },
       { label: t('companyLinks.contact'), href: '/contact' },
     ],
   }

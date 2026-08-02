@@ -8,10 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "gen-types": "supabase gen types typescript --project-id xpvrgdpsvffmttlwwfuo > src/types/supabase.ts",
-    "check:i18n": "node scripts/check-i18n-keys.mjs",
-    "test": "node --test \"test/unit/*.test.mjs\"",
-    "test:watch": "node --test --watch \"test/unit/*.test.mjs\"",
-    "check": "npm test"
+    "check:i18n": "node scripts/check-i18n-keys.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.55",
@@ -77,7 +74,6 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
     "vaul": "^1.1.2",
-    "write-excel-file": "^4.1.1",
     "yet-another-react-lightbox": "^3.28.0",
     "zod": "^4.3.6",
     "zustand": "^5.0.9"

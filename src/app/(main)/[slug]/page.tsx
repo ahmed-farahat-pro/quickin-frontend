@@ -7,12 +7,6 @@ export const dynamic = 'force-dynamic'
 import { getLocale } from 'next-intl/server'
 import { DynamicPageRenderer } from '@/components/features/cms/dynamic-page-renderer'
 import { TermsPage } from './terms-content'
-import {
-  CONTACT_EMAIL,
-  CONTACT_EMAIL_HREF,
-  CONTACT_PHONE_DISPLAY,
-  whatsappHref,
-} from '@/lib/contact'
 
 interface PageProps {
   params: Promise<{ slug: string }>
@@ -34,7 +28,7 @@ const INFO_PAGES: Record<string, { title: string; body: string[] }> = {
     body: [
       'Need a hand? Most questions about booking, payments, check-in, and cancellations are answered here.',
       'Booking is simple: find a stay, choose your dates and guests, and send a request. The host approves it, you pay securely, and your reservation is confirmed. You can track every reservation from your account.',
-      `Still stuck? Reach our team any time at ${CONTACT_EMAIL}, or on ${CONTACT_PHONE_DISPLAY} by phone or WhatsApp.`,
+      'Still stuck? Reach our team any time at support@quickin.app.',
     ],
   },
   safety: {
@@ -56,7 +50,7 @@ const INFO_PAGES: Record<string, { title: string; body: string[] }> = {
     title: 'Report a Concern',
     body: [
       'If a listing, message, or stay doesn’t feel right, let us know. Reports are confidential and reviewed by our trust & safety team.',
-      `Email the details to ${CONTACT_EMAIL} and we’ll follow up promptly.`,
+      'Email the details to support@quickin.app and we’ll follow up promptly.',
     ],
   },
   host: {
@@ -88,10 +82,24 @@ const INFO_PAGES: Record<string, { title: string; body: string[] }> = {
     ],
   },
   about_us: { title: 'About QuickIn', body: ['QuickIn connects travelers with curated boutique stays.'] },
+  newsroom: {
+    title: 'Newsroom',
+    body: [
+      'News, updates, and stories from QuickIn.',
+      'For press inquiries, reach us at press@quickin.app.',
+    ],
+  },
+  careers: {
+    title: 'Careers',
+    body: [
+      'We’re building a better way to travel, and we’re always looking for thoughtful, curious people to join us.',
+      'Interested? Send your CV and a note about what you’d love to work on to careers@quickin.app.',
+    ],
+  },
   contact: {
     title: 'Contact Us',
     body: [
-      'We’d love to hear from you. Reach the QuickIn team by email or WhatsApp — we usually reply within a few hours.',
+      'We’d love to hear from you. Reach the QuickIn team by email, phone, or WhatsApp — we usually reply within a few hours.',
     ],
   },
   terms: {
@@ -123,20 +131,18 @@ function humanize(slug: string) {
   return slug.replace(/[-/]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-// Contact methods block. The phone line and the WhatsApp account are the same
-// number, so they share a single row — two rows for one number just made people
-// wonder which one to use. Values live in @/lib/contact.
+// Contact methods block (email / phone / WhatsApp). Values come from env with
+// clearly-marked PLACEHOLDER defaults — set NEXT_PUBLIC_* in Vercel to swap.
 function ContactMethods() {
-  const rows: { label: string; value: string; href: string; external?: boolean }[] = [
-    { label: 'Email', value: CONTACT_EMAIL, href: CONTACT_EMAIL_HREF },
-    {
-      label: 'Phone / WhatsApp',
-      value: CONTACT_PHONE_DISPLAY,
-      // Opens the chat rather than dialling: WhatsApp is where the team actually
-      // answers, and a tel: link does nothing on desktop.
-      href: whatsappHref(),
-      external: true,
-    },
+  const email = process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'support@quickin.app'
+  const phoneRaw = process.env.NEXT_PUBLIC_CONTACT_PHONE || '+20 100 000 0000'
+  const waRaw = process.env.NEXT_PUBLIC_WHATSAPP || '201000000000'
+  const wa = waRaw.replace(/[^\d]/g, '')
+  const tel = phoneRaw.replace(/[^\d+]/g, '')
+  const rows: { label: string; value: string; href: string }[] = [
+    { label: 'Email', value: email, href: `mailto:${email}` },
+    { label: 'Phone', value: phoneRaw, href: `tel:${tel}` },
+    { label: 'WhatsApp', value: phoneRaw, href: `https://wa.me/${wa}` },
   ]
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, margin: '8px 0 4px' }}>
@@ -144,8 +150,8 @@ function ContactMethods() {
         <a
           key={r.label}
           href={r.href}
-          target={r.external ? '_blank' : undefined}
-          rel={r.external ? 'noopener noreferrer' : undefined}
+          target={r.label === 'WhatsApp' ? '_blank' : undefined}
+          rel={r.label === 'WhatsApp' ? 'noopener noreferrer' : undefined}
           style={{
             display: 'flex',
             alignItems: 'center',

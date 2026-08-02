@@ -6,7 +6,6 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
 import { verifyToken, getUserRowByEmail } from '@/lib/local/auth'
-import { listActiveResorts } from '@/lib/local/resorts'
 import { NewListingForm } from './new-listing-form'
 
 export const dynamic = 'force-dynamic'
@@ -45,15 +44,6 @@ async function isSignedIn(): Promise<boolean> {
 }
 
 export default async function NewListingPage() {
-  // Server-side: the catalog is a small, cacheable read and the page already has
-  // DB access, so there is no reason to make the browser fetch it. A failure here
-  // degrades to the free-text "Other" path rather than breaking the form.
-  let resorts: Awaited<ReturnType<typeof listActiveResorts>> = []
-  try {
-    resorts = await listActiveResorts()
-  } catch (err) {
-    console.error('host/new resorts:', err)
-  }
   if (!(await isSignedIn())) redirect('/login')
 
   const t = await getTranslations('hostPage.create')
@@ -124,7 +114,7 @@ export default async function NewListingPage() {
           {t('subtitle')}
         </p>
 
-        <NewListingForm resorts={resorts} />
+        <NewListingForm />
       </section>
     </main>
   )

@@ -3,9 +3,8 @@
 // this adds the per-module check, so only a super admin or a moderator holding the
 // 'payments' module sees the panels. The API routes behind them re-check the same
 // permission independently.
-// Two panels live in the 'use client' component below: the Instapay destination
-// settings form (number, link, QR, instructions) and the payment-disputes queue.
-// Strings are hardcoded English (this ops page
+// Two panels live in the 'use client' component below: the Instapay handle settings
+// form and the payment-disputes queue. Strings are hardcoded English (this ops page
 // is intentionally not wired into next-intl to keep the change contained).
 import type { Metadata } from 'next'
 import { cookies } from 'next/headers'

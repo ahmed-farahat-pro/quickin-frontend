@@ -73,12 +73,6 @@ type AdminListing = {
   id: string
   title: string
   location: string | null
-  region: string | null
-  approval_status: string
-  /** Set when the host typed their own resort via "Other" — needs review before
-   *  this listing can be approved. */
-  resort_name: string | null
-  resort: string | null
   currency: string
   price_per_night: number
   is_published: boolean
@@ -202,14 +196,6 @@ export default function OpsPage() {
   })
 
   const [busyId, setBusyId] = useState<string | null>(null)
-  // Resort review: set while approving a listing whose resort is free text.
-  // `mode` mirrors the API — add it to the catalog, match an existing one, or keep
-  // the host's wording. `name` starts as what the host typed so a typo can simply
-  // be corrected in place.
-  const [resortReview, setResortReview] = useState<
-    { listing: AdminListing; mode: 'new' | 'match' | 'keep'; name: string; region: string; matchId: string } | null
-  >(null)
-  const [resortCatalog, setResortCatalog] = useState<Array<{ id: string; name: string; region: string }>>([])
 
   // App download links (admin-editable; surfaced by the web "download the app" bar).
   const [appIos, setAppIos] = useState('')
@@ -371,59 +357,6 @@ export default function OpsPage() {
     const ok = await post('app-links', { ios: appIos.trim(), android: appAndroid.trim() })
     setSavingLinks(false)
     setLinksMsg(ok ? 'Saved — the phone download bar updates on the next page load.' : 'Could not save. Please retry.')
-  }
-
-  // ---- listing approval ----
-
-  /** Approve a listing. If its resort is free text, review that first. */
-  const approveListing = async (l: AdminListing) => {
-    if (l.resort_name) {
-      const cat = await adminGet<{ resorts: Array<{ id: string; name: string; region: string }> }>('resorts')
-      if (cat && cat !== 'forbidden') setResortCatalog(cat.resorts ?? [])
-      setResortReview({
-        listing: l,
-        mode: 'new',
-        // Prefilled with the host's spelling — the admin corrects it or accepts it.
-        name: l.resort_name,
-        region: l.region ?? '',
-        matchId: '',
-      })
-      return
-    }
-    setBusyId(l.id)
-    const ok = await post('listings', { id: l.id, action: 'approve' })
-    setBusyId(null)
-    if (ok) void loadSection('listings')
-  }
-
-  const rejectListing = async (l: AdminListing) => {
-    const note = window.prompt('Optional note for the host (why rejected):') ?? null
-    setBusyId(l.id)
-    const ok = await post('listings', { id: l.id, action: 'reject', note })
-    setBusyId(null)
-    if (ok) void loadSection('listings')
-  }
-
-  /** Submit the resort decision and the approval together. */
-  const submitResortReview = async () => {
-    if (!resortReview) return
-    const r = resortReview
-    setBusyId(r.listing.id)
-    const ok = await post('listings', {
-      id: r.listing.id,
-      action: 'approve',
-      resort:
-        r.mode === 'match'
-          ? { mode: 'match', resort_id: r.matchId }
-          : r.mode === 'new'
-            ? { mode: 'new', name: r.name, region: r.region }
-            : { mode: 'keep' },
-    })
-    setBusyId(null)
-    if (ok) {
-      setResortReview(null)
-      void loadSection('listings')
-    }
   }
 
   // ---- users actions ----
@@ -921,20 +854,13 @@ export default function OpsPage() {
                       }}
                     >
                       <span style={{ fontSize: 16, fontWeight: 700, color: INK }}>{l.title}</span>
-                      {l.approval_status === 'pending'
-                        ? badge('Awaiting approval', TAN, BURGUNDY)
-                        : l.approval_status === 'rejected'
-                          ? badge('Rejected', '#F6E0E2', BURGUNDY)
-                          : l.is_published
-                            ? badge('Published', '#E2F0E9', GREEN)
-                            : badge('Hidden', TAN, MUTED)}
-                      {/* Free text needs a decision before this listing can go live. */}
-                      {l.resort_name ? badge('Resort: review needed', '#F6E0E2', BURGUNDY) : null}
+                      {l.is_published
+                        ? badge('Published', '#E2F0E9', GREEN)
+                        : badge('Hidden', TAN, MUTED)}
                     </div>
                     <div style={{ fontSize: 13, color: MUTED, marginTop: 4 }}>
                       {l.host_name ? `Host: ${l.host_name}` : 'Host: —'}
                       {l.location ? ` · ${l.location}` : ''}
-                      {l.resort ? ` · ${l.resort}` : ''}
                     </div>
                     <div style={{ fontSize: 14, marginTop: 6, color: INK }}>
                       {fmtMoney(l.price_per_night, l.currency)}{' '}
@@ -953,24 +879,6 @@ export default function OpsPage() {
                       alignItems: 'center',
                     }}
                   >
-                    {l.approval_status === 'pending' ? (
-                      <>
-                        <button
-                          style={approveBtn}
-                          disabled={busyId === l.id}
-                          onClick={() => approveListing(l)}
-                        >
-                          {busyId === l.id ? 'Working…' : 'Approve'}
-                        </button>
-                        <button
-                          style={outlineBtn}
-                          disabled={busyId === l.id}
-                          onClick={() => rejectListing(l)}
-                        >
-                          Reject
-                        </button>
-                      </>
-                    ) : null}
                     <button
                       style={outlineBtn}
                       disabled={busyId === l.id}
@@ -1257,140 +1165,6 @@ export default function OpsPage() {
           )
         ) : null}
       </div>
-
-      {/* ---- Resort review, shown while approving a listing whose resort is free text ---- */}
-      {resortReview && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Review resort before approving"
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(42,34,32,0.45)',
-            display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-            padding: '5vh 16px', overflowY: 'auto', zIndex: 60,
-          }}
-          onClick={(e) => { if (e.target === e.currentTarget) setResortReview(null) }}
-        >
-          <div style={{ ...cardStyle, width: '100%', maxWidth: 520 }}>
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: BURGUNDY }}>
-              This listing&apos;s resort needs review
-            </h2>
-            <p style={{ margin: '6px 0 14px', fontSize: 13, color: MUTED, lineHeight: 1.6 }}>
-              The host chose <strong>Other</strong> and typed{' '}
-              <strong style={{ color: INK }}>&ldquo;{resortReview.listing.resort_name}&rdquo;</strong>, which
-              isn&apos;t in the catalog. Decide what it means before approving.
-            </p>
-
-            {/* Three ways out, as radio-style choices. */}
-            <div style={{ display: 'grid', gap: 8 }}>
-              {([
-                ['new', 'Add it as a new resort'],
-                ['match', 'Match an existing resort'],
-                ['keep', 'Keep the host\u2019s wording for now'],
-              ] as const).map(([mode, label]) => (
-                <label
-                  key={mode}
-                  style={{
-                    display: 'flex', gap: 9, alignItems: 'flex-start', padding: '10px 12px',
-                    borderRadius: 12, cursor: 'pointer',
-                    border: `1px solid ${resortReview.mode === mode ? BURGUNDY : TAN}`,
-                    background: resortReview.mode === mode ? 'rgba(91,15,22,0.04)' : '#fff',
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name="resort-mode"
-                    checked={resortReview.mode === mode}
-                    onChange={() => setResortReview({ ...resortReview, mode })}
-                    style={{ marginTop: 2, accentColor: BURGUNDY }}
-                  />
-                  <span style={{ fontSize: 13.5, fontWeight: 600, color: INK }}>{label}</span>
-                </label>
-              ))}
-            </div>
-
-            {resortReview.mode === 'new' && (
-              <div style={{ marginTop: 12, display: 'grid', gap: 10 }}>
-                <div>
-                  <label style={labelStyle} htmlFor="rr-name">Resort name</label>
-                  <input
-                    id="rr-name"
-                    value={resortReview.name}
-                    onChange={(e) => setResortReview({ ...resortReview, name: e.target.value })}
-                    style={inputStyle}
-                    autoFocus
-                  />
-                  <p style={{ margin: '5px 0 0', fontSize: 12, color: MUTED }}>
-                    Prefilled with what the host typed — correct the spelling, or accept it as is.
-                  </p>
-                </div>
-                <div>
-                  <label style={labelStyle} htmlFor="rr-region">Region</label>
-                  <select
-                    id="rr-region"
-                    value={resortReview.region}
-                    onChange={(e) => setResortReview({ ...resortReview, region: e.target.value })}
-                    style={inputStyle}
-                  >
-                    <option value="">Pick a region…</option>
-                    {[...new Set(resortCatalog.map((r) => r.region))].map((r) => (
-                      <option key={r} value={r}>{r}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            )}
-
-            {resortReview.mode === 'match' && (
-              <div style={{ marginTop: 12 }}>
-                <label style={labelStyle} htmlFor="rr-match">Existing resort</label>
-                <select
-                  id="rr-match"
-                  value={resortReview.matchId}
-                  onChange={(e) => setResortReview({ ...resortReview, matchId: e.target.value })}
-                  style={inputStyle}
-                >
-                  <option value="">Pick a resort…</option>
-                  {resortCatalog.map((r) => (
-                    <option key={r.id} value={r.id}>{r.name} · {r.region}</option>
-                  ))}
-                </select>
-                <p style={{ margin: '5px 0 0', fontSize: 12, color: MUTED }}>
-                  For when the host simply didn&apos;t spot it in the list.
-                </p>
-              </div>
-            )}
-
-            <p style={{ margin: '12px 0 0', fontSize: 12, color: MUTED, lineHeight: 1.6 }}>
-              {resortReview.mode === 'keep'
-                ? 'The typed name stays on the listing and stays in the Resorts queue.'
-                : 'Only this listing is relinked. Other listings using the same wording stay in the Resorts queue — but the spelling is remembered, so future hosts typing it link automatically.'}
-            </p>
-
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
-              <button onClick={() => setResortReview(null)} style={outlineBtn}>Cancel</button>
-              <button
-                onClick={submitResortReview}
-                disabled={
-                  busyId === resortReview.listing.id ||
-                  (resortReview.mode === 'new' && (!resortReview.name.trim() || !resortReview.region)) ||
-                  (resortReview.mode === 'match' && !resortReview.matchId)
-                }
-                style={{
-                  ...approveBtn,
-                  opacity:
-                    busyId === resortReview.listing.id ||
-                    (resortReview.mode === 'new' && (!resortReview.name.trim() || !resortReview.region)) ||
-                    (resortReview.mode === 'match' && !resortReview.matchId)
-                      ? 0.5 : 1,
-                }}
-              >
-                {busyId === resortReview.listing.id ? 'Approving…' : 'Save & approve'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   )
 }

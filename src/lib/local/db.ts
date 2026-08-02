@@ -1,8 +1,5 @@
 import { randomInt } from 'node:crypto'
 import { pool } from './pool'
-import { resolveResortSelection } from './resorts'
-import { INSTAPAY_KEYS, rowsToPaymentConfig } from './payment-config-core'
-import type { PaymentConfig } from './payment-config-core'
 import { isLiveStayStatus, normalizeReservationCode } from '@/lib/stay-code'
 // The catalogs the host forms offer — one source of truth for what the API
 // accepts and what the create/edit forms render (see lib/listing-options.ts).
@@ -76,12 +73,6 @@ export interface Listing {
   property_type: string | null
   /** Curated browse area (one of REGION_VALUES), or null when the host hasn't picked one. */
   region: string | null
-  /** The catalog resort this listing belongs to, or null when the host typed
-   *  their own (see `resort`). Region is derived from it. */
-  resort_id?: string | null
-  /** Display name: the catalog resort's name, or the host's free text.
-   *  Free text still shows to guests as typed while it awaits moderation. */
-  resort?: string | null
   /** Amenity names, canonical English (see lib/listing-options.ts). Never null. */
   amenities: string[]
   is_guest_favorite: boolean
@@ -146,7 +137,6 @@ const LISTING_COLS = `
   l.currency,
   l.bedrooms, l.beds, l.bathrooms, l.max_guests, l.property_type,
   l.region, COALESCE(l.amenities, '{}') AS amenities,
-  l.resort_id, COALESCE((SELECT name FROM resorts WHERE id = l.resort_id), l.resort_name) AS resort,
   l.is_guest_favorite, l.listing_code, l.lat::float8 AS lat, l.lng::float8 AS lng,
   COALESCE(l.approval_status, 'approved') AS approval_status,
   to_char(l.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
@@ -237,8 +227,6 @@ const BOOKING_COLS = `
   (SELECT pp.reject_reason FROM payment_proofs pp WHERE pp.booking_id = b.id ORDER BY pp.submitted_at DESC LIMIT 1) AS payment_reject_reason,
   to_char(b.paid_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS paid_at,
   to_char(b.cancelled_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS cancelled_at,
-  b.cancelled_by, b.cancelled_by_role, b.cancellation_policy AS booked_cancellation_policy,
-  b.commission_rate,
   b.refund_percent, b.host_notes,
   -- The REAL column, never a synthesized stand-in: quickin-backend stores the
   -- code here and getStayByCode()/the QR resolve against it. A derived value
@@ -302,12 +290,7 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
   // when no weekend price is configured.
   const { rows } = await pool.query(
     `WITH ins AS (
-       -- cancellation_policy and commission_rate are SNAPSHOTTED here on purpose:
-       -- both are editable after the fact (the listing's policy by its host, the
-       -- rate by an admin), and a report must reflect what was in force when the
-       -- booking was taken. Mirrors the backend createBooking.
-       INSERT INTO bookings (listing_id, user_id, check_in, check_out, guests, adults, children, infants, pets, total_price, status,
-                             cancellation_policy, commission_rate)
+       INSERT INTO bookings (listing_id, user_id, check_in, check_out, guests, adults, children, infants, pets, total_price, status)
        SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9,
               (SELECT COALESCE(SUM(
                  CASE WHEN l.weekend_price IS NOT NULL AND l.weekend_days IS NOT NULL
@@ -315,9 +298,7 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
                       THEN l.weekend_price ELSE l.price_per_night END
                ), 0)
                FROM generate_series($3::date, $4::date - interval '1 day', interval '1 day') AS gs),
-              'pending',
-              COALESCE(l.cancellation_policy, 'moderate'),
-              COALESCE((SELECT value::numeric FROM app_settings WHERE key = 'platform_commission_rate'), 0.1)
+              'pending'
        FROM listings l WHERE l.id = $1
        RETURNING *
      )
@@ -390,10 +371,7 @@ export async function cancelBooking(
   const percent = moderateRefundPercent(b.days_until)
   const { rows } = await pool.query(
     `WITH upd AS (
-       UPDATE bookings SET status = 'cancelled', cancelled_at = now(), refund_percent = $3,
-              -- B3: record the actor in the SAME statement as the status change, so
-              -- it can never be skipped. $2 is the guest's own id (also the WHERE guard).
-              cancelled_by = $2::text, cancelled_by_role = 'guest'
+       UPDATE bookings SET status = 'cancelled', cancelled_at = now(), refund_percent = $3
         WHERE id = $1 AND user_id = $2 RETURNING *
      )
      SELECT ${BOOKING_COLS} FROM upd b JOIN listings l ON l.id = b.listing_id`,
@@ -1583,10 +1561,6 @@ export interface CreateListingInput {
   property_type?: string
   /** Curated browse area — one of REGION_VALUES (optional). */
   region?: string
-  /** Resort picked from the catalog. Wins over resort_name. */
-  resort_id?: string | null
-  /** Free text the host typed via "Other". Queued for admin review. */
-  resort_name?: string | null
   /** Amenity names (optional); validated exactly like the edit flow. */
   amenities?: string[]
   images?: string[]
@@ -1624,14 +1598,6 @@ export async function createListing(hostId: string, data: CreateListingInput): P
     ? null
     : normalizeRegion(data.region)
   const amenities = data.amenities === undefined ? [] : normalizeAmenities(data.amenities)
-  // The resort decides the region — that is the point of a resort belonging to one.
-  // An unknown typed name is kept as free text AND queued for /ops.
-  const resort = await resolveResortSelection({
-    resortId: data.resort_id,
-    resortName: data.resort_name,
-    region,
-    userId: hostId,
-  })
   const { rows } = await pool.query(
     // New listings enter moderation: not published + approval_status 'pending'.
     // An admin approves them in /ops, which flips is_published=true and notifies
@@ -1640,8 +1606,8 @@ export async function createListing(hostId: string, data: CreateListingInput): P
        (host_id, title, description, location, country, lat, lng, price_per_night,
         weekend_price, weekend_days, currency,
         bedrooms, beds, bathrooms, max_guests, property_type, region, amenities,
-        is_published, approval_status, ownership_doc, resort_id, resort_name)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, false, 'pending', $19, $20, $21)
+        is_published, approval_status, ownership_doc)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, false, 'pending', $19)
      RETURNING id`,
     [
       hostId, title, data.description ?? null, data.location ?? null, data.country ?? null,
@@ -1650,8 +1616,7 @@ export async function createListing(hostId: string, data: CreateListingInput): P
       weekendPrice && weekendPrice > 0 && weekendDays.length ? weekendDays : null,
       data.currency || 'EGP',
       nn(data.bedrooms, 1), nn(data.beds, 1), nn(data.bathrooms, 1), nn(data.max_guests, 2),
-      data.property_type ?? null, resort.region, amenities, ownershipDoc,
-      resort.resort_id, resort.resort_name,
+      data.property_type ?? null, region, amenities, ownershipDoc,
     ]
   )
   const newId = rows[0].id as string
@@ -1682,7 +1647,7 @@ export async function createListing(hostId: string, data: CreateListingInput): P
  *  applied by setListingOwnershipDoc, which already re-queues on its own. */
 export const EDITABLE_LISTING_FIELDS = [
   // Moderation-relevant — what an admin actually looks at.
-  'title', 'description', 'location', 'country', 'region', 'resort', 'lat', 'lng',
+  'title', 'description', 'location', 'country', 'region', 'lat', 'lng',
   'property_type', 'max_guests', 'bedrooms', 'beds', 'bathrooms', 'amenities',
   'ownership_doc', 'images',
   // Commercial — what the host tunes day to day.
@@ -1835,8 +1800,6 @@ export async function updateListing(
     location?: unknown
     country?: unknown
     region?: unknown
-  resort_id?: unknown
-  resort_name?: unknown
     price_per_night?: unknown
     weekend_price?: unknown
     currency?: unknown
@@ -1870,23 +1833,7 @@ export async function updateListing(
   if (data.description !== undefined) put('description', String(data.description ?? '').trim().slice(0, 5000) || null)
   if (data.location !== undefined) put('location', String(data.location ?? '').trim().slice(0, 200) || null)
   if (data.country !== undefined) put('country', String(data.country ?? '').trim().slice(0, 100) || null)
-  // Resort is THREE columns (resort_id, resort_name, region) driven by one logical
-  // edit, so it cannot go through put(), which maps one field to one column. When a
-  // resort is chosen its region wins, so the standalone region edit is skipped.
-  const resortEdited = data.resort_id !== undefined || data.resort_name !== undefined
-  if (data.region !== undefined && !resortEdited) put('region', normalizeRegion(data.region))
-  if (resortEdited) {
-    const sel = await resolveResortSelection({
-      resortId: data.resort_id === undefined ? null : String(data.resort_id ?? '') || null,
-      resortName: data.resort_name === undefined ? null : (data.resort_name as string | null),
-      region: data.region === undefined ? null : normalizeRegion(data.region),
-      userId: hostId,
-    })
-    vals.push(sel.resort_id); sets.push(`resort_id = $${vals.length}::uuid`)
-    vals.push(sel.resort_name); sets.push(`resort_name = $${vals.length}`)
-    vals.push(sel.region); sets.push(`region = $${vals.length}`)
-    touched.push('resort')
-  }
+  if (data.region !== undefined) put('region', normalizeRegion(data.region))
   // Map pin — the edit form has the same place-search + pin picker as create.
   if (data.lat !== undefined) put('lat', assertCoord(data.lat, 'Latitude', 90))
   if (data.lng !== undefined) put('lng', assertCoord(data.lng, 'Longitude', 180))
@@ -2036,12 +1983,10 @@ export async function adminStats(): Promise<AdminStats> {
        (SELECT COUNT(*) FROM bookings)::int AS bookings,
        (SELECT COUNT(*) FROM bookings WHERE status = 'pending')::int AS pending_bookings,
        (SELECT COUNT(*) FROM bookings WHERE status = 'confirmed')::int AS confirmed_bookings,
-       -- payment_status, NOT "paid_at IS NOT NULL": a refund CLEARS paid_at, so that
-       -- predicate silently under-counted. Same rule as analytics-core's PAID_SQL.
-       (SELECT COUNT(*) FROM bookings WHERE COALESCE(payment_status, 'unpaid') = 'paid')::int AS paid_bookings,
+       (SELECT COUNT(*) FROM bookings WHERE paid_at IS NOT NULL)::int AS paid_bookings,
        (SELECT COUNT(*) FROM host_applications WHERE status = 'pending')::int AS pending_applications,
        (SELECT COUNT(*) FROM id_verifications WHERE status = 'pending')::int AS pending_verifications,
-       COALESCE((SELECT SUM(total_price) FROM bookings WHERE COALESCE(payment_status, 'unpaid') = 'paid'), 0)::float8 AS gross_paid`
+       COALESCE((SELECT SUM(total_price) FROM bookings WHERE paid_at IS NOT NULL), 0)::float8 AS gross_paid`
   )
   return rows[0] as AdminStats
 }
@@ -2118,14 +2063,6 @@ export interface AdminListingRow {
   id: string
   title: string
   location: string | null
-  region: string | null
-  /** Set when the host picked from the catalog. */
-  resort_id: string | null
-  /** Set when the host typed their own via "Other" — this is what needs review
-   *  before the listing is approved. Never set at the same time as resort_id. */
-  resort_name: string | null
-  /** Display name, whichever column it came from. */
-  resort: string | null
   currency: string
   price_per_night: number
   is_published: boolean
@@ -2152,18 +2089,13 @@ export async function adminListListings(): Promise<AdminListingRow[]> {
             (l.ownership_doc IS NOT NULL AND l.ownership_doc <> '') AS has_ownership_doc,
             CASE WHEN COALESCE(l.approval_status, 'approved') = 'pending'
                  THEN l.ownership_doc END AS ownership_doc,
-            l.host_id, u.full_name AS host_name, l.region,
-            -- The approval flow needs to know whether the resort is a catalog entry
-            -- or free text the host typed via "Other" (which needs review).
-            l.resort_id, l.resort_name,
-            COALESCE(r.name, l.resort_name) AS resort,
+            l.host_id, u.full_name AS host_name,
             to_char(l.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
             (SELECT COUNT(*) FROM bookings b WHERE b.listing_id = l.id)::int AS booking_count,
             (SELECT li.url FROM listing_images li WHERE li.listing_id = l.id
               ORDER BY li."order" LIMIT 1) AS image
        FROM listings l
        LEFT JOIN users u ON u.id = l.host_id
-       LEFT JOIN resorts r ON r.id = l.resort_id
       ORDER BY l.created_at DESC
       LIMIT 300`
   )
@@ -2556,19 +2488,19 @@ export async function setSetting(key: string, value: string, updatedBy: string |
   )
 }
 
-export type { PaymentConfig }
+export interface PaymentConfig {
+  instapay_handle: string
+  instructions: string
+}
 
-/**
- * The public-facing Instapay destination shown to guests at checkout: the
- * handle/number, the optional deep link, and the optional admin-uploaded QR.
- * Rows that were never saved read as '' — no migration is needed to add a key.
- */
+/** The public-facing Instapay destination shown to guests at checkout. */
 export async function getPaymentConfig(): Promise<PaymentConfig> {
   const { rows } = await pool.query(
-    `SELECT key, value FROM app_settings WHERE key = ANY($1::text[])`,
-    [Object.values(INSTAPAY_KEYS)]
+    `SELECT key, value FROM app_settings WHERE key IN ('instapay_handle', 'instapay_instructions')`
   )
-  return rowsToPaymentConfig(rows as Array<{ key: string; value: string | null }>)
+  const map: Record<string, string> = {}
+  for (const r of rows) map[r.key as string] = (r.value as string | null) ?? ''
+  return { instapay_handle: map.instapay_handle ?? '', instructions: map.instapay_instructions ?? '' }
 }
 
 export interface PaymentProof {
