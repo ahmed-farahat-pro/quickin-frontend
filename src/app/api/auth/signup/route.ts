@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import {
   createUser, getUserRowByEmail, hashPassword, generateOtp,
-  isValidEmail, isDisposableEmail, rateLimit, clientIp,
+  isValidEmail, isDisposableEmail, rateLimit, clientIp, blockedAccountResponse,
 } from '@/lib/local/auth'
 import { createOtpCode } from '@/lib/local/db'
 import { sendOtpEmail } from '@/lib/local/email'
@@ -38,6 +38,11 @@ export async function POST(req: Request) {
     }
     const existing = await getUserRowByEmail(email)
     if (existing) {
+      // A blocked or removed account still holds this email. Say so plainly rather
+      // than re-issuing a code (or 409-ing to a login that will also refuse) —
+      // reinstating an account is an admin decision, not a re-registration.
+      const blocked = blockedAccountResponse(existing.account_status, CORS)
+      if (blocked) return blocked
       // Account exists but email was never OTP-verified → don't dead-end. Re-issue a
       // code and tell the client to jump to the OTP step (web + iOS + Android handle this).
       if (!existing.email_verified) {

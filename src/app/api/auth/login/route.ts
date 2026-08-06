@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getUserRowByEmail, verifyPassword, signToken, rateLimit, clientIp, publicUserWithHost, generateOtp } from '@/lib/local/auth'
+import { getUserRowByEmail, verifyPassword, signToken, rateLimit, clientIp, publicUserWithHost, generateOtp, blockedAccountResponse } from '@/lib/local/auth'
 import { createOtpCode } from '@/lib/local/db'
 import { sendOtpEmail } from '@/lib/local/email'
 
@@ -25,6 +25,12 @@ export async function POST(req: Request) {
     if (!row || !verifyPassword(String(password), row.password_hash)) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401, headers: CORS })
     }
+    // Blocked / removed → stop here. AFTER the password check, so this never tells a
+    // stranger which emails are suspended; BEFORE the email_verified branch, so a
+    // blocked account triggers no OTP mail and isn't sent to the verification screen
+    // it could never get past.
+    const blocked = blockedAccountResponse(row.account_status, CORS)
+    if (blocked) return blocked
     // Correct password, but the email was never OTP-verified → force verification.
     // Re-issue a fresh code; clients (web/iOS/Android) route to the OTP screen on this.
     if (!row.email_verified) {

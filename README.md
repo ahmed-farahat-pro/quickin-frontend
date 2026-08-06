@@ -119,10 +119,59 @@ tabbed dashboard at `/ops`:
 
 | Page | Module | What it does |
 | --- | --- | --- |
+| `/ops/users` | `users` | Searchable directory of every guest and host, and one person's full profile — listings, bookings, payments, messages, documents — plus block / remove / restore |
 | `/ops/analytics` | `analytics` | Booking, payment and cancellation reports with a shared filter bar, plus CSV/Excel export |
 | `/ops/resorts` | `resorts` | Resort catalog and the pending-submission queue |
 | `/ops/staff` | `staff` | Moderator accounts and their permissions (super admin only) |
 | `/ops/payments` | `payments` | The Instapay destination guests pay to, plus the dispute queue |
+
+### Users API
+
+The directory, the profile, and the account lifecycle. All gated by the `users` module.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/api/local/admin/users?q=&status=&role=&sort=&limit=&offset=` | `{ users, total, filter }`. `q` matches email, name or phone; `status` ∈ `all\|active\|blocked\|removed`; `role` ∈ `all\|host\|guest`; `sort` ∈ `recent\|oldest\|name\|bookings`; `limit` ≤ 200. Bad input is a `400`, never a 500 |
+| GET | `/api/local/admin/users/:id` | `{ user, listings, bookings, payments, conversations, documents, stats }` — the profile. Message bodies and document images are **not** included |
+| POST | `/api/local/admin/users/:id` | `{ action:'block'\|'unblock'\|'remove'\|'restore', reason? }`. `block`/`remove` require a reason. `restore` is **super admin only** |
+| GET | `/api/local/admin/users/:id/thread/:conversationId` | The message bodies of one thread. **Writes a `user_thread_viewed` audit row on every call** |
+| POST | `/api/local/admin/users` | `{ id, action:'activate'\|'make-host'\|'remove-host' }` — email verification and host access |
+
+Every mutation writes to `staff_audit_log` (`user_blocked`, `user_unblocked`,
+`user_removed`, `user_restored`, `user_thread_viewed`, `user_activate_email`,
+`user_set_host`). Before this, user changes — including a hard delete — left no trail
+at all.
+
+### Account status — block and remove
+
+`users.account_status` is `'active' | 'blocked' | 'removed'`, with `status_reason`,
+`status_changed_at` and `status_changed_by` alongside it. One column rather than a
+pair of flags, so every enforcement site tests one thing and the two states can never
+both be true.
+
+- **Block** is reversible suspension. **Remove** closes the account and also refuses
+  a fresh signup on that email. Both hide the person's published listings; going back
+  to active republishes **exactly** the ones that were hidden — that is what
+  `listings.unpublished_by_admin` is for, so a listing the host took down themselves
+  stays down.
+- **Nothing is deleted.** Bookings, payments and messages survive a removal so a
+  dispute can still be settled. The old hard delete is gone from `/ops`, and the
+  backend's `DELETE /api/local/admin/users/:id` now answers `410 Gone`.
+  `adminDeleteUser` remains **only** for self-service deletion at
+  `/api/local/account` (App Store 5.1.1(v) / Google Play).
+- **Enforcement.** User tokens are stateless 30-day HMACs with no session table and
+  no revocation, so status is re-read on every request in `getUserFromRequest` — one
+  chokepoint covering every authenticated route. Routes that *mint* a token run
+  before there is a session, so `login`, `verify-otp`, `resend-otp`, `signup` and the
+  social providers each call `blockedAccountResponse` themselves; social sign-in
+  checks **before** `upsertSocialUser`, which would otherwise let a removed user
+  reactivate themselves. `createBooking` additionally refuses a blocked host's
+  listing, so a deep link can't book around the hiding.
+- **The rejection is `403` with `{ error, accountStatus }` and deliberately no
+  `needsVerification`.** iOS and Android route `403 + needsVerification:true` to their
+  OTP screen and otherwise display `error` verbatim, so this shows our message with
+  no app change — but adding that key would send a blocked user to a verification
+  screen they can pass and still be refused.
 
 ### Instapay destination
 
@@ -218,6 +267,7 @@ npm run check     # same; the pre-deploy gate
 | --- | --- |
 | `analytics-core.ts` | Filter parsing and validation, the `buildReportWhere` SQL builder (placeholder numbering, the date-column injection guard), commission/refund math, CSV escaping and formula-injection defusing |
 | `resort-core.ts` | Resort name normalization, slug collision (`Amouage` = `amouage` = `AMOUAGE.`), typo distance |
+| `user-admin-core.ts` | Users-list query parsing and clamping, the full block/remove transition matrix, the `ORDER BY` injection guard, blocked-login copy |
 | `xlsx.ts` | Cell typing (numbers stay numeric so Excel can sum them), sheet-name sanitizing, filename safety |
 
 Those two modules deliberately have **no runtime imports** — Node's ESM resolver

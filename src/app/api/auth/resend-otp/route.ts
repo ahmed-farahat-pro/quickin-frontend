@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { generateOtp, isValidEmail, rateLimit } from '@/lib/local/auth'
+import { generateOtp, isValidEmail, rateLimit, getUserRowByEmail, blockedAccountResponse } from '@/lib/local/auth'
 import { createOtpCode } from '@/lib/local/db'
 import { sendOtpEmail } from '@/lib/local/email'
 
@@ -30,6 +30,12 @@ export async function POST(req: Request) {
         { error: 'Too many code requests. Please try again later.' },
         { status: 429, headers: { ...CORS, 'Retry-After': String(hourly) } }
       )
+    }
+    // Never mail a code to a blocked or removed account.
+    const existing = await getUserRowByEmail(key)
+    if (existing) {
+      const blocked = blockedAccountResponse(existing.account_status, CORS)
+      if (blocked) return blocked
     }
     const code = generateOtp()
     await createOtpCode(key, code)

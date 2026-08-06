@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifyToken, getUserRowByEmail, publicUserWithHost } from '@/lib/local/auth'
+import { normalizeStatus } from '@/lib/local/user-admin-core'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +24,16 @@ export async function GET(req: Request) {
 
     const row = await getUserRowByEmail(claims.email)
     if (!row) return NextResponse.json({ user: null }, { headers: CORS })
+
+    // This route resolves the token itself rather than going through
+    // getUserFromRequest (it needs the full row for the host fields), so the
+    // blocked/removed check has to be repeated here — otherwise a suspended user's
+    // client keeps re-validating happily on every launch. `user: null` is the
+    // existing "signed out" contract; accountStatus lets a client explain why.
+    const status = normalizeStatus(row.account_status)
+    if (status !== 'active') {
+      return NextResponse.json({ user: null, accountStatus: status }, { headers: CORS })
+    }
 
     return NextResponse.json({ user: await publicUserWithHost(row) }, { headers: CORS })
   } catch (err) {

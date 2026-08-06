@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { upsertSocialUser, signToken, publicUserWithHost } from '@/lib/local/auth'
+import { upsertSocialUser, signToken, publicUserWithHost, getUserRowByEmail, blockedAccountResponse } from '@/lib/local/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +20,14 @@ export async function POST(req: Request) {
       (provider === 'apple' ? 'Nora Salem' : 'Omar Khaled')
     const avatarUrl: string | undefined = body.avatar_url
 
+    // BEFORE the upsert: upsertSocialUser writes the row and sets email_verified,
+    // so a removed user could otherwise reactivate themselves by tapping "Sign in
+    // with Google".
+    const existing = await getUserRowByEmail(email)
+    if (existing) {
+      const blocked = blockedAccountResponse(existing.account_status, CORS)
+      if (blocked) return blocked
+    }
     const user = await upsertSocialUser({ email, fullName, provider, avatarUrl })
     const token = signToken({ sub: user.id, email: user.email })
     const res = NextResponse.json({ token, user: await publicUserWithHost(user) }, { headers: CORS })

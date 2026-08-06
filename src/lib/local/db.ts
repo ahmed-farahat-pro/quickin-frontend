@@ -3,6 +3,8 @@ import { pool } from './pool'
 import { resolveResortSelection } from './resorts'
 import { INSTAPAY_KEYS, rowsToPaymentConfig } from './payment-config-core'
 import type { PaymentConfig } from './payment-config-core'
+import { buildUserListWhere, hidesListings, normalizeStatus, orderBySql } from './user-admin-core'
+import type { AccountStatus, UserListFilter } from './user-admin-core'
 import { isLiveStayStatus, normalizeReservationCode } from '@/lib/stay-code'
 // The catalogs the host forms offer — one source of truth for what the API
 // accepts and what the create/edit forms render (see lib/listing-options.ts).
@@ -278,12 +280,24 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
   const g = Math.max(1, adults + children)
 
   // Load the listing (for max_guests / title / host_id) and enforce capacity.
+  // Search already hides unpublished listings, but a booking can arrive with a
+  // listing id straight from a deep link or a stale client, so the same rules are
+  // enforced here: an unpublished listing and a blocked/removed host are both
+  // unbookable. Without this, "hide their listings" would only hide them.
   const { rows: lrows } = await pool.query(
-    `SELECT title, max_guests, host_id FROM listings WHERE id = $1`,
+    `SELECT l.title, l.max_guests, l.host_id, COALESCE(l.is_published, false) AS is_published,
+            COALESCE(hu.account_status, 'active') AS host_status
+       FROM listings l LEFT JOIN users hu ON hu.id = l.host_id
+      WHERE l.id = $1`,
     [listingId]
   )
-  const listing = lrows[0] as { title: string; max_guests: number | null; host_id: string | null } | undefined
+  const listing = lrows[0] as
+    | { title: string; max_guests: number | null; host_id: string | null; is_published: boolean; host_status: string }
+    | undefined
   if (!listing) throw new Error('Could not create booking (listing not found)')
+  if (!listing.is_published || listing.host_status !== 'active') {
+    throw new Error('This listing is not available for booking')
+  }
   if (listing.max_guests != null && g > listing.max_guests) {
     throw new Error('Exceeds the maximum guests for this listing')
   }
@@ -2061,32 +2075,71 @@ export interface AdminUserRow {
   created_at: string
   listing_count: number
   booking_count: number
+  /** D3/D4 lifecycle — 'active' | 'blocked' | 'removed'. */
+  account_status: string
+  status_reason: string | null
+  status_changed_at: string | null
+  /** Free-text actor, `staff:<uuid>`. */
+  status_changed_by: string | null
 }
 
-/** Newest-first users (LIMIT 300) with their latest verification status, the count
- *  of listings they host and bookings they've made. */
-export async function adminListUsers(): Promise<AdminUserRow[]> {
+/** The projection the /ops users list renders. Kept as a fragment so the list and
+ *  the profile header agree on what a user row looks like. `u` is the users alias. */
+const ADMIN_USER_COLS = `
+  u.id, u.email, u.full_name, COALESCE(u.is_host, false) AS is_host,
+  COALESCE(u.email_verified, false) AS email_verified,
+  COALESCE(
+    (SELECT v.status FROM id_verifications v
+      WHERE v.user_id = u.id ORDER BY v.submitted_at DESC LIMIT 1),
+    'none'
+  ) AS verification_status,
+  u.provider,
+  u.push_platform,
+  (u.fcm_token IS NOT NULL OR EXISTS (SELECT 1 FROM device_tokens dt WHERE dt.user_id = u.id)) AS has_push,
+  (SELECT string_agg(DISTINCT dt.platform, ', ') FROM device_tokens dt WHERE dt.user_id = u.id) AS device_platforms,
+  (SELECT COUNT(*) FROM device_tokens dt WHERE dt.user_id = u.id)::int AS device_count,
+  to_char(u.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
+  (SELECT COUNT(*) FROM listings l WHERE l.host_id = u.id)::int AS listing_count,
+  (SELECT COUNT(*) FROM bookings b WHERE b.user_id = u.id)::int AS booking_count,
+  COALESCE(u.account_status, 'active') AS account_status,
+  u.status_reason,
+  to_char(u.status_changed_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS status_changed_at,
+  u.status_changed_by
+`
+
+/** D1 — the /ops users directory: search, filter, sort and page through every
+ *  account with their verification status, listing and booking counts.
+ *
+ *  `total` is the post-filter count, taken from the same query via COUNT(*) OVER ()
+ *  so pagination needs no second round trip. Replaces the old unfiltered
+ *  `adminListUsers()`, whose hardcoded LIMIT 300 silently hid older accounts. */
+export async function adminSearchUsers(
+  filter: UserListFilter,
+): Promise<{ users: AdminUserRow[]; total: number }> {
+  const { where, params } = buildUserListWhere(filter)
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : ''
+  // ORDER BY comes from a whitelist (orderBySql), never from raw input.
   const { rows } = await pool.query(
-    `SELECT u.id, u.email, u.full_name, COALESCE(u.is_host, false) AS is_host,
-            COALESCE(u.email_verified, false) AS email_verified,
-            COALESCE(
-              (SELECT v.status FROM id_verifications v
-                WHERE v.user_id = u.id ORDER BY v.submitted_at DESC LIMIT 1),
-              'none'
-            ) AS verification_status,
-            u.provider,
-            u.push_platform,
-            (u.fcm_token IS NOT NULL OR EXISTS (SELECT 1 FROM device_tokens dt WHERE dt.user_id = u.id)) AS has_push,
-            (SELECT string_agg(DISTINCT dt.platform, ', ') FROM device_tokens dt WHERE dt.user_id = u.id) AS device_platforms,
-            (SELECT COUNT(*) FROM device_tokens dt WHERE dt.user_id = u.id)::int AS device_count,
-            to_char(u.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
-            (SELECT COUNT(*) FROM listings l WHERE l.host_id = u.id)::int AS listing_count,
-            (SELECT COUNT(*) FROM bookings b WHERE b.user_id = u.id)::int AS booking_count
+    `SELECT ${ADMIN_USER_COLS}, COUNT(*) OVER ()::int AS total_count
        FROM users u
-      ORDER BY u.created_at DESC
-      LIMIT 300`
+       ${whereSql}
+      ORDER BY ${orderBySql(filter.sort)}
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+    [...params, filter.limit, filter.offset],
   )
-  return rows as AdminUserRow[]
+  // total_count rides on every row; strip it so callers get a clean AdminUserRow.
+  const users = rows.map(({ total_count: _total, ...rest }) => rest) as AdminUserRow[]
+  let total = rows.length ? Number((rows[0] as { total_count: number }).total_count) : 0
+  // An empty page past the end carries no row to read the window count from, so
+  // "0 of 0" would be reported for a non-empty table. Only then pay for a COUNT.
+  if (!rows.length && filter.offset > 0) {
+    const { rows: c } = await pool.query(
+      `SELECT COUNT(*)::int AS total FROM users u ${whereSql}`,
+      params,
+    )
+    total = Number((c[0] as { total: number })?.total ?? 0)
+  }
+  return { users, total }
 }
 
 /** Admin: delete a booking and notify BOTH the guest and the host (in-app + push via the
@@ -2170,10 +2223,19 @@ export async function adminListListings(): Promise<AdminListingRow[]> {
   return rows as AdminListingRow[]
 }
 
-/** Publish / unpublish a listing. */
+/** Publish / unpublish a listing.
+ *  Publishing clears `unpublished_by_admin` — once an operator puts a listing back
+ *  up by hand it is no longer "hidden by a block", so a later account restore must
+ *  not claim it. Unpublishing deliberately does NOT set the flag: that would make a
+ *  manual takedown get auto-republished when the host is unblocked. */
 export async function adminSetListingPublished(id: string, published: boolean): Promise<void> {
   if (!isUuid(id)) throw new Error('Invalid listing')
-  await pool.query(`UPDATE listings SET is_published = $2 WHERE id = $1`, [id, published])
+  await pool.query(
+    published
+      ? `UPDATE listings SET is_published = true, unpublished_by_admin = false WHERE id = $1`
+      : `UPDATE listings SET is_published = false WHERE id = $1`,
+    [id],
+  )
 }
 
 /**
@@ -2241,9 +2303,336 @@ export async function adminSetHost(id: string, makeHost: boolean): Promise<void>
   }
 }
 
-/** Admin: permanently delete a user and everything they own. Most child rows cascade,
- *  but listings.host_id has no ON DELETE CASCADE, so their listings are removed first
- *  (which cascades to those listings' images / bookings / reviews). Transactional. */
+// ---- D2: user profile -------------------------------------------------------
+
+export interface AdminUserListing {
+  id: string
+  title: string
+  is_published: boolean
+  approval_status: string
+  /** True when a block/removal took this listing down — so /ops can say WHY it's
+   *  hidden rather than leaving the operator guessing. */
+  unpublished_by_admin: boolean
+  price_per_night: number
+  currency: string
+  created_at: string
+  booking_count: number
+}
+
+export interface AdminUserBooking {
+  id: string
+  reservation_code: string | null
+  listing_id: string | null
+  listing_title: string | null
+  status: string
+  payment_status: string
+  total_price: number
+  currency: string
+  check_in: string
+  check_out: string
+  created_at: string
+}
+
+export interface AdminUserPayment {
+  id: string
+  booking_id: string
+  reservation_code: string | null
+  listing_title: string | null
+  amount: number
+  status: string
+  submitted_at: string | null
+  reviewed_at: string | null
+  reject_reason: string | null
+}
+
+export interface AdminUserConversation {
+  id: string
+  listing_id: string | null
+  listing_title: string | null
+  counterparty_id: string | null
+  counterparty_name: string | null
+  counterparty_email: string | null
+  message_count: number
+  last_message_at: string | null
+  /** Which side of the thread this user is on. */
+  viewer_role: 'guest' | 'host'
+}
+
+export interface AdminUserDocument {
+  kind: 'id_verification' | 'host_application'
+  id: string
+  status: string
+  submitted_at: string | null
+  reviewed_at: string | null
+  notes: string | null
+  /** Whether a document image is on file. The image itself is NOT returned — it's
+   *  reviewed on the Verifications screen, and a profile shouldn't ship megabytes
+   *  of inline base64 (or that much PII) on every open. */
+  has_document: boolean
+}
+
+export interface AdminUserDetail {
+  user: AdminUserRow & {
+    phone: string | null
+    country: string | null
+    bio: string | null
+    avatar_url: string | null
+    role: string | null
+    host_type: string | null
+    company: string | null
+    referral_code: string | null
+  }
+  listings: AdminUserListing[]
+  bookings: AdminUserBooking[]
+  payments: AdminUserPayment[]
+  conversations: AdminUserConversation[]
+  documents: AdminUserDocument[]
+  stats: {
+    gross_paid: number
+    nights_booked: number
+    /** Booking-scoped mobile messages. Those threads have a different shape from
+     *  the web `conversations` above, so they're counted rather than merged. */
+    mobile_message_count: number
+    report_count: number
+  }
+}
+
+/** D2 — everything the /ops user profile renders, in one round of queries.
+ *  Returns null for an unknown or non-uuid id so the route can 404. */
+export async function adminGetUserDetail(id: string): Promise<AdminUserDetail | null> {
+  if (!isUuid(id)) return null
+  const { rows: urows } = await pool.query(
+    `SELECT ${ADMIN_USER_COLS},
+            u.phone, u.country, u.bio, u.avatar_url, u.role, u.host_type, u.company, u.referral_code
+       FROM users u WHERE u.id = $1`,
+    [id],
+  )
+  const user = urows[0] as AdminUserDetail['user'] | undefined
+  if (!user) return null
+
+  const [listings, bookings, payments, conversations, verifications, applications, stats] = await Promise.all([
+    pool.query(
+      `SELECT l.id, l.title, COALESCE(l.is_published, false) AS is_published,
+              COALESCE(l.approval_status, 'approved') AS approval_status,
+              COALESCE(l.unpublished_by_admin, false) AS unpublished_by_admin,
+              COALESCE(l.price_per_night, 0)::float8 AS price_per_night,
+              COALESCE(l.currency, 'USD') AS currency,
+              to_char(l.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
+              (SELECT COUNT(*) FROM bookings b WHERE b.listing_id = l.id)::int AS booking_count
+         FROM listings l WHERE l.host_id = $1 ORDER BY l.created_at DESC LIMIT 200`,
+      [id],
+    ),
+    pool.query(
+      `SELECT b.id, b.reservation_code, b.listing_id, l.title AS listing_title,
+              b.status, COALESCE(b.payment_status, 'unpaid') AS payment_status,
+              COALESCE(b.total_price, 0)::float8 AS total_price,
+              COALESCE(l.currency, 'USD') AS currency,
+              to_char(b.check_in, 'YYYY-MM-DD') AS check_in,
+              to_char(b.check_out, 'YYYY-MM-DD') AS check_out,
+              to_char(b.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
+         FROM bookings b LEFT JOIN listings l ON l.id = b.listing_id
+        WHERE b.user_id = $1 ORDER BY b.created_at DESC LIMIT 200`,
+      [id],
+    ),
+    // Payment proofs have no direct user FK — they hang off the booking.
+    pool.query(
+      `SELECT pp.id, pp.booking_id, b.reservation_code, l.title AS listing_title,
+              COALESCE(pp.amount, b.total_price, 0)::float8 AS amount,
+              pp.status, pp.reject_reason,
+              to_char(pp.submitted_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS submitted_at,
+              to_char(pp.reviewed_at,  'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS reviewed_at
+         FROM payment_proofs pp
+         JOIN bookings b ON b.id = pp.booking_id
+         LEFT JOIN listings l ON l.id = b.listing_id
+        WHERE b.user_id = $1 ORDER BY pp.submitted_at DESC LIMIT 200`,
+      [id],
+    ),
+    adminListUserConversations(id),
+    pool.query(
+      `SELECT id, status, notes,
+              to_char(submitted_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS submitted_at,
+              to_char(reviewed_at,  'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS reviewed_at,
+              (image_data IS NOT NULL) AS has_document
+         FROM id_verifications WHERE user_id = $1 ORDER BY submitted_at DESC LIMIT 20`,
+      [id],
+    ),
+    pool.query(
+      `SELECT id, status, COALESCE(review_note, notes) AS notes,
+              to_char(submitted_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS submitted_at,
+              to_char(reviewed_at,  'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS reviewed_at,
+              (national_id IS NOT NULL) AS has_document
+         FROM host_applications WHERE user_id = $1 ORDER BY submitted_at DESC LIMIT 20`,
+      [id],
+    ),
+    pool.query(
+      `SELECT COALESCE((SELECT SUM(b.total_price) FROM bookings b
+                         WHERE b.user_id = $1 AND COALESCE(b.payment_status,'unpaid') = 'paid'), 0)::float8 AS gross_paid,
+              COALESCE((SELECT SUM(b.check_out - b.check_in) FROM bookings b
+                         WHERE b.user_id = $1 AND b.status <> 'cancelled'), 0)::int AS nights_booked,
+              (SELECT COUNT(*) FROM messages m WHERE m.sender_id = $1)::int AS mobile_message_count,
+              (SELECT COUNT(*) FROM reports r WHERE r.target_type = 'user' AND r.target_id = $1)::int AS report_count`,
+      [id],
+    ),
+  ])
+
+  const documents: AdminUserDocument[] = [
+    ...verifications.rows.map((r) => ({ ...(r as Omit<AdminUserDocument, 'kind'>), kind: 'id_verification' as const })),
+    ...applications.rows.map((r) => ({ ...(r as Omit<AdminUserDocument, 'kind'>), kind: 'host_application' as const })),
+  ]
+
+  return {
+    user,
+    listings: listings.rows as AdminUserListing[],
+    bookings: bookings.rows as AdminUserBooking[],
+    payments: payments.rows as AdminUserPayment[],
+    conversations,
+    documents,
+    stats: stats.rows[0] as AdminUserDetail['stats'],
+  }
+}
+
+/** Thread metadata for the /ops profile — who with, which listing, how many
+ *  messages, last activity. Message BODIES are deliberately absent: reading them
+ *  goes through adminReadConversation, which the route audits. */
+export async function adminListUserConversations(userId: string): Promise<AdminUserConversation[]> {
+  if (!isUuid(userId)) return []
+  const { rows } = await pool.query(
+    `SELECT c.id, c.listing_id, l.title AS listing_title,
+            CASE WHEN c.guest_id = $1 THEN c.host_id ELSE c.guest_id END AS counterparty_id,
+            CASE WHEN c.guest_id = $1 THEN hu.full_name ELSE gu.full_name END AS counterparty_name,
+            CASE WHEN c.guest_id = $1 THEN hu.email ELSE gu.email END AS counterparty_email,
+            (SELECT COUNT(*) FROM chat_messages m WHERE m.conversation_id = c.id)::int AS message_count,
+            to_char(c.last_message_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS last_message_at,
+            CASE WHEN c.host_id = $1 THEN 'host' ELSE 'guest' END AS viewer_role
+       FROM conversations c
+       LEFT JOIN listings l ON l.id = c.listing_id
+       LEFT JOIN users gu ON gu.id = c.guest_id
+       LEFT JOIN users hu ON hu.id = c.host_id
+      WHERE c.guest_id = $1 OR c.host_id = $1
+      ORDER BY c.last_message_at DESC NULLS LAST
+      LIMIT 200`,
+    [userId],
+  )
+  return rows as AdminUserConversation[]
+}
+
+export interface AdminThreadMessage {
+  id: string
+  sender_id: string
+  sender_name: string | null
+  body: string
+  created_at: string
+}
+
+/** Read a thread's message bodies for /ops. Returns null unless the conversation is
+ *  one THIS user belongs to — so an operator can't page through arbitrary threads by
+ *  guessing ids; they have to come in via a profile. The route logs every call. */
+export async function adminReadConversation(
+  userId: string,
+  conversationId: string,
+): Promise<{ conversation: AdminUserConversation; messages: AdminThreadMessage[] } | null> {
+  if (!isUuid(userId) || !isUuid(conversationId)) return null
+  const conversation = (await adminListUserConversations(userId)).find((c) => c.id === conversationId)
+  if (!conversation) return null
+  const { rows } = await pool.query(
+    `SELECT m.id, m.sender_id, u.full_name AS sender_name, m.body,
+            to_char(m.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
+       FROM chat_messages m LEFT JOIN users u ON u.id = m.sender_id
+      WHERE m.conversation_id = $1 ORDER BY m.created_at ASC LIMIT 500`,
+    [conversationId],
+  )
+  return { conversation, messages: rows as AdminThreadMessage[] }
+}
+
+// ---- D3 / D4: block, remove, restore ----------------------------------------
+
+/**
+ * The one writer of `users.account_status`, for all four transitions.
+ *
+ * Blocking or removing hides the account's published listings and flags them
+ * `unpublished_by_admin`; returning to active republishes EXACTLY those, so a
+ * listing the host had taken down themselves stays down. Transactional, with the
+ * user row locked, so status and listing visibility can never disagree.
+ *
+ * Refuses to touch a `role='admin'` row: staff.ts's legacy-admin fallback resolves
+ * such a user through getUserFromRequest, so blocking one would lock the legacy
+ * operator out of /ops entirely.
+ *
+ * History lives in staff_audit_log (written by the route); the status_changed_*
+ * columns hold just the latest transition for cheap display.
+ */
+export async function adminSetAccountStatus(
+  id: string,
+  next: AccountStatus,
+  opts: { reason?: string | null; actor: string },
+): Promise<{ previous: AccountStatus; email: string; listingsChanged: number }> {
+  if (!isUuid(id)) throw new Error('Invalid user')
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const { rows } = await client.query(
+      `SELECT email, role, COALESCE(account_status, 'active') AS account_status
+         FROM users WHERE id = $1 FOR UPDATE`,
+      [id],
+    )
+    const row = rows[0] as { email: string; role: string | null; account_status: string } | undefined
+    if (!row) throw new Error('User not found')
+    if (String(row.role ?? '').toLowerCase() === 'admin') {
+      throw new Error('Cannot change the status of an admin account')
+    }
+    const previous = normalizeStatus(row.account_status)
+
+    await client.query(
+      `UPDATE users
+          SET account_status = $2, status_reason = $3,
+              status_changed_at = now(), status_changed_by = $4
+        WHERE id = $1`,
+      [id, next, opts.reason ?? null, opts.actor],
+    )
+
+    let listingsChanged = 0
+    if (hidesListings(next) && !hidesListings(previous)) {
+      // Only currently-published listings are touched, so pending/rejected ones are
+      // never flagged and can't be published by a later restore.
+      const hid = await client.query(
+        `UPDATE listings SET is_published = false, unpublished_by_admin = true
+          WHERE host_id = $1 AND is_published = true`,
+        [id],
+      )
+      listingsChanged = hid.rowCount ?? 0
+    } else if (!hidesListings(next) && hidesListings(previous)) {
+      const shown = await client.query(
+        `UPDATE listings SET is_published = true, unpublished_by_admin = false
+          WHERE host_id = $1 AND unpublished_by_admin = true
+            AND COALESCE(approval_status, 'approved') = 'approved'`,
+        [id],
+      )
+      listingsChanged = shown.rowCount ?? 0
+      // A listing rejected while the account was down stays hidden, but must not
+      // stay flagged — otherwise a future restore would resurrect it.
+      await client.query(
+        `UPDATE listings SET unpublished_by_admin = false
+          WHERE host_id = $1 AND unpublished_by_admin = true`,
+        [id],
+      )
+    }
+
+    await client.query('COMMIT')
+    return { previous, email: row.email, listingsChanged }
+  } catch (e) {
+    await client.query('ROLLBACK')
+    throw e
+  } finally {
+    client.release()
+  }
+}
+
+/** Self-service account deletion ONLY — the App Store 5.1.1(v) / Google Play route
+ *  at /api/local/account. **Not** an admin action: /ops blocks and removes instead
+ *  (adminSetAccountStatus), which is reversible and keeps booking and payment
+ *  history for disputes. Most child rows cascade, but listings.host_id has no
+ *  ON DELETE CASCADE, so their listings are removed first (which cascades to those
+ *  listings' images / bookings / reviews). Transactional. */
 export async function adminDeleteUser(id: string): Promise<void> {
   if (!isUuid(id)) throw new Error('Invalid user')
   const client = await pool.connect()

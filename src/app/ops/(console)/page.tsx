@@ -1,7 +1,7 @@
 'use client'
 
 // QuickIn — operations console (local-stack admin).
-// Runs a full admin dashboard against the real (Neon) data — overview stats, users,
+// Runs a full admin dashboard against the real (Neon) data — overview stats,
 // listings (with publish/hide/delete), bookings, host applications and ID
 // verifications.
 //
@@ -15,6 +15,7 @@
 // localStorage['qk_ops_key'], which gave anyone holding the string full delete rights
 // with no attribution.
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useOpsSession, OpsHeader } from './ops-session'
 
 // Boutique palette.
@@ -31,11 +32,10 @@ const NO_ACCESS = 'Your access to this section has been removed.'
 
 // Each TabId is also a STAFF_MODULES key, so a tab maps 1:1 to the permission that
 // guards its API route — no lookup table needed.
-type TabId = 'overview' | 'users' | 'listings' | 'bookings' | 'applications' | 'verifications'
+type TabId = 'overview' | 'listings' | 'bookings' | 'applications' | 'verifications'
 
 const TABS: Array<{ id: TabId; label: string }> = [
   { id: 'overview', label: 'Overview' },
-  { id: 'users', label: 'Users' },
   { id: 'listings', label: 'Listings' },
   { id: 'bookings', label: 'Bookings' },
   { id: 'applications', label: 'Applications' },
@@ -57,17 +57,6 @@ type AdminStats = {
   gross_paid: number
 }
 
-type AdminUser = {
-  id: string
-  email: string
-  full_name: string | null
-  is_host: boolean
-  verification_status: string
-  email_verified: boolean
-  created_at: string
-  listing_count: number
-  booking_count: number
-}
 
 type AdminListing = {
   id: string
@@ -156,6 +145,7 @@ export default function OpsPage() {
 
   // A4 (hide): only the modules this operator holds. The server enforces the same
   // thing on every request, so this is presentation.
+  const router = useRouter()
   const visibleTabs = useMemo(() => TABS.filter((t) => can(t.id)), [can])
   const [tab, setTab] = useState<TabId>(() => visibleTabs[0]?.id ?? 'overview')
 
@@ -167,9 +157,15 @@ export default function OpsPage() {
     }
   }, [visibleTabs, tab])
 
+  // Users moved out to its own page, so an operator holding ONLY that module now has
+  // no tabs at all and would hit the "No modules assigned" dead end below. Send them
+  // where their permission actually leads.
+  useEffect(() => {
+    if (visibleTabs.length === 0 && can('users')) router.replace('/ops/users')
+  }, [visibleTabs, can, router])
+
   // Per-section data.
   const [stats, setStats] = useState<AdminStats | null>(null)
-  const [users, setUsers] = useState<AdminUser[]>([])
   const [listings, setListings] = useState<AdminListing[]>([])
   const [bookings, setBookings] = useState<AdminBooking[]>([])
   const [apps, setApps] = useState<HostApplication[]>([])
@@ -178,7 +174,6 @@ export default function OpsPage() {
   // Per-section loading / error.
   const [loading, setLoading] = useState<Record<TabId, boolean>>({
     overview: false,
-    users: false,
     listings: false,
     bookings: false,
     applications: false,
@@ -186,7 +181,6 @@ export default function OpsPage() {
   })
   const [errors, setErrors] = useState<Record<TabId, string | null>>({
     overview: null,
-    users: null,
     listings: null,
     bookings: null,
     applications: null,
@@ -194,7 +188,6 @@ export default function OpsPage() {
   })
   const [loaded, setLoaded] = useState<Record<TabId, boolean>>({
     overview: false,
-    users: false,
     listings: false,
     bookings: false,
     applications: false,
@@ -265,14 +258,6 @@ export default function OpsPage() {
             return
           }
           setStats(json.stats)
-        } else if (id === 'users') {
-          const json = await adminGet<{ users?: AdminUser[] }>('users')
-          if (json === 'forbidden') return setSectionError(id, NO_ACCESS)
-          if (!json) {
-            setSectionError(id, 'Could not load users. Please retry.')
-            return
-          }
-          setUsers(Array.isArray(json.users) ? json.users : [])
         } else if (id === 'listings') {
           const json = await adminGet<{ listings?: AdminListing[] }>('listings')
           if (json === 'forbidden') return setSectionError(id, NO_ACCESS)
@@ -426,32 +411,6 @@ export default function OpsPage() {
     }
   }
 
-  // ---- users actions ----
-  const activateUser = async (u: AdminUser) => {
-    setBusyId(u.id)
-    const ok = await post('users', { id: u.id, action: 'activate' })
-    setBusyId(null)
-    if (ok) {
-      setUsers((prev) =>
-        prev.map((x) => (x.id === u.id ? { ...x, email_verified: true } : x)),
-      )
-    } else {
-      setSectionError('users', 'Could not activate the user. Please retry.')
-    }
-  }
-
-  const deleteUser = async (u: AdminUser) => {
-    if (!window.confirm(`Permanently delete ${u.email}? This removes their account, listings and bookings and cannot be undone.`)) return
-    setBusyId(u.id)
-    const ok = await post('users', { id: u.id, action: 'delete' })
-    setBusyId(null)
-    if (ok) {
-      setUsers((prev) => prev.filter((x) => x.id !== u.id))
-    } else {
-      setSectionError('users', 'Could not delete the user. Please retry.')
-    }
-  }
-
   // ---- listings actions ----
   const togglePublish = async (l: AdminListing) => {
     setBusyId(l.id)
@@ -582,13 +541,6 @@ export default function OpsPage() {
       {text}
     </span>
   )
-
-  const verificationBadge = (status: string): React.ReactNode => {
-    const s = (status || 'none').toLowerCase()
-    if (s === 'verified' || s === 'approved') return badge('Verified', '#E2F0E9', GREEN)
-    if (s === 'pending') return badge('Pending', '#FBF1DD', '#8A6D1F')
-    return badge('None', TAN, MUTED)
-  }
 
   const statusBadge = (status: string): React.ReactNode => {
     const s = (status || '').toLowerCase()
@@ -790,79 +742,6 @@ export default function OpsPage() {
         ) : null}
 
         {/* ===================== USERS ===================== */}
-        {tab === 'users' && loaded.users ? (
-          users.length === 0 ? (
-            <p style={{ color: MUTED, fontSize: 14 }}>No users.</p>
-          ) : (
-            <div style={{ ...cardStyle, padding: 0, overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
-                <thead>
-                  <tr>
-                    <th style={thStyle}>Name</th>
-                    <th style={thStyle}>Email</th>
-                    <th style={thStyle}>Role</th>
-                    <th style={thStyle}>Email status</th>
-                    <th style={thStyle}>Verification</th>
-                    <th style={thStyle}>Listings</th>
-                    <th style={thStyle}>Bookings</th>
-                    <th style={thStyle}>Joined</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((u) => (
-                    <tr key={u.id}>
-                      <td style={{ ...tdStyle, fontWeight: 600 }}>{u.full_name || '—'}</td>
-                      <td style={tdStyle}>{u.email}</td>
-                      <td style={tdStyle}>
-                        {u.is_host
-                          ? badge('Host', BURGUNDY, '#fff')
-                          : badge('Guest', TAN, MUTED)}
-                      </td>
-                      <td style={tdStyle}>
-                        <div
-                          style={{
-                            display: 'flex',
-                            gap: 10,
-                            alignItems: 'center',
-                            flexWrap: 'wrap',
-                          }}
-                        >
-                          {u.email_verified
-                            ? badge('Verified', '#E2F0E9', GREEN)
-                            : badge('Unverified', '#FBF1DD', '#8A6D1F')}
-                          {!u.email_verified ? (
-                            <button
-                              style={approveBtn}
-                              disabled={busyId === u.id}
-                              onClick={() => activateUser(u)}
-                            >
-                              {busyId === u.id ? 'Working…' : 'Activate'}
-                            </button>
-                          ) : null}
-                          <button
-                            style={dangerBtn}
-                            disabled={busyId === u.id}
-                            onClick={() => deleteUser(u)}
-                          >
-                            {busyId === u.id ? 'Working…' : 'Delete'}
-                          </button>
-                        </div>
-                      </td>
-                      <td style={tdStyle}>{verificationBadge(u.verification_status)}</td>
-                      <td style={tdStyle}>{u.listing_count}</td>
-                      <td style={tdStyle}>{u.booking_count}</td>
-                      <td style={{ ...tdStyle, color: MUTED, whiteSpace: 'nowrap' }}>
-                        {fmtDay(u.created_at)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )
-        ) : null}
-
-        {/* ===================== LISTINGS ===================== */}
         {tab === 'listings' && loaded.listings ? (
           listings.length === 0 ? (
             <p style={{ color: MUTED, fontSize: 14 }}>No listings.</p>

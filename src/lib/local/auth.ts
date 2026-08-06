@@ -1,5 +1,7 @@
 import { scryptSync, randomBytes, timingSafeEqual, createHmac, randomInt } from 'node:crypto'
+import { NextResponse } from 'next/server'
 import { pool } from './pool'
+import { blockedLoginMessage, normalizeStatus } from './user-admin-core'
 
 /** A cryptographically-random 6-digit OTP, as a zero-padded string. */
 export function generateOtp(): string {
@@ -149,7 +151,14 @@ export function verifyToken(token: string): { sub: string; email: string } | nul
   }
 }
 
-/** Resolve the signed-in user from a request — Bearer header (mobile) or qk_token cookie (web). */
+/** Resolve the signed-in user from a request — Bearer header (mobile) or qk_token cookie (web).
+ *
+ *  This is THE chokepoint for D3/D4: tokens are stateless 30-day HMACs with no
+ *  session table and no revocation, so a blocked or removed account can only be
+ *  stopped by re-reading its status on every request — which this already does, via
+ *  the row lookup below. Returning null (→ every caller's 401) rather than a richer
+ *  shape is deliberate: no route can forget to handle a status field it never sees,
+ *  so the failure mode is "signed out", never "still allowed". */
 export async function getUserFromRequest(
   req: Request
 ): Promise<{ id: string; email: string } | null> {
@@ -163,7 +172,9 @@ export async function getUserFromRequest(
   const claims = verifyToken(token)
   if (!claims) return null
   const row = await getUserRowByEmail(claims.email)
-  return row ? { id: row.id, email: row.email } : null
+  if (!row) return null
+  if (normalizeStatus(row.account_status) !== 'active') return null
+  return { id: row.id, email: row.email }
 }
 
 /** Resolve the signed-in user AND their role (`admin | host | user`) from a request.
@@ -203,26 +214,65 @@ const USER_COLS = `id, email, full_name, provider, avatar_url`
 
 export async function getUserRowByEmail(
   email: string
-): Promise<{ id: string; email: string; password_hash: string | null; full_name: string | null; provider: string; avatar_url: string | null; is_host: boolean; email_verified: boolean } | null> {
+): Promise<{ id: string; email: string; password_hash: string | null; full_name: string | null; provider: string; avatar_url: string | null; is_host: boolean; email_verified: boolean; account_status: string } | null> {
   try {
     const { rows } = await pool.query(
       `SELECT id, email, password_hash, full_name, provider, avatar_url,
-              COALESCE(is_host, false) AS is_host, COALESCE(email_verified, false) AS email_verified
+              COALESCE(is_host, false) AS is_host, COALESCE(email_verified, false) AS email_verified,
+              COALESCE(account_status, 'active') AS account_status
        FROM users WHERE lower(email) = lower($1)`,
       [email]
     )
     return rows[0] ?? null
   } catch {
-    // is_host / email_verified may not exist yet (pre-migration window) — degrade
-    // gracefully so auth keeps working. Treat as a verified guest until migrated
-    // (defaulting email_verified to true here avoids locking anyone out mid-deploy).
+    // is_host / email_verified / account_status may not exist yet (pre-migration
+    // window) — degrade gracefully so auth keeps working. Treat as a verified guest
+    // until migrated (defaulting email_verified to true here avoids locking anyone
+    // out mid-deploy).
+    //
+    // NOTE the security consequence of that choice: `'active' AS account_status`
+    // means block/remove enforcement is OFF while this fallback is in use, because
+    // failing closed here would lock out EVERY user on a pre-migration deploy. The
+    // fix is to run the migration, not to change this default — so it is loud in
+    // the logs rather than silent.
+    console.error(
+      'getUserRowByEmail fell back: a users column is missing. If account_status is the missing one, ' +
+      'block/remove enforcement is DISABLED — run scripts/migrate-account-status.mjs.'
+    )
     const { rows } = await pool.query(
-      `SELECT id, email, password_hash, full_name, provider, avatar_url, false AS is_host, true AS email_verified
+      `SELECT id, email, password_hash, full_name, provider, avatar_url, false AS is_host, true AS email_verified,
+              'active' AS account_status
        FROM users WHERE lower(email) = lower($1)`,
       [email]
     )
     return rows[0] ?? null
   }
+}
+
+/**
+ * Gate for every route that MINTS a token or sends account mail — login, verify-otp,
+ * resend-otp, signup and the social providers. `getUserFromRequest` covers
+ * already-authenticated requests; these routes run before there is a session, so they
+ * need their own check or a blocked user could just log in again for a fresh 30-day
+ * token and only discover the block on their next call.
+ *
+ * Returns null when the account may proceed, otherwise the rejection to return as-is.
+ *
+ * **403 with `accountStatus` and deliberately NO `needsVerification` key.** The mobile
+ * contract is `403 + needsVerification:true` → OTP screen; both clients read the body
+ * before branching (`AuthService.kt` `code == 403 && needsVerification(text)`,
+ * `AuthService.swift` `body.needsVerification == true`) and otherwise fall through to
+ * showing `error` verbatim. So this renders our message on iOS and Android with no app
+ * change — but do not add `needsVerification` here, or a blocked user lands on the OTP
+ * screen and verifies successfully into a still-blocked account.
+ */
+export function blockedAccountResponse(
+  status: string | null | undefined,
+  headers: Record<string, string>,
+): NextResponse | null {
+  const s = normalizeStatus(status)
+  if (s === 'active') return null
+  return NextResponse.json({ error: blockedLoginMessage(s), accountStatus: s }, { status: 403, headers })
 }
 
 /** Client-facing user shape (web + mobile). One unified account: `is_host` is a

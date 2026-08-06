@@ -98,6 +98,7 @@ export function OpsSessionProvider({
  *  'staff' is super-admin-only, which staffCan() already enforces — so listing it
  *  here needs no extra role check. */
 const NAV: Array<{ href: string; label: string; module: StaffModule }> = [
+  { href: '/ops/users', label: 'Users', module: 'users' },
   { href: '/ops/analytics', label: 'Analytics', module: 'analytics' },
   { href: '/ops/payments', label: 'Payments', module: 'payments' },
   { href: '/ops/resorts', label: 'Resorts', module: 'resorts' },

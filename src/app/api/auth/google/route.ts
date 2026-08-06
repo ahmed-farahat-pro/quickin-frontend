@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { verifyGoogleIdToken, oauthConfigured } from '@/lib/local/oauth'
-import { upsertSocialUser, signToken, publicUserWithHost } from '@/lib/local/auth'
+import { upsertSocialUser, signToken, publicUserWithHost, getUserRowByEmail, blockedAccountResponse } from '@/lib/local/auth'
 
 export const dynamic = 'force-dynamic'
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' }
@@ -27,6 +27,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Google account has no email' }, { status: 400, headers: CORS })
     }
 
+    // BEFORE the upsert — upsertSocialUser sets email_verified, so a removed user
+    // must not be able to reactivate themselves through Google.
+    const existing = await getUserRowByEmail(String(claims.email))
+    if (existing) {
+      const blocked = blockedAccountResponse(existing.account_status, CORS)
+      if (blocked) return blocked
+    }
     const user = await upsertSocialUser({
       email: String(claims.email),
       fullName: String(claims.name || String(claims.email).split('@')[0]),

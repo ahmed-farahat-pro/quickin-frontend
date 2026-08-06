@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getUserRowByEmail, signToken, rateLimit, clientIp, publicUserWithHost } from '@/lib/local/auth'
+import { getUserRowByEmail, signToken, rateLimit, clientIp, publicUserWithHost, blockedAccountResponse } from '@/lib/local/auth'
 import { verifyOtpCode, markEmailVerified } from '@/lib/local/db'
 
 // Verify the emailed 6-digit code and issue the session.
@@ -20,6 +20,13 @@ export async function POST(req: Request) {
         { error: `Too many attempts. Please try again in ${wait}s.` },
         { status: 429, headers: { ...CORS, 'Retry-After': String(wait) } }
       )
+    }
+    // Check the account BEFORE the code, so a blocked user doesn't burn a valid
+    // one-time code discovering they can't get in.
+    const existing = await getUserRowByEmail(String(email).trim())
+    if (existing) {
+      const blocked = blockedAccountResponse(existing.account_status, CORS)
+      if (blocked) return blocked
     }
     const ok = await verifyOtpCode(String(email), String(code))
     if (!ok) {
