@@ -177,21 +177,26 @@ export function ApplyForm({
       }
 
       // Submit the ID photos for admin verification (same store as /verify-id).
-      // Non-blocking: if this fails the application is still considered submitted.
-      try {
-        await fetch('/api/local/verification', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            front: idFront,
-            back: idBack,
-            id_number: nationalId.replace(/\D/g, '') || undefined,
-            full_name: fullName.trim() || undefined,
-          }),
-        })
-      } catch (verr) {
-        console.error('ID verification submit failed', verr)
+      //
+      // This used to be fire-and-forget: it ran AFTER the application was accepted,
+      // inside a catch that only logged, and it never checked res.ok — so a 413 (the
+      // exact failure an uncompressed photo produced) was discarded in silence and
+      // the applicant saw "submitted" with no ID on file. It is now checked and
+      // surfaced; an application with no ID is not a submission worth confirming.
+      const vres = await fetch('/api/local/verification', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          front: idFront,
+          back: idBack,
+          id_number: nationalId.replace(/\D/g, '') || undefined,
+          full_name: fullName.trim() || undefined,
+        }),
+      })
+      if (!vres.ok) {
+        const verr = await vres.json().catch(() => ({}))
+        throw new Error(verr.error || t('errors.submitFailed'))
       }
 
       setSubmitted(true)

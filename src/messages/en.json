@@ -1436,7 +1436,8 @@
     },
     "card": {
       "guestFavorite": "★ Guest favorite",
-      "perNight": "/ night"
+      "perNight": "/ night",
+      "verifiedHost": "Verified host"
     },
     "footer": {
       "tagline": "QuickIn — boutique stays for travelers who love the details.",
@@ -1546,6 +1547,7 @@
       "company": "Company",
       "brokerage": "Brokerage"
     },
+    "verifiedHost": "Verified host",
     "gallery": {
       "close": "Close",
       "prev": "Previous photo",

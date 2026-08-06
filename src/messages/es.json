@@ -1436,7 +1436,8 @@
     },
     "card": {
       "guestFavorite": "★ Favorito de los huéspedes",
-      "perNight": "/ noche"
+      "perNight": "/ noche",
+      "verifiedHost": "Anfitrión verificado"
     },
     "footer": {
       "tagline": "QuickIn — alojamientos boutique para viajeros que aman los detalles.",
@@ -1546,6 +1547,7 @@
       "company": "Empresa",
       "brokerage": "Agencia"
     },
+    "verifiedHost": "Anfitrión verificado",
     "gallery": {
       "close": "Cerrar",
       "prev": "Foto anterior",

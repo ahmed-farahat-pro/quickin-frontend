@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { requireStaff } from '@/lib/local/staff'
+import { requireStaff, staffActor, logStaffAction, clientIpOf } from '@/lib/local/staff'
 import { getPendingHostApplications, reviewHostApplication } from '@/lib/local/db'
 
 // Admin (staff session + 'applications' module): GET [?status=]  → host applications (default: pending).
@@ -28,7 +28,17 @@ export async function POST(req: Request) {
     const id = body?.id
     const action = body?.action === 'approve' ? 'approve' : body?.action === 'reject' ? 'reject' : null
     if (!id || !action) return NextResponse.json({ error: 'id and action required' }, { status: 400, headers: CORS })
-    await reviewHostApplication(id, action, body?.note ?? null)
+    const note = body?.note ?? null
+    await reviewHostApplication(id, action, note, staffActor(gate.staff))
+    await logStaffAction({
+      staffId: gate.staff.legacy ? null : gate.staff.staffId,
+      staffEmail: gate.staff.email,
+      action: action === 'approve' ? 'host_application_approved' : 'host_application_rejected',
+      targetType: 'host_application',
+      targetId: id,
+      detail: { note },
+      ip: clientIpOf(req),
+    })
     return NextResponse.json({ ok: true }, { headers: CORS })
   } catch (err) {
     console.error('admin host-applications POST:', err)

@@ -1,18 +1,20 @@
 import { NextResponse } from 'next/server'
 import { purgeStaffExpired } from '@/lib/local/db'
 
-// Housekeeping for the staff RBAC tables (World 1 — Neon). staff_sessions and
-// staff_password_resets accumulate a row per sign-in and per reset request forever;
-// this drops the long-dead ones. Negligible at a handful of seats, but unbounded.
+// Housekeeping for the World-1 (Neon) tables that grow a row per event forever:
+// staff_sessions and staff_password_resets (one per staff sign-in / reset request,
+// 30 days), and user_logins (one per USER sign-in, 90 days). The last of those is the
+// reason this is now scheduled rather than run by hand — it carries an IP and a user
+// agent per row, so letting it accumulate indefinitely is a standing privacy
+// liability, not just wasted space.
 //
 //   GET /api/cron/staff-cleanup     header: Authorization: Bearer <CRON_SECRET>
 //
 // Deliberately separate from /api/cron/booking-timeouts, which is a Supabase
 // (World 2) route — this feature is Neon-only and shouldn't depend on it.
 //
-// NOT yet scheduled: add to quickin-frontend/vercel.json "crons" to automate it,
-// e.g. { "path": "/api/cron/staff-cleanup", "schedule": "0 3 * * *" }. Safe to run
-// by hand, and safe to run repeatedly.
+// Scheduled daily at 03:00 UTC in vercel.json. Safe to run by hand, and safe to run
+// repeatedly.
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 

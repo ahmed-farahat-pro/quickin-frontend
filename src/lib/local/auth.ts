@@ -333,12 +333,41 @@ export async function getHostState(userId: string, isHost: boolean): Promise<Hos
   }
 }
 
-/** publicUser + the host fields every client reads on launch / session restore. */
+/**
+ * The account's own ID-verification state, for the session payload.
+ *
+ * Separate from HostState because verification applies to guests too. Tolerant of a
+ * pre-migration DB for the same reason getHostState is: a missing column must
+ * degrade the badge, not fail the session.
+ */
+export async function getVerificationState(
+  userId: string,
+): Promise<{ verification_status: string; verified: boolean }> {
+  try {
+    const { rows } = await pool.query(
+      `SELECT COALESCE(verification_status, 'unverified') AS verification_status FROM users WHERE id = $1`,
+      [userId]
+    )
+    const status = String(rows[0]?.verification_status ?? 'unverified')
+    return { verification_status: status, verified: status === 'verified' }
+  } catch {
+    return { verification_status: 'unverified', verified: false }
+  }
+}
+
+/** publicUser + the host fields every client reads on launch / session restore.
+ *  Now also carries the account's verification state — without it a signed-in
+ *  client had no way to know whether it was verified, so it could neither show
+ *  "you're verified" nor prompt the user to submit an ID. */
 export async function publicUserWithHost(row: {
   id: string; email: string; full_name: string | null; provider: string; avatar_url: string | null; is_host?: boolean | null; email_verified?: boolean | null
-}): Promise<User & { role: 'host' | 'guest' } & HostState> {
+}): Promise<User & { role: 'host' | 'guest' } & HostState & { verification_status: string; verified: boolean }> {
   const user = publicUser(row)
-  return { ...user, ...(await getHostState(user.id, user.is_host)) }
+  const [host, verification] = await Promise.all([
+    getHostState(user.id, user.is_host),
+    getVerificationState(user.id),
+  ])
+  return { ...user, ...host, ...verification }
 }
 
 // NB: there is deliberately no "promote me to host" helper here. Host is granted

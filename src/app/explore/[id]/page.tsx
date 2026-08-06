@@ -292,6 +292,25 @@ export default async function ListingDetailPage({
                       {t(`hostType.${listing.host_type}`)}
                     </span>
                   )}
+                  {/* E3: staff-verified ID. Same pill as the host profile page so the
+                      badge reads identically wherever a guest meets this host. */}
+                  {listing.host_verified && (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        background: '#e7f5ec',
+                        color: '#177245',
+                        fontSize: 12.5,
+                        fontWeight: 700,
+                        padding: '4px 12px',
+                        borderRadius: 999,
+                      }}
+                    >
+                      ✓ {t('verifiedHost')}
+                    </span>
+                  )}
                 </div>
               </div>
               <span

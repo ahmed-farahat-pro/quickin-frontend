@@ -1436,7 +1436,8 @@
     },
     "card": {
       "guestFavorite": "★ مفضّل لدى الضيوف",
-      "perNight": "/ الليلة"
+      "perNight": "/ الليلة",
+      "verifiedHost": "مضيف موثّق"
     },
     "footer": {
       "tagline": "QuickIn — إقامات بوتيك للمسافرين الذين يعشقون التفاصيل.",
@@ -1546,6 +1547,7 @@
       "company": "شركة",
       "brokerage": "وساطة عقارية"
     },
+    "verifiedHost": "مضيف موثّق",
     "gallery": {
       "close": "إغلاق",
       "prev": "الصورة السابقة",

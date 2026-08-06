@@ -120,10 +120,92 @@ tabbed dashboard at `/ops`:
 | Page | Module | What it does |
 | --- | --- | --- |
 | `/ops/users` | `users` | Searchable directory of every guest and host, and one person's full profile — listings, bookings, payments, messages, documents — plus block / remove / restore |
+| `/ops/activity` | `overview` | Everything that happened on the site — signups, sign-ins, listings, bookings, payments, cancellations. **Derived**, so it shows full history rather than starting at deploy |
+| `/ops/alerts` | `overview` | Every queue waiting on a human, filtered to the modules you hold, with how long the oldest item has waited. Also the bell in the header |
+| `/ops/reports` | `reports` | Abuse reports filed by guests and hosts. The table and filing API existed for months with no screen — nothing filed had ever been read |
+| `/ops/audit` | `audit` | Every staff action, who did it and when. **Super admin only** |
+| *(no screen)* | `documents` | A capability, not a tab: permits opening ID and ownership documents from the Verifications and Listings queues. Every open writes a `document_viewed` row to `staff_audit_log` |
 | `/ops/analytics` | `analytics` | Booking, payment and cancellation reports with a shared filter bar, plus CSV/Excel export |
 | `/ops/resorts` | `resorts` | Resort catalog and the pending-submission queue |
 | `/ops/staff` | `staff` | Moderator accounts and their permissions (super admin only) |
 | `/ops/payments` | `payments` | The Instapay destination guests pay to, plus the dispute queue |
+
+### Activity, audit and alerts
+
+**The activity feed is derived, not recorded.** There is no `activity_log` table: six
+of the seven event kinds come from timestamps already on real rows (`users.created_at`,
+`listings.created_at`, `bookings.created_at`, `payment_proofs.submitted_at`,
+`bookings.paid_at`, `bookings.cancelled_at`). That means full history from day one and
+nothing that can drift from the data it describes. Each UNION branch is date-windowed
+and LIMITed *before* the merge so it uses its own index.
+
+Sign-ins are the exception — nothing recorded them (no `last_login_at`, no user session
+table; auth is a stateless JWT) — so `user_logins` is the one new table. It carries an
+IP and a user agent, so the staff-cleanup cron purges it at **90 days** and is now
+scheduled daily in `vercel.json`. Writing it is best-effort: a telemetry failure must
+never block a sign-in.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/api/local/admin/activity?kind=&q=&from=&to=&limit=&offset=` | `kind` is comma-separated; returns `hasMore` rather than a total, because counting a seven-branch UNION costs as much as the page |
+| GET | `/api/local/admin/audit?q=&action=&target_type=&from=&to=` | Super admin only. `actions` lists what this deployment has actually recorded |
+| GET | `/api/local/admin/alerts` | Derived counts, filtered server-side to the caller's modules |
+| GET \| POST | `/api/local/admin/reports` | Triage queue; `{ id, action:'resolve'\|'dismiss' }` |
+
+**Every admin mutation is now audited.** The previously-unaudited ones included the two
+most consequential actions in the system — changing the Instapay destination (where
+guests send money) and sending a broadcast to every user. The backend repo had *no*
+audit call sites at all; it now writes them too, and its `admin/host-applications`
+route was moved off the pre-RBAC `users.role='admin'` check onto the staff module gate
+it should always have used.
+
+**Polling.** The dashboard and the alert centre refresh every 30s. The hook pauses when
+the tab is hidden, and on a 401 it **stops and says so** rather than redirecting — a
+background poll that yanked an operator to the login page mid-edit would be worse than
+stale numbers. It deliberately does not touch the idle timer, which resets only on real
+input.
+
+### Documents and verification
+
+Identity documents (`id_verifications.image_data` / `back_image_data` /
+`selfie_image_data`) and proof-of-ownership (`listings.ownership_doc`) are stored
+base64-inline like every other World-1 image. Three rules govern them.
+
+**1. `users.verification_status` is the source of truth.** `id_verifications` is the
+submission log; the user row is what every badge reads — the mobile apps'
+`getUserBadges`, `host_verified` on every listing payload, the web host profile,
+listing pages and search cards. They used to disagree: `/ops` wrote only the
+submission row, so the iOS and Android verified badges were permanently dark and
+`users.verified_at` was never written by anything. Vocabulary is
+`unverified | pending | verified | rejected`, where `unverified` means "never
+submitted". Submitting sets `pending` — except for an already-verified account, which
+keeps its badge while a renewed ID is reviewed rather than going dark mid-review.
+
+**2. Documents are never shipped in bulk.** The verification queue and the listings
+queue return `has_front` / `has_back` / `has_selfie` / `has_ownership_doc` booleans.
+The bytes come one request at a time from the endpoint below. Before this, opening the
+Verifications tab handed you every pending submission's three ID photos, and opening
+the Listings tab handed you every pending ownership document, with no record either way.
+
+**3. Every document open is recorded, or it doesn't happen.**
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/api/local/admin/documents/:kind/:id` | `kind` ∈ `id_front\|id_back\|id_selfie\|ownership`. Returns image **bytes**; `415` if the stored value isn't an allowlisted image, `404` if there's nothing there. Requires **both** `documents` and the owning module (`verifications` for IDs, `listings` for ownership) |
+| GET | `/api/local/admin/verifications?status=` | `pending` (default) `\|verified\|rejected\|all` — a decided case stays reachable so it can be reopened |
+| POST | `/api/local/admin/verifications` | `{ id, action:'verify'\|'reject'\|'pending', note? }`. Writes both tables in one transaction and records the deciding staff member |
+
+The `documents` module is a **capability, not a screen** — it has no `/ops` tab, and
+holding it doesn't grant a queue you weren't given; it lets you open a document you
+could already reach. The audit write for a document view deliberately **throws** —
+unlike `logStaffAction`, which swallows errors so an audit hiccup can't break the
+action it's auditing. Here "log who viewed what" *is* the feature, so no log means no
+bytes. Don't reconcile the two by routing document views through `logStaffAction`.
+
+Responses carry `no-store, private`, `X-Content-Type-Options: nosniff`,
+`Referrer-Policy: no-referrer`, and — unlike every other admin route — **no
+`Access-Control-Allow-Origin`**. Identity documents must not be readable
+cross-origin; don't "fix" that by copying the `CORS` const from a neighbour.
 
 ### Users API
 
@@ -268,6 +350,8 @@ npm run check     # same; the pre-deploy gate
 | `analytics-core.ts` | Filter parsing and validation, the `buildReportWhere` SQL builder (placeholder numbering, the date-column injection guard), commission/refund math, CSV escaping and formula-injection defusing |
 | `resort-core.ts` | Resort name normalization, slug collision (`Amouage` = `amouage` = `AMOUAGE.`), typo distance |
 | `user-admin-core.ts` | Users-list query parsing and clamping, the full block/remove transition matrix, the `ORDER BY` injection guard, blocked-login copy |
+| `activity-core.ts` | Activity/audit filter parsing, the UNION branch limits, the audit-action label map, and `alertsFor` — including that an operator never receives an alert for a module they don't hold |
+| `document-core.ts` | Document-kind validation, the data-URL parser and its mime allowlist (SVG and HTML are rejected — these bytes render in an admin's browser), the verification state machine, and which module owns which document |
 | `xlsx.ts` | Cell typing (numbers stay numeric so Excel can sum them), sheet-name sanitizing, filename safety |
 
 Those two modules deliberately have **no runtime imports** — Node's ESM resolver

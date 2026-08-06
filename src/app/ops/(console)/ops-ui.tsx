@@ -206,6 +206,27 @@ export async function adminGet<T>(path: string): Promise<T | 'forbidden' | null>
   }
 }
 
+/**
+ * Like adminGet, but for BACKGROUND polling: a 401 returns 'expired' instead of
+ * redirecting to the login page.
+ *
+ * adminGet's redirect is right for a click — the operator asked for something and the
+ * session was gone. It is wrong for a poll, which would yank someone out of whatever
+ * they were typing on another screen the moment their session lapsed. The caller
+ * stops polling and says so instead.
+ */
+export async function adminGetQuiet<T>(path: string): Promise<T | 'forbidden' | 'expired' | null> {
+  try {
+    const res = await fetch(`/api/local/admin/${path}`, { credentials: 'same-origin', cache: 'no-store' })
+    if (res.status === 401) return 'expired'
+    if (res.status === 403) return 'forbidden'
+    if (!res.ok) return null
+    return (await res.json()) as T
+  } catch {
+    return null
+  }
+}
+
 /** POST/PATCH/DELETE an admin endpoint. Returns the parsed body plus `ok`, so a
  *  caller can surface the server's own error message. */
 export async function adminSend<T = unknown>(

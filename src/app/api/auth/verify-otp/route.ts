@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getUserRowByEmail, signToken, rateLimit, clientIp, publicUserWithHost, blockedAccountResponse } from '@/lib/local/auth'
-import { verifyOtpCode, markEmailVerified } from '@/lib/local/db'
+import { verifyOtpCode, markEmailVerified, recordLogin } from '@/lib/local/db'
 
 // Verify the emailed 6-digit code and issue the session.
 //   POST /api/auth/verify-otp { email, code } → { token, user } | 400
@@ -40,6 +40,9 @@ export async function POST(req: Request) {
     }
     const user = await publicUserWithHost(row)
     const token = signToken({ sub: user.id, email: user.email })
+    // F1: the one activity event nothing else records. Best-effort —
+    // never let telemetry stop a sign-in.
+    await recordLogin(user.id, 'otp', req)
     const res = NextResponse.json({ token, user }, { headers: CORS })
     res.cookies.set('qk_token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 30 * 24 * 3600 })
     return res

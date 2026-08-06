@@ -1436,7 +1436,8 @@
     },
     "card": {
       "guestFavorite": "★ Coup de cœur voyageurs",
-      "perNight": "/ nuit"
+      "perNight": "/ nuit",
+      "verifiedHost": "Hôte vérifié"
     },
     "footer": {
       "tagline": "QuickIn — des séjours de charme pour les voyageurs qui aiment les détails.",
@@ -1546,6 +1547,7 @@
       "company": "Entreprise",
       "brokerage": "Agence"
     },
+    "verifiedHost": "Hôte vérifié",
     "gallery": {
       "close": "Fermer",
       "prev": "Photo précédente",

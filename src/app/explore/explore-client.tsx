@@ -890,6 +890,22 @@ function ListingCard({
             <TypeIcon size={13} strokeWidth={1.8} color={COLORS.burgundy} /> {listing.property_type}
           </span>
         )}
+        {/* E3: staff-verified host. Inline in the chip row rather than a third
+            floating overlay — the photo corners already carry Guest favourite and
+            the wishlist button. */}
+        {listing.host_verified && (
+          <span
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              marginTop: 10, marginLeft: listing.property_type ? 6 : 0,
+              background: '#e7f5ec', color: '#177245',
+              fontSize: 11, fontWeight: 700,
+              padding: '4px 10px', borderRadius: 999,
+            }}
+          >
+            ✓ {t('card.verifiedHost')}
+          </span>
+        )}
         <p style={{ margin: '12px 0 0', fontSize: 15, color: COLORS.ink }}>
           <span style={{ fontWeight: 700, color: COLORS.burgundy, fontSize: 17 }}>
             {formatPrice(listing.price_per_night, listing.currency)}

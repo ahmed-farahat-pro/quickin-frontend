@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { fileToCompressedDataUrl, MAX_OWNERSHIP_DOC_CHARS as MAX_ID_IMAGE_CHARS } from '@/lib/image'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -43,20 +44,32 @@ export function IdVerificationPanel() {
   }
   useEffect(() => { load() }, [])
 
-  function onPick(side: Side, e: React.ChangeEvent<HTMLInputElement>) {
+  /**
+   * Compress before storing, the same way the host apply form does.
+   *
+   * This used to be a raw FileReader.readAsDataURL — so a modern phone photo (5–8 MB
+   * → ~7–11 MB of base64) sailed past the client and was rejected by the platform's
+   * request-body limit before the route ever ran, with no usable error. That is very
+   * likely why ID submissions failed for real users on real phones.
+   */
+  async function onPick(side: Side, e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
+    // Allow re-picking the same file.
+    e.target.value = ''
     if (!file) return
     setError(null)
-    const reader = new FileReader()
-    reader.onload = () => {
-      const url = typeof reader.result === 'string' ? reader.result : null
+    try {
+      const url = await fileToCompressedDataUrl(file)
+      if (url.length > MAX_ID_IMAGE_CHARS) {
+        setError('That photo is too large even after compression. Please try a smaller one.')
+        return
+      }
       if (side === 'front') setFront(url)
       else if (side === 'back') setBack(url)
       else setSelfie(url)
+    } catch {
+      setError('We could not read that photo. Please try a different one.')
     }
-    reader.readAsDataURL(file)
-    // Allow re-picking the same file.
-    e.target.value = ''
   }
 
   async function submit() {

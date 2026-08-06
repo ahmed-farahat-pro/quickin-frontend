@@ -5,6 +5,11 @@ import { INSTAPAY_KEYS, rowsToPaymentConfig } from './payment-config-core'
 import type { PaymentConfig } from './payment-config-core'
 import { buildUserListWhere, hidesListings, normalizeStatus, orderBySql } from './user-admin-core'
 import type { AccountStatus, UserListFilter } from './user-admin-core'
+import { idColumnFor, statusForAction } from './document-core'
+import { branchLimit, wantsKind } from './activity-core'
+import type { ActivityFilter, AuditFilter } from './activity-core'
+import { PAID_SQL } from './analytics-core'
+import type { DocumentKind, VerificationAction, VerificationFilter } from './document-core'
 import { isLiveStayStatus, normalizeReservationCode } from '@/lib/stay-code'
 // The catalogs the host forms offer — one source of truth for what the API
 // accepts and what the create/edit forms render (see lib/listing-options.ts).
@@ -98,6 +103,9 @@ export interface Listing {
   host_avatar?: string | null
   host_type?: string | null
   host_company?: string | null
+  /** True when the host's ID has been verified by staff — drives the green pill on
+   *  listing cards and the listing page. Comes from users.verification_status. */
+  host_verified?: boolean
   image_url?: string | null
 }
 
@@ -151,6 +159,12 @@ const LISTING_COLS = `
   l.resort_id, COALESCE((SELECT name FROM resorts WHERE id = l.resort_id), l.resort_name) AS resort,
   l.is_guest_favorite, l.listing_code, l.lat::float8 AS lat, l.lng::float8 AS lng,
   COALESCE(l.approval_status, 'approved') AS approval_status,
+  -- E3: the host's verified badge, character-for-character the same expression the
+  -- backend uses in its own LISTING_COLS — so the web and the mobile apps can never
+  -- disagree about whether a host is verified. A correlated subquery rather than a
+  -- join because LISTING_COLS is spliced into four different FROM clauses, one of
+  -- which already joins users u (a second alias would collide).
+  COALESCE((SELECT u.verification_status = 'verified' FROM users u WHERE u.id = l.host_id), false) AS host_verified,
   to_char(l.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
   COALESCE(
     (SELECT json_agg(json_build_object('url', li.url, 'order', li."order") ORDER BY li."order")
@@ -1043,6 +1057,19 @@ export async function submitVerification(args: {
       [userId, imageData, backImageData, selfieImageData, idNumber, fullName, source]
     )
   }
+  // Mirror onto the source of truth. Without this the backend's own verification
+  // queue (which reads users WHERE verification_status = 'pending') stays empty
+  // forever, and a re-submission after a rejection would still show as rejected.
+  //
+  // Deliberately NOT applied to an already-verified account: a host renewing an
+  // expiring ID would otherwise drop their badge — and the verified pill on every
+  // one of their listings — for however long the review takes. They keep it until
+  // an admin actually decides on the new document.
+  await pool.query(
+    `UPDATE users SET verification_status = 'pending', verified_at = NULL
+      WHERE id = $1 AND COALESCE(verification_status, 'unverified') <> 'verified'`,
+    [userId],
+  )
   return getVerification(userId)
 }
 
@@ -1327,7 +1354,7 @@ export async function getPendingHostApplications(status: string = 'pending'): Pr
  *  The application row and the users flip are one transaction so an approval can never
  *  half-land (approved application, still not a host). The notification is sent after
  *  the commit — it must never roll a decision back. */
-export async function reviewHostApplication(appId: string, action: 'approve' | 'reject', note: string | null): Promise<void> {
+export async function reviewHostApplication(appId: string, action: 'approve' | 'reject', note: string | null, actor: string): Promise<void> {
   if (!isUuid(appId)) throw new Error('Invalid application')
   const status = action === 'approve' ? 'approved' : 'rejected'
   const client = await pool.connect()
@@ -1335,9 +1362,11 @@ export async function reviewHostApplication(appId: string, action: 'approve' | '
   try {
     await client.query('BEGIN')
     const { rows } = await client.query(
-      `UPDATE host_applications SET status=$2, reviewed_at=now(), reviewed_by='admin', review_note=$3
+      // `actor` is staff:<uuid>; this used to be the literal 'admin', which threw
+      // away who actually made the call.
+      `UPDATE host_applications SET status=$2, reviewed_at=now(), reviewed_by=$4, review_note=$3
         WHERE id=$1 RETURNING user_id`,
-      [appId, status, note]
+      [appId, status, note, actor]
     )
     uid = rows[0]?.user_id ?? ''
     if (!uid) throw new Error('Application not found')
@@ -1369,26 +1398,164 @@ export async function reviewHostApplication(appId: string, action: 'approve' | '
 
 // ---- Admin: ID verification review -----------------------------------------
 
-export async function getPendingVerifications(): Promise<Array<{ id: string; user_id: string; email: string; full_name: string | null; id_number: string | null; status: string; image_data: string; back_image_data: string | null; selfie_image_data: string | null; submitted_at: string }>> {
+/**
+ * One document's stored value, looked up THROUGH its subject.
+ *
+ * Returns null for a missing row, a missing column value, and a non-uuid id alike —
+ * the route collapses all three to an identical 404 so an operator can't tell "no
+ * such user" from "that user has no selfie on file".
+ *
+ * `column` comes from `idColumnFor`, a closed map that is unit-tested to contain only
+ * bare identifiers — nothing user-supplied is ever interpolated here.
+ */
+export async function adminReadDocument(
+  kind: DocumentKind,
+  id: string,
+): Promise<{ value: string; subjectId: string } | null> {
+  if (!isUuid(id)) return null
+  if (kind === 'ownership') {
+    const { rows } = await pool.query(
+      `SELECT ownership_doc AS value, host_id AS subject_id FROM listings WHERE id = $1`,
+      [id],
+    )
+    const row = rows[0] as { value: string | null; subject_id: string | null } | undefined
+    if (!row?.value) return null
+    // The listing is the subject for audit purposes, so its own id is the target.
+    return { value: row.value, subjectId: id }
+  }
+  const column = idColumnFor(kind)
+  if (!column) return null
   const { rows } = await pool.query(
-    `SELECT v.id, v.user_id, u.email, v.full_name, v.id_number, v.status, v.image_data, v.back_image_data, v.selfie_image_data,
-            to_char(v.submitted_at,'YYYY-MM-DD HH24:MI') AS submitted_at
-       FROM id_verifications v JOIN users u ON u.id = v.user_id
-      WHERE v.status = 'pending' ORDER BY v.submitted_at ASC`
+    `SELECT ${column} AS value, user_id AS subject_id FROM id_verifications WHERE id = $1`,
+    [id],
   )
-  return rows
+  const row = rows[0] as { value: string | null; subject_id: string } | undefined
+  if (!row?.value) return null
+  return { value: row.value, subjectId: row.subject_id }
 }
 
-export async function reviewVerification(verifId: string, action: 'verify' | 'reject', note: string | null): Promise<void> {
-  if (!isUuid(verifId)) throw new Error('Invalid verification')
-  const status = action === 'verify' ? 'verified' : 'rejected'
-  const { rows } = await pool.query(
-    `UPDATE id_verifications SET status=$2, reviewed_at=now(), reviewed_by='admin', notes=$3
-      WHERE id=$1 RETURNING user_id`,
-    [verifId, status, note]
+/**
+ * Write a document-view audit row — and THROW if it fails.
+ *
+ * Deliberately not `logStaffAction` (staff.ts), which swallows every error by
+ * contract so an audit hiccup can't break the action being audited. That trade is
+ * right for a block/unblock: losing the log is worse than losing the action. Here it
+ * inverts — "log who viewed what" IS the feature, so an unlogged view is the exact
+ * outcome E4 exists to prevent. No log, no bytes.
+ *
+ * Do not "fix" the inconsistency by routing this through logStaffAction.
+ */
+export async function recordDocumentView(entry: {
+  staffId: string | null
+  staffEmail: string | null
+  targetType: 'user' | 'listing'
+  targetId: string
+  detail: unknown
+  ip: string | null
+}): Promise<void> {
+  await pool.query(
+    `INSERT INTO staff_audit_log (staff_id, staff_email, action, target_type, target_id, detail, ip)
+     VALUES ($1, $2, 'document_viewed', $3, $4, $5::jsonb, $6)`,
+    [entry.staffId, entry.staffEmail, entry.targetType, entry.targetId, JSON.stringify(entry.detail), entry.ip],
   )
-  const uid = rows[0]?.user_id
-  if (!uid) throw new Error('Verification not found')
+}
+
+export interface AdminVerificationRow {
+  id: string
+  user_id: string
+  email: string
+  full_name: string | null
+  id_number: string | null
+  status: string
+  /** Which documents are on file. The BYTES are deliberately absent — they come
+   *  from the audited /api/local/admin/documents endpoint, one explicit request at
+   *  a time. This queue used to ship every pending submission's three base64 photos
+   *  to anyone who opened the tab, with no record of who saw them. */
+  has_front: boolean
+  has_back: boolean
+  has_selfie: boolean
+  submitted_at: string
+  reviewed_at: string | null
+  reviewed_by: string | null
+  notes: string | null
+}
+
+/** The /ops verification queue. `filter` defaults to 'pending' — the work list —
+ *  but a decided case can be found again and reopened. */
+export async function getPendingVerifications(
+  filter: VerificationFilter = 'pending',
+): Promise<AdminVerificationRow[]> {
+  const { rows } = await pool.query(
+    `SELECT v.id, v.user_id, u.email, v.full_name, v.id_number, v.status,
+            (v.image_data        IS NOT NULL AND v.image_data        <> '') AS has_front,
+            (v.back_image_data   IS NOT NULL AND v.back_image_data   <> '') AS has_back,
+            (v.selfie_image_data IS NOT NULL AND v.selfie_image_data <> '') AS has_selfie,
+            to_char(v.submitted_at,'YYYY-MM-DD HH24:MI') AS submitted_at,
+            to_char(v.reviewed_at, 'YYYY-MM-DD HH24:MI') AS reviewed_at,
+            v.reviewed_by, v.notes
+       FROM id_verifications v JOIN users u ON u.id = v.user_id
+      WHERE ($1 = 'all' OR v.status = $1)
+      ORDER BY v.submitted_at ASC
+      LIMIT 300`,
+    [filter],
+  )
+  return rows as AdminVerificationRow[]
+}
+
+/**
+ * Admin decision on an ID submission — the one writer of a user's verified state.
+ *
+ * Writes BOTH tables in one transaction: `id_verifications` is the submission log,
+ * `users.verification_status` is the source of truth every badge reads (mobile
+ * `getUserBadges`, `host_verified` on every listing payload, and the web host
+ * profile). They used to disagree — /ops wrote only the submission row, so the
+ * apps' verified badges were permanently dark and `users.verified_at` was never
+ * written at all.
+ *
+ * `action: 'pending'` reopens a decided case, clearing the review so it returns to
+ * the queue. `actor` is `staff:<uuid>`, replacing the hardcoded 'admin' that
+ * discarded who actually decided.
+ */
+export async function reviewVerification(
+  verifId: string,
+  action: VerificationAction,
+  note: string | null,
+  actor: string,
+): Promise<void> {
+  if (!isUuid(verifId)) throw new Error('Invalid verification')
+  const status = statusForAction(action)
+  const client = await pool.connect()
+  let uid = ''
+  try {
+    await client.query('BEGIN')
+    const { rows } = await client.query(
+      // Reopening clears the review; deciding stamps it.
+      `UPDATE id_verifications
+          SET status = $2,
+              reviewed_at = CASE WHEN $2 = 'pending' THEN NULL ELSE now() END,
+              reviewed_by = CASE WHEN $2 = 'pending' THEN NULL ELSE $4 END,
+              notes = $3
+        WHERE id = $1 RETURNING user_id`,
+      [verifId, status, note, actor],
+    )
+    uid = rows[0]?.user_id ?? ''
+    if (!uid) throw new Error('Verification not found')
+    await client.query(
+      `UPDATE users
+          SET verification_status = $2,
+              verified_at = CASE WHEN $2 = 'verified' THEN now() ELSE NULL END
+        WHERE id = $1`,
+      [uid, status],
+    )
+    await client.query('COMMIT')
+  } catch (e) {
+    await client.query('ROLLBACK')
+    throw e
+  } finally {
+    client.release()
+  }
+  // Reopening is an internal correction — don't tell the user their ID "changed".
+  if (action === 'pending') return
   await createNotification(
     uid, 'verification',
     action === 'verify' ? 'Identity verified' : 'Identity check update',
@@ -1526,7 +1693,13 @@ export async function getHostProfile(hostId: string): Promise<HostProfile | null
   if (!isUuid(hostId)) return null
   const user = await getUserById(hostId)
   if (!user) return null
-  const verification = await getVerification(hostId)
+  // Read the source of truth, not the submission log — so this badge, the listing
+  // pages and the mobile apps all agree.
+  const { rows: vrows } = await pool.query(
+    `SELECT COALESCE(verification_status, 'unverified') AS status FROM users WHERE id = $1`,
+    [hostId],
+  )
+  const verificationStatus = String(vrows[0]?.status ?? 'unverified')
 
   const [{ rows: lrows }, { rows: rvrows }] = await Promise.all([
     pool.query(
@@ -1569,7 +1742,7 @@ export async function getHostProfile(hostId: string): Promise<HostProfile | null
   const totalReviews = listings.reduce((s, l) => s + (l.rating_count ?? 0), 0)
 
   return {
-    profile: { ...user, bio: null, verification_status: verification.status },
+    profile: { ...user, bio: null, verification_status: verificationStatus },
     listings,
     reviews: rvrows as HostReviewCard[],
     avgRating,
@@ -2035,16 +2208,30 @@ export interface AdminStats {
   pending_applications: number
   pending_verifications: number
   gross_paid: number
+  /** F3/F4 — the "needs attention" counts behind the alert tiles and the alert centre. */
+  bookings_today: number
+  pending_listings: number
+  disputed_payments: number
+  pending_resort_submissions: number
+  open_reports: number
+  /** When the oldest item in each queue arrived, so an alert can show how long it has waited. */
+  oldest_verification: string | null
+  oldest_application: string | null
+  oldest_listing: string | null
+  oldest_report: string | null
 }
 
-/** Top-line counts for the admin dashboard. gross_paid = SUM(total_price) of paid
- *  bookings; verified = users with at least one verified id_verification. */
+/** Top-line counts for the admin dashboard, plus the alert queues (F3/F4).
+ *  gross_paid = SUM(total_price) of paid bookings. */
 export async function adminStats(): Promise<AdminStats> {
   const { rows } = await pool.query(
     `SELECT
        (SELECT COUNT(*) FROM users)::int AS users,
        (SELECT COUNT(*) FROM users WHERE is_host = true)::int AS hosts,
-       (SELECT COUNT(DISTINCT user_id) FROM id_verifications WHERE status = 'verified')::int AS verified,
+       -- users.verification_status is the source of truth (E2/E3), not the
+       -- submission log — otherwise this tile disagrees with every badge the
+       -- moment someone is verified without a matching id_verifications row.
+       (SELECT COUNT(*) FROM users WHERE verification_status = 'verified')::int AS verified,
        (SELECT COUNT(*) FROM listings)::int AS listings,
        (SELECT COUNT(*) FROM listings WHERE is_published = true)::int AS published,
        (SELECT COUNT(*) FROM bookings)::int AS bookings,
@@ -2055,7 +2242,26 @@ export async function adminStats(): Promise<AdminStats> {
        (SELECT COUNT(*) FROM bookings WHERE COALESCE(payment_status, 'unpaid') = 'paid')::int AS paid_bookings,
        (SELECT COUNT(*) FROM host_applications WHERE status = 'pending')::int AS pending_applications,
        (SELECT COUNT(*) FROM id_verifications WHERE status = 'pending')::int AS pending_verifications,
-       COALESCE((SELECT SUM(total_price) FROM bookings WHERE COALESCE(payment_status, 'unpaid') = 'paid'), 0)::float8 AS gross_paid`
+       COALESCE((SELECT SUM(total_price) FROM bookings WHERE COALESCE(payment_status, 'unpaid') = 'paid'), 0)::float8 AS gross_paid,
+       -- F3/F4: the queues that need someone's attention. These drive both the
+       -- dashboard's alert tiles and the alert centre, so they live in the same single
+       -- query rather than fanning out per poll.
+       (SELECT COUNT(*) FROM bookings WHERE created_at >= date_trunc('day', now()))::int AS bookings_today,
+       (SELECT COUNT(*) FROM listings WHERE COALESCE(approval_status, 'approved') = 'pending')::int AS pending_listings,
+       -- Only the LATEST proof per booking counts — an old disputed proof superseded by
+       -- a fresh one is not an open dispute. Mirrors adminListDisputes.
+       (SELECT COUNT(*) FROM payment_proofs pp
+         WHERE pp.status = 'disputed'
+           AND pp.id = (SELECT id FROM payment_proofs p2 WHERE p2.booking_id = pp.booking_id
+                         ORDER BY p2.submitted_at DESC LIMIT 1))::int AS disputed_payments,
+       (SELECT COUNT(*) FROM resort_submissions WHERE status = 'pending')::int AS pending_resort_submissions,
+       (SELECT COUNT(*) FROM reports WHERE status = 'open')::int AS open_reports,
+       -- How long the oldest item in each queue has waited, so the alert centre can say
+       -- "3 days" rather than just a number.
+       (SELECT to_char(MIN(submitted_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') FROM id_verifications WHERE status = 'pending') AS oldest_verification,
+       (SELECT to_char(MIN(submitted_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') FROM host_applications WHERE status = 'pending') AS oldest_application,
+       (SELECT to_char(MIN(created_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') FROM listings WHERE COALESCE(approval_status, 'approved') = 'pending') AS oldest_listing,
+       (SELECT to_char(MIN(created_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') FROM reports WHERE status = 'open') AS oldest_report`
   )
   return rows[0] as AdminStats
 }
@@ -2188,12 +2394,12 @@ export interface AdminListingRow {
   created_at: string
   booking_count: number
   image: string | null
-  /** True when the host attached a proof-of-ownership document. */
+  /** True when the host attached a proof-of-ownership document. The document ITSELF
+   *  is no longer shipped here — it comes one at a time from the audited
+   *  /api/local/admin/documents/ownership/:id, which needs the `documents` module
+   *  and records who opened it. This payload used to carry the inline base64 for
+   *  every pending listing, to anyone holding `listings`, with no record at all. */
   has_ownership_doc: boolean
-  /** The document itself — only sent for listings awaiting review, since that is
-   *  where the admin has to look at it before approving. Withheld elsewhere so a
-   *  300-row queue isn't 300 inline base64 images. */
-  ownership_doc: string | null
 }
 
 /** Newest-first listings (LIMIT 300) with host name, booking count and a primary image. */
@@ -2203,8 +2409,6 @@ export async function adminListListings(): Promise<AdminListingRow[]> {
             l.price_per_night::float8 AS price_per_night, l.is_published,
             COALESCE(l.approval_status, 'approved') AS approval_status,
             (l.ownership_doc IS NOT NULL AND l.ownership_doc <> '') AS has_ownership_doc,
-            CASE WHEN COALESCE(l.approval_status, 'approved') = 'pending'
-                 THEN l.ownership_doc END AS ownership_doc,
             l.host_id, u.full_name AS host_name, l.region,
             -- The approval flow needs to know whether the resort is a catalog entry
             -- or free text the host typed via "Other" (which needs review).
@@ -2301,6 +2505,269 @@ export async function adminSetHost(id: string, makeHost: boolean): Promise<void>
   if (makeHost) {
     await createNotification(id, 'host', 'You are now a host!', 'Your account was upgraded to host — sign out and back in to start listing your space.', '/host')
   }
+}
+
+// ---- F4: abuse reports ------------------------------------------------------
+
+export interface AdminReport {
+  id: string
+  reporter_id: string | null
+  reporter_name: string | null
+  reporter_email: string | null
+  target_type: string
+  target_id: string
+  /** Who or what was reported, resolved to something readable. */
+  target_label: string | null
+  reason: string | null
+  details: string | null
+  status: string
+  created_at: string
+  resolved_at: string | null
+}
+
+/**
+ * The abuse-report queue (F4).
+ *
+ * Ported from the backend's trust.ts, which has had this logic — and a full triage API
+ * — since the trust work landed. /ops lives in this project and had neither, so the
+ * `reports` staff module gated a route the console could never reach and no filed
+ * report had ever been seen by anyone.
+ *
+ * The target is resolved to a label here rather than in the UI so a moderator can tell
+ * what they're looking at without opening three tabs.
+ */
+export async function adminListReports(status = 'open'): Promise<AdminReport[]> {
+  const filterable = status === 'open' || status === 'resolved' || status === 'dismissed'
+  const { rows } = await pool.query(
+    `SELECT r.id, r.reporter_id, u.full_name AS reporter_name, u.email AS reporter_email,
+            r.target_type, r.target_id, r.reason, r.details, r.status,
+            to_char(r.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
+            to_char(r.resolved_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS resolved_at,
+            CASE r.target_type
+              WHEN 'user'    THEN (SELECT COALESCE(NULLIF(tu.full_name, ''), tu.email) FROM users tu WHERE tu.id = r.target_id)
+              WHEN 'listing' THEN (SELECT tl.title FROM listings tl WHERE tl.id = r.target_id)
+              WHEN 'review'  THEN (SELECT left(COALESCE(tr.comment, ''), 80) FROM reviews tr WHERE tr.id = r.target_id)
+            END AS target_label
+       FROM reports r LEFT JOIN users u ON u.id = r.reporter_id
+      ${filterable ? 'WHERE r.status = $1' : ''}
+      ORDER BY r.created_at DESC
+      LIMIT 300`,
+    filterable ? [status] : [],
+  )
+  return rows as AdminReport[]
+}
+
+/** Resolve or dismiss a report. Returns false when the id doesn't exist. */
+export async function adminResolveReport(
+  reportId: string,
+  status: 'resolved' | 'dismissed',
+): Promise<boolean> {
+  if (!isUuid(reportId)) return false
+  const { rowCount } = await pool.query(
+    `UPDATE reports SET status = $2, resolved_at = now() WHERE id = $1`,
+    [reportId, status],
+  )
+  return (rowCount ?? 0) > 0
+}
+
+// ---- F2: reading the staff audit trail --------------------------------------
+
+export interface AuditEntry {
+  id: string
+  at: string
+  staff_id: string | null
+  staff_email: string | null
+  action: string
+  target_type: string | null
+  target_id: string | null
+  detail: unknown
+  ip: string | null
+}
+
+/**
+ * The staff audit trail (F2).
+ *
+ * staff_audit_log has been written since the RBAC work landed but NEVER read — until
+ * this, the only way to answer "who deleted that?" was psql against Neon. The table
+ * itself needed no change; it needed a reader.
+ *
+ * `action` and `target_type` arrive pre-validated as plain slugs (parseAuditFilter)
+ * and are still bound, never interpolated.
+ */
+export async function getAuditLog(
+  filter: AuditFilter,
+): Promise<{ entries: AuditEntry[]; hasMore: boolean }> {
+  const where: string[] = []
+  const params: unknown[] = []
+  const bind = (v: unknown) => `$${params.push(v)}`
+
+  if (filter.q) where.push(`COALESCE(staff_email, '') ILIKE ${bind(`%${filter.q}%`)}`)
+  if (filter.action) where.push(`action = ${bind(filter.action)}`)
+  if (filter.targetType) where.push(`target_type = ${bind(filter.targetType)}`)
+  if (filter.from) where.push(`created_at >= ${bind(filter.from)}::date`)
+  if (filter.to) where.push(`created_at < (${bind(filter.to)}::date + interval '1 day')`)
+
+  const limit = bind(filter.limit + 1)
+  const offset = bind(filter.offset)
+  const { rows } = await pool.query(
+    `SELECT id, to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS at,
+            staff_id, staff_email, action, target_type, target_id, detail, ip
+       FROM staff_audit_log
+       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+      ORDER BY created_at DESC
+      LIMIT ${limit} OFFSET ${offset}`,
+    params,
+  )
+  const hasMore = rows.length > filter.limit
+  return { entries: rows.slice(0, filter.limit) as AuditEntry[], hasMore }
+}
+
+/** The distinct actions actually present, for the filter dropdown — so it offers what
+ *  this deployment has really recorded rather than a hardcoded list that drifts. */
+export async function getAuditActions(): Promise<string[]> {
+  const { rows } = await pool.query(
+    `SELECT DISTINCT action FROM staff_audit_log ORDER BY action`,
+  )
+  return rows.map((r) => String(r.action))
+}
+
+// ---- F1: the site activity feed ---------------------------------------------
+
+export interface ActivityEvent {
+  kind: string
+  at: string
+  actor_id: string | null
+  actor_email: string | null
+  actor_name: string | null
+  /** What the event was about — a listing title, a reservation code, an amount. */
+  subject: string | null
+  subject_type: string | null
+  subject_id: string | null
+  /** Money, where the event has any. */
+  amount: number | null
+  detail: string | null
+}
+
+/**
+ * Everything that happened on the site, newest first.
+ *
+ * There is NO activity_log table. Six of the seven kinds are derived from timestamps
+ * already sitting on real rows, so this feed has full history from the day it shipped
+ * rather than starting empty — and it cannot drift from the data it describes, because
+ * it IS the data. `login` is the exception and has its own table.
+ *
+ * Each branch is date-windowed and LIMITed BEFORE the union, so every one uses its own
+ * created_at index instead of sorting a whole table; the outer query only merges an
+ * already-small set. Branches the filter excludes are not emitted at all.
+ */
+export async function getActivityFeed(
+  filter: ActivityFilter,
+): Promise<{ events: ActivityEvent[]; hasMore: boolean }> {
+  const params: unknown[] = []
+  const bind = (v: unknown) => `$${params.push(v)}`
+
+  // One shared window; `to` widens to the whole final day.
+  const from = filter.from ? bind(filter.from) : null
+  const to = filter.to ? bind(filter.to) : null
+  const windowFor = (col: string) => {
+    const parts: string[] = [`${col} IS NOT NULL`]
+    if (from) parts.push(`${col} >= ${from}::date`)
+    if (to) parts.push(`${col} < (${to}::date + interval '1 day')`)
+    return parts.join(' AND ')
+  }
+  const cap = bind(branchLimit(filter))
+  const search = filter.q ? bind(`%${filter.q}%`) : null
+  // Applied to the actor, whoever that is for the branch in question.
+  const match = (email: string, name: string) =>
+    search ? ` AND (${email} ILIKE ${search} OR COALESCE(${name}, '') ILIKE ${search})` : ''
+
+  const branches: string[] = []
+
+  if (wantsKind(filter, 'signup')) branches.push(`
+    (SELECT 'signup' AS kind, u.created_at AS at, u.id AS actor_id, u.email AS actor_email,
+            u.full_name AS actor_name, NULL::text AS subject, 'user' AS subject_type,
+            u.id::text AS subject_id, NULL::float8 AS amount,
+            CASE WHEN COALESCE(u.is_host, false) THEN 'host' ELSE 'guest' END AS detail
+       FROM users u
+      WHERE ${windowFor('u.created_at')}${match('u.email', 'u.full_name')}
+      ORDER BY u.created_at DESC LIMIT ${cap})`)
+
+  if (wantsKind(filter, 'login')) branches.push(`
+    (SELECT 'login' AS kind, lg.created_at AS at, u.id AS actor_id, u.email AS actor_email,
+            u.full_name AS actor_name, NULL::text AS subject, 'user' AS subject_type,
+            u.id::text AS subject_id, NULL::float8 AS amount, lg.method AS detail
+       FROM user_logins lg JOIN users u ON u.id = lg.user_id
+      WHERE ${windowFor('lg.created_at')}${match('u.email', 'u.full_name')}
+      ORDER BY lg.created_at DESC LIMIT ${cap})`)
+
+  if (wantsKind(filter, 'listing_created')) branches.push(`
+    (SELECT 'listing_created' AS kind, l.created_at AS at, u.id AS actor_id, u.email AS actor_email,
+            u.full_name AS actor_name, l.title AS subject, 'listing' AS subject_type,
+            l.id::text AS subject_id, l.price_per_night::float8 AS amount,
+            COALESCE(l.approval_status, 'approved') AS detail
+       FROM listings l LEFT JOIN users u ON u.id = l.host_id
+      WHERE ${windowFor('l.created_at')}${match("COALESCE(u.email, '')", 'u.full_name')}
+      ORDER BY l.created_at DESC LIMIT ${cap})`)
+
+  if (wantsKind(filter, 'booking_created')) branches.push(`
+    (SELECT 'booking_created' AS kind, b.created_at AS at, u.id AS actor_id, u.email AS actor_email,
+            u.full_name AS actor_name, l.title AS subject, 'booking' AS subject_type,
+            b.id::text AS subject_id, b.total_price::float8 AS amount, b.status AS detail
+       FROM bookings b LEFT JOIN users u ON u.id = b.user_id
+                       LEFT JOIN listings l ON l.id = b.listing_id
+      WHERE ${windowFor('b.created_at')}${match("COALESCE(u.email, '')", 'u.full_name')}
+      ORDER BY b.created_at DESC LIMIT ${cap})`)
+
+  if (wantsKind(filter, 'payment_submitted')) branches.push(`
+    (SELECT 'payment_submitted' AS kind, pp.submitted_at AS at, u.id AS actor_id, u.email AS actor_email,
+            u.full_name AS actor_name, l.title AS subject, 'booking' AS subject_type,
+            b.id::text AS subject_id, COALESCE(pp.amount, b.total_price)::float8 AS amount,
+            pp.status AS detail
+       FROM payment_proofs pp JOIN bookings b ON b.id = pp.booking_id
+                              LEFT JOIN users u ON u.id = b.user_id
+                              LEFT JOIN listings l ON l.id = b.listing_id
+      WHERE ${windowFor('pp.submitted_at')}${match("COALESCE(u.email, '')", 'u.full_name')}
+      ORDER BY pp.submitted_at DESC LIMIT ${cap})`)
+
+  // NB the paid_at trap: it is NULLed on refund. Gating on PAID_SQL means this branch
+  // shows payments that are still paid, and a refund shows up as its own money event
+  // rather than a payment that silently vanished.
+  if (wantsKind(filter, 'payment_approved')) branches.push(`
+    (SELECT 'payment_approved' AS kind, b.paid_at AS at, u.id AS actor_id, u.email AS actor_email,
+            u.full_name AS actor_name, l.title AS subject, 'booking' AS subject_type,
+            b.id::text AS subject_id, b.total_price::float8 AS amount, b.payment_status AS detail
+       FROM bookings b LEFT JOIN users u ON u.id = b.user_id
+                       LEFT JOIN listings l ON l.id = b.listing_id
+      WHERE ${windowFor('b.paid_at')} AND ${PAID_SQL}${match("COALESCE(u.email, '')", 'u.full_name')}
+      ORDER BY b.paid_at DESC LIMIT ${cap})`)
+
+  if (wantsKind(filter, 'booking_cancelled')) branches.push(`
+    (SELECT 'booking_cancelled' AS kind, b.cancelled_at AS at, u.id AS actor_id, u.email AS actor_email,
+            u.full_name AS actor_name, l.title AS subject, 'booking' AS subject_type,
+            b.id::text AS subject_id, b.refund_amount::float8 AS amount,
+            COALESCE(b.cancelled_by_role, 'guest') AS detail
+       FROM bookings b LEFT JOIN users u ON u.id = b.user_id
+                       LEFT JOIN listings l ON l.id = b.listing_id
+      WHERE ${windowFor('b.cancelled_at')}${match("COALESCE(u.email, '')", 'u.full_name')}
+      ORDER BY b.cancelled_at DESC LIMIT ${cap})`)
+
+  if (branches.length === 0) return { events: [], hasMore: false }
+
+  const dir = filter.sort === 'oldest' ? 'ASC' : 'DESC'
+  // Fetch one extra row so the client knows whether a next page exists without a
+  // COUNT over a seven-branch union.
+  const limit = bind(filter.limit + 1)
+  const offset = bind(filter.offset)
+  const { rows } = await pool.query(
+    `SELECT kind, to_char(at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS at, actor_id, actor_email,
+            actor_name, subject, subject_type, subject_id, amount, detail
+       FROM (${branches.join('\n    UNION ALL')}) e
+      ORDER BY at ${dir}
+      LIMIT ${limit} OFFSET ${offset}`,
+    params,
+  )
+  const hasMore = rows.length > filter.limit
+  return { events: rows.slice(0, filter.limit) as ActivityEvent[], hasMore }
 }
 
 // ---- D2: user profile -------------------------------------------------------
@@ -3437,7 +3904,7 @@ export async function markStaffResetUsed(id: string): Promise<void> {
 }
 
 /** Housekeeping for the daily cron — sessions and reset codes accumulate forever. */
-export async function purgeStaffExpired(): Promise<{ sessions: number; resets: number }> {
+export async function purgeStaffExpired(): Promise<{ sessions: number; resets: number; logins: number }> {
   const s = await pool.query(
     `DELETE FROM staff_sessions WHERE expires_at < now() - interval '30 days'`
   )
@@ -3445,5 +3912,37 @@ export async function purgeStaffExpired(): Promise<{ sessions: number; resets: n
     `DELETE FROM staff_password_resets
       WHERE created_at < now() - interval '30 days' AND (used_at IS NOT NULL OR expires_at < now())`
   )
-  return { sessions: s.rowCount ?? 0, resets: r.rowCount ?? 0 }
+  // user_logins carries an IP and a user agent per sign-in — real PII, and unbounded.
+  // 90 days is long enough to investigate an incident and short enough that the table
+  // isn't a standing liability.
+  const l = await pool.query(`DELETE FROM user_logins WHERE created_at < now() - interval '90 days'`)
+  return { sessions: s.rowCount ?? 0, resets: r.rowCount ?? 0, logins: l.rowCount ?? 0 }
+}
+
+/**
+ * Record a user sign-in (F1) — the ONE event the activity feed can't derive, because
+ * nothing else in the schema records that a user logged in: no last_login_at, and no
+ * user session table (auth is a stateless 30-day JWT).
+ *
+ * Best-effort by design, and the opposite call from recordDocumentView: a logging
+ * failure must never stop someone signing in. Swallow and move on.
+ */
+export async function recordLogin(
+  userId: string,
+  method: 'password' | 'otp' | 'google' | 'apple' | 'social',
+  req?: Request,
+): Promise<void> {
+  try {
+    if (!isUuid(userId)) return
+    const ip = req
+      ? (req.headers.get('x-forwarded-for')?.split(',')[0].trim() || req.headers.get('x-real-ip') || null)
+      : null
+    const ua = req ? (req.headers.get('user-agent') || '').slice(0, 300) || null : null
+    await pool.query(
+      `INSERT INTO user_logins (user_id, method, ip, user_agent) VALUES ($1, $2, $3, $4)`,
+      [userId, method, ip, ua],
+    )
+  } catch {
+    /* never block a sign-in over telemetry */
+  }
 }

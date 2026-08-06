@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { recordLogin } from '@/lib/local/db'
 import { verifyAppleIdToken, oauthConfigured } from '@/lib/local/oauth'
 import { upsertSocialUser, signToken, publicUserWithHost, getUserRowByEmail, blockedAccountResponse } from '@/lib/local/auth'
 
@@ -45,6 +46,9 @@ export async function POST(req: Request) {
       provider: 'apple',
     })
     const token = signToken({ sub: user.id, email: user.email })
+    // F1: the one activity event nothing else records. Best-effort —
+    // never let telemetry stop a sign-in.
+    await recordLogin(user.id, 'apple', req)
     const res = NextResponse.json({ token, user: await publicUserWithHost(user) }, { headers: CORS })
     res.cookies.set('qk_token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 30 * 24 * 3600 })
     return res

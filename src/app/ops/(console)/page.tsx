@@ -17,6 +17,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useOpsSession, OpsHeader } from './ops-session'
+import { useLivePoll, agoLabel } from './use-live-stats'
+import { adminGetQuiet } from './ops-ui'
+import { alertsFor, alertTotal, waitingLabel } from '@/lib/local/activity-core'
 
 // Boutique palette.
 const BURGUNDY = '#5B0F16'
@@ -55,6 +58,15 @@ type AdminStats = {
   pending_applications: number
   pending_verifications: number
   gross_paid: number
+  bookings_today: number
+  pending_listings: number
+  disputed_payments: number
+  pending_resort_submissions: number
+  open_reports: number
+  oldest_verification: string | null
+  oldest_application: string | null
+  oldest_listing: string | null
+  oldest_report: string | null
 }
 
 
@@ -76,6 +88,9 @@ type AdminListing = {
   created_at: string
   booking_count: number
   image: string | null
+  /** Whether the host attached proof of ownership. The document itself is opened
+   *  through the audited endpoint — see openDocument. */
+  has_ownership_doc?: boolean
 }
 
 type AdminBooking = {
@@ -114,10 +129,15 @@ type Verification = {
   full_name?: string | null
   id_number?: string | null
   status?: string | null
-  image_data?: string | null
-  back_image_data?: string | null
-  selfie_image_data?: string | null
+  // Which documents exist. The bytes are NOT here — each one is fetched on demand
+  // from the audited /api/local/admin/documents endpoint. See openDocument below.
+  has_front?: boolean
+  has_back?: boolean
+  has_selfie?: boolean
   submitted_at?: string | null
+  reviewed_at?: string | null
+  reviewed_by?: string | null
+  notes?: string | null
 }
 
 function fmtDate(value?: string | null): string {
@@ -170,6 +190,9 @@ export default function OpsPage() {
   const [bookings, setBookings] = useState<AdminBooking[]>([])
   const [apps, setApps] = useState<HostApplication[]>([])
   const [verifs, setVerifs] = useState<Verification[]>([])
+  // E2: the queue is a work list, so it defaults to pending — but a decided case must
+  // stay reachable, otherwise it can never be reopened.
+  const [verifFilter, setVerifFilter] = useState<'pending' | 'verified' | 'rejected' | 'all'>('pending')
 
   // Per-section loading / error.
   const [loading, setLoading] = useState<Record<TabId, boolean>>({
@@ -193,6 +216,23 @@ export default function OpsPage() {
     applications: false,
     verifications: false,
   })
+
+  // F3: the Overview polls. Everything else in /ops is still fetch-once — a dashboard
+  // is the one screen where a stale number is actively misleading.
+  const live = useLivePoll<AdminStats>(
+    () => adminGetQuiet<{ stats?: AdminStats }>('stats').then((r) =>
+      typeof r === 'string' || r == null ? r : (r.stats ?? null)),
+    30_000,
+    null,
+  )
+  useEffect(() => { if (live.data) setStats(live.data) }, [live.data])
+  // Re-render once a second purely so "updated 12s ago" counts up.
+  const [nowTick, setNowTick] = useState(() => 0)
+  useEffect(() => {
+    if (tab !== 'overview') return
+    const t = setInterval(() => setNowTick(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [tab])
 
   const [busyId, setBusyId] = useState<string | null>(null)
   // Resort review: set while approving a listing whose resort is free text.
@@ -283,7 +323,7 @@ export default function OpsPage() {
           }
           setApps(Array.isArray(json.applications) ? json.applications : [])
         } else if (id === 'verifications') {
-          const json = await adminGet<{ verifications?: Verification[] }>('verifications')
+          const json = await adminGet<{ verifications?: Verification[] }>(`verifications?status=${verifFilter}`)
           if (json === 'forbidden') return setSectionError(id, NO_ACCESS)
           if (!json) {
             setSectionError(id, 'Could not load verifications. Please retry.')
@@ -296,13 +336,19 @@ export default function OpsPage() {
         setSectionLoading(id, false)
       }
     },
-    [adminGet],
+    [adminGet, verifFilter],
   )
 
   // Lazy-fetch the active tab on first open.
   useEffect(() => {
     if (!loaded[tab] && !loading[tab]) void loadSection(tab)
   }, [tab, loaded, loading, loadSection])
+
+  // A different verification filter is a different result set — drop the loaded flag
+  // so the effect above refetches instead of showing the previous filter's rows.
+  useEffect(() => {
+    setLoaded((prev) => (prev.verifications ? { ...prev, verifications: false } : prev))
+  }, [verifFilter])
 
 
   // Load the app download links once. They sit on the console shell above the tabs,
@@ -450,7 +496,7 @@ export default function OpsPage() {
     if (ok) setApps((prev) => prev.filter((a) => a.id !== id))
   }
 
-  const decideVerif = async (id: string, action: 'verify' | 'reject') => {
+  const decideVerif = async (id: string, action: 'verify' | 'reject' | 'pending') => {
     let note: string | null = null
     if (action === 'reject') {
       note = window.prompt('Optional note (why rejected):') ?? null
@@ -458,7 +504,43 @@ export default function OpsPage() {
     setBusyId(id)
     const ok = await post('verifications', { id, action, note })
     setBusyId(null)
-    if (ok) setVerifs((prev) => prev.filter((v) => v.id !== id))
+    if (!ok) return
+    // On a filtered view the row no longer matches, so drop it; on 'all' it still
+    // belongs but with a new status, so refetch rather than lie about it.
+    if (verifFilter === 'all') setLoaded((p) => ({ ...p, verifications: false }))
+    else setVerifs((prev) => prev.filter((v) => v.id !== id))
+  }
+
+  /**
+   * Fetch one document from the audited endpoint and open it.
+   *
+   * Deliberately fetch -> blob -> object URL rather than <img src={apiUrl}>: an <img>
+   * turns 403 (no `documents` module) and 404 (nothing on file) into the same broken
+   * -image icon, and the operator needs to know which. Every call writes an audit row.
+   */
+  const openDocument = async (kind: string, id: string) => {
+    setBusyId(id)
+    try {
+      const res = await fetch(`/api/local/admin/documents/${kind}/${id}`, { credentials: 'same-origin' })
+      if (res.status === 403) return void window.alert('Your account does not have the Documents permission.')
+      if (res.status === 404) return void window.alert('No document on file.')
+      if (res.status === 415) return void window.alert('That document is stored in a format we cannot display.')
+      if (!res.ok) return void window.alert('Could not open the document.')
+      // A document stored as a link comes back as JSON instead of bytes.
+      if (res.headers.get('content-type')?.includes('application/json')) {
+        const body = await res.json()
+        if (body?.url) window.open(body.url, '_blank', 'noopener,noreferrer')
+        return
+      }
+      const url = URL.createObjectURL(await res.blob())
+      window.open(url, '_blank', 'noopener,noreferrer')
+      // The tab has the blob by now; releasing it frees the decoded image from memory.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch {
+      window.alert('Could not open the document.')
+    } finally {
+      setBusyId(null)
+    }
   }
 
   // ---- styles ----
@@ -692,6 +774,61 @@ export default function OpsPage() {
         {/* ===================== OVERVIEW ===================== */}
         {tab === 'overview' && loaded.overview ? (
           stats ? (
+          <>
+            {/* F4: what needs a human, above the vanity metrics — and only the queues
+                this operator can actually act on. */}
+            {(() => {
+              const alerts = alertsFor(stats as unknown as Record<string, number>, {
+                modules: [], isSuperAdmin: true,
+              }).filter((a) => can(a.module as never))
+              const oldest: Record<string, string | null> = {
+                pending_verifications: stats.oldest_verification,
+                pending_applications: stats.oldest_application,
+                pending_listings: stats.oldest_listing,
+                open_reports: stats.oldest_report,
+              }
+              if (alerts.length === 0) {
+                return (
+                  <div style={{ ...cardStyle, marginBottom: 14, color: GREEN, fontSize: 14, fontWeight: 700 }}>
+                    Nothing is waiting. Every queue is clear.
+                  </div>
+                )
+              }
+              return (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+                    <strong style={{ fontSize: 14, color: BURGUNDY }}>
+                      Needs attention ({alertTotal(alerts)})
+                    </strong>
+                    <span style={{ fontSize: 12, color: live.expired ? '#B3261E' : MUTED }}>
+                      {live.expired
+                        ? 'Session ended — reload to resume live updates'
+                        : `Live · updated ${agoLabel(live.updatedAt, nowTick || Date.now())}`}
+                    </span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10 }}>
+                    {alerts.map((a) => (
+                      <a
+                        key={a.key}
+                        href={a.href}
+                        style={{
+                          ...cardStyle, padding: '14px 16px', textDecoration: 'none',
+                          borderLeft: `4px solid ${BURGUNDY}`, display: 'block',
+                        }}
+                      >
+                        <div style={{ fontSize: 24, fontWeight: 800, color: BURGUNDY, lineHeight: 1.1 }}>{a.count}</div>
+                        <div style={{ fontSize: 12.5, color: INK, marginTop: 4, fontWeight: 600 }}>{a.label}</div>
+                        {oldest[a.key] ? (
+                          <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>
+                            oldest waiting {waitingLabel(oldest[a.key], nowTick || Date.now())}
+                          </div>
+                        ) : null}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
             <div
               style={{
                 display: 'grid',
@@ -706,7 +843,9 @@ export default function OpsPage() {
                 { label: 'Listings', value: stats.listings },
                 { label: 'Published', value: stats.published },
                 { label: 'Bookings', value: stats.bookings },
+                { label: 'Bookings today', value: stats.bookings_today },
                 { label: 'Pending bookings', value: stats.pending_bookings },
+                { label: 'Confirmed', value: stats.confirmed_bookings },
                 { label: 'Paid', value: stats.paid_bookings },
                 {
                   label: 'Gross paid',
@@ -736,6 +875,7 @@ export default function OpsPage() {
                 </div>
               ))}
             </div>
+          </>
           ) : (
             <p style={{ color: MUTED, fontSize: 14 }}>No stats available.</p>
           )
@@ -834,6 +974,19 @@ export default function OpsPage() {
                   >
                     {l.approval_status === 'pending' ? (
                       <>
+                        {/* Approving is a judgement about a document, so the document
+                            has to be reachable — it is no longer inlined in the list
+                            payload. Each open is audited. */}
+                        {l.has_ownership_doc ? (
+                          <button
+                            style={outlineBtn}
+                            disabled={busyId === l.id}
+                            title="Opening this is recorded in the staff audit log"
+                            onClick={() => openDocument('ownership', l.id)}
+                          >
+                            Ownership doc
+                          </button>
+                        ) : null}
                         <button
                           style={approveBtn}
                           disabled={busyId === l.id}
@@ -1012,9 +1165,30 @@ export default function OpsPage() {
 
         {/* ===================== ID VERIFICATIONS ===================== */}
         {tab === 'verifications' && loaded.verifications ? (
-          verifs.length === 0 ? (
-            <p style={{ color: MUTED, fontSize: 14 }}>No pending verifications.</p>
-          ) : (
+          <>
+            {/* Filter chips — a decided case must stay reachable so it can be reopened. */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+              {(['pending', 'verified', 'rejected', 'all'] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setVerifFilter(f)}
+                  style={{
+                    ...btnBase,
+                    background: verifFilter === f ? BURGUNDY : 'transparent',
+                    color: verifFilter === f ? CREAM : INK,
+                    border: `1px solid ${verifFilter === f ? BURGUNDY : TAN}`,
+                    textTransform: 'capitalize',
+                  }}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+            {verifs.length === 0 ? (
+              <p style={{ color: MUTED, fontSize: 14 }}>
+                No {verifFilter === 'all' ? '' : verifFilter} verifications.
+              </p>
+            ) : (
             <div style={{ display: 'grid', gap: 14 }}>
               {verifs.map((v) => (
                 <div key={v.id} style={cardStyle}>
@@ -1052,68 +1226,47 @@ export default function OpsPage() {
                       </div>
                     ) : null}
                   </div>
-                  {v.image_data || v.back_image_data || v.selfie_image_data ? (
-                    <div
-                      style={{
-                        display: 'flex',
-                        gap: 12,
-                        flexWrap: 'wrap',
-                        marginBottom: 14,
-                      }}
-                    >
-                      {v.image_data ? (
-                        <div>
-                          <div style={labelStyle}>Front</div>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={v.image_data}
-                            alt="ID front"
-                            style={{
-                              maxHeight: 160,
-                              maxWidth: '100%',
-                              borderRadius: 12,
-                              border: `1px solid ${TAN}`,
-                              display: 'block',
-                            }}
-                          />
-                        </div>
-                      ) : null}
-                      {v.back_image_data ? (
-                        <div>
-                          <div style={labelStyle}>Back</div>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={v.back_image_data}
-                            alt="ID back"
-                            style={{
-                              maxHeight: 160,
-                              maxWidth: '100%',
-                              borderRadius: 12,
-                              border: `1px solid ${TAN}`,
-                              display: 'block',
-                            }}
-                          />
-                        </div>
-                      ) : null}
-                      {v.selfie_image_data ? (
-                        <div>
-                          <div style={labelStyle}>Selfie</div>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={v.selfie_image_data}
-                            alt="Personal photo"
-                            style={{
-                              maxHeight: 160,
-                              maxWidth: '100%',
-                              borderRadius: 12,
-                              border: `1px solid ${TAN}`,
-                              display: 'block',
-                            }}
-                          />
-                        </div>
-                      ) : null}
+                  {/* Documents are opened one at a time through the audited endpoint —
+                      never rendered inline. This queue used to ship every pending
+                      submission's three ID photos to anyone who opened the tab. */}
+                  {v.has_front || v.has_back || v.has_selfie ? (
+                    <div style={{ marginBottom: 14 }}>
+                      <p
+                        style={{
+                          margin: '0 0 8px',
+                          fontSize: 12,
+                          lineHeight: 1.6,
+                          color: INK,
+                          background: '#FDF0DC',
+                          padding: '8px 10px',
+                          borderRadius: 10,
+                        }}
+                      >
+                        Opening a document reveals this person&apos;s identity papers and is
+                        recorded in the staff audit log.
+                      </p>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {([
+                          ['id_front', 'View front', v.has_front],
+                          ['id_back', 'View back', v.has_back],
+                          ['id_selfie', 'View selfie', v.has_selfie],
+                        ] as Array<[string, string, boolean | undefined]>).map(([kind, label, present]) =>
+                          present ? (
+                            <button
+                              key={kind}
+                              style={outlineBtn}
+                              disabled={busyId === v.id}
+                              onClick={() => openDocument(kind, v.id)}
+                            >
+                              {label}
+                            </button>
+                          ) : null,
+                        )}
+                      </div>
                     </div>
-                  ) : null}
+                  ) : (
+                    <p style={{ margin: '0 0 14px', fontSize: 13, color: MUTED }}>No documents on file.</p>
+                  )}
                   <div style={{ display: 'flex', gap: 10 }}>
                     <button
                       style={approveBtn}
@@ -1129,11 +1282,30 @@ export default function OpsPage() {
                     >
                       Reject
                     </button>
+                    {/* E2's third state: put a decided case back in the queue. Hidden
+                        on a row that is already pending, where it would be a no-op. */}
+                    {v.status && v.status !== 'pending' ? (
+                      <button
+                        style={outlineBtn}
+                        disabled={busyId === v.id}
+                        onClick={() => decideVerif(v.id, 'pending')}
+                      >
+                        Reopen
+                      </button>
+                    ) : null}
                   </div>
+                  {v.reviewed_at ? (
+                    <p style={{ margin: '10px 0 0', fontSize: 12, color: MUTED }}>
+                      {v.status === 'verified' ? 'Verified' : 'Rejected'} {fmtDate(v.reviewed_at)}
+                      {v.reviewed_by ? ` by ${v.reviewed_by.replace(/^staff:/, 'staff ').slice(0, 20)}` : ''}
+                      {v.notes ? ` — ${v.notes}` : ''}
+                    </p>
+                  ) : null}
                 </div>
               ))}
             </div>
-          )
+            )}
+          </>
         ) : null}
       </div>
 

@@ -11,6 +11,9 @@ import { getUserFromRequest } from '@/lib/local/auth'
 // normalized to a data URL. Back-compat: { doc } or { image } is treated as FRONT only. Images are
 // stored inline (base64) so the admin panel can render them with no blob storage.
 export const dynamic = 'force-dynamic'
+
+/** Matches MAX_OWNERSHIP_DOC_CHARS and every other image cap in the project. */
+const MAX_ID_IMAGE_CHARS = 3_500_000
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' }
 
 export async function GET(req: Request) {
@@ -56,7 +59,11 @@ export async function POST(req: Request) {
     const back = backRaw ? toDataUrl(backRaw) : null
     const selfie = selfieRaw ? toDataUrl(selfieRaw) : null
     // Guard against runaway payloads (base64 of a ~5 MB image ≈ 6.7 MB).
-    if (front.length > 9_000_000 || (back && back.length > 9_000_000) || (selfie && selfie.length > 9_000_000)) {
+    // 3.5MB, the project-wide cap — NOT the 9MB this route used to allow. A 9MB
+    // base64 image cannot reach this code anyway: the serverless request-body limit
+    // rejects it first, with an error the client can't explain. Failing here gives
+    // the user an actionable message instead.
+    if (front.length > MAX_ID_IMAGE_CHARS || (back && back.length > MAX_ID_IMAGE_CHARS) || (selfie && selfie.length > MAX_ID_IMAGE_CHARS)) {
       return NextResponse.json({ error: 'Image too large; please use a smaller photo' }, { status: 413, headers: CORS })
     }
     const v = await submitVerification({

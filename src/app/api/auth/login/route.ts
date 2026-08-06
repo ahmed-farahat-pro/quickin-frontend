@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getUserRowByEmail, verifyPassword, signToken, rateLimit, clientIp, publicUserWithHost, generateOtp, blockedAccountResponse } from '@/lib/local/auth'
-import { createOtpCode } from '@/lib/local/db'
+import { createOtpCode, recordLogin } from '@/lib/local/db'
 import { sendOtpEmail } from '@/lib/local/email'
 
 export const dynamic = 'force-dynamic'
@@ -44,6 +44,9 @@ export async function POST(req: Request) {
     }
     const user = await publicUserWithHost(row)
     const token = signToken({ sub: user.id, email: user.email })
+    // F1: the one activity event nothing else records. Best-effort —
+    // never let telemetry stop a sign-in.
+    await recordLogin(user.id, 'password', req)
     const res = NextResponse.json({ token, user }, { headers: CORS })
     res.cookies.set('qk_token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 30 * 24 * 3600 })
     return res

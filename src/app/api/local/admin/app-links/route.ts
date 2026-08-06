@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { requireStaff } from '@/lib/local/staff'
+import { requireStaff, logStaffAction, clientIpOf } from '@/lib/local/staff'
 import { getAppLinks, setAppLinks } from '@/lib/local/db'
 
 // Admin: GET returns the current app store links; POST { ios, android } saves them.
@@ -36,6 +36,15 @@ export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}))
     await setAppLinks(cleanUrl(body.ios), cleanUrl(body.android))
+    await logStaffAction({
+      staffId: gate.staff.legacy ? null : gate.staff.staffId,
+      staffEmail: gate.staff.email,
+      action: 'app_links_updated',
+      targetType: 'setting',
+      targetId: 'app_links',
+      detail: { ios: body?.ios ?? null, android: body?.android ?? null },
+      ip: clientIpOf(req),
+    })
     return NextResponse.json(await getAppLinks(), { headers: CORS })
   } catch (err) {
     console.error('admin app-links POST:', err)

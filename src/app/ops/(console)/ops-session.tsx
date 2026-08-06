@@ -8,7 +8,7 @@
 // The timer is a convenience, NOT the security boundary: the server rejects an idle
 // session on the next request regardless (see resolveStaffSession). Without it the UI
 // would simply sit on a dead session until the operator clicked something.
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { StaffModule, StaffRole } from '@/lib/local/staff'
 
@@ -99,16 +99,47 @@ export function OpsSessionProvider({
  *  here needs no extra role check. */
 const NAV: Array<{ href: string; label: string; module: StaffModule }> = [
   { href: '/ops/users', label: 'Users', module: 'users' },
+  { href: '/ops/activity', label: 'Activity', module: 'overview' },
+  { href: '/ops/reports', label: 'Reports', module: 'reports' },
   { href: '/ops/analytics', label: 'Analytics', module: 'analytics' },
   { href: '/ops/payments', label: 'Payments', module: 'payments' },
   { href: '/ops/resorts', label: 'Resorts', module: 'resorts' },
+  { href: '/ops/audit', label: 'Audit', module: 'audit' },
   { href: '/ops/staff', label: 'Staff', module: 'staff' },
 ]
+
+/**
+ * The alert count, polled in the header so it follows the operator across every /ops
+ * screen rather than only existing on the dashboard.
+ *
+ * Deliberately quiet about failure: a bell that can't reach the server shows nothing
+ * rather than a zero, because "0 alerts" and "I don't know" must not look the same.
+ */
+function useAlertCount(): number | null {
+  const [total, setTotal] = useState<number | null>(null)
+  useEffect(() => {
+    let stop = false
+    const tick = async () => {
+      if (document.visibilityState === 'hidden') return
+      try {
+        const res = await fetch('/api/local/admin/alerts', { credentials: 'same-origin', cache: 'no-store' })
+        if (!res.ok) return
+        const body = await res.json()
+        if (!stop) setTotal(Number(body?.total ?? 0))
+      } catch { /* leave the previous value; never show a wrong zero */ }
+    }
+    void tick()
+    const t = setInterval(() => void tick(), 60_000)
+    return () => { stop = true; clearInterval(t) }
+  }, [])
+  return total
+}
 
 /** Shared header strip for the console pages: logo, who's signed in, sign out. */
 export function OpsHeader({ title }: { title: string }) {
   const { session, can, signOut } = useOpsSession()
   const router = useRouter()
+  const alertCount = useAlertCount()
 
   return (
     <header
@@ -145,6 +176,26 @@ export function OpsHeader({ title }: { title: string }) {
           {/* Module-gated nav. Each entry is hidden unless the operator holds the
               module — the page and its API re-check independently, so this is
               convenience, not the boundary. */}
+          {can('overview') && (
+            <button
+              type="button"
+              onClick={() => router.push('/ops/alerts')}
+              title={alertCount == null ? 'Alerts' : `${alertCount} waiting`}
+              style={{
+                position: 'relative',
+                padding: '8px 12px',
+                borderRadius: 12,
+                border: '1px solid rgba(91,15,22,0.25)',
+                background: alertCount ? '#5B0F16' : 'transparent',
+                color: alertCount ? '#F6F1E6' : '#5B0F16',
+                fontWeight: 700,
+                fontSize: 13,
+                cursor: 'pointer',
+              }}
+            >
+              {alertCount ? `\u2022 ${alertCount}` : '\u2022'} Alerts
+            </button>
+          )}
           {NAV.filter((n) => can(n.module)).map((n) => (
             <button
               key={n.href}

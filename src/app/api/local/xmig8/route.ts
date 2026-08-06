@@ -108,6 +108,9 @@ export async function GET(req: Request) {
     )`)
   await run('index staff_audit_log.created_at', `CREATE INDEX IF NOT EXISTS staff_audit_log_created_idx ON staff_audit_log (created_at DESC)`)
   await run('index staff_audit_log.staff_id', `CREATE INDEX IF NOT EXISTS staff_audit_log_staff_idx ON staff_audit_log (staff_id)`)
+  // Document views are audited, so "who opened document X" must not be a seq scan.
+  // Mirrors migrate-documents-audit.mjs in the backend repo — keep both in step.
+  await run('index staff_audit_log.target', `CREATE INDEX IF NOT EXISTS staff_audit_log_target_idx ON staff_audit_log (target_type, target_id)`)
 
   // ---- optional: seed the first super admin ---------------------------------
   const seedEmail = (url.searchParams.get('seed_email') || '').trim().toLowerCase()
