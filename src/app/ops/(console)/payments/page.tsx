@@ -11,6 +11,7 @@ import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import { resolveStaffSession, staffCan, STAFF_COOKIE } from '@/lib/local/staff'
 import { OpsPayments } from './ops-payments'
+import { OpsHeader } from '../ops-session'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,29 +43,12 @@ export default async function OpsPaymentsPage() {
         fontFamily: FONT,
       }}
     >
-      <header
-        style={{
-          background: `linear-gradient(180deg, ${COLORS.tan} 0%, ${COLORS.cream} 100%)`,
-          borderBottom: `1px solid rgba(91,15,22,0.10)`,
-          padding: '20px 24px',
-        }}
-      >
-        <div
-          style={{
-            maxWidth: 960,
-            margin: '0 auto',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 16,
-          }}
-        >
-          <a href="/explore" style={{ display: 'inline-flex', alignItems: 'center' }}>
-            <img src="/logo.png" alt="QuickIn" height={40} style={{ height: 40, width: 'auto', display: 'block' }} />
-          </a>
-          <span style={{ color: COLORS.burgundy, fontWeight: 700, fontSize: 14 }}>Payments Ops</span>
-        </div>
-      </header>
+      {/* This page used to build its own header — a logo linking to /explore and a
+          title, and nothing else. That meant the module nav, the alert bell, the
+          signed-in identity and Sign out all vanished the moment you opened Payments,
+          with no way back into the console except the browser button. Use the shared
+          header like every other /ops screen. */}
+      <OpsHeader title="Payments" />
 
       <section style={{ maxWidth: 960, margin: '0 auto', padding: '36px 24px 72px' }}>
         <h1

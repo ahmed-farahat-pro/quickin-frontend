@@ -9,7 +9,7 @@
 // session on the next request regardless (see resolveStaffSession). Without it the UI
 // would simply sit on a dead session until the operator clicked something.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import type { StaffModule, StaffRole } from '@/lib/local/staff'
 
 export type OpsSession = {
@@ -139,7 +139,16 @@ function useAlertCount(): number | null {
 export function OpsHeader({ title }: { title: string }) {
   const { session, can, signOut } = useOpsSession()
   const router = useRouter()
+  const pathname = usePathname()
   const alertCount = useAlertCount()
+  // Inline styles can't express :hover, and /ops has no stylesheet — so hover is
+  // tracked in state, the same way the rest of this console handles it.
+  const [hovered, setHovered] = useState<string | null>(null)
+
+  /** A nav entry is current on its own page AND on anything nested under it, so
+   *  /ops/users/<id> still shows Users as selected. */
+  const isCurrent = (href: string) =>
+    pathname === href || pathname.startsWith(`${href}/`)
 
   return (
     <header
@@ -196,25 +205,36 @@ export function OpsHeader({ title }: { title: string }) {
               {alertCount ? `\u2022 ${alertCount}` : '\u2022'} Alerts
             </button>
           )}
-          {NAV.filter((n) => can(n.module)).map((n) => (
-            <button
-              key={n.href}
-              type="button"
-              onClick={() => router.push(n.href)}
-              style={{
-                padding: '8px 14px',
-                borderRadius: 12,
-                border: '1px solid rgba(91,15,22,0.25)',
-                background: 'transparent',
-                color: '#5B0F16',
-                fontWeight: 700,
-                fontSize: 13,
-                cursor: 'pointer',
-              }}
-            >
-              {n.label}
-            </button>
-          ))}
+          {NAV.filter((n) => can(n.module)).map((n) => {
+            const current = isCurrent(n.href)
+            const hot = hovered === n.href
+            return (
+              <button
+                key={n.href}
+                type="button"
+                aria-current={current ? 'page' : undefined}
+                // Already here — don't push the same route again. Re-navigating a
+                // screen you're on re-runs its server component and refetches for
+                // nothing, which is what made repeated clicks look like a loop.
+                onClick={() => { if (!current) router.push(n.href) }}
+                onMouseEnter={() => setHovered(n.href)}
+                onMouseLeave={() => setHovered((h) => (h === n.href ? null : h))}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 12,
+                  border: `1px solid ${current ? '#5B0F16' : 'rgba(91,15,22,0.25)'}`,
+                  background: current ? '#5B0F16' : hot ? 'rgba(91,15,22,0.08)' : 'transparent',
+                  color: current ? '#F6F1E6' : '#5B0F16',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: current ? 'default' : 'pointer',
+                  transition: 'background .15s, color .15s, border-color .15s',
+                }}
+              >
+                {n.label}
+              </button>
+            )
+          })}
           <button
             type="button"
             onClick={signOut}

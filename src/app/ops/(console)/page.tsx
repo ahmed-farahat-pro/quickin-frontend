@@ -331,8 +331,12 @@ export default function OpsPage() {
           }
           setVerifs(Array.isArray(json.verifications) ? json.verifications : [])
         }
-        setLoaded((prev) => ({ ...prev, [id]: true }))
       } finally {
+        // Mark the section loaded on EVERY exit path, including the error returns
+        // above. The lazy-fetch effect below runs whenever `loading` changes and
+        // re-fires while `!loaded[tab]`, so a section that errored out used to
+        // refetch forever — one failed request became an endless stream of them.
+        setLoaded((prev) => (prev[id] ? prev : { ...prev, [id]: true }))
         setSectionLoading(id, false)
       }
     },
