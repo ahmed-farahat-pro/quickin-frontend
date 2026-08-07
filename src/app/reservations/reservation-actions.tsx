@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { InstapayDetails } from '@/components/instapay-details'
+import { paymentStageFor } from '@/lib/local/payment-flow-core'
 
 const C = { burgundy: '#5B0F16', tan: '#EFE6D8', ink: '#2A2220', muted: '#6B6055' }
 
@@ -27,10 +28,15 @@ export function ReservationActions(props: {
   bookingId: string
   status: string
   paid: boolean
+  /** The RAW bookings.payment_status. `paid` above is a derived paid_at flag and
+   *  cannot express "submitted", which is why this is passed separately. */
+  paymentState?: string | null
+  /** Latest payment_proofs.status. */
+  proofStatus?: string | null
   checkIn: string
   checkOut: string
 }) {
-  const { bookingId, status, paid, checkIn, checkOut } = props
+  const { bookingId, status, paid, paymentState, proofStatus, checkIn, checkOut } = props
   const t = useTranslations('reservationsLocal')
   const tPay = useTranslations('instapay')
   const router = useRouter()
@@ -38,8 +44,6 @@ export function ReservationActions(props: {
   const [note, setNote] = useState<string | null>(null)
   const [reviewing, setReviewing] = useState(false)
   const [reviewed, setReviewed] = useState(false)
-  const [paying, setPaying] = useState(false)
-  const [payErr, setPayErr] = useState<string | null>(null)
   // Collapsed by default: an admin-uploaded QR arrives inline as a base64 data
   // URL, so InstapayDetails only fetches once the guest asks to see it.
   const [showInstapay, setShowInstapay] = useState(false)
@@ -69,27 +73,20 @@ export function ReservationActions(props: {
     }
   }
 
-  async function pay() {
-    if (status !== 'confirmed' || paid) return
-    setPaying(true); setPayErr(null)
-    try {
-      const res = await fetch(`/api/local/bookings/${bookingId}/pay`, {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ method: 'card' }),
-      })
-      if (!res.ok) {
-        const e = await res.json().catch(() => ({}))
-        throw new Error(e.error || t('payError'))
-      }
-      router.refresh()
-    } catch (e) {
-      setPaying(false)
-      setPayErr(e instanceof Error ? e.message : t('payError'))
-    }
+  // Pay now used to POST to /api/local/bookings/:id/pay — a mock that stamped
+  // paid_at and marked the booking paid without any money moving. That endpoint is
+  // gone; paying means going to the page, transferring, and uploading the receipt.
+  function goToPay() {
+    router.push(`/pay/${bookingId}`)
   }
 
-  const awaitingPayment = status === 'confirmed' && !paid
+  // paymentStage is the single source of truth here. This used to be
+  // `status === 'confirmed' && !paid`, where `paid` came from a DERIVED
+  // paid_at-based field — so a guest who had already uploaded a screenshot was shown
+  // Pay now again and could pay twice.
+  const stage = paymentStageFor({ status, payment_state: paymentState, payment_proof_status: proofStatus })
+  const awaitingPayment = stage === 'awaiting_payment' || stage === 'rejected'
+  const underReview = stage === 'under_review'
 
   return (
     <>
@@ -106,12 +103,17 @@ export function ReservationActions(props: {
 
       {awaitingPayment && (
         <button
-          onClick={pay}
-          disabled={paying}
-          style={{ background: C.burgundy, color: '#fff', border: 'none', borderRadius: 10, padding: '7px 16px', fontWeight: 700, fontSize: 13.5, cursor: paying ? 'default' : 'pointer', opacity: paying ? 0.7 : 1, fontFamily: 'inherit' }}
+          onClick={goToPay}
+          style={{ background: C.burgundy, color: '#fff', border: 'none', borderRadius: 10, padding: '7px 16px', fontWeight: 700, fontSize: 13.5, cursor: 'pointer', fontFamily: 'inherit' }}
         >
-          {paying ? t('paying') : t('payNow')}
+          {stage === 'rejected' ? tPay('tryAgain') : t('payNow')}
         </button>
+      )}
+
+      {underReview && (
+        <span style={{ background: '#FDF0DC', color: '#8A5A12', fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999 }}>
+          ⏳ {tPay('underReview')}
+        </span>
       )}
 
       {awaitingPayment && (
@@ -138,7 +140,6 @@ export function ReservationActions(props: {
 
       {reviewed && <span style={{ fontSize: 13, color: '#177245', fontWeight: 600 }}>{t('reviewThanks')}</span>}
       {note && <span style={{ fontSize: 13, color: '#b3261e' }}>{note}</span>}
-      {payErr && <span style={{ fontSize: 13, color: '#b3261e' }}>{payErr}</span>}
     </div>
 
     {awaitingPayment && showInstapay && (

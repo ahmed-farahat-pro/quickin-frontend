@@ -255,6 +255,43 @@ both be true.
   no app change — but adding that key would send a blocked user to a verification
   screen they can pass and still be refused.
 
+### Paying for a stay
+
+**`/pay/<bookingId>`** — how to pay on the left (the QR, handle and deep link, via the
+shared `InstapayDetails`), the screenshot upload and an **"I have paid"** button on the
+right. It stacks on narrow screens. Reached from Pay now on `/reservations`, and gated
+on the booking being yours, confirmed, and not already paid.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| POST | `/api/local/bookings/:id/payment-proof` | `{ image, method? }` — the guest submits their receipt. Sets `payment_status = 'submitted'` |
+| GET | `/api/local/bookings/:id/payment-proof` | The latest screenshot, for the guest or an admin |
+| GET | `/api/local/admin/payments` | `{ pending, disputes }` — two queues |
+| POST | `/api/local/admin/payments` | `{ booking_id, action }` — `accept`/`reject` decides a new screenshot, `approve`/`uphold` resolves a dispute |
+
+**Who confirms a payment: QuickIn, not the host.** Money goes to QuickIn's Instapay
+account, so an admin accepts or rejects the screenshot in `/ops/payments`. Hosts still
+accept or decline the *reservation*; they no longer see the guest's bank screenshot at
+all.
+
+Three things this replaced, each of which was broken:
+
+- **A payment made through the website went nowhere.** A guest can only pay once a
+  booking is `confirmed`, but the only path that could approve a fresh screenshot
+  required it to be `pending` — and the admin queue was filtered to disputes. Proofs
+  sat in `submitted` with no reviewer, and the guest couldn't even escalate.
+- **"Pay now" didn't take a payment.** It POSTed to a mock endpoint that stamped
+  `paid_at` on the caller's own booking — any guest could mark themselves paid without
+  transferring anything, and it counted toward `gross_paid`. That route is deleted.
+- **The guest was invited to pay twice.** `/reservations` read a derived
+  `paid_at IS NULL ? 'unpaid' : 'paid'` field, which cannot express "submitted", so a
+  guest who had already uploaded a receipt still saw Pay now. Everything now goes
+  through `paymentStageFor`.
+
+Rejecting a screenshot leaves the booking **confirmed** — the guest uploads a clearer
+one. The old host path flipped the whole reservation to `rejected`, cancelling a real
+booking over an unreadable photo.
+
 ### Instapay destination
 
 `/ops/payments` is where the number, QR code and link guests see are set. The four
@@ -351,6 +388,7 @@ npm run check     # same; the pre-deploy gate
 | `resort-core.ts` | Resort name normalization, slug collision (`Amouage` = `amouage` = `AMOUAGE.`), typo distance |
 | `user-admin-core.ts` | Users-list query parsing and clamping, the full block/remove transition matrix, the `ORDER BY` injection guard, blocked-login copy |
 | `activity-core.ts` | Activity/audit filter parsing, the UNION branch limits, the audit-action label map, and `alertsFor` — including that an operator never receives an alert for a module they don't hold |
+| `payment-flow-core.ts` | Which stage a booking is at (`paymentStageFor`), the shared `canPay` predicate, what an admin decision writes, and the proof-image validator — including that a submitted screenshot is never "awaiting payment" |
 | `document-core.ts` | Document-kind validation, the data-URL parser and its mime allowlist (SVG and HTML are rejected — these bytes render in an admin's browser), the verification state machine, and which module owns which document |
 | `xlsx.ts` | Cell typing (numbers stay numeric so Excel can sum them), sheet-name sanitizing, filename safety |
 

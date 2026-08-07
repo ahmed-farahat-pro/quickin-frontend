@@ -6,6 +6,8 @@ import type { PaymentConfig } from './payment-config-core'
 import { buildUserListWhere, hidesListings, normalizeStatus, orderBySql } from './user-admin-core'
 import type { AccountStatus, UserListFilter } from './user-admin-core'
 import { idColumnFor, statusForAction } from './document-core'
+import { assertProofImage, canPay, outcomeFor, PaymentProofError } from './payment-flow-core'
+import type { PaymentReviewAction } from './payment-flow-core'
 import { branchLimit, wantsKind } from './activity-core'
 import type { ActivityFilter, AuditFilter } from './activity-core'
 import { PAID_SQL } from './analytics-core'
@@ -436,54 +438,12 @@ export async function cancelBooking(
 
 // ---- Mock payment (keeps the booking 'pending' awaiting host approval) ------
 
-export interface PaymentReceipt {
-  currency: string; nights: number; nightly: number; subtotal: number
-  serviceFee: number; methodFee: number; total: number; reference: string
-  paidAt: string; method: string; promoCode: string | null; promoDiscount: number
-}
+// PaymentReceipt was the return of the retired mock payBooking(). Instapay has no
+// gateway receipt — the guest's screenshot IS the receipt (payment_proofs).
 
 /** Records a mock payment. Only allowed once the host has APPROVED the request
  *  (status 'confirmed'); a pending reservation can't be paid yet. Payment doesn't
  *  change the status — it sets paid_at, so an approved booking becomes "confirmed & paid". */
-export async function payBooking(args: {
-  userId: string; bookingId: string; method?: string; promoCode?: string | null
-}): Promise<{ booking: Booking; receipt: PaymentReceipt }> {
-  const { userId, bookingId } = args
-  const method = args.method === 'bank_transfer' ? 'bank_transfer' : 'card'
-  if (!isUuid(bookingId)) throw new Error('Invalid booking')
-  const { rows: br } = await pool.query(
-    `SELECT b.status, b.total_price::float8 AS total, (b.check_out - b.check_in)::int AS nights,
-            l.price_per_night::float8 AS nightly, COALESCE(l.currency,'EGP') AS currency
-       FROM bookings b JOIN listings l ON l.id = b.listing_id
-      WHERE b.id = $1 AND b.user_id = $2`,
-    [bookingId, userId]
-  )
-  const b = br[0]
-  if (!b) throw new Error('Booking not found')
-  if (b.status === 'cancelled' || b.status === 'rejected') throw new Error('This booking can no longer be paid')
-  if (b.status === 'pending') throw new Error('This reservation is awaiting host approval — you can pay once it is approved')
-  if (b.status !== 'confirmed') throw new Error('This reservation cannot be paid')
-  const { rows } = await pool.query(
-    `WITH upd AS (
-       UPDATE bookings SET paid_at = COALESCE(paid_at, now()) WHERE id = $1 AND user_id = $2 RETURNING *
-     )
-     SELECT ${BOOKING_COLS} FROM upd b JOIN listings l ON l.id = b.listing_id`,
-    [bookingId, userId]
-  )
-  const subtotal = Math.round(b.total)
-  const methodFee = method === 'card' ? Math.round(subtotal * 0.05) : -Math.round(subtotal * 0.05)
-  const receipt: PaymentReceipt = {
-    currency: b.currency, nights: b.nights, nightly: Math.round(b.nightly),
-    subtotal, serviceFee: 0, methodFee, total: subtotal + methodFee,
-    reference: 'QK-' + bookingId.slice(0, 8).toUpperCase(),
-    paidAt: (rows[0] as { paid_at?: string }).paid_at || new Date().toISOString(),
-    method, promoCode: null, promoDiscount: 0,
-  }
-  return { booking: rows[0] as Booking, receipt }
-}
-
-// ---- Notifications ----------------------------------------------------------
-
 export async function createNotification(
   userId: string, type: string, title: string, body?: string | null, link?: string | null
 ): Promise<void> {
@@ -534,7 +494,7 @@ export async function getBookingById(userId: string, bookingId: string): Promise
 /** Host actions on a single reservation: set host_notes and/or decide status.
  *  Authorization: this endpoint is HOST-ONLY — the caller must own the booking's
  *  listing (listings.host_id === callerId). Guests manage their own reservations
- *  via cancelBooking()/payBooking(), which scope by user_id.
+ *  via cancelBooking(), which scopes by user_id.
  *  Status is a strict allowlist: 'confirm'→'confirmed', 'reject'→'rejected', and
  *  only from a 'pending' reservation. Any other value is rejected (no raw writes).
  *  Returns the updated booking, or null if the booking does not exist. */
@@ -2212,6 +2172,8 @@ export interface AdminStats {
   bookings_today: number
   pending_listings: number
   disputed_payments: number
+  /** Transfer screenshots waiting for an accept/reject. */
+  pending_payments: number
   pending_resort_submissions: number
   open_reports: number
   /** When the oldest item in each queue arrived, so an alert can show how long it has waited. */
@@ -2219,6 +2181,7 @@ export interface AdminStats {
   oldest_application: string | null
   oldest_listing: string | null
   oldest_report: string | null
+  oldest_payment: string | null
 }
 
 /** Top-line counts for the admin dashboard, plus the alert queues (F3/F4).
@@ -2254,6 +2217,12 @@ export async function adminStats(): Promise<AdminStats> {
          WHERE pp.status = 'disputed'
            AND pp.id = (SELECT id FROM payment_proofs p2 WHERE p2.booking_id = pp.booking_id
                          ORDER BY p2.submitted_at DESC LIMIT 1))::int AS disputed_payments,
+       -- Transfers waiting for a first decision. Nothing counted these before, so a
+       -- guest could pay and no one would ever be told.
+       (SELECT COUNT(*) FROM payment_proofs pp
+         WHERE pp.status = 'submitted'
+           AND pp.id = (SELECT id FROM payment_proofs p2 WHERE p2.booking_id = pp.booking_id
+                         ORDER BY p2.submitted_at DESC LIMIT 1))::int AS pending_payments,
        (SELECT COUNT(*) FROM resort_submissions WHERE status = 'pending')::int AS pending_resort_submissions,
        (SELECT COUNT(*) FROM reports WHERE status = 'open')::int AS open_reports,
        -- How long the oldest item in each queue has waited, so the alert centre can say
@@ -2261,7 +2230,8 @@ export async function adminStats(): Promise<AdminStats> {
        (SELECT to_char(MIN(submitted_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') FROM id_verifications WHERE status = 'pending') AS oldest_verification,
        (SELECT to_char(MIN(submitted_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') FROM host_applications WHERE status = 'pending') AS oldest_application,
        (SELECT to_char(MIN(created_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') FROM listings WHERE COALESCE(approval_status, 'approved') = 'pending') AS oldest_listing,
-       (SELECT to_char(MIN(created_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') FROM reports WHERE status = 'open') AS oldest_report`
+       (SELECT to_char(MIN(created_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') FROM reports WHERE status = 'open') AS oldest_report,
+       (SELECT to_char(MIN(submitted_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') FROM payment_proofs WHERE status = 'submitted') AS oldest_payment`
   )
   return rows[0] as AdminStats
 }
@@ -2629,6 +2599,87 @@ export async function getAuditActions(): Promise<string[]> {
     `SELECT DISTINCT action FROM staff_audit_log ORDER BY action`,
   )
   return rows.map((r) => String(r.action))
+}
+
+/**
+ * A guest submits their transfer screenshot.
+ *
+ * Ported from the backend, which has had this since Instapay landed — the WEB never
+ * could upload, because its payment-proof route was GET-only. That is why a payment
+ * started on the website had no way to complete.
+ *
+ * Writes payment_status = 'submitted', which IS the "pending confirmation" state; an
+ * admin then accepts or rejects it in /ops. Re-submitting after a rejection inserts a
+ * fresh proof row rather than editing the old one, so the history of what was sent
+ * survives the decision.
+ */
+export async function submitPaymentProof(
+  bookingId: string,
+  userId: string,
+  imageData: string,
+  method = 'instapay',
+): Promise<Booking | null> {
+  if (!isUuid(bookingId) || !isUuid(userId)) return null
+  const img = assertProofImage(imageData)
+  const m = method === 'instapay' ? 'instapay' : String(method).slice(0, 32)
+  // BOOKING_COLS doesn't carry host_id (it lives on the listing), so pick it up here
+  // rather than running a second query just to address the notification.
+  const cur = await pool.query(
+    `SELECT b.status, b.payment_status, b.paid_at, l.host_id, l.title
+       FROM bookings b JOIN listings l ON l.id = b.listing_id
+      WHERE b.id = $1 AND b.user_id = $2`,
+    [bookingId, userId],
+  )
+  const row = cur.rows[0] as
+    | { status: string; payment_status: string | null; paid_at: string | null; host_id: string | null; title: string | null }
+    | undefined
+  if (!row) return null
+  // One predicate, shared with the payment page and the Pay-now button, so the three
+  // can never disagree about whether this booking is payable.
+  if (!canPay({ status: row.status, payment_state: row.payment_status, paid_at: row.paid_at })) {
+    throw new PaymentProofError(
+      row.paid_at || row.payment_status === 'paid'
+        ? 'This booking is already paid'
+        : row.payment_status === 'submitted'
+          ? 'Your transfer is already being reviewed'
+          : 'This booking cannot be paid right now',
+    )
+  }
+
+  await pool.query(
+    `INSERT INTO payment_proofs (booking_id, method, image_data, amount)
+     VALUES ($1, $2, $3, (SELECT total_price FROM bookings WHERE id = $1))`,
+    [bookingId, m, img],
+  )
+  const { rows } = await pool.query(
+    `WITH upd AS (
+       UPDATE bookings b SET payment_status = 'submitted', payment_method = $3
+       WHERE b.id = $1 AND b.user_id = $2
+       RETURNING b.*
+     )
+     SELECT ${BOOKING_COLS} FROM upd b JOIN listings l ON l.id = b.listing_id`,
+    [bookingId, userId, m],
+  )
+  const booking = (rows[0] as Booking) ?? null
+  if (booking) {
+    // The guest is told their part is done. The host is told money arrived, but NOT
+    // asked to approve it — that is an admin decision now.
+    await createNotification(
+      userId, 'payment',
+      'Transfer received',
+      `We got your screenshot for ${row.title ?? 'your stay'}. We'll confirm it shortly.`,
+      '/reservations',
+    )
+    if (row.host_id) {
+      await createNotification(
+        row.host_id, 'payment',
+        'Guest sent a payment',
+        `${row.title ?? 'A stay'} — the guest uploaded a transfer receipt. QuickIn will confirm it.`,
+        '/host',
+      )
+    }
+  }
+  return booking
 }
 
 // ---- F1: the site activity feed ---------------------------------------------
@@ -3469,57 +3520,10 @@ export async function getBookingProof(
  * 'pending'. Updates the latest proof row and notifies the guest. Returns null if
  * not the host / not pending.
  */
-export async function hostReviewPayment(
-  bookingId: string,
-  hostUserId: string,
-  action: 'accept' | 'reject',
-  reason: string | null = null,
-): Promise<Booking | null> {
-  if (!isUuid(bookingId) || !isUuid(hostUserId)) return null
-  const accept = action === 'accept'
-  // paid_at drives the derived payment_status in BOOKING_COLS; payment_status is the
-  // shared rollup column the backend also writes (kept in sync here).
-  const { rows } = await pool.query(
-    `WITH upd AS (
-       UPDATE bookings b SET
-         status = CASE WHEN $3 THEN 'confirmed' ELSE 'rejected' END,
-         payment_status = CASE WHEN $3 THEN 'paid' ELSE 'rejected' END,
-         paid_at = CASE WHEN $3 THEN COALESCE(b.paid_at, now()) ELSE b.paid_at END
-       FROM listings l
-       WHERE b.id = $1 AND b.listing_id = l.id AND l.host_id = $2 AND b.status = 'pending'
-       RETURNING b.*, b.user_id AS _uid, l.title AS _title
-     )
-     SELECT ${BOOKING_COLS}, b.user_id AS _uid, l.title AS _title
-       FROM upd b JOIN listings l ON l.id = b.listing_id`,
-    [bookingId, hostUserId, accept]
-  )
-  const row = rows[0] as (Booking & { _uid?: string; _title?: string }) | undefined
-  if (!row) return null
-  await pool.query(
-    `UPDATE payment_proofs SET
-        status = CASE WHEN $2 THEN 'approved' ELSE 'rejected' END,
-        reviewed_by = $3, reviewed_at = now(),
-        reject_reason = CASE WHEN $2 THEN NULL ELSE $4 END
-      WHERE id = (SELECT id FROM payment_proofs WHERE booking_id = $1 ORDER BY submitted_at DESC LIMIT 1)`,
-    [bookingId, accept, hostUserId, reason ? String(reason).slice(0, 500) : null]
-  )
-  const title = row._title ?? 'your stay'
-  if (row._uid && isUuid(row._uid)) {
-    await createNotification(
-      row._uid,
-      'payment',
-      accept ? 'Payment confirmed' : 'Payment not accepted',
-      accept
-        ? `Your stay at ${title} is confirmed & paid.`
-        : `${title}: ${reason || 'the transfer could not be verified'}.`,
-      '/reservations'
-    )
-  }
-  delete row._uid
-  delete row._title
-  return row as Booking
-}
-
+// hostReviewPayment was removed with the payment-flow change: hosts no longer approve
+// transfers, an admin does (adminReviewProof). It was also unreachable in practice —
+// it required b.status = 'pending' while a guest can only pay once a booking is
+// 'confirmed', so a normal screenshot could never be approved through it.
 export interface DisputeRow {
   booking_id: string
   reservation_code: string | null
@@ -3536,6 +3540,118 @@ export interface DisputeRow {
 }
 
 /** All open payment disputes (latest proof still 'disputed'), for the admin queue. */
+export interface PendingProofRow {
+  booking_id: string
+  reservation_code: string | null
+  title: string | null
+  guest_id: string
+  guest_name: string | null
+  guest_email: string | null
+  host_id: string | null
+  total_price: number
+  amount: number
+  method: string | null
+  submitted_at: string
+  check_in: string
+  check_out: string
+}
+
+/**
+ * Transfer screenshots waiting for a decision.
+ *
+ * This queue did not exist. `adminListDisputes` is hard-filtered to
+ * `pp.status = 'disputed'`, and the only path that could approve a FRESH proof —
+ * hostReviewPayment — was guarded by `b.status = 'pending'`, while a guest can only
+ * pay once the booking is 'confirmed'. So a screenshot submitted through the normal
+ * flow had no reviewer at all and sat in 'submitted' indefinitely.
+ *
+ * Latest proof per booking only, so a superseded submission doesn't queue twice.
+ */
+export async function adminListPendingProofs(): Promise<PendingProofRow[]> {
+  const { rows } = await pool.query(
+    `SELECT b.id AS booking_id, b.reservation_code, l.title,
+            b.user_id AS guest_id,
+            (SELECT full_name FROM users u WHERE u.id = b.user_id) AS guest_name,
+            (SELECT email     FROM users u WHERE u.id = b.user_id) AS guest_email,
+            l.host_id,
+            b.total_price::float8 AS total_price,
+            COALESCE(pp.amount, b.total_price)::float8 AS amount,
+            pp.method,
+            to_char(pp.submitted_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS submitted_at,
+            to_char(b.check_in, 'YYYY-MM-DD') AS check_in,
+            to_char(b.check_out, 'YYYY-MM-DD') AS check_out
+       FROM payment_proofs pp
+       JOIN bookings b ON b.id = pp.booking_id
+       JOIN listings l ON l.id = b.listing_id
+      WHERE pp.status = 'submitted'
+        AND pp.id = (SELECT id FROM payment_proofs p2 WHERE p2.booking_id = pp.booking_id ORDER BY p2.submitted_at DESC LIMIT 1)
+      ORDER BY pp.submitted_at ASC`
+  )
+  return rows as PendingProofRow[]
+}
+
+/**
+ * An admin accepts or rejects a transfer screenshot.
+ *
+ * Note what rejecting does NOT do: it leaves `bookings.status` alone. The old host
+ * review flipped the whole booking to 'rejected' on a bad screenshot, cancelling a
+ * real reservation over an unreadable photo. Here the booking stays confirmed and the
+ * guest can upload a clearer one — `canPay` treats a rejected payment as payable.
+ *
+ * Transactional so the proof row and the booking can never disagree about the outcome.
+ */
+export async function adminReviewProof(
+  bookingId: string,
+  action: PaymentReviewAction,
+  reason: string | null,
+  actor: string,
+): Promise<{ guestId: string; title: string | null } | null> {
+  if (!isUuid(bookingId)) throw new Error('Invalid booking')
+  const out = outcomeFor(action)
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const { rows } = await client.query(
+      `SELECT b.user_id, l.title FROM bookings b JOIN listings l ON l.id = b.listing_id WHERE b.id = $1`,
+      [bookingId],
+    )
+    const row = rows[0] as { user_id: string; title: string | null } | undefined
+    if (!row) { await client.query('ROLLBACK'); return null }
+
+    await client.query(
+      `UPDATE bookings SET payment_status = $2,
+              paid_at = CASE WHEN $3 THEN COALESCE(paid_at, now()) ELSE paid_at END
+        WHERE id = $1`,
+      [bookingId, out.paymentState, out.markPaid],
+    )
+    // Only the latest proof — an older superseded one keeps its own history.
+    await client.query(
+      `UPDATE payment_proofs SET status = $2, reviewed_by = $3, reviewed_at = now(),
+              reject_reason = $4
+        WHERE id = (SELECT id FROM payment_proofs WHERE booking_id = $1 ORDER BY submitted_at DESC LIMIT 1)`,
+      [bookingId, out.proofStatus, actor, reason],
+    )
+    await client.query('COMMIT')
+
+    await createNotification(
+      row.user_id, 'payment',
+      action === 'accept' ? 'Payment confirmed' : 'We could not confirm your transfer',
+      action === 'accept'
+        ? `Your booking for ${row.title ?? 'your stay'} is fully confirmed.`
+        : (reason
+            ? `${row.title ?? 'Your stay'} — ${reason}. You can upload another screenshot.`
+            : `${row.title ?? 'Your stay'} — please upload a clearer screenshot of the transfer.`),
+      '/reservations',
+    )
+    return { guestId: row.user_id, title: row.title }
+  } catch (e) {
+    await client.query('ROLLBACK')
+    throw e
+  } finally {
+    client.release()
+  }
+}
+
 export async function adminListDisputes(): Promise<DisputeRow[]> {
   const { rows } = await pool.query(
     `SELECT b.id AS booking_id,

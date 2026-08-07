@@ -184,6 +184,7 @@ describe('alertsFor — the permission boundary', () => {
     pending_verifications: 3,
     pending_applications: 1,
     pending_listings: 2,
+    pending_payments: 7,
     disputed_payments: 5,
     open_reports: 4,
     pending_resort_submissions: 6,
@@ -192,14 +193,22 @@ describe('alertsFor — the permission boundary', () => {
   test('a super admin sees every non-zero queue', () => {
     const a = alertsFor(COUNTS, { modules: [], isSuperAdmin: true })
     assert.equal(a.length, ALERT_SOURCES.length)
-    assert.equal(alertTotal(a), 21)
+    assert.equal(alertTotal(a), 28)
   })
 
   test('an operator NEVER sees an alert for a module they do not hold', () => {
     const a = alertsFor(COUNTS, { modules: ['verifications'] })
     assert.deepEqual(a.map((x) => x.key), ['pending_verifications'])
-    // The dispute count must not leak through the total either.
+    // The payment and dispute counts must not leak through the total either.
     assert.equal(alertTotal(a), 3)
+  })
+
+  test('the payments module carries BOTH payment queues', () => {
+    // A payments moderator needs to see a transfer waiting for a first decision, not
+    // just an escalated dispute — that gap is what left guests paying into silence.
+    const a = alertsFor(COUNTS, { modules: ['payments'] })
+    assert.deepEqual(a.map((x) => x.key).sort(), ['disputed_payments', 'pending_payments'])
+    assert.equal(alertTotal(a), 12)
   })
 
   test('no modules at all means no alerts', () => {

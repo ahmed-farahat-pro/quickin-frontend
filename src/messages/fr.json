@@ -1665,7 +1665,9 @@
     "copy": "Copier",
     "copied": "Copié",
     "openInstapay": "Ouvrir dans Instapay",
-    "scanHint": "Scannez avec votre application bancaire"
+    "scanHint": "Scannez avec votre application bancaire",
+    "underReview": "En cours de vérification",
+    "tryAgain": "Envoyer une nouvelle capture"
   },
   "reservationsLocal": {
     "meta": {

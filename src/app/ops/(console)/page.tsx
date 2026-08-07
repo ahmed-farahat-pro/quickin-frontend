@@ -61,12 +61,14 @@ type AdminStats = {
   bookings_today: number
   pending_listings: number
   disputed_payments: number
+  pending_payments: number
   pending_resort_submissions: number
   open_reports: number
   oldest_verification: string | null
   oldest_application: string | null
   oldest_listing: string | null
   oldest_report: string | null
+  oldest_payment: string | null
 }
 
 
@@ -789,6 +791,7 @@ export default function OpsPage() {
                 pending_verifications: stats.oldest_verification,
                 pending_applications: stats.oldest_application,
                 pending_listings: stats.oldest_listing,
+                pending_payments: stats.oldest_payment,
                 open_reports: stats.oldest_report,
               }
               if (alerts.length === 0) {

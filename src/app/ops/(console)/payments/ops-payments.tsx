@@ -79,8 +79,160 @@ export function OpsPayments() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
       <InstapaySettings />
+      <PendingPaymentsQueue />
       <DisputesQueue />
     </div>
+  )
+}
+
+// ---- Payments awaiting confirmation -----------------------------------------
+
+interface PendingProof {
+  booking_id: string
+  reservation_code: string | null
+  title: string | null
+  guest_name: string | null
+  guest_email: string | null
+  amount: number
+  submitted_at: string
+  check_in: string
+  check_out: string
+}
+
+/**
+ * Transfer screenshots waiting for a first decision.
+ *
+ * This queue is new, and it closes a real hole: a guest can only pay once a booking is
+ * 'confirmed', but the only path that could approve a fresh screenshot required the
+ * booking to be 'pending'. So a normal payment had no reviewer — the money was sent
+ * and nothing ever moved.
+ */
+function PendingPaymentsQueue() {
+  const [rows, setRows] = useState<PendingProof[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [rowError, setRowError] = useState<{ id: string; msg: string } | null>(null)
+  const [proofs, setProofs] = useState<Record<string, ProofState>>({})
+
+  const load = useCallback(async () => {
+    setError(null)
+    try {
+      const res = await fetch('/api/local/admin/payments', { credentials: 'same-origin' })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed to load')
+      const data = await res.json()
+      setRows(data?.pending ?? [])
+    } catch (e) {
+      setRows([])
+      setError(e instanceof Error ? e.message : 'Failed to load')
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  async function showProof(id: string) {
+    if (proofs[id]?.image) {
+      setProofs((p) => { const n = { ...p }; delete n[id]; return n })
+      return
+    }
+    setProofs((p) => ({ ...p, [id]: { loading: true, image: null, error: null } }))
+    try {
+      const res = await fetch(`/api/local/bookings/${id}/payment-proof`, { credentials: 'same-origin' })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Could not load the screenshot')
+      const data = await res.json()
+      setProofs((p) => ({ ...p, [id]: { loading: false, image: data.image_data ?? null, error: null } }))
+    } catch (e) {
+      setProofs((p) => ({ ...p, [id]: { loading: false, image: null, error: e instanceof Error ? e.message : 'Could not load' } }))
+    }
+  }
+
+  async function decide(id: string, action: 'accept' | 'reject') {
+    let reason: string | null = null
+    if (action === 'reject') {
+      // Shown to the guest, who can then upload a clearer screenshot — so it has to
+      // say something useful, not just "no".
+      reason = window.prompt('Why is this screenshot not acceptable? The guest will see this.')
+      if (!reason || !reason.trim()) return
+    }
+    setBusyId(id); setRowError(null)
+    try {
+      const res = await fetch('/api/local/admin/payments', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ booking_id: id, action, reason }),
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'That did not work')
+      await load()
+    } catch (e) {
+      setRowError({ id, msg: e instanceof Error ? e.message : 'That did not work' })
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  return (
+    <section style={card}>
+      <h2 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800, color: C.burgundy }}>
+        Awaiting confirmation {rows && rows.length > 0 ? `(${rows.length})` : ''}
+      </h2>
+      <p style={{ margin: '0 0 16px', fontSize: 13, color: C.muted, lineHeight: 1.6 }}>
+        Guests who have transferred and uploaded a receipt. Accepting confirms the booking
+        as paid; rejecting asks them for a clearer screenshot without cancelling the stay.
+      </p>
+
+      {error && <p style={{ margin: '0 0 12px', fontSize: 13, color: '#b3261e', fontWeight: 600 }}>{error}</p>}
+      {rows === null && <p style={{ fontSize: 13, color: C.muted }}>Loading…</p>}
+      {rows?.length === 0 && <p style={{ fontSize: 13, color: C.muted }}>No payments waiting.</p>}
+
+      <div style={{ display: 'grid', gap: 12 }}>
+        {rows?.map((r) => (
+          <div key={r.booking_id} style={{ border: `1px solid ${C.tan}`, borderRadius: 14, padding: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <strong style={{ fontSize: 14.5, color: C.ink }}>{r.title ?? 'Stay'}</strong>
+                <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>
+                  {r.guest_name || r.guest_email} · {r.check_in} → {r.check_out}
+                  {r.reservation_code ? ` · ${r.reservation_code}` : ''}
+                </div>
+                <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+                  Sent {new Date(r.submitted_at).toLocaleString()}
+                </div>
+              </div>
+              <strong style={{ fontSize: 16, color: C.burgundy, whiteSpace: 'nowrap' }}>
+                EGP {Math.round(Number(r.amount) || 0).toLocaleString()}
+              </strong>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+              <button type="button" onClick={() => showProof(r.booking_id)} style={ghostBtn}>
+                {proofs[r.booking_id]?.image ? 'Hide screenshot' : proofs[r.booking_id]?.loading ? 'Loading…' : 'View screenshot'}
+              </button>
+              <button type="button" disabled={busyId === r.booking_id} onClick={() => decide(r.booking_id, 'accept')} style={primaryBtn}>
+                {busyId === r.booking_id ? 'Working…' : 'Accept'}
+              </button>
+              <button type="button" disabled={busyId === r.booking_id} onClick={() => decide(r.booking_id, 'reject')} style={ghostBtn}>
+                Reject
+              </button>
+            </div>
+
+            {proofs[r.booking_id]?.error && (
+              <p style={{ margin: '10px 0 0', fontSize: 13, color: '#b3261e' }}>{proofs[r.booking_id]?.error}</p>
+            )}
+            {proofs[r.booking_id]?.image && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={proofs[r.booking_id]!.image!}
+                alt="Transfer screenshot"
+                style={{ marginTop: 12, maxWidth: '100%', maxHeight: 420, borderRadius: 12, border: `1px solid ${C.tan}`, display: 'block' }}
+              />
+            )}
+            {rowError?.id === r.booking_id && (
+              <p style={{ margin: '10px 0 0', fontSize: 13, color: '#b3261e' }}>{rowError.msg}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 
@@ -366,7 +518,8 @@ function DisputesQueue() {
         throw new Error(e.error || 'Failed to load disputes')
       }
       const data = await res.json()
-      setDisputes(Array.isArray(data) ? data : [])
+      // The route returns both queues now; this component owns the disputes half.
+      setDisputes(Array.isArray(data) ? data : (data?.disputes ?? []))
     } catch (e) {
       setDisputes([])
       setError(e instanceof Error ? e.message : 'Failed to load disputes')

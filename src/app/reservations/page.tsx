@@ -402,6 +402,11 @@ async function ReservationsList({
                   bookingId={b.id}
                   status={b.status}
                   paid={b.payment_status === 'paid'}
+                  // The raw column and the latest proof — b.payment_status here is a
+                  // DERIVED paid_at flag that only ever reads 'paid'/'unpaid', so on
+                  // its own it cannot tell "not paid" from "paid, awaiting review".
+                  paymentState={b.payment_state}
+                  proofStatus={b.payment_proof_status}
                   checkIn={b.check_in}
                   checkOut={b.check_out}
                 />

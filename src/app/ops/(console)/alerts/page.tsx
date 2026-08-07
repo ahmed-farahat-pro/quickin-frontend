@@ -34,6 +34,7 @@ export default async function OpsAlertsPage() {
       pending_verifications: stats.oldest_verification,
       pending_applications: stats.oldest_application,
       pending_listings: stats.oldest_listing,
+      pending_payments: stats.oldest_payment,
       open_reports: stats.oldest_report,
     }
   } catch (err) {

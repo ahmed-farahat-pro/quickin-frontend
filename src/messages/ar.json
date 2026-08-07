@@ -1665,7 +1665,9 @@
     "copy": "نسخ",
     "copied": "تم النسخ",
     "openInstapay": "فتح في إنستاباي",
-    "scanHint": "امسح الرمز بتطبيق البنك"
+    "scanHint": "امسح الرمز بتطبيق البنك",
+    "underReview": "قيد المراجعة",
+    "tryAgain": "إرسال لقطة شاشة جديدة"
   },
   "reservationsLocal": {
     "meta": {

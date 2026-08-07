@@ -1722,7 +1722,9 @@
     "copy": "Copy",
     "copied": "Copied",
     "openInstapay": "Open in Instapay",
-    "scanHint": "Scan with your banking app"
+    "scanHint": "Scan with your banking app",
+    "underReview": "Under review",
+    "tryAgain": "Upload a new screenshot"
   },
   "reservationsLocal": {
     "meta": {
