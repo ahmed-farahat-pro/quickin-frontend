@@ -8,10 +8,12 @@ import { paymentStageFor } from '@/lib/local/payment-flow-core'
 
 const C = { burgundy: '#5B0F16', tan: '#EFE6D8', ink: '#2A2220', muted: '#6B6055' }
 
-function statusChip(status: string, paid: boolean): { bg: string; fg: string; labelKey: string } {
+function statusChip(status: string): { bg: string; fg: string; labelKey: string } {
   switch (status) {
     case 'pending':   return { bg: '#fff7e6', fg: '#9a6b00', labelKey: 'waitingForApproval' }
-    case 'confirmed': return { bg: '#e7f5ec', fg: '#177245', labelKey: paid ? 'paid' : 'approved' }
+    // Deliberately NOT 'paid' when paid — the payment has its own chip beside this
+    // one, and both saying "Paid" is where the duplicate green pills came from.
+    case 'confirmed': return { bg: '#e7f5ec', fg: '#177245', labelKey: 'approved' }
     case 'cancelled': return { bg: '#f1efec', fg: C.muted,   labelKey: 'status.cancelled' }
     case 'rejected':  return { bg: '#fdecea', fg: '#b3261e', labelKey: 'status.rejected' }
     default:          return { bg: '#f1efec', fg: C.muted,   labelKey: '' }
@@ -52,7 +54,7 @@ export function ReservationActions(props: {
   const isPast = checkOut < today
   const isUpcoming = checkIn >= today
   const active = status !== 'cancelled' && status !== 'rejected'
-  const chip = statusChip(status, paid)
+  const chip = statusChip(status)
   const chipLabel = chip.labelKey ? t(chip.labelKey) : (status || '—')
 
   async function cancel() {
@@ -84,7 +86,16 @@ export function ReservationActions(props: {
   // `status === 'confirmed' && !paid`, where `paid` came from a DERIVED
   // paid_at-based field — so a guest who had already uploaded a screenshot was shown
   // Pay now again and could pay twice.
-  const stage = paymentStageFor({ status, payment_state: paymentState, payment_proof_status: proofStatus })
+  // `paid` is the DERIVED paid_at flag. It has to go in, or this contradicts itself:
+  // a booking left half-paid by the retired mock /pay endpoint (paid_at stamped,
+  // payment_status never updated) rendered a "Paid" chip AND a Pay now button at the
+  // same time, and the payment page — which does see paid_at — bounced straight back.
+  const stage = paymentStageFor({
+    status,
+    payment_state: paymentState,
+    payment_proof_status: proofStatus,
+    paid_at: paid ? 'set' : null,
+  })
   const awaitingPayment = stage === 'awaiting_payment' || stage === 'rejected'
   const underReview = stage === 'under_review'
 
@@ -95,7 +106,9 @@ export function ReservationActions(props: {
         {chipLabel}
       </span>
 
-      {status === 'confirmed' && paid && (
+      {/* One chip per concern: the status chip above describes the RESERVATION, this
+          one the PAYMENT. They used to both say "Paid", side by side. */}
+      {stage === 'paid' && (
         <span style={{ background: '#e7f5ec', color: '#177245', fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999 }}>
           ✓ {t('paid')}
         </span>
