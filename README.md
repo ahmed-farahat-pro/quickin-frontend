@@ -159,7 +159,7 @@ Reaching a section without its module gets a no-access card and a 403 from the A
 
 | Page | Module | What it does |
 | --- | --- | --- |
-| `/ops` | `overview` | Money (commission earned / expected, host payouts), the queues needing attention, top-line counts, app download links |
+| `/ops` | `overview` | Top-line counts and the graph they drive (click a tile), money (commission earned / expected, host payouts), the queues needing attention, app download links — in that order, with a one-line alert strip pinned above them |
 | `/ops/listings` | `listings` | Properties, with approve / publish / hide / delete and the free-text resort review |
 | `/ops/bookings` | `bookings` | Reservations with guest paid / host payout / commission per row, and totals over the loaded page |
 | `/ops/applications` | `applications` | The host-application queue |
@@ -388,6 +388,58 @@ approval the admin types the **canonical** spelling, so `amouge` becomes `Amouag
 every listing carrying the submitted text is relinked, and the submitted spelling is
 kept in `resort_aliases` so the next host who types it **auto-links instead of
 re-queueing**. Every resolution is written to `staff_audit_log`.
+
+### Overview trends — the cards are a graph selector
+
+The Overview's twelve count tiles used to be a dead grid: every number was "as of
+right now", so nothing on the screen said whether the platform was growing or
+stalling. **Clicking a tile draws its history** in the panel below it — Users by
+default. `Total` plots the running total (the tile's own number, rewound); `New`
+plots additions per bucket. Range presets are 7 / 30 / 90 days and 12 months, the
+last switching to monthly buckets.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/api/local/admin/stats/trends` | `?range=7d\|30d\|90d\|12mo` (default `30d`) — every metric's series in one response. Module: `overview`, same as `/stats` |
+
+**Three tiles do not click, deliberately.** A tile counts rows matching a predicate
+*today*; charting it needs a timestamp for when each row started matching, and these
+three have none:
+
+| Tile | Missing |
+| --- | --- |
+| Published | `listings` has no `published_at` (nor `approved_at`) |
+| Pending bookings | `bookings` has `created_at` / `paid_at` / `cancelled_at` — no status-change stamps |
+| Confirmed | the same |
+
+They render as plain tiles rather than as a line that silently answers a different
+question. If they are ever wanted the fix is a nightly `metric_daily` snapshot
+table, **not a cleverer query** — the information is not in the database today.
+
+Three more things worth knowing when reading these lines:
+
+- **Every cumulative series is dated so its last point equals the tile exactly.**
+  That is why `hosts` and `verified` date rows by `COALESCE(approval, signup)`: an
+  account with no decision stamp (seeded, or flipped straight in the database) must
+  still be counted once, or the chart would end below the tile beside it. Rows with
+  a NULL date axis are counted in the baseline for the same reason.
+- **`baseline`** — rows falling before the window — is what keeps the running total
+  honest. Without it the 7-day view would draw the platform's entire user base as
+  having arrived last week.
+- **The two queue metrics chart submissions, not the queue.** Nothing records when
+  an application or an ID left the queue, so a running total there would be
+  "submitted ever" — a line that climbs forever and never meets its tile. They are
+  flagged `cumulative: false`, which hides the Total/New toggle and prints why.
+
+The `paid` metric is decided by `payment_status`, never `paid_at IS NOT NULL` — the
+same refund trap the Analytics API documents below.
+
+The whole response is fetched **once per range**, not per tile and not on the
+Overview's 30-second stats poll: switching tiles is then free, and a trend line does
+not move meaningfully inside half a minute. Range parsing, bucket math and series
+filling are pure in `src/lib/local/overview-trends-core.ts` and covered by
+`test/unit/overview-trends-core.test.mjs`; only the two SQL round trips live in
+`db.ts`.
 
 ### Analytics API
 

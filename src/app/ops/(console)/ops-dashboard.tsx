@@ -28,7 +28,10 @@ import Link from 'next/link'
 import { useOpsSession } from './ops-session'
 import { useLivePoll, agoLabel } from './use-live-stats'
 import { adminGetQuiet, money } from './ops-ui'
+import { OverviewMetrics } from './overview-trend'
+import { OpsSectionSkeleton } from './ops-skeleton'
 import { alertsFor, alertTotal, waitingLabel } from '@/lib/local/activity-core'
+import type { StaffModule } from '@/lib/local/staff'
 
 // Boutique palette.
 const BURGUNDY = '#5B0F16'
@@ -55,7 +58,9 @@ const SECTION_TITLES: Record<SectionId, string> = {
   verifications: 'ID verifications',
 }
 
-type AdminStats = {
+/** Exported for overview-trend.tsx, which reads the same payload to fill its tiles.
+ *  Type-only import there, so this does not create a runtime cycle. */
+export type AdminStats = {
   users: number
   hosts: number
   verified: number
@@ -716,12 +721,146 @@ export function OpsDashboard({ section }: { section: SectionId }) {
           </div>
         </header>
 
-        {/* App download links — surfaced by the mobile "download the app" bar. It
-            used to sit above the tab strip, which put a settings form on top of the
-            bookings table and the verification queue alike; it belongs on the one
-            section whose module gates it. */}
-        {section === 'overview' && (
-          <section style={{ ...cardStyle, marginBottom: 20 }}>
+        {sectionError ? (
+          <p
+            style={{
+              color: BURGUNDY,
+              background: TAN,
+              border: `1px solid ${BURGUNDY}`,
+              borderRadius: 12,
+              padding: '8px 14px',
+              fontSize: 13,
+              marginBottom: 16,
+            }}
+          >
+            {sectionError}
+          </p>
+        ) : null}
+
+        {/* The section's own fetch, which runs AFTER this page has already arrived —
+            the route skeleton covered the server wait, not this one. `!loaded[tab]`
+            keeps it to the first load: a Refresh re-runs the same fetch, and
+            replacing rows the operator is reading with placeholders would be worse
+            than leaving them up while the new ones arrive. */}
+        {sectionLoading && !loaded[tab] ? <OpsSectionSkeleton section={tab} /> : null}
+
+        {/* ===================== OVERVIEW ===================== */}
+        {tab === 'overview' && loaded.overview ? (
+          stats ? (
+          <>
+            {/* The alert queues, derived once and read twice: by the slim banner at
+                the very top and by the full cards further down. Only the queues this
+                operator can actually act on — a moderator without the payments module
+                is not shown a dispute they cannot open. */}
+            {(() => {
+              const alerts = alertsFor(stats as unknown as Record<string, number>, {
+                modules: [], isSuperAdmin: true,
+              }).filter((a) => can(a.module as never))
+              const oldest: Record<string, string | null> = {
+                pending_verifications: stats.oldest_verification,
+                pending_applications: stats.oldest_application,
+                pending_listings: stats.oldest_listing,
+                pending_payments: stats.oldest_payment,
+                open_reports: stats.oldest_report,
+              }
+              const liveLabel = live.expired
+                ? 'Session ended — reload to resume live updates'
+                : `Live · updated ${agoLabel(live.updatedAt, nowTick || Date.now())}`
+
+              /* The queue cards now sit third, below the graph and the money — so a
+                 one-line strip stays pinned at the top. Without it the only
+                 actionable thing on the page would be below the fold on a laptop,
+                 and this console's whole job is telling an operator what to do next.
+                 It links to /ops/alerts rather than scrolling, since that page is
+                 the same list with filters. */
+              const banner =
+                alerts.length === 0 ? (
+                  <div
+                    style={{
+                      ...cardStyle, marginBottom: 14, padding: '10px 16px',
+                      color: GREEN, fontSize: 13.5, fontWeight: 700,
+                    }}
+                  >
+                    Nothing is waiting. Every queue is clear.
+                  </div>
+                ) : (
+                  <Link
+                    href="/ops/alerts"
+                    style={{
+                      ...cardStyle, marginBottom: 14, padding: '10px 16px',
+                      borderLeft: `4px solid ${BURGUNDY}`, textDecoration: 'none',
+                      display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+                    }}
+                  >
+                    <strong style={{ fontSize: 13.5, color: BURGUNDY }}>
+                      {alertTotal(alerts)} {alertTotal(alerts) === 1 ? 'item needs' : 'items need'} attention
+                    </strong>
+                    <span style={{ fontSize: 12.5, color: MUTED }}>
+                      {alerts.map((a) => a.label).join(' · ')}
+                    </span>
+                    <span style={{ marginLeft: 'auto', fontSize: 12.5, color: BURGUNDY, fontWeight: 700 }}>
+                      Open →
+                    </span>
+                  </Link>
+                )
+
+              const queue =
+                alerts.length === 0 ? null : (
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+                      <strong style={{ fontSize: 14, color: BURGUNDY }}>
+                        Needs attention ({alertTotal(alerts)})
+                      </strong>
+                      <span style={{ fontSize: 12, color: live.expired ? '#B3261E' : MUTED }}>
+                        {liveLabel}
+                      </span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10 }}>
+                      {alerts.map((a) => (
+                        <a
+                          key={a.key}
+                          href={a.href}
+                          style={{
+                            ...cardStyle, padding: '14px 16px', textDecoration: 'none',
+                            borderLeft: `4px solid ${BURGUNDY}`, display: 'block',
+                          }}
+                        >
+                          <div style={{ fontSize: 24, fontWeight: 800, color: BURGUNDY, lineHeight: 1.1 }}>{a.count}</div>
+                          <div style={{ fontSize: 12.5, color: INK, marginTop: 4, fontWeight: 600 }}>{a.label}</div>
+                          {oldest[a.key] ? (
+                            <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>
+                              oldest waiting {waitingLabel(oldest[a.key], nowTick || Date.now())}
+                            </div>
+                          ) : null}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )
+
+              return (
+                <>
+                  {banner}
+                  {/* 1 — the counts, and the graph they drive. */}
+                  <OverviewMetrics stats={stats} />
+                  {/* 2 — money. */}
+                  <MoneySection stats={stats} can={can} />
+                  {/* 3 — the queues in full. */}
+                  {queue}
+                </>
+              )
+            })()}
+          </>
+          ) : (
+            <p style={{ color: MUTED, fontSize: 14 }}>No stats available.</p>
+          )
+        ) : null}
+
+        {/* 4 — App download links, surfaced by the mobile "download the app" bar.
+            A settings form is the least urgent thing on the page, so it sits last;
+            it lives on the Overview because `overview` is the module that gates it. */}
+        {section === 'overview' && allowed && (
+          <section style={{ ...cardStyle, marginTop: 4 }}>
             <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: BURGUNDY }}>App download links</h2>
             <p style={{ margin: '4px 0 14px', fontSize: 13, color: MUTED }}>
               Shown on phones as a “Get the app” bar. Leave a field empty to show “coming soon” for that platform.
@@ -755,219 +894,6 @@ export function OpsDashboard({ section }: { section: SectionId }) {
           </section>
         )}
 
-        {sectionError ? (
-          <p
-            style={{
-              color: BURGUNDY,
-              background: TAN,
-              border: `1px solid ${BURGUNDY}`,
-              borderRadius: 12,
-              padding: '8px 14px',
-              fontSize: 13,
-              marginBottom: 16,
-            }}
-          >
-            {sectionError}
-          </p>
-        ) : null}
-
-        {sectionLoading && !loaded[tab] ? (
-          <p style={{ color: MUTED, fontSize: 14, marginTop: 8 }}>Loading live data…</p>
-        ) : null}
-
-        {/* ===================== OVERVIEW ===================== */}
-        {tab === 'overview' && loaded.overview ? (
-          stats ? (
-          <>
-            {/* F4: what needs a human, above the vanity metrics — and only the queues
-                this operator can actually act on. */}
-            {(() => {
-              const alerts = alertsFor(stats as unknown as Record<string, number>, {
-                modules: [], isSuperAdmin: true,
-              }).filter((a) => can(a.module as never))
-              const oldest: Record<string, string | null> = {
-                pending_verifications: stats.oldest_verification,
-                pending_applications: stats.oldest_application,
-                pending_listings: stats.oldest_listing,
-                pending_payments: stats.oldest_payment,
-                open_reports: stats.oldest_report,
-              }
-              if (alerts.length === 0) {
-                return (
-                  <div style={{ ...cardStyle, marginBottom: 14, color: GREEN, fontSize: 14, fontWeight: 700 }}>
-                    Nothing is waiting. Every queue is clear.
-                  </div>
-                )
-              }
-              return (
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
-                    <strong style={{ fontSize: 14, color: BURGUNDY }}>
-                      Needs attention ({alertTotal(alerts)})
-                    </strong>
-                    <span style={{ fontSize: 12, color: live.expired ? '#B3261E' : MUTED }}>
-                      {live.expired
-                        ? 'Session ended — reload to resume live updates'
-                        : `Live · updated ${agoLabel(live.updatedAt, nowTick || Date.now())}`}
-                    </span>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10 }}>
-                    {alerts.map((a) => (
-                      <a
-                        key={a.key}
-                        href={a.href}
-                        style={{
-                          ...cardStyle, padding: '14px 16px', textDecoration: 'none',
-                          borderLeft: `4px solid ${BURGUNDY}`, display: 'block',
-                        }}
-                      >
-                        <div style={{ fontSize: 24, fontWeight: 800, color: BURGUNDY, lineHeight: 1.1 }}>{a.count}</div>
-                        <div style={{ fontSize: 12.5, color: INK, marginTop: 4, fontWeight: 600 }}>{a.label}</div>
-                        {oldest[a.key] ? (
-                          <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>
-                            oldest waiting {waitingLabel(oldest[a.key], nowTick || Date.now())}
-                          </div>
-                        ) : null}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )
-            })()}
-            {/* Money first, and money on its own. What QuickIn has earned is the
-                question this console gets asked most, and it used to be a single
-                unlabelled "Gross paid" sitting eleventh in a grid of user counts. */}
-            <section style={{ marginBottom: 20 }}>
-              <h2 style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 700, color: BURGUNDY }}>
-                Money
-              </h2>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-                  gap: 12,
-                }}
-              >
-                {[
-                  {
-                    label: 'Commission earned',
-                    value: money(stats.commission_paid),
-                    hint: `QuickIn's cut of ${stats.paid_bookings} paid bookings`,
-                    accent: true,
-                  },
-                  {
-                    label: 'Commission expected',
-                    value: money(stats.commission_pending),
-                    hint: 'on live bookings not yet paid',
-                    accent: false,
-                  },
-                  {
-                    label: 'Host payouts (paid)',
-                    value: money(stats.gross_paid),
-                    // gross_paid is SUM(total_price) — the host's raw price, which
-                    // they receive in full. It is NOT what guests handed over; add
-                    // the commission for that. Saying so beats a bare "Gross paid".
-                    hint: 'their price in full, before the markup',
-                    accent: false,
-                  },
-                ].map((s) => (
-                  <div
-                    key={s.label}
-                    style={{
-                      background: s.accent ? BURGUNDY : '#fff',
-                      border: `1px solid ${s.accent ? BURGUNDY : TAN}`,
-                      borderRadius: 18,
-                      padding: '16px 18px',
-                      boxShadow: '0 1px 3px rgba(42,34,32,0.06)',
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: 26,
-                        fontWeight: 800,
-                        lineHeight: 1.15,
-                        color: s.accent ? CREAM : BURGUNDY,
-                        fontVariantNumeric: 'tabular-nums',
-                      }}
-                    >
-                      {s.value}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 12.5,
-                        marginTop: 6,
-                        fontWeight: 600,
-                        color: s.accent ? CREAM : INK,
-                      }}
-                    >
-                      {s.label}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 11,
-                        marginTop: 2,
-                        color: s.accent ? CREAM : MUTED,
-                        opacity: s.accent ? 0.8 : 1,
-                      }}
-                    >
-                      {s.hint}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <p style={{ margin: '8px 0 0', fontSize: 11.5, color: MUTED }}>
-                Each booking is counted at the commission rate it was taken at, so
-                changing the rate in{' '}
-                {can('pricing') ? <Link href="/ops/pricing" style={{ color: BURGUNDY }}>Pricing</Link> : 'Pricing'}{' '}
-                never restates what has already been earned. Refunded bookings drop out.
-              </p>
-            </section>
-
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
-                gap: 14,
-              }}
-            >
-              {[
-                { label: 'Users', value: stats.users },
-                { label: 'Hosts', value: stats.hosts },
-                { label: 'Verified', value: stats.verified },
-                { label: 'Listings', value: stats.listings },
-                { label: 'Published', value: stats.published },
-                { label: 'Bookings', value: stats.bookings },
-                { label: 'Bookings today', value: stats.bookings_today },
-                { label: 'Pending bookings', value: stats.pending_bookings },
-                { label: 'Confirmed', value: stats.confirmed_bookings },
-                { label: 'Paid', value: stats.paid_bookings },
-                { label: 'Pending applications', value: stats.pending_applications },
-                { label: 'Pending IDs', value: stats.pending_verifications },
-              ].map((s) => (
-                <div
-                  key={s.label}
-                  style={{
-                    background: TAN,
-                    border: `1px solid ${TAN}`,
-                    borderRadius: 18,
-                    padding: '18px 18px 16px',
-                    boxShadow: '0 1px 3px rgba(42,34,32,0.06)',
-                  }}
-                >
-                  <div style={{ fontSize: 30, fontWeight: 800, color: BURGUNDY, lineHeight: 1.1 }}>
-                    {s.value}
-                  </div>
-                  <div style={{ fontSize: 12, color: MUTED, marginTop: 6, fontWeight: 600 }}>
-                    {s.label}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-          ) : (
-            <p style={{ color: MUTED, fontSize: 14 }}>No stats available.</p>
-          )
-        ) : null}
 
         {/* ===================== USERS ===================== */}
         {tab === 'listings' && loaded.listings ? (
@@ -1582,5 +1508,99 @@ export function OpsDashboard({ section }: { section: SectionId }) {
         </div>
       )}
     </main>
+  )
+}
+
+/**
+ * The money row: commission earned, commission expected, host payouts.
+ *
+ * Extracted from OpsDashboard's body when the Overview was reordered — it is 80
+ * lines of tiles and the section around it now has three siblings to keep straight,
+ * so leaving it inline made the ordering impossible to read at a glance.
+ *
+ * Money used to lead the Overview, and the reasoning still holds: what QuickIn has
+ * earned is the question this console gets asked most, and it was once a single
+ * unlabelled "Gross paid" sitting eleventh in a grid of user counts. It now sits
+ * below the growth graph, which answers the second-most-asked question.
+ */
+function MoneySection({
+  stats,
+  can,
+}: {
+  stats: AdminStats
+  can: (module: StaffModule) => boolean
+}) {
+  const tiles = [
+    {
+      label: 'Commission earned',
+      value: money(stats.commission_paid),
+      hint: `QuickIn's cut of ${stats.paid_bookings} paid bookings`,
+      accent: true,
+    },
+    {
+      label: 'Commission expected',
+      value: money(stats.commission_pending),
+      hint: 'on live bookings not yet paid',
+      accent: false,
+    },
+    {
+      label: 'Host payouts (paid)',
+      value: money(stats.gross_paid),
+      // gross_paid is SUM(total_price) — the host's raw price, which they receive in
+      // full. It is NOT what guests handed over; add the commission for that. Saying
+      // so beats a bare "Gross paid".
+      hint: 'their price in full, before the markup',
+      accent: false,
+    },
+  ]
+
+  return (
+    <section style={{ marginBottom: 20 }}>
+      <h2 style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 700, color: BURGUNDY }}>Money</h2>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12 }}>
+        {tiles.map((s) => (
+          <div
+            key={s.label}
+            style={{
+              background: s.accent ? BURGUNDY : '#fff',
+              border: `1px solid ${s.accent ? BURGUNDY : TAN}`,
+              borderRadius: 18,
+              padding: '16px 18px',
+              boxShadow: '0 1px 3px rgba(42,34,32,0.06)',
+            }}
+          >
+            <div
+              style={{
+                fontSize: 26,
+                fontWeight: 800,
+                lineHeight: 1.15,
+                color: s.accent ? CREAM : BURGUNDY,
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {s.value}
+            </div>
+            <div style={{ fontSize: 12.5, marginTop: 6, fontWeight: 600, color: s.accent ? CREAM : INK }}>
+              {s.label}
+            </div>
+            <div
+              style={{
+                fontSize: 11,
+                marginTop: 2,
+                color: s.accent ? CREAM : MUTED,
+                opacity: s.accent ? 0.8 : 1,
+              }}
+            >
+              {s.hint}
+            </div>
+          </div>
+        ))}
+      </div>
+      <p style={{ margin: '8px 0 0', fontSize: 11.5, color: MUTED }}>
+        Each booking is counted at the commission rate it was taken at, so changing the rate in{' '}
+        {can('pricing') ? <Link href="/ops/pricing" style={{ color: BURGUNDY }}>Pricing</Link> : 'Pricing'}{' '}
+        never restates what has already been earned. Refunded bookings drop out.
+      </p>
+    </section>
   )
 }

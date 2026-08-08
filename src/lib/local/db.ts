@@ -22,6 +22,8 @@ import type { PaymentReviewAction } from './payment-flow-core'
 import { branchLimit, wantsKind } from './activity-core'
 import type { ActivityFilter, AuditFilter } from './activity-core'
 import { PAID_SQL } from './analytics-core'
+import { buildSeries, bucketsFor, METRICS, RANGES, windowFor } from './overview-trends-core'
+import type { MetricId, MetricSpec, RangeId, SeriesPoint } from './overview-trends-core'
 import type { DocumentKind, VerificationAction, VerificationFilter } from './document-core'
 import { isLiveStayStatus, normalizeReservationCode } from '@/lib/stay-code'
 // The catalogs the host forms offer — one source of truth for what the API
@@ -2529,6 +2531,82 @@ export async function adminStats(): Promise<AdminStats> {
        (SELECT to_char(MIN(submitted_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') FROM payment_proofs WHERE status = 'submitted') AS oldest_payment`
   )
   return rows[0] as AdminStats
+}
+
+/**
+ * The history behind the Overview's number cards — one dense series per chartable
+ * metric, for the card → graph panel.
+ *
+ * TWO round trips for all eight metrics, not two per metric: the per-bucket counts
+ * are one UNION ALL and the baselines are another. The Overview already polls
+ * `adminStats` every 30 seconds from every operator's browser, so a fan-out of
+ * sixteen queries behind a chart nobody has clicked yet is exactly the load this
+ * screen cannot afford. The page fetches this once per range instead, and switching
+ * cards is then free — every series is already on the client.
+ *
+ * `baseline` is what makes a running total honest: rows dated before the window
+ * start. Without it the 7-day view would draw the platform's entire user base as
+ * having arrived in the last week.
+ *
+ * Injection surface: `metric` is validated against METRIC_IDS by the route, and the
+ * only interpolated identifiers are the constant from/where/at fragments that
+ * METRICS keys off it. Dates are $n placeholders.
+ */
+export async function adminStatTrends(
+  range: RangeId,
+  now: Date = new Date(),
+): Promise<Record<MetricId, SeriesPoint[]>> {
+  const spec = RANGES[range]
+  const buckets = bucketsFor(range, now)
+  const { from, toExclusive } = windowFor(range, now)
+
+  // date_trunc's unit is a constant from RANGES ('day' | 'month'), never user text.
+  const bucketOf = (at: string) => `to_char(date_trunc('${spec.granularity}', ${at}), 'YYYY-MM-DD')`
+  const scoped = (m: MetricSpec, extra: string) =>
+    `FROM ${m.from} WHERE ${m.where ? `${m.where} AND ` : ''}${extra}`
+
+  const ids = Object.keys(METRICS) as MetricId[]
+
+  const countsSql = ids
+    .map((id) => {
+      const m = METRICS[id]
+      return `SELECT '${id}' AS metric, ${bucketOf(m.at)} AS bucket, COUNT(*)::int AS count
+                ${scoped(m, `${m.at} >= $1::date AND ${m.at} < $2::date`)}
+               GROUP BY 2`
+    })
+    .join('\nUNION ALL\n')
+
+  // A row with a NULL date axis has no bucket to sit in, so it can never appear in
+  // the series — count it in the baseline instead of losing it, or the final
+  // running total would fall short of the card.
+  const baselineSql = ids
+    .map((id) => {
+      const m = METRICS[id]
+      return `SELECT '${id}' AS metric, COUNT(*)::int AS count
+                ${scoped(m, `(${m.at} IS NULL OR ${m.at} < $1::date)`)}`
+    })
+    .join('\nUNION ALL\n')
+
+  const [counts, baselines] = await Promise.all([
+    pool.query(countsSql, [from, toExclusive]),
+    pool.query(baselineSql, [from]),
+  ])
+
+  const baselineOf = new Map<string, number>()
+  for (const r of baselines.rows) baselineOf.set(r.metric, Number(r.count) || 0)
+
+  const rowsOf = new Map<string, Array<{ bucket: string; count: number }>>()
+  for (const r of counts.rows) {
+    const list = rowsOf.get(r.metric) ?? []
+    list.push({ bucket: r.bucket, count: Number(r.count) || 0 })
+    rowsOf.set(r.metric, list)
+  }
+
+  const out = {} as Record<MetricId, SeriesPoint[]>
+  for (const id of ids) {
+    out[id] = buildSeries(buckets, rowsOf.get(id) ?? [], baselineOf.get(id) ?? 0, METRICS[id].cumulative)
+  }
+  return out
 }
 
 export interface AdminUserRow {
