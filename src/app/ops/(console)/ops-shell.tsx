@@ -12,6 +12,14 @@
 // sign out. Everything that navigates lives in the sidebar; everything in the top
 // bar is an action.
 //
+// CHROME IS TAN, CONTENT IS CREAM, CARDS ARE WHITE — in that order, darkest to
+// lightest. The rail was white first, which broke the ladder twice over: white is
+// what cardStyle uses, so the navigation spoke the same language as the panels it
+// framed; and with the cream page sitting between two whites, the brightest thing
+// on screen was the menu rather than the work. Tan also runs the top bar, so the
+// two now read as one L-shaped frame instead of two pieces of furniture meeting at
+// a corner. If you are tempted to lighten this rail, lighten the content instead.
+//
 // Styling is inline objects in the boutique palette, matching the rest of /ops
 // (see ops-ui.tsx for why). That costs us CSS's `:hover` and media queries, so
 // hover/focus are tracked in state and the breakpoint is read with matchMedia.
@@ -21,6 +29,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { COLORS, FONT } from '../ops-theme'
 import { useOpsSession } from './ops-session'
 import type { StaffModule } from '@/lib/local/staff'
+
+/** Group headings, a shade darker than COLORS.muted: muted was tuned against white
+ *  and sits at roughly 4.6:1 on tan — passing, but too faint to hold the groups
+ *  apart once the rail stopped being the brightest thing on the page. */
+const GROUP_LABEL = '#5A5047'
 
 /** Width of the sidebar rail on a desktop viewport. */
 const SIDEBAR_W = 248
@@ -238,7 +251,9 @@ export function OpsShell({ children }: { children: React.ReactNode }) {
       style={{
         width: SIDEBAR_W,
         flexShrink: 0,
-        background: '#fff',
+        // Tan, not white — see CHROME above. White is the card colour, and a white
+        // rail made the navigation the brightest surface on the page.
+        background: COLORS.tan,
         borderRight: '1px solid rgba(91,15,22,0.10)',
         display: 'flex',
         flexDirection: 'column',
@@ -249,6 +264,10 @@ export function OpsShell({ children }: { children: React.ReactNode }) {
           : { position: 'sticky', top: 60, height: 'calc(100vh - 60px)' }),
       }}
     >
+      {/* No minHeight: 0 needed here, though `flex: 1` in a column usually wants it —
+          a flex item's automatic minimum size is already zero once it is a scroll
+          container in that axis, which overflowY makes it. The footer below stays
+          pinned on a short viewport and this list scrolls under it. */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '14px 12px' }}>
         {groups.map((group) => {
           const open = !collapsed.has(group.title)
@@ -267,7 +286,7 @@ export function OpsShell({ children }: { children: React.ReactNode }) {
                   padding: '8px 10px',
                   border: 'none',
                   background: 'transparent',
-                  color: COLORS.muted,
+                  color: GROUP_LABEL,
                   fontFamily: FONT,
                   fontSize: 11,
                   fontWeight: 700,
@@ -309,7 +328,7 @@ export function OpsShell({ children }: { children: React.ReactNode }) {
                           background: current
                             ? COLORS.burgundy
                             : hot
-                              ? 'rgba(91,15,22,0.07)'
+                              ? 'rgba(91,15,22,0.11)'
                               : 'transparent',
                           transition: 'background .15s, color .15s',
                         }}
@@ -351,7 +370,9 @@ export function OpsShell({ children }: { children: React.ReactNode }) {
           alignItems: 'center',
           gap: 12,
           padding: '0 16px',
-          background: 'linear-gradient(180deg, #EFE6D8 0%, #F6F1E6 100%)',
+          // Flat, and the same tan as the rail: the old gradient faded to cream at
+          // its lower edge, so bar and rail met in a visible step.
+          background: COLORS.tan,
           borderBottom: '1px solid rgba(91,15,22,0.10)',
         }}
       >
