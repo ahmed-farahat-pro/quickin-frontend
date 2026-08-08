@@ -385,6 +385,15 @@ export function OverviewMetrics({
           ) : points.length === 0 ? (
             <p style={{ fontSize: 13, color: COLORS.muted }}>No data in this range.</p>
           ) : (
+            /* isAnimationActive={false} on both marks, for two reasons.
+               Recharts draws its entry animation with a clipPath whose width grows
+               from zero on requestAnimationFrame — and browsers throttle rAF in a
+               BACKGROUND TAB, so a console opened in one (or left to load while the
+               operator does something else) paints axes, gridlines and a caption
+               around an empty rectangle until it is focused. The chart is not
+               missing, it is clipped to nothing, which is worse than slow.
+               Second: this panel is a metric SELECTOR. Re-animating ninety points
+               every time a tile is clicked fights the comparison it exists for. */
             <ResponsiveContainer width="100%" height="100%">
               {effectiveMode === 'total' ? (
                 // A running total is a level, so it reads as a filled area…
@@ -421,6 +430,7 @@ export function OverviewMetrics({
                     // 90 daily points with a dot on each is a caterpillar, not a chart.
                     dot={points.length <= 14}
                     activeDot={{ r: 4 }}
+                    isAnimationActive={false}
                   />
                 </AreaChart>
               ) : (
@@ -446,7 +456,13 @@ export function OverviewMetrics({
                     cursor={{ fill: 'rgba(91,15,22,0.06)' }}
                     content={<TrendTooltip granularity={granularity} />}
                   />
-                  <Bar dataKey="value" fill={COLORS.burgundy} radius={[3, 3, 0, 0]} maxBarSize={26} />
+                  <Bar
+                    dataKey="value"
+                    fill={COLORS.burgundy}
+                    radius={[3, 3, 0, 0]}
+                    maxBarSize={26}
+                    isAnimationActive={false}
+                  />
                 </BarChart>
               )}
             </ResponsiveContainer>
