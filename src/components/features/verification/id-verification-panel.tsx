@@ -5,6 +5,7 @@ import { fileToCompressedDataUrl, MAX_OWNERSHIP_DOC_CHARS as MAX_ID_IMAGE_CHARS 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import { ShieldCheck, Clock, ShieldAlert, XCircle, UploadCloud, Loader2, X } from 'lucide-react'
 
 type Status = 'loading' | 'guest' | 'unverified' | 'pending' | 'verified' | 'rejected'
@@ -99,8 +100,16 @@ export function IdVerificationPanel() {
     }
   }
 
+  // This panel gates listing creation, so it is the first thing a would-be host
+  // sees. Tailwind kit here, not the boutique one — this file is shadcn throughout.
   if (status === 'loading') {
-    return <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
+    return (
+      <div className="space-y-3">
+        <Skeleton className="h-7 w-36 rounded-full" />
+        <Skeleton className="h-4 w-64" />
+        <Skeleton className="h-4 w-48" />
+      </div>
+    )
   }
 
   const pill = {

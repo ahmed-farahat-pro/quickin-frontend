@@ -6,6 +6,7 @@
 // the /messages page.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
+import { ShimmerStyles, SkeletonChatBubbles } from '@/components/ui/skeleton-block'
 
 const C = {
   burgundy: '#5B0F16',
@@ -139,7 +140,15 @@ export default function LocalChatPanel({
           padding: '4px 2px',
         }}
       >
-        {state === 'loading' && <p style={{ fontSize: 13, color: C.muted }}>{t('loading')}</p>}
+        {/* The transcript takes a moment on every open — this panel is a drawer on
+            listing pages as well as the /messages thread, so it is the one placeholder
+            a guest is most likely to see. */}
+        {state === 'loading' && (
+          <>
+            <ShimmerStyles />
+            <SkeletonChatBubbles count={4} />
+          </>
+        )}
         {state === 'ready' && messages.length === 0 && (
           <p style={{ fontSize: 13, color: C.muted }}>{t('empty')}</p>
         )}

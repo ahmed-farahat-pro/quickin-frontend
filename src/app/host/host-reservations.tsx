@@ -5,6 +5,7 @@
 // /api/local/bookings/[id] { status: 'confirm' | 'reject' } and refresh the list.
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslations, useLocale } from 'next-intl'
+import { ShimmerStyles, SkeletonRow } from '@/components/ui/skeleton-block'
 import { StayGuideEditor } from './stay-guide-editor'
 
 const C = {
@@ -161,8 +162,18 @@ export function HostReservations() {
     return decide(b.id, 'reject')
   }
 
+  // A host's whole reservation list. SkeletonRow is already the thumbnail + two
+  // lines + trailing action shape these rows use, so this is the existing kit
+  // rather than a new placeholder.
   if (bookings === null) {
-    return <p style={{ fontSize: 14, color: C.muted }}>{t('loading')}</p>
+    return (
+      <div style={{ display: 'grid', gap: 14 }}>
+        <ShimmerStyles />
+        {Array.from({ length: 3 }).map((_, i) => (
+          <SkeletonRow key={i} />
+        ))}
+      </div>
+    )
   }
 
   if (error && bookings.length === 0) {

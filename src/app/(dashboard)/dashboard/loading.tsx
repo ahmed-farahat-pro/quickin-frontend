@@ -1,6 +1,5 @@
 import { Skeleton } from '@/components/ui/skeleton'
 import { RouteProgress } from '@/components/ui/route-progress'
-import { Loader2 } from 'lucide-react'
 
 export default function DashboardLoading() {
   return (
@@ -13,13 +12,9 @@ export default function DashboardLoading() {
         <Skeleton className="h-4 w-72" />
       </div>
 
-      {/* Loading indicator */}
-      <div className="flex items-center justify-center py-12">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Loading...</p>
-        </div>
-      </div>
+      {/* The spinner and the word "Loading..." that used to sit here said nothing
+          the skeleton around them wasn't already saying, and pushed the content
+          placeholders a screen down so they described a layout nobody could see. */}
 
       {/* Content skeleton */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

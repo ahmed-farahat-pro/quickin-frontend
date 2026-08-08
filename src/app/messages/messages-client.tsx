@@ -15,7 +15,10 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import LocalChatPanel from '@/components/local-chat-panel'
-import { ShimmerStyles, SkeletonBlock } from '@/components/ui/skeleton-block'
+// The two shapes below live in the shared kit rather than here: loading.tsx needs
+// the same ones for the route boundary, and local-chat-panel needs the bubbles for
+// the thread it renders on listing pages.
+import { ShimmerStyles, SkeletonChatBubbles, SkeletonThreadRows } from '@/components/ui/skeleton-block'
 
 const C = { burgundy: '#5B0F16', cream: '#F6F1E6', tan: '#EFE6D8', ink: '#2A2220', muted: '#6B6055' }
 
@@ -27,53 +30,6 @@ export interface Convo {
   last_message: string | null
   last_message_at: string
   is_host: boolean
-}
-
-/**
- * Still here, and still needed — just for a narrower case than before.
- *
- * With the list server-rendered these only appear when the server render itself
- * failed and the poll is doing the first load instead. That is rare, which is
- * exactly why it should still look like a screen loading rather than an empty one.
- */
-function ThreadListSkeleton() {
-  const widths = ['62%', '48%', '70%', '54%']
-  return (
-    <div>
-      <ShimmerStyles />
-      {widths.map((w, i) => (
-        <div key={i} style={{ padding: '13px 15px', borderBottom: '1px solid rgba(42,34,32,0.06)' }}>
-          <SkeletonBlock width={w} height={14} />
-          <SkeletonBlock width="80%" height={11} style={{ marginTop: 7 }} />
-          <SkeletonBlock width="90%" height={11} style={{ marginTop: 6 }} />
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function ThreadSkeleton() {
-  // Alternating sides, so it reads as a conversation rather than a list.
-  const bubbles: Array<{ w: string; mine: boolean }> = [
-    { w: '58%', mine: false },
-    { w: '44%', mine: true },
-    { w: '68%', mine: false },
-    { w: '36%', mine: true },
-  ]
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <ShimmerStyles />
-      {bubbles.map((b, i) => (
-        <SkeletonBlock
-          key={i}
-          width={b.w}
-          height={38}
-          radius={14}
-          style={{ alignSelf: b.mine ? 'flex-end' : 'flex-start' }}
-        />
-      ))}
-    </div>
-  )
 }
 
 export function MessagesClient({
@@ -150,7 +106,14 @@ export function MessagesClient({
           <div className="qk-msg-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 300px) 1fr', gap: 20, alignItems: 'stretch' }}>
             {/* Thread list */}
             <div style={{ background: '#fff', borderRadius: 18, border: '1px solid rgba(42,34,32,0.06)', overflow: 'hidden' }}>
-              {state === 'loading' && <ThreadListSkeleton />}
+              {/* With the list server-rendered this only appears when that render
+                  failed and the poll is doing the first load instead. */}
+              {state === 'loading' && (
+                <>
+                  <ShimmerStyles />
+                  <SkeletonThreadRows count={4} />
+                </>
+              )}
               {state === 'ready' && convos.length === 0 && <p style={{ padding: 16, fontSize: 14, color: C.muted }}>{t('noThreads')}</p>}
               {convos.map((c) => (
                 <button
@@ -180,7 +143,10 @@ export function MessagesClient({
               ) : state === 'loading' ? (
                 // "Pick a thread" is wrong while the list is still arriving — there
                 // is nothing to pick yet, and it reads as an empty inbox.
-                <ThreadSkeleton />
+                <>
+                  <ShimmerStyles />
+                  <SkeletonChatBubbles count={4} />
+                </>
               ) : (
                 <p style={{ fontSize: 14, color: C.muted }}>{t('pickThread')}</p>
               )}

@@ -15,6 +15,7 @@
 // reservation has a code. `stayPassPath` still refuses a null/"null" code.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
+import { ShimmerStyles, SkeletonBlock } from '@/components/ui/skeleton-block'
 import { fileToCompressedDataUrl, MAX_OWNERSHIP_DOC_CHARS } from '@/lib/image'
 import { stayPassPath } from '@/lib/stay-code'
 import { StayQr } from '@/app/stay/stay-qr'
@@ -309,7 +310,19 @@ export function StayGuideEditor({
       )}
 
       {items === null ? (
-        <p style={{ margin: '14px 0 0', fontSize: 13.5, color: C.muted }}>{t('loading')}</p>
+        // The guide is a list of titled entries — hold that shape, not a sentence.
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, margin: '14px 0 0' }}>
+          <ShimmerStyles />
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              style={{ border: `1px solid ${C.tan}`, borderRadius: 14, padding: 14 }}
+            >
+              <SkeletonBlock width="46%" height={14} />
+              <SkeletonBlock width="88%" height={12} style={{ marginTop: 9 }} />
+            </div>
+          ))}
+        </div>
       ) : (
         <>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, margin: '14px 0 0' }}>

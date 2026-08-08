@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { QRCodeSVG } from 'qrcode.react'
+import { ShimmerStyles, SkeletonBlock } from '@/components/ui/skeleton-block'
 import { isPaymentConfigured } from '@/lib/local/payment-config-core'
 import type { PaymentConfig } from '@/lib/local/payment-config-core'
 
@@ -50,7 +51,33 @@ export function InstapayDetails() {
   }
 
   if (error) return <p style={{ margin: 0, fontSize: 13.5, color: '#b3261e' }}>{error}</p>
-  if (!cfg) return <p style={{ margin: 0, fontSize: 13.5, color: C.muted }}>{t('loading')}</p>
+  // A guest reaches this holding their phone, mid-transfer. A line of text where
+  // the QR belongs reads as "there is nothing to pay to"; the shape reads as "the
+  // QR is coming". Matches the panel below: QR square, then handle and instructions.
+  if (!cfg) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 18,
+          padding: 16,
+          borderRadius: 16,
+          border: `1px solid ${C.tan}`,
+          background: C.cream,
+        }}
+      >
+        <ShimmerStyles />
+        <SkeletonBlock width={132} height={132} radius={12} style={{ flex: '0 0 auto' }} />
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <SkeletonBlock width={96} height={10} radius={4} />
+          <SkeletonBlock width="72%" height={19} radius={8} style={{ marginTop: 9 }} />
+          <SkeletonBlock width="90%" height={12} style={{ marginTop: 16 }} />
+          <SkeletonBlock width="64%" height={12} style={{ marginTop: 7 }} />
+        </div>
+      </div>
+    )
+  }
   if (!isPaymentConfigured(cfg)) {
     return <p style={{ margin: 0, fontSize: 13.5, color: C.muted }}>{t('notConfigured')}</p>
   }

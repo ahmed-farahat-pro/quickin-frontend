@@ -6,6 +6,7 @@
 // because it reuses the identical querystring.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { COLORS, SERIF } from '../../ops-theme'
+import { OpsSkeletonChart, OpsSkeletonStats } from '../ops-skeleton'
 import {
   BarList,
   Stat,
@@ -212,7 +213,13 @@ export function OpsAnalytics() {
         {error ? (
           <div style={{ ...section, color: COLORS.red, fontSize: 13, fontWeight: 700 }}>{error}</div>
         ) : loading || !data || data.kind !== kind ? (
-          <div style={{ ...section, color: COLORS.muted, fontSize: 13 }}>Loading…</div>
+          // Switching report kind refetches, so this shows on every tab change —
+          // not only the first load. All three reports open with headline numbers
+          // above a chart, which is the shape held here.
+          <div style={section}>
+            <OpsSkeletonStats count={4} />
+            <OpsSkeletonChart bars={26} />
+          </div>
         ) : data.kind === 'bookings' ? (
           <BookingsView data={data.payload as never} />
         ) : data.kind === 'revenue' ? (

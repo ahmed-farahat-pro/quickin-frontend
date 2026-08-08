@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { ShimmerStyles, SkeletonBlock } from '@/components/ui/skeleton-block'
 import { CONTACT_EMAIL } from '@/lib/contact'
 
 // Public account-deletion page. Doubles as:
@@ -70,7 +71,14 @@ export default function DeleteAccountPage() {
             Your account has been deleted. We&apos;re sorry to see you go. <a href="/" style={{ color: C.burgundy, fontWeight: 600 }}>Return home</a>
           </div>
         ) : !loaded ? (
-          <p style={{ textAlign: 'center', color: C.muted, fontSize: 14 }}>Loading…</p>
+          // Which account is about to be deleted is the whole point of this screen,
+          // so hold its shape rather than a centred word.
+          <div>
+            <ShimmerStyles />
+            <SkeletonBlock width="58%" height={14} />
+            <SkeletonBlock height={44} radius={12} style={{ marginTop: 18 }} />
+            <SkeletonBlock width={168} height={44} radius={999} style={{ marginTop: 16 }} />
+          </div>
         ) : email ? (
           <>
             {error && <div style={{ background: 'rgba(91,15,22,0.06)', border: '1px solid rgba(91,15,22,0.18)', color: C.burgundy, fontSize: 13.5, borderRadius: 12, padding: '10px 14px', marginBottom: 14 }}>{error}</div>}

@@ -138,6 +138,59 @@ export function SkeletonRow({ style }: { style?: CSSProperties }) {
   )
 }
 
+/**
+ * A chat transcript placeholder: bubbles alternating sides so it reads as a
+ * conversation rather than a list.
+ *
+ * Shared because three places need the same shape — the inbox route skeleton, the
+ * inbox client while its poll does a first load, and local-chat-panel, which is the
+ * thread itself and appears on listing pages as well as /messages.
+ */
+export function SkeletonChatBubbles({ count = 4, style }: { count?: number; style?: CSSProperties }) {
+  // Fixed widths and sides: these render on the server too, so anything random here
+  // would hydrate mismatched.
+  const bubbles = [
+    { w: '58%', mine: false },
+    { w: '44%', mine: true },
+    { w: '68%', mine: false },
+    { w: '36%', mine: true },
+    { w: '52%', mine: false },
+    { w: '40%', mine: true },
+  ]
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, ...style }}>
+      {Array.from({ length: count }).map((_, i) => {
+        const b = bubbles[i % bubbles.length]
+        return (
+          <SkeletonBlock
+            key={i}
+            width={b.w}
+            height={38}
+            radius={14}
+            style={{ alignSelf: b.mine ? 'flex-end' : 'flex-start' }}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
+/** A conversation-list row: who, which listing, and the last thing said. */
+export function SkeletonThreadRows({ count = 4 }: { count?: number }) {
+  const widths = ['62%', '48%', '70%', '54%']
+  return (
+    <div>
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} style={{ padding: '13px 15px', borderBottom: '1px solid rgba(42,34,32,0.06)' }}>
+          <SkeletonBlock width={widths[i % widths.length]} height={14} />
+          <SkeletonBlock width="80%" height={11} style={{ marginTop: 7 }} />
+          <SkeletonBlock width="90%" height={11} style={{ marginTop: 6 }} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 /** Re-export palette + font so loading.tsx files can match page chrome without duplicating them. */
 export const SKELETON_COLORS = COLORS
 export const SKELETON_FONT = FONT

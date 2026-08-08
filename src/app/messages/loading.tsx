@@ -5,7 +5,13 @@
 // a page moves its fetch to the server, not only when a page is written that way.
 //
 // Mirrors messages-client.tsx: back link, serif heading, the two-panel grid.
-import { ShimmerStyles, SkeletonBlock, SKELETON_COLORS as C } from '@/components/ui/skeleton-block'
+import {
+  ShimmerStyles,
+  SkeletonBlock,
+  SkeletonChatBubbles,
+  SkeletonThreadRows,
+  SKELETON_COLORS as C,
+} from '@/components/ui/skeleton-block'
 import { RouteProgress } from '@/components/ui/route-progress'
 
 const panel: React.CSSProperties = {
@@ -42,33 +48,12 @@ export default function MessagesLoading() {
         >
           {/* Thread list */}
           <div style={{ ...panel, overflow: 'hidden' }}>
-            {['62%', '48%', '70%', '54%'].map((w, i) => (
-              <div key={i} style={{ padding: '13px 15px', borderBottom: '1px solid rgba(42,34,32,0.06)' }}>
-                <SkeletonBlock width={w} height={14} />
-                <SkeletonBlock width="80%" height={11} style={{ marginTop: 7 }} />
-                <SkeletonBlock width="90%" height={11} style={{ marginTop: 6 }} />
-              </div>
-            ))}
+            <SkeletonThreadRows count={4} />
           </div>
 
           {/* Active thread */}
           <div style={{ ...panel, padding: 16, height: '62vh', minHeight: 380 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {[
-                { w: '58%', mine: false },
-                { w: '44%', mine: true },
-                { w: '68%', mine: false },
-                { w: '36%', mine: true },
-              ].map((b, i) => (
-                <SkeletonBlock
-                  key={i}
-                  width={b.w}
-                  height={38}
-                  radius={14}
-                  style={{ alignSelf: b.mine ? 'flex-end' : 'flex-start' }}
-                />
-              ))}
-            </div>
+            <SkeletonChatBubbles count={4} />
           </div>
         </div>
       </div>
