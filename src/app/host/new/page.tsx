@@ -7,7 +7,9 @@ import { redirect } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
 import { verifyToken, getUserRowByEmail } from '@/lib/local/auth'
 import { listActiveResorts } from '@/lib/local/resorts'
-import { getCommissionConfig } from '@/lib/local/db'
+import { getCommissionConfig, getListingGateState, getVerification } from '@/lib/local/db'
+import { canPublishListing } from '@/lib/local/host-verification-core'
+import { VerificationGateNotice } from '../verification-gate-notice'
 import { NewListingForm } from './new-listing-form'
 
 export const dynamic = 'force-dynamic'
@@ -32,16 +34,18 @@ const COLORS = {
 
 const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
 
-async function isSignedIn(): Promise<boolean> {
+/** The signed-in user's id, or null. Returns the id rather than a boolean so the
+ *  listing gate below can be checked without a second lookup. */
+async function signedInUserId(): Promise<string | null> {
   const token = (await cookies()).get('qk_token')?.value
-  if (!token) return false
+  if (!token) return null
   const claims = verifyToken(token)
-  if (!claims?.email) return false
+  if (!claims?.email) return null
   try {
     const row = await getUserRowByEmail(claims.email)
-    return !!row
+    return row?.id ?? null
   } catch {
-    return false
+    return null
   }
 }
 
@@ -64,7 +68,16 @@ export default async function NewListingPage() {
   } catch (err) {
     console.error('host/new commission:', err)
   }
-  if (!(await isSignedIn())) redirect('/login')
+  const userId = await signedInUserId()
+  if (!userId) redirect('/login')
+
+  // Check the gate BEFORE rendering the form. The POST enforces it anyway, but
+  // letting an unverified host fill in a whole listing only to be refused at the
+  // end is a bad way to communicate a rule we already know.
+  const gate = canPublishListing(await getListingGateState(userId))
+  // The reviewer's reason, fetched only when it is going to be shown.
+  const rejectionReason =
+    gate.code === 'verification_rejected' ? (await getVerification(userId)).notes : null
 
   const t = await getTranslations('hostPage.create')
 
@@ -134,7 +147,11 @@ export default async function NewListingPage() {
           {t('subtitle')}
         </p>
 
-        <NewListingForm resorts={resorts} commissionRate={commissionRate} />
+        {gate.allowed ? (
+          <NewListingForm resorts={resorts} commissionRate={commissionRate} />
+        ) : (
+          <VerificationGateNotice code={gate.code} message={gate.message} reason={rejectionReason} />
+        )}
       </section>
     </main>
   )

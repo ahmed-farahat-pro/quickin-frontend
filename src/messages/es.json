@@ -2197,7 +2197,8 @@
       "brokerageName": "Nombre de la agencia",
       "idFront": "Anverso del documento",
       "idBack": "Reverso del documento",
-      "idPhotos": "Verifica tu identidad"
+      "idPhotos": "Verifica tu identidad",
+      "docType": "¿Qué documento vas a subir?"
     },
     "placeholders": {
       "fullName": "Tu nombre",
@@ -2250,7 +2251,12 @@
     },
     "idHint": "Sube fotos nítidas del anverso y el reverso de tu documento. Nuestro equipo las revisa.",
     "idChoose": "Elegir o tomar una foto",
-    "idRemove": "Quitar"
+    "idRemove": "Quitar",
+    "docTypes": {
+      "national_id": "Documento nacional de identidad",
+      "passport": "Pasaporte",
+      "residence_permit": "Permiso de residencia"
+    }
   },
   "contact": {
     "whatsappAria": "Contáctanos por WhatsApp"

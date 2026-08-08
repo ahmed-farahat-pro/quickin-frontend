@@ -14,6 +14,7 @@ import {
 import { buildUserListWhere, hidesListings, normalizeStatus, orderBySql } from './user-admin-core'
 import type { AccountStatus, UserListFilter } from './user-admin-core'
 import { idColumnFor, statusForAction } from './document-core'
+import { normalizeDocType, normalizeVerificationStatus, revokesListingPrivileges } from './host-verification-core'
 import { assertProofImage, canPay, outcomeFor, PaymentProofError } from './payment-flow-core'
 import type { PaymentReviewAction } from './payment-flow-core'
 import { branchLimit, wantsKind } from './activity-core'
@@ -1040,24 +1041,29 @@ export async function getUserById(userId: string): Promise<PublicUser | null> {
 // ---- ID verification --------------------------------------------------------
 
 export interface VerificationRow {
+  /** Row id — null when the user has never submitted. Lets a host application
+   *  link to the submission it was filed with. */
+  id: string | null
   status: string                 // unverified | pending | verified | rejected
   id_number: string | null
   full_name: string | null
+  /** national_id | passport | residence_permit; null on rows predating doc_type. */
+  doc_type: string | null
   notes: string | null
   submitted_at: string | null
   reviewed_at: string | null
 }
 
 const UNVERIFIED: VerificationRow = {
-  status: 'unverified', id_number: null, full_name: null,
-  notes: null, submitted_at: null, reviewed_at: null,
+  id: null, status: 'unverified', id_number: null, full_name: null,
+  doc_type: null, notes: null, submitted_at: null, reviewed_at: null,
 }
 
 /** Latest verification submission for a user, or 'unverified' if none. */
 export async function getVerification(userId: string): Promise<VerificationRow> {
   if (!isUuid(userId)) return UNVERIFIED
   const { rows } = await pool.query(
-    `SELECT status, id_number, full_name, notes, submitted_at, reviewed_at
+    `SELECT id, status, id_number, full_name, doc_type, notes, submitted_at, reviewed_at
        FROM id_verifications WHERE user_id = $1
       ORDER BY submitted_at DESC LIMIT 1`,
     [userId]
@@ -1073,9 +1079,11 @@ export async function submitVerification(args: {
   selfieImageData?: string | null
   idNumber?: string | null
   fullName?: string | null
+  /** Which document this is; the reviewer checks the photo against it. */
+  docType?: string | null
   source?: string
 }): Promise<VerificationRow> {
-  const { userId, imageData, backImageData = null, selfieImageData = null, idNumber = null, fullName = null, source = 'manual' } = args
+  const { userId, imageData, backImageData = null, selfieImageData = null, idNumber = null, fullName = null, docType = null, source = 'manual' } = args
   const existing = await pool.query(
     `SELECT id FROM id_verifications WHERE user_id = $1 AND status = 'pending' LIMIT 1`,
     [userId]
@@ -1086,15 +1094,16 @@ export async function submitVerification(args: {
           SET image_data = $2, back_image_data = $3, selfie_image_data = $4,
               id_number = COALESCE($5, id_number),
               full_name = COALESCE($6, full_name), source = $7,
+              doc_type = COALESCE($8, doc_type),
               submitted_at = now(), reviewed_at = NULL, reviewed_by = NULL, notes = NULL
         WHERE id = $1`,
-      [existing.rows[0].id, imageData, backImageData, selfieImageData, idNumber, fullName, source]
+      [existing.rows[0].id, imageData, backImageData, selfieImageData, idNumber, fullName, source, docType]
     )
   } else {
     await pool.query(
-      `INSERT INTO id_verifications (user_id, image_data, back_image_data, selfie_image_data, id_number, full_name, source)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [userId, imageData, backImageData, selfieImageData, idNumber, fullName, source]
+      `INSERT INTO id_verifications (user_id, image_data, back_image_data, selfie_image_data, id_number, full_name, source, doc_type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [userId, imageData, backImageData, selfieImageData, idNumber, fullName, source, docType]
     )
   }
   // Mirror onto the source of truth. Without this the backend's own verification
@@ -1286,6 +1295,14 @@ export interface HostApplication {
   review_note: string | null
   email?: string
   host_type?: string | null
+  /** The ID submission filed with this application (null for applications made
+   *  before identity documents were folded in). Lets the reviewer open the
+   *  document before approving, since approving now verifies the identity too. */
+  verification_id?: string | null
+  /** national_id | passport | residence_permit — what the applicant says it is. */
+  doc_type?: string | null
+  /** Status of that submission: pending | verified | rejected. */
+  verification_status?: string | null
 }
 
 /** The host types a user can apply as. Stored on users.host_type (no such column
@@ -1313,7 +1330,14 @@ export class HostApplicationError extends Error {
  */
 export async function submitHostApplication(
   userId: string,
-  f: { full_name?: string; national_id?: string; phone?: string; address?: string; company?: string; notes?: string; host_type?: string }
+  f: {
+    full_name?: string; national_id?: string; phone?: string; address?: string
+    company?: string; notes?: string; host_type?: string
+    // Identity documents submitted WITH the application, so one admin decision
+    // approves both host status and identity. Required for a new applicant; a
+    // host who already has a verified/pending submission need not repeat it.
+    doc_type?: string; id_front?: string; id_back?: string; id_selfie?: string
+  }
 ): Promise<{ host_status: 'pending'; application: HostApplication | null }> {
   if (!isUuid(userId)) throw new HostApplicationError('Invalid user', 400)
 
@@ -1329,6 +1353,23 @@ export async function submitHostApplication(
   if (!phone) fields.phone = 'Phone is required'
   if (!address) fields.address = 'Address is required'
   if (!(HOST_TYPES as readonly string[]).includes(host_type)) fields.host_type = 'Choose individual, company or brokerage'
+
+  // Identity documents. An applicant who already has a verified or pending
+  // submission (e.g. they verified as a guest first) doesn't upload again.
+  const priorVerification = await getVerification(userId)
+  const alreadySubmitted = priorVerification?.status === 'verified' || priorVerification?.status === 'pending'
+  const idFront = String(f.id_front ?? '').trim()
+  let docType: string | null = null
+  if (!alreadySubmitted) {
+    if (!idFront) {
+      fields.id_front = 'A photo of your ID is required'
+    }
+    try {
+      docType = normalizeDocType(f.doc_type)
+    } catch (e) {
+      fields.doc_type = e instanceof Error ? e.message : 'Choose a document type'
+    }
+  }
   if (Object.keys(fields).length) {
     throw new HostApplicationError('Please check the highlighted fields', 400, fields)
   }
@@ -1355,6 +1396,23 @@ export async function submitHostApplication(
       vals
     )
   }
+  // File the identity documents and link them to the application, so approving
+  // the application can approve the identity in the same decision.
+  if (!alreadySubmitted && idFront) {
+    const v = await submitVerification({
+      userId,
+      imageData: idFront,
+      backImageData: String(f.id_back ?? '').trim() || null,
+      selfieImageData: String(f.id_selfie ?? '').trim() || null,
+      idNumber: national_id,
+      fullName: full_name,
+      docType,
+      source: 'host_application',
+    })
+    await pool.query(`UPDATE host_applications SET verification_id=$2 WHERE user_id=$1`, [userId, v.id])
+  } else if (priorVerification?.id) {
+    await pool.query(`UPDATE host_applications SET verification_id=$2 WHERE user_id=$1`, [userId, priorVerification.id])
+  }
   // Persist the host type + company name on the user so listings can show a
   // "Company"/"Brokerage" badge (an individual has no company name).
   const company = host_type === 'individual' ? null : (f.company?.trim() || null)
@@ -1367,7 +1425,10 @@ export async function getHostApplication(userId: string): Promise<HostApplicatio
   const { rows } = await pool.query(
     `SELECT id, user_id, full_name, national_id, phone, address, company, notes, status,
             to_char(submitted_at,'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS submitted_at,
-            to_char(reviewed_at,'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS reviewed_at, review_note
+            to_char(reviewed_at,'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS reviewed_at, review_note,
+            verification_id,
+            (SELECT v.doc_type FROM id_verifications v WHERE v.id = host_applications.verification_id) AS doc_type,
+            (SELECT v.status   FROM id_verifications v WHERE v.id = host_applications.verification_id) AS verification_status
        FROM host_applications WHERE user_id=$1`,
     [userId]
   )
@@ -1379,10 +1440,16 @@ export async function getHostApplication(userId: string): Promise<HostApplicatio
 export async function getPendingHostApplications(status: string = 'pending'): Promise<HostApplication[]> {
   const filter = ['pending', 'approved', 'rejected'].includes(status) ? status : null
   const { rows } = await pool.query(
+    // The linked ID submission rides along so the reviewer can open the document
+    // before approving — approving an application now verifies the identity too,
+    // and approving that blind would defeat the point of the check.
     `SELECT a.id, a.user_id, a.full_name, a.national_id, a.phone, a.address, a.company, a.notes, a.status,
             to_char(a.submitted_at,'YYYY-MM-DD HH24:MI') AS submitted_at,
             to_char(a.reviewed_at,'YYYY-MM-DD HH24:MI') AS reviewed_at, a.review_note,
-            u.email, u.host_type
+            u.email, u.host_type,
+            a.verification_id,
+            (SELECT v.doc_type FROM id_verifications v WHERE v.id = a.verification_id) AS doc_type,
+            (SELECT v.status   FROM id_verifications v WHERE v.id = a.verification_id) AS verification_status
        FROM host_applications a JOIN users u ON u.id = a.user_id
       WHERE ($1::text IS NULL OR a.status = $1) ORDER BY a.submitted_at ASC`,
     [filter]
@@ -1399,6 +1466,7 @@ export async function reviewHostApplication(appId: string, action: 'approve' | '
   const status = action === 'approve' ? 'approved' : 'rejected'
   const client = await pool.connect()
   let uid = ''
+  let verifiedIdentity = false
   try {
     await client.query('BEGIN')
     const { rows } = await client.query(
@@ -1421,6 +1489,32 @@ export async function reviewHostApplication(appId: string, action: 'approve' | '
       } catch {
         await client.query('ROLLBACK TO SAVEPOINT role_sync') /* role column not present */
       }
+      // ONE decision approves both facts: the applicant becomes a host AND their
+      // identity documents — submitted with the application and linked by
+      // verification_id — are marked verified. Without this an approved host
+      // would still be blocked by the listing gate with nothing left to do.
+      const linked = await client.query(
+        `SELECT verification_id FROM host_applications WHERE id = $1`,
+        [appId],
+      )
+      const verifId = linked.rows[0]?.verification_id ?? null
+      if (verifId) {
+        await client.query(
+          `UPDATE id_verifications
+              SET status = 'verified', reviewed_at = now(), reviewed_by = $2, notes = $3
+            WHERE id = $1`,
+          [verifId, actor, note],
+        )
+        await client.query(
+          `UPDATE users SET verification_status = 'verified', verified_at = now() WHERE id = $1`,
+          [uid],
+        )
+        verifiedIdentity = true
+      }
+    } else {
+      // Rejecting the application leaves the ID submission alone: it may be a
+      // perfectly good document and the applicant may reapply. Rejecting the
+      // identity is a separate decision in Verifications.
     }
     await client.query('COMMIT')
   } catch (e) {
@@ -1430,7 +1524,13 @@ export async function reviewHostApplication(appId: string, action: 'approve' | '
     client.release()
   }
   if (action === 'approve') {
-    await createNotification(uid, 'host', 'You are now a host!', 'Your host application was approved — you can now list your space and accept guests.', '/host')
+    await createNotification(
+      uid, 'host', 'You are now a host!',
+      verifiedIdentity
+        ? 'Your host application and identity documents were approved — you can now list your space and accept guests.'
+        : 'Your host application was approved. Verify your identity to start publishing listings.',
+      verifiedIdentity ? '/host' : '/verify-id',
+    )
   } else {
     await createNotification(uid, 'host', 'Host application update', note ? `Your application needs attention: ${note}` : 'Your host application was not approved this time.', '/account')
   }
@@ -1542,6 +1642,33 @@ export async function getPendingVerifications(
   return rows as AdminVerificationRow[]
 }
 
+// ---- The host listing gate ---------------------------------------------------
+
+/**
+ * The two facts that decide whether someone may put a listing in front of
+ * guests: are they an approved host, and did an admin approve their ID?
+ *
+ * Host status is read from `is_host` OR `role='host'` because the two projects
+ * write different columns — this project's application approval sets `is_host`
+ * (and syncs `role` behind a SAVEPOINT that may not fire), while the mobile
+ * backend has always keyed off `role`. Trusting only one would lock out hosts
+ * approved through the other.
+ */
+export async function getListingGateState(
+  userId: string
+): Promise<{ isHost: boolean; verificationStatus: string }> {
+  if (!isUuid(userId)) return { isHost: false, verificationStatus: 'unverified' }
+  const { rows } = await pool.query(
+    `SELECT (COALESCE(is_host, false) = true OR role = 'host') AS is_host,
+            COALESCE(verification_status, 'unverified') AS verification_status
+       FROM users WHERE id = $1`,
+    [userId]
+  )
+  const r = rows[0]
+  if (!r) return { isHost: false, verificationStatus: 'unverified' }
+  return { isHost: Boolean(r.is_host), verificationStatus: String(r.verification_status) }
+}
+
 /**
  * Admin decision on an ID submission — the one writer of a user's verified state.
  *
@@ -1566,6 +1693,8 @@ export async function reviewVerification(
   const status = statusForAction(action)
   const client = await pool.connect()
   let uid = ''
+  let listingsHidden = 0
+  let listingsRestored = 0
   try {
     await client.query('BEGIN')
     const { rows } = await client.query(
@@ -1580,6 +1709,13 @@ export async function reviewVerification(
     )
     uid = rows[0]?.user_id ?? ''
     if (!uid) throw new Error('Verification not found')
+    // Read the OLD status before overwriting it — losing verification has to take
+    // the host's listings off the market, and that is only knowable by comparing.
+    const prev = await client.query(
+      `SELECT COALESCE(verification_status, 'unverified') AS status FROM users WHERE id = $1`,
+      [uid],
+    )
+    const previousStatus = prev.rows[0]?.status ?? 'unverified'
     await client.query(
       `UPDATE users
           SET verification_status = $2,
@@ -1587,6 +1723,31 @@ export async function reviewVerification(
         WHERE id = $1`,
       [uid, status],
     )
+
+    // A host who is no longer verified must not keep listings in front of guests
+    // — that is the whole point of the gate. Flagged with a dedicated column so
+    // re-verifying restores exactly these and nothing else; sharing the account
+    // block's unpublished_by_admin flag would let unblocking republish listings
+    // that verification had hidden.
+    if (revokesListingPrivileges(previousStatus, status)) {
+      const hid = await client.query(
+        `UPDATE listings SET is_published = false, unpublished_by_verification = true
+          WHERE host_id = $1 AND is_published = true`,
+        [uid],
+      )
+      listingsHidden = hid.rowCount ?? 0
+    } else if (normalizeVerificationStatus(status) === 'verified') {
+      // Restore only what verification hid, and only if the account is not ALSO
+      // blocked — the two reasons compose, so a listing hidden for both stays
+      // hidden until both clear.
+      const shown = await client.query(
+        `UPDATE listings SET is_published = true, unpublished_by_verification = false
+          WHERE host_id = $1 AND unpublished_by_verification = true
+            AND COALESCE(unpublished_by_admin, false) = false`,
+        [uid],
+      )
+      listingsRestored = shown.rowCount ?? 0
+    }
     await client.query('COMMIT')
   } catch (e) {
     await client.query('ROLLBACK')
@@ -1595,12 +1756,35 @@ export async function reviewVerification(
     client.release()
   }
   // Reopening is an internal correction — don't tell the user their ID "changed".
-  if (action === 'pending') return
+  // It can still have unpublished their listings, so that is reported separately.
+  if (action === 'pending') {
+    if (listingsHidden > 0) {
+      await createNotification(
+        uid, 'verification', 'Listings paused',
+        `We're re-checking your identity documents. ${listingsHidden} listing${listingsHidden === 1 ? ' is' : 's are'} paused until that's done.`,
+        '/host'
+      )
+    }
+    return
+  }
+  const verified = action === 'verify'
+  // Say what happened to their listings — a host whose listings vanished with no
+  // explanation will open a support ticket.
+  const listingNote = verified
+    ? (listingsRestored > 0
+        ? ` ${listingsRestored} listing${listingsRestored === 1 ? '' : 's'} ${listingsRestored === 1 ? 'is' : 'are'} live again.`
+        : '')
+    : (listingsHidden > 0
+        ? ` ${listingsHidden} listing${listingsHidden === 1 ? '' : 's'} ${listingsHidden === 1 ? 'has' : 'have'} been paused until you're verified.`
+        : '')
   await createNotification(
     uid, 'verification',
-    action === 'verify' ? 'Identity verified' : 'Identity check update',
-    action === 'verify' ? 'Your ID was verified — your account is now verified.' : (note ? `We could not verify your ID: ${note}` : 'We could not verify your ID. Please re-submit a clear photo.'),
-    '/account'
+    verified ? 'Identity verified' : 'Identity check update',
+    (verified
+      ? 'Your ID was verified — your account is now verified and you can publish listings.'
+      : (note ? `We could not verify your ID: ${note}` : 'We could not verify your ID. Please re-submit a clear photo.')
+    ) + listingNote,
+    verified ? '/host' : '/verify-id'
   )
 }
 
@@ -1895,7 +2079,10 @@ export async function createListing(hostId: string, data: CreateListingInput): P
       [newId, images[i].trim(), i]
     )
   }
-  const listing = await getListingById(newId)
+  // asHost: this is the host's own listing coming straight back to them, and the
+  // editor saves these values again — the guest projection would inflate the price
+  // by the commission on every round trip.
+  const listing = await getListingById(newId, { asHost: true })
   if (!listing) throw new Error('Could not create listing')
   return listing
 }
@@ -2160,7 +2347,7 @@ export async function updateListing(
   // the ownership-doc-only PATCH (the route applies the document separately).
   if (!touched.length) {
     const owned = await pool.query(`SELECT id FROM listings WHERE id = $1 AND host_id = $2`, [id, hostId])
-    return owned.rows[0] ? getListingById(id) : null
+    return owned.rows[0] ? getListingById(id, { asHost: true }) : null
   }
 
   const requeue = requeuesForReview(touched)
@@ -2199,7 +2386,7 @@ export async function updateListing(
   } finally {
     client.release()
   }
-  return getListingById(id)
+  return getListingById(id, { asHost: true })
 }
 
 /**
@@ -2223,7 +2410,7 @@ export async function setListingOwnershipDoc(
     [id, hostId, value]
   )
   if (!rowCount) return null
-  return getListingById(id)
+  return getListingById(id, { asHost: true })
 }
 
 /** Whether one of the host's OWN listings already has an ownership document on
@@ -3212,8 +3399,11 @@ export async function adminSetAccountStatus(
       listingsChanged = hid.rowCount ?? 0
     } else if (!hidesListings(next) && hidesListings(previous)) {
       const shown = await client.query(
+        // Not the ones verification took down — those come back only when the
+        // host is verified again.
         `UPDATE listings SET is_published = true, unpublished_by_admin = false
           WHERE host_id = $1 AND unpublished_by_admin = true
+            AND COALESCE(unpublished_by_verification, false) = false
             AND COALESCE(approval_status, 'approved') = 'approved'`,
         [id],
       )

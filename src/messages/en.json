@@ -2197,7 +2197,8 @@
       "brokerageName": "Brokerage name",
       "idFront": "Front of ID",
       "idBack": "Back of ID",
-      "idPhotos": "Verify your identity"
+      "idPhotos": "Verify your identity",
+      "docType": "Which document are you uploading?"
     },
     "placeholders": {
       "fullName": "Your name",
@@ -2250,7 +2251,12 @@
     },
     "idHint": "Upload clear photos of the front and back of your ID. Our team reviews them.",
     "idChoose": "Choose or take a photo",
-    "idRemove": "Remove"
+    "idRemove": "Remove",
+    "docTypes": {
+      "national_id": "National ID",
+      "passport": "Passport",
+      "residence_permit": "Residence permit"
+    }
   },
   "contact": {
     "whatsappAria": "Contact us on WhatsApp"

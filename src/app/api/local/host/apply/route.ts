@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import { getUserFromRequest, getUserRowByEmail, getHostState } from '@/lib/local/auth'
 import { submitHostApplication, getHostApplication, HostApplicationError } from '@/lib/local/db'
 
-// POST /api/local/host/apply { full_name, national_id, phone, address, host_type, company?, notes? } (auth)
+// POST /api/local/host/apply { full_name, national_id, phone, address, host_type,
+//        company?, notes?, doc_type, id_front, id_back?, id_selfie? } (auth)
 //   → submits (or re-submits) a host application for admin review. Never grants host —
 //     only an admin approval in /ops does. 400 { error, fields } on validation failure;
 //     409 when the user is already a host or already has an application under review.
@@ -19,6 +20,10 @@ export async function POST(req: Request) {
     const out = await submitHostApplication(me.id, {
       full_name: body.full_name, national_id: body.national_id, phone: body.phone,
       address: body.address, company: body.company, notes: body.notes, host_type: body.host_type,
+      // Identity documents filed with the application — one admin decision then
+      // approves both host status and identity.
+      doc_type: body.doc_type, id_front: body.id_front,
+      id_back: body.id_back, id_selfie: body.id_selfie,
     })
     return NextResponse.json({ ok: true, ...out }, { headers: CORS })
   } catch (err) {

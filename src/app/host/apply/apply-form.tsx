@@ -8,6 +8,7 @@ import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { fileToCompressedDataUrl } from '@/lib/image'
+import { DOC_TYPES, type DocType } from '@/lib/local/host-verification-core'
 
 const C = {
   burgundy: '#5B0F16',
@@ -92,6 +93,9 @@ export function ApplyForm({
   // ID photos (data URLs) — required so admins can verify the host, same as /verify-id.
   const [idFront, setIdFront] = useState<string | null>(null)
   const [idBack, setIdBack] = useState<string | null>(null)
+  // Which document these photos are. The reviewer checks the images against it,
+  // so it is submitted rather than inferred.
+  const [docType, setDocType] = useState<DocType>('national_id')
   const frontInputRef = useRef<HTMLInputElement>(null)
   const backInputRef = useRef<HTMLInputElement>(null)
 
@@ -148,6 +152,14 @@ export function ApplyForm({
           address: address.trim(),
           company: isBusiness ? company.trim() || undefined : undefined,
           notes: notes.trim() || undefined,
+          // Identity documents ride WITH the application. They used to be a second
+          // request made after it was accepted, so a failure there (a 413 from an
+          // oversized photo, most often) left an application on file with no ID
+          // attached and nothing linking the two. One admin decision now approves
+          // both, and one failure fails the whole submission.
+          doc_type: docType,
+          id_front: idFront,
+          id_back: idBack,
         }),
       })
       if (res.status === 401) {
@@ -174,29 +186,6 @@ export function ApplyForm({
           throw new Error(t('errors.checkFields'))
         }
         throw new Error(err.error || t('errors.submitFailed'))
-      }
-
-      // Submit the ID photos for admin verification (same store as /verify-id).
-      //
-      // This used to be fire-and-forget: it ran AFTER the application was accepted,
-      // inside a catch that only logged, and it never checked res.ok — so a 413 (the
-      // exact failure an uncompressed photo produced) was discarded in silence and
-      // the applicant saw "submitted" with no ID on file. It is now checked and
-      // surfaced; an application with no ID is not a submission worth confirming.
-      const vres = await fetch('/api/local/verification', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          front: idFront,
-          back: idBack,
-          id_number: nationalId.replace(/\D/g, '') || undefined,
-          full_name: fullName.trim() || undefined,
-        }),
-      })
-      if (!vres.ok) {
-        const verr = await vres.json().catch(() => ({}))
-        throw new Error(verr.error || t('errors.submitFailed'))
       }
 
       setSubmitted(true)
@@ -366,6 +355,23 @@ export function ApplyForm({
           required
         />
         <FieldError text={fieldErrors.address} />
+      </div>
+
+      <div style={fieldWrap}>
+        <label style={label} htmlFor="apply-doc-type">
+          {t('fields.docType')} <span style={{ color: C.burgundy }}>*</span>
+        </label>
+        <select
+          id="apply-doc-type"
+          style={input}
+          value={docType}
+          onChange={(e) => setDocType(e.target.value as DocType)}
+        >
+          {DOC_TYPES.map((d) => (
+            <option key={d.key} value={d.key}>{t(`docTypes.${d.key}`)}</option>
+          ))}
+        </select>
+        <FieldError text={fieldErrors.doc_type} />
       </div>
 
       <div style={fieldWrap}>

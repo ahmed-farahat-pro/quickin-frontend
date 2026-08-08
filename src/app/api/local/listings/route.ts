@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-import { getListings, createListing, isListingInputError } from '@/lib/local/db'
+import { getListings, createListing, isListingInputError, getListingGateState } from '@/lib/local/db'
 import { getUserFromRequest } from '@/lib/local/auth'
+import { canPublishListing } from '@/lib/local/host-verification-core'
 
 // Local-only API (no Supabase). GET /api/local/listings → JSON array.
 // Supports search: ?location=&guests=&checkIn=YYYY-MM-DD&checkOut=YYYY-MM-DD
@@ -54,6 +55,14 @@ export async function POST(req: Request) {
   try {
     const user = await getUserFromRequest(req)
     if (!user) return NextResponse.json({ error: 'Please sign in to create a listing' }, { status: 401, headers: CORS })
+    // This route previously required nothing beyond a session, so any signed-in
+    // guest could create a listing here even though the mobile API has always
+    // required a host. Both checks now live in one place: approved host AND
+    // identity-verified. The `code` lets the client show the right next step.
+    const gate = canPublishListing(await getListingGateState(user.id))
+    if (!gate.allowed) {
+      return NextResponse.json({ error: gate.message, code: gate.code }, { status: 403, headers: CORS })
+    }
     const body = await req.json().catch(() => null)
     if (!body) return NextResponse.json({ error: 'Invalid request body' }, { status: 400, headers: CORS })
     const num = (v: unknown) => (v === undefined || v === null || v === '' ? undefined : Number(v))

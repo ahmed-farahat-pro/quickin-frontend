@@ -2197,7 +2197,8 @@
       "brokerageName": "اسم مكتب الوساطة",
       "idFront": "مقدمة الهوية",
       "idBack": "خلفية الهوية",
-      "idPhotos": "تحقّق من هويتك"
+      "idPhotos": "تحقّق من هويتك",
+      "docType": "ما المستند الذي ترفعه؟"
     },
     "placeholders": {
       "fullName": "اسمك",
@@ -2250,7 +2251,12 @@
     },
     "idHint": "ارفع صورًا واضحة لمقدمة وخلفية هويتك. يقوم فريقنا بمراجعتها.",
     "idChoose": "اختر أو التقط صورة",
-    "idRemove": "إزالة"
+    "idRemove": "إزالة",
+    "docTypes": {
+      "national_id": "بطاقة الرقم القومي",
+      "passport": "جواز السفر",
+      "residence_permit": "تصريح الإقامة"
+    }
   },
   "contact": {
     "whatsappAria": "تواصل معنا عبر واتساب"

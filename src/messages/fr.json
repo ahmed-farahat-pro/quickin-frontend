@@ -2197,7 +2197,8 @@
       "brokerageName": "Nom de l'agence",
       "idFront": "Recto de la pièce d'identité",
       "idBack": "Verso de la pièce d'identité",
-      "idPhotos": "Vérifiez votre identité"
+      "idPhotos": "Vérifiez votre identité",
+      "docType": "Quel document téléversez-vous ?"
     },
     "placeholders": {
       "fullName": "Votre nom",
@@ -2250,7 +2251,12 @@
     },
     "idHint": "Téléchargez des photos nettes du recto et du verso de votre pièce d'identité. Notre équipe les vérifie.",
     "idChoose": "Choisir ou prendre une photo",
-    "idRemove": "Supprimer"
+    "idRemove": "Supprimer",
+    "docTypes": {
+      "national_id": "Carte nationale d'identité",
+      "passport": "Passeport",
+      "residence_permit": "Titre de séjour"
+    }
   },
   "contact": {
     "whatsappAria": "Contactez-nous sur WhatsApp"
