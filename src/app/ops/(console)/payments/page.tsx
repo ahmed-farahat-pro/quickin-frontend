@@ -11,7 +11,6 @@ import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import { resolveStaffSession, staffCan, STAFF_COOKIE } from '@/lib/local/staff'
 import { OpsPayments } from './ops-payments'
-import { OpsHeader } from '../ops-session'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,7 +47,6 @@ export default async function OpsPaymentsPage() {
           signed-in identity and Sign out all vanished the moment you opened Payments,
           with no way back into the console except the browser button. Use the shared
           header like every other /ops screen. */}
-      <OpsHeader title="Payments" />
 
       <section style={{ maxWidth: 960, margin: '0 auto', padding: '36px 24px 72px' }}>
         <h1

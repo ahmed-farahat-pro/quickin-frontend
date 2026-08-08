@@ -114,11 +114,31 @@ npm run dev                  # http://localhost:5000
 
 ## /ops admin console
 
-Staff-only, gated by per-module permissions (`src/lib/local/staff.ts`). Beyond the
-tabbed dashboard at `/ops`:
+Staff-only, gated by per-module permissions (`src/lib/local/staff.ts`).
+
+**One sidebar, no tabs.** The console used to carry two navigation bars — a header
+strip of buttons plus a tab row that existed only on `/ops` — which left half the
+screens reachable only from the dashboard. `(console)/ops-shell.tsx` now renders a
+single grouped sidebar (Dashboard / Operations / People / Insights / Settings) from
+the layout, so it is present on every screen and anywhere reaches anywhere in one
+click. The top bar holds only the logo (home), the alert bell and sign out; below
+900px the sidebar becomes a drawer. A group whose every item is hidden by
+permissions disappears with it.
+
+The five dashboard sections became **real routes** — `/ops`, `/ops/listings`,
+`/ops/bookings`, `/ops/applications`, `/ops/verifications` — each rendering
+`ops-dashboard.tsx` with a fixed `section`. As tabs they had no URL, so nothing
+could link to them; the alert centre's own "ID verifications to review" pointed at
+`/ops?tab=verifications`, a query string nothing read, and landed on the Overview.
+Reaching a section without its module gets a no-access card and a 403 from the API.
 
 | Page | Module | What it does |
 | --- | --- | --- |
+| `/ops` | `overview` | Money (commission earned / expected, host payouts), the queues needing attention, top-line counts, app download links |
+| `/ops/listings` | `listings` | Properties, with approve / publish / hide / delete and the free-text resort review |
+| `/ops/bookings` | `bookings` | Reservations with guest paid / host payout / commission per row, and totals over the loaded page |
+| `/ops/applications` | `applications` | The host-application queue |
+| `/ops/verifications` | `verifications` | Submitted ID documents, filterable by decision |
 | `/ops/users` | `users` | Searchable directory of every guest and host, and one person's full profile — listings, bookings, payments, messages, documents — plus block / remove / restore |
 | `/ops/activity` | `overview` | Everything that happened on the site — signups, sign-ins, listings, bookings, payments, cancellations. **Derived**, so it shows full history rather than starting at deploy |
 | `/ops/alerts` | `overview` | Every queue waiting on a human, filtered to the modules you hold, with how long the oldest item has waited. Also the bell in the header |
@@ -349,7 +369,7 @@ re-queueing**. Every resolution is written to `staff_audit_log`.
 | Method | Path | Notes |
 | --- | --- | --- |
 | GET | `/api/local/admin/analytics/bookings` | Totals (active/completed/cancelled), trend, by resort, by status |
-| GET | `/api/local/admin/analytics/revenue` | Gross, commission, host net, refunds, payout estimates |
+| GET | `/api/local/admin/analytics/revenue` | Guest gross, commission, host payouts, refunds, payout estimates |
 | GET | `/api/local/admin/analytics/cancellations` | Count, rate, by actor, by policy, by resort |
 | GET | `/api/local/admin/analytics/facets` | Filter options — regions, active resorts, hosts |
 | GET | `/api/local/admin/analytics/export` | `?kind=&format=csv\|xlsx` — one booking per row, same filters |
@@ -365,7 +385,16 @@ Two things worth knowing when reading these numbers:
   `PAID_SQL` / `REFUNDED_SQL` / `MONEY_AT_SQL` constants in `analytics-core.ts` exist
   so no query re-derives it.
 - **Payout figures are derived estimates**, not a ledger — there is no payouts table.
-  They are host-net split by whether the stay has ended.
+  They are the host's price split by whether the stay has ended.
+- **Every money figure is the guest-facing one.** `bookings.total_price` stores the
+  *host's* raw price, and the commission is a markup on top of it, so a report that
+  summed the column would understate what was collected. Gross, trend and by-resort
+  values all go through `sqlWithCommission()`; commission is
+  `bookingCommissionSql()` — guest price minus raw price — not `total_price × rate`,
+  which ignores the round-up to 10 EGP and so never reconciles with the real charge.
+  `hostPayouts` is the raw price **in full**: the markup was never deducted from the
+  host. (This report previously used the retired fee model, reporting hosts at 90% of
+  a total they were in fact paid entirely.)
 
 Exports carry guest and host emails, so every one is recorded in `staff_audit_log`
 as `analytics_export`. CSV is written with a UTF-8 BOM (so Excel reads Arabic
@@ -384,7 +413,8 @@ npm run check     # same; the pre-deploy gate
 
 | Module | Covers |
 | --- | --- |
-| `analytics-core.ts` | Filter parsing and validation, the `buildReportWhere` SQL builder (placeholder numbering, the date-column injection guard), commission/refund math, CSV escaping and formula-injection defusing |
+| `analytics-core.ts` | Filter parsing and validation, the `buildReportWhere` SQL builder (placeholder numbering, the date-column injection guard), refund math, CSV escaping and formula-injection defusing. It holds **no** commission math on purpose — see `commission-core.ts` |
+| `commission-core.ts` | The markup and its round-up to 10 EGP, rate parsing and the blank-row trap (`Number('')` is 0, which would read as a 0% commission), and the SQL builders — including that `bookingCommissionSql()` is guest minus raw, never a percentage |
 | `resort-core.ts` | Resort name normalization, slug collision (`Amouage` = `amouage` = `AMOUAGE.`), typo distance |
 | `user-admin-core.ts` | Users-list query parsing and clamping, the full block/remove transition matrix, the `ORDER BY` injection guard, blocked-login copy |
 | `activity-core.ts` | Activity/audit filter parsing, the UNION branch limits, the audit-action label map, and `alertsFor` — including that an operator never receives an alert for a module they don't hold |
@@ -392,7 +422,7 @@ npm run check     # same; the pre-deploy gate
 | `document-core.ts` | Document-kind validation, the data-URL parser and its mime allowlist (SVG and HTML are rejected — these bytes render in an admin's browser), the verification state machine, and which module owns which document |
 | `xlsx.ts` | Cell typing (numbers stay numeric so Excel can sum them), sheet-name sanitizing, filename safety |
 
-Those two modules deliberately have **no runtime imports** — Node's ESM resolver
+Those modules deliberately have **no runtime imports** — Node's ESM resolver
 rejects the extension-less relative specifiers used elsewhere in `src/lib/local`, so a
 module with no relative imports is the one shape a test can load. Keep pure logic
 there and have `db.ts` / `analytics.ts` import it, never the reverse. The backend

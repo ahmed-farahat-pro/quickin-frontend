@@ -288,11 +288,15 @@ export function actorLabel(actor: string | null | undefined): string {
  *
  * Alerts are DERIVED counts, not stored rows: there is no read/unread state to keep
  * in sync, and an alert disappears exactly when the work is done.
+ *
+ * The first three used to point at `/ops?tab=…`, which never worked: the dashboard
+ * sections were React state and nothing ever read that query string, so clicking
+ * "3 ID verifications to review" landed on the Overview. They are real routes now.
  */
 export const ALERT_SOURCES = [
-  { key: 'pending_verifications', label: 'ID verifications to review', module: 'verifications', href: '/ops?tab=verifications' },
-  { key: 'pending_applications', label: 'Host applications to review', module: 'applications', href: '/ops?tab=applications' },
-  { key: 'pending_listings', label: 'Listings awaiting approval', module: 'listings', href: '/ops?tab=listings' },
+  { key: 'pending_verifications', label: 'ID verifications to review', module: 'verifications', href: '/ops/verifications' },
+  { key: 'pending_applications', label: 'Host applications to review', module: 'applications', href: '/ops/applications' },
+  { key: 'pending_listings', label: 'Listings awaiting approval', module: 'listings', href: '/ops/listings' },
   { key: 'pending_payments', label: 'Payments to confirm', module: 'payments', href: '/ops/payments' },
   { key: 'disputed_payments', label: 'Payment disputes', module: 'payments', href: '/ops/payments' },
   { key: 'open_reports', label: 'Abuse reports to triage', module: 'reports', href: '/ops/reports' },

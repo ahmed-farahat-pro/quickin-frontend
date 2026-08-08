@@ -13,7 +13,6 @@ import { cookies } from 'next/headers'
 import { resolveStaffSession, staffCan, STAFF_COOKIE } from '@/lib/local/staff'
 import { getCommissionConfig, getCommissionImpact } from '@/lib/local/db'
 import { OpsPricing } from './ops-pricing'
-import { OpsHeader } from '../ops-session'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,7 +41,6 @@ export default async function OpsPricingPage() {
 
   return (
     <main style={{ minHeight: '100vh', background: COLORS.cream, color: COLORS.ink, fontFamily: FONT }}>
-      <OpsHeader title="Pricing" />
 
       <section style={{ maxWidth: 960, margin: '0 auto', padding: '36px 24px 72px' }}>
         <h1

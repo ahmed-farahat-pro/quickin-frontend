@@ -6,6 +6,7 @@
 // The pure half (parsing, clause building, money math, CSV) lives in
 // analytics-core.ts and is unit-tested; this file is the thin SQL layer.
 import { pool } from './pool'
+import { bookingCommissionSql, bookingRateSql, sqlWithCommission } from './commission-core'
 import {
   ACTIVE_SQL,
   MONEY_AT_SQL,
@@ -23,6 +24,16 @@ import {
 
 /** bookings ⋈ listings ⋈ resorts — every report reads this shape. */
 const FROM_SQL = `FROM bookings b JOIN listings l ON l.id = b.listing_id ${RESORT_JOIN}`
+
+/**
+ * What the GUEST was charged for a booking: the host's raw total_price marked up
+ * at that booking's own snapshotted rate.
+ *
+ * Every "gross"/"value" figure in these reports is this, never the bare
+ * total_price — an operator reading a revenue number means the money that changed
+ * hands, and total_price is the host's side of it. See commission-core.ts.
+ */
+const GUEST_SQL = sqlWithCommission('b.total_price', bookingRateSql())
 
 /** Assemble a full WHERE from the shared filter plus any report-specific clauses. */
 function where(f: ReportFilter, dateColumn: DateColumn, extra: string[] = []) {
@@ -79,7 +90,7 @@ export async function bookingsReport(f: ReportFilter): Promise<BookingsReport> {
               count(*) FILTER (WHERE b.status = 'rejected')::int  AS rejected,
               count(*) FILTER (WHERE b.status = 'pending')::int   AS pending,
               count(*) FILTER (WHERE b.status = 'confirmed')::int AS confirmed,
-              COALESCE(sum(b.total_price), 0)::float8             AS gross
+              COALESCE(sum(${GUEST_SQL}), 0)::float8             AS gross
          ${FROM_SQL} WHERE ${w.sql}`,
       w.params
     ),
@@ -87,21 +98,21 @@ export async function bookingsReport(f: ReportFilter): Promise<BookingsReport> {
       `SELECT to_char(${bucket}, 'YYYY-MM-DD') AS bucket,
               count(*)::int AS count,
               count(*) FILTER (WHERE b.status = 'cancelled')::int AS cancelled,
-              COALESCE(sum(b.total_price), 0)::float8 AS gross
+              COALESCE(sum(${GUEST_SQL}), 0)::float8 AS gross
          ${FROM_SQL} WHERE ${w.sql}
         GROUP BY 1 ORDER BY 1`,
       w.params
     ),
     pool.query(
       `SELECT ${RESORT_KEY_SQL} AS key, ${RESORT_LABEL_SQL} AS label,
-              count(*)::int AS count, COALESCE(sum(b.total_price), 0)::float8 AS value
+              count(*)::int AS count, COALESCE(sum(${GUEST_SQL}), 0)::float8 AS value
          ${FROM_SQL} WHERE ${w.sql}
         GROUP BY 1, 2 ORDER BY 3 DESC, 2`,
       w.params
     ),
     pool.query(
       `SELECT b.status AS key, b.status AS label,
-              count(*)::int AS count, COALESCE(sum(b.total_price), 0)::float8 AS value
+              count(*)::int AS count, COALESCE(sum(${GUEST_SQL}), 0)::float8 AS value
          ${FROM_SQL} WHERE ${w.sql}
         GROUP BY 1 ORDER BY 3 DESC`,
       w.params
@@ -120,9 +131,12 @@ export async function bookingsReport(f: ReportFilter): Promise<BookingsReport> {
 
 export interface RevenueReport {
   totals: {
+    /** Commission-inclusive — the money guests actually handed over. */
     gross: number
+    /** The platform's margin: gross − hostPayouts. */
     commission: number
-    hostNet: number
+    /** What the hosts are owed: their raw price, in full. */
+    hostPayouts: number
     refunded: number
     paidCount: number
     refundedCount: number
@@ -136,38 +150,55 @@ export interface RevenueReport {
 /**
  * B2 — revenue, commission, refunds and a payout split.
  *
- * Three deliberate choices:
+ * THE MONEY MODEL. The commission is a MARKUP, not a deduction: bookings.total_price
+ * is the host's RAW price and they are paid it in full, while the guest was charged
+ * that price marked up and rounded to the nearest 10 EGP. So:
+ *
+ *     gross (guest paid) = withCommission(total_price)
+ *     hostPayouts        = total_price          ← the whole thing, not 90% of it
+ *     commission         = gross − hostPayouts  ← NOT total_price × rate
+ *
+ * This report used to read `gross = sum(total_price)` and `hostNet = gross −
+ * commission`, which was the old fee model: it understated hosts by the commission
+ * and reported guest revenue as if the markup had never been charged.
+ *
+ * Three deliberate choices, unchanged:
  *  - Money is bucketed by MONEY_AT_SQL, not paid_at: a refund clears paid_at, so
  *    bucketing on it would drop every refunded booking off the chart.
- *  - Commission uses the per-booking snapshot, falling back to 0.1 for rows taken
- *    before the snapshot existed — so changing the rate never rewrites history.
+ *  - Commission uses the per-booking snapshot, falling back to the live rate for
+ *    rows taken before the snapshot existed — so changing the rate never rewrites
+ *    history.
  *  - Refunds are recomputed from refund_percent. bookings.refund_amount is NULL for
- *    every web-originated cancellation and can never be trusted.
+ *    every web-originated cancellation and can never be trusted. A refund returns a
+ *    percentage of what the GUEST paid, so it is a percentage of the marked-up
+ *    figure.
  *
  * "Pending payout" is a DERIVED ESTIMATE, not a ledger: there is no payouts table.
- * It is simply host-net on paid bookings whose stay has not ended. Label it as an
- * estimate wherever it is shown.
+ * It is simply the host's price on paid bookings whose stay has not ended. Label it
+ * as an estimate wherever it is shown.
  */
 export async function revenueReport(f: ReportFilter): Promise<RevenueReport> {
   const w = where(f, 'money_at')
   const bucket = bucketSql(f.granularity, MONEY_AT_SQL)
-  const RATE = `COALESCE(b.commission_rate, 0.1)`
-  const GROSS = `COALESCE(sum(b.total_price) FILTER (WHERE ${PAID_SQL}), 0)::float8`
-  const COMMISSION = `COALESCE(sum(b.total_price * ${RATE}) FILTER (WHERE ${PAID_SQL}), 0)::float8`
-  const REFUNDED = `COALESCE(sum(b.total_price * COALESCE(b.refund_percent, 0) / 100.0) FILTER (WHERE ${REFUNDED_SQL} OR b.refund_percent > 0), 0)::float8`
+  const GUEST = GUEST_SQL
+  const GROSS = `COALESCE(sum(${GUEST}) FILTER (WHERE ${PAID_SQL}), 0)::float8`
+  const HOST_PAYOUTS = `COALESCE(sum(b.total_price) FILTER (WHERE ${PAID_SQL}), 0)::float8`
+  const COMMISSION = `COALESCE(sum(${bookingCommissionSql()}) FILTER (WHERE ${PAID_SQL}), 0)::float8`
+  const REFUNDED = `COALESCE(sum(${GUEST} * COALESCE(b.refund_percent, 0) / 100.0) FILTER (WHERE ${REFUNDED_SQL} OR b.refund_percent > 0), 0)::float8`
 
   const [totals, trend, byResort] = await Promise.all([
     pool.query(
       `SELECT ${GROSS} AS gross,
               ${COMMISSION} AS commission,
-              (${GROSS} - ${COMMISSION}) AS "hostNet",
+              ${HOST_PAYOUTS} AS "hostPayouts",
               ${REFUNDED} AS refunded,
               count(*) FILTER (WHERE ${PAID_SQL})::int     AS "paidCount",
               count(*) FILTER (WHERE ${REFUNDED_SQL})::int AS "refundedCount",
-              -- Derived estimate only: no payouts table exists.
-              COALESCE(sum(b.total_price * (1 - ${RATE}))
+              -- Derived estimate only: no payouts table exists. The host is owed
+              -- their raw price in full — the markup was never theirs to lose.
+              COALESCE(sum(b.total_price)
                 FILTER (WHERE ${PAID_SQL} AND b.check_out >= CURRENT_DATE), 0)::float8 AS "pendingPayout",
-              COALESCE(sum(b.total_price * (1 - ${RATE}))
+              COALESCE(sum(b.total_price)
                 FILTER (WHERE ${PAID_SQL} AND b.check_out < CURRENT_DATE), 0)::float8 AS "settledPayout"
          ${FROM_SQL} WHERE ${w.sql}`,
       w.params
@@ -300,6 +331,11 @@ export interface ReportRows {
  * One booking per row, with everything the three reports aggregate. The same
  * filter produces the same population as the on-screen report, so an export always
  * reconciles with what the operator was looking at.
+ *
+ * "Guest total" is what was charged and "Host payout" the raw price the host is
+ * owed; Commission is the gap. They add up per row, which is the property that
+ * makes the export auditable — the old export wrote the host figure under "Total"
+ * and a percentage under "Commission", and those two never summed to anything.
  */
 export async function reportRows(f: ReportFilter, dateColumn: DateColumn = 'created_at'): Promise<ReportRows> {
   const w = where(f, dateColumn)
@@ -312,10 +348,12 @@ export async function reportRows(f: ReportFilter, dateColumn: DateColumn = 'crea
             b.cancelled_by_role, b.cancellation_policy,
             l.title, ${RESORT_LABEL_SQL} AS resort, l.region,
             hu.email AS host_email, gu.email AS guest_email,
-            b.total_price::float8 AS total,
-            (b.total_price * COALESCE(b.commission_rate, 0.1))::float8 AS commission,
+            ${GUEST_SQL}::float8 AS total,
+            b.total_price::float8 AS host_payout,
+            ${bookingCommissionSql()}::float8 AS commission,
+            (${bookingRateSql()} * 100)::float8 AS commission_percent,
             COALESCE(b.refund_percent, 0)::int AS refund_percent,
-            (b.total_price * COALESCE(b.refund_percent, 0) / 100.0)::float8 AS refund
+            (${GUEST_SQL} * COALESCE(b.refund_percent, 0) / 100.0)::float8 AS refund
        ${FROM_SQL}
        LEFT JOIN users hu ON hu.id = l.host_id
        LEFT JOIN users gu ON gu.id = b.user_id
@@ -328,7 +366,7 @@ export async function reportRows(f: ReportFilter, dateColumn: DateColumn = 'crea
   const headers = [
     'Reservation', 'Status', 'Payment', 'Created', 'Check in', 'Check out', 'Cancelled',
     'Cancelled by', 'Policy', 'Listing', 'Resort', 'Region', 'Host', 'Guest',
-    'Total', 'Commission', 'Refund %', 'Refund',
+    'Guest total', 'Host payout', 'Commission', 'Commission %', 'Refund %', 'Refund',
   ]
   return {
     headers,
@@ -336,7 +374,7 @@ export async function reportRows(f: ReportFilter, dateColumn: DateColumn = 'crea
       r.reservation_code, r.status, r.payment_status, r.created, r.check_in, r.check_out,
       r.cancelled, r.cancelled_by_role ?? 'unknown', r.cancellation_policy ?? 'unknown',
       r.title, r.resort, r.region, r.host_email, r.guest_email,
-      r.total, r.commission, r.refund_percent, r.refund,
+      r.total, r.host_payout, r.commission, r.commission_percent, r.refund_percent, r.refund,
     ]),
   }
 }

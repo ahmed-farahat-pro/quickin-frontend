@@ -6,7 +6,6 @@
 // something went wrong, so it is deliberately read-only with no bulk actions.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { COLORS, SERIF } from '../../ops-theme'
-import { OpsHeader } from '../ops-session'
 import { adminGet, controlStyle, fieldLabel, ghostBtn, pageStyle, panelStyle, td, th } from '../ops-ui'
 import {
   AUDIT_TARGET_TYPES,
@@ -108,7 +107,6 @@ export function OpsAudit({
 
   return (
     <main style={pageStyle}>
-      <OpsHeader title="Audit log" />
       <section style={{ maxWidth: 1180, margin: '0 auto', padding: '24px 20px 64px' }}>
         <h1 style={{ margin: '0 0 4px', fontFamily: SERIF, fontSize: 'clamp(24px, 4vw, 30px)', fontWeight: 700, letterSpacing: '-0.02em', color: COLORS.burgundy }}>
           Audit log

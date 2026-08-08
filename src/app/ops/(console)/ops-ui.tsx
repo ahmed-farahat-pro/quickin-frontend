@@ -11,9 +11,10 @@
 // table/panel/control shapes and the two authenticated fetch helpers.
 import { COLORS, FONT } from '../ops-theme'
 
+/** A console page is just the content column inside the shell — ops-shell.tsx owns
+ *  the frame (full-height background, the top bar, the sidebar and the scroll), so
+ *  this no longer claims 100vh of its own and no longer repaints the background. */
 export const pageStyle: React.CSSProperties = {
-  minHeight: '100vh',
-  background: COLORS.cream,
   color: COLORS.ink,
   fontFamily: FONT,
 }

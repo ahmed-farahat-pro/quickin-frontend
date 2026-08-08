@@ -11,7 +11,6 @@
 // console. See ../../ops-theme.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { COLORS, FONT, SERIF, cardStyle, inputStyle, labelStyle } from '../../ops-theme'
-import { OpsHeader } from '../ops-session'
 
 type Account = {
   id: string
@@ -208,7 +207,6 @@ export function StaffClient({
 
   return (
     <main style={{ minHeight: '100vh', background: COLORS.cream, color: COLORS.ink, fontFamily: FONT }}>
-      <OpsHeader title="Staff & permissions" />
 
       <section style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px 72px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 22 }}>

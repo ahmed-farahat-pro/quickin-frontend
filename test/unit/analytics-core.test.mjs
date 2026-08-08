@@ -13,15 +13,12 @@ import {
   GRANULARITIES,
   DATE_COLUMNS,
   DEFAULT_RANGE_DAYS,
-  DEFAULT_COMMISSION_RATE,
   ReportInputError,
   parseReportFilter,
   buildReportWhere,
   bucketSql,
   dateExpr,
   toDateString,
-  commissionFor,
-  hostNetFor,
   refundFor,
   csvCell,
   toCsv,
@@ -212,26 +209,9 @@ describe('the paid_at trap constants', () => {
 })
 
 describe('money math', () => {
-  test('commission uses the booking snapshot when present', () => {
-    assert.equal(commissionFor(1000, 0.15), 150)
-    assert.equal(commissionFor(1000, 0.2), 200)
-  })
-
-  test('falls back to the historical 10% when the snapshot is missing', () => {
-    assert.equal(DEFAULT_COMMISSION_RATE, 0.1)
-    assert.equal(commissionFor(1000, null), 100)
-    assert.equal(commissionFor(1000, undefined), 100)
-  })
-
-  test('host net is the remainder', () => {
-    assert.equal(hostNetFor(1000, 0.1), 900)
-    assert.equal(commissionFor(1000, 0.1) + hostNetFor(1000, 0.1), 1000)
-  })
-
-  test('rounds to two decimals', () => {
-    assert.equal(commissionFor(333.33, 0.1), 33.33)
-    assert.equal(commissionFor(0.125, 1), 0.13)
-  })
+  // The commission itself is NOT tested here — it lives in commission-core.ts and is
+  // covered by commission-core.test.mjs. This module deliberately holds no second
+  // definition of the platform's margin; see the note above refundFor().
 
   test('refund is recomputed from the percentage, never from refund_amount', () => {
     // refund_amount is NULL for every web cancellation, so it can never be trusted.
@@ -247,8 +227,8 @@ describe('money math', () => {
   })
 
   test('tolerates junk totals', () => {
-    assert.equal(commissionFor(NaN, 0.1), 0)
     assert.equal(refundFor(null, 50), 0)
+    assert.equal(refundFor(NaN, 50), 0)
   })
 })
 

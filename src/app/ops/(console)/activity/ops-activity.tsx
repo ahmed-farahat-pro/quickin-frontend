@@ -8,7 +8,6 @@
 // with a Next that disables at the end, not "of 4,213".
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { COLORS, SERIF } from '../../ops-theme'
-import { OpsHeader } from '../ops-session'
 import { adminGet, controlStyle, fieldLabel, ghostBtn, numTd, pageStyle, panelStyle, td, th, money } from '../ops-ui'
 import {
   DEFAULT_ACTIVITY_LIMIT,
@@ -101,7 +100,6 @@ export function OpsActivity({ initial }: { initial: { events: ActivityEvent[]; h
 
   return (
     <main style={pageStyle}>
-      <OpsHeader title="Activity" />
       <section style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 20px 64px' }}>
         <h1 style={{ margin: '0 0 4px', fontFamily: SERIF, fontSize: 'clamp(24px, 4vw, 30px)', fontWeight: 700, letterSpacing: '-0.02em', color: COLORS.burgundy }}>
           Activity

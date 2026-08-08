@@ -8,11 +8,15 @@
 // The session is resolved server-side (so an unauthenticated visitor never receives
 // the console HTML at all) and handed to the client tree via OpsSessionProvider,
 // which also runs the idle-logout timer.
+//
+// The chrome — top bar and sidebar — is rendered here rather than by each page, so
+// it survives navigation instead of being torn down and rebuilt fifteen times over.
 import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { resolveStaffSession, STAFF_COOKIE, STAFF_IDLE_MS } from '@/lib/local/staff'
 import { OpsSessionProvider } from './ops-session'
+import { OpsShell } from './ops-shell'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,7 +46,7 @@ export default async function OpsConsoleLayout({ children }: { children: React.R
       }}
       idleMs={STAFF_IDLE_MS}
     >
-      {children}
+      <OpsShell>{children}</OpsShell>
     </OpsSessionProvider>
   )
 }

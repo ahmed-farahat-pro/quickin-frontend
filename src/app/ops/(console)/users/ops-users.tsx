@@ -9,7 +9,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { COLORS, SERIF } from '../../ops-theme'
-import { OpsHeader } from '../ops-session'
 import { adminGet, controlStyle, fieldLabel, ghostBtn, numTd, pageStyle, panelStyle, td, th } from '../ops-ui'
 import {
   DEFAULT_USER_LIMIT,
@@ -126,7 +125,6 @@ export function OpsUsers({ initial }: { initial: { users: AdminUser[]; total: nu
 
   return (
     <main style={pageStyle}>
-      <OpsHeader title="Users" />
       <section style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 20px 64px' }}>
         <h1 style={{ margin: '0 0 4px', fontFamily: SERIF, fontSize: 'clamp(24px, 4vw, 30px)', fontWeight: 700, letterSpacing: '-0.02em', color: COLORS.burgundy }}>
           Users

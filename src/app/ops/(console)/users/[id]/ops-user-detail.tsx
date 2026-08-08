@@ -13,7 +13,6 @@
 import { useCallback, useState } from 'react'
 import Link from 'next/link'
 import { COLORS, SERIF } from '../../../ops-theme'
-import { OpsHeader } from '../../ops-session'
 import { adminGet, adminSend, ghostBtn, money, numTd, pageStyle, panelStyle, solidBtn, td, th, Stat, StatGrid } from '../../ops-ui'
 import { normalizeStatus, statusLabel, type AccountStatus, type UserStatusAction } from '@/lib/local/user-admin-core'
 import { StatusPill, actorLabel, fmtDay, fmtMoment, pill } from '../user-bits'
@@ -121,7 +120,6 @@ export function OpsUserDetail({ initial, isSuperAdmin }: { initial: Detail; isSu
 
   return (
     <main style={pageStyle}>
-      <OpsHeader title="Users" />
       <section style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 20px 64px' }}>
         <Link href="/ops/users" style={{ fontSize: 12, color: COLORS.muted, textDecoration: 'none' }}>
           ← All users

@@ -7,7 +7,6 @@
 // somewhere to find out who they're deciding about.
 import { useCallback, useEffect, useState } from 'react'
 import { COLORS, SERIF } from '../../ops-theme'
-import { OpsHeader } from '../ops-session'
 import { adminGet, adminSend, btnBase, ghostBtn, pageStyle, panelStyle, solidBtn, td, th } from '../ops-ui'
 import { waitingLabel } from '@/lib/local/activity-core'
 
@@ -70,7 +69,6 @@ export function OpsReports({ initial }: { initial: Report[] }) {
 
   return (
     <main style={pageStyle}>
-      <OpsHeader title="Reports" />
       <section style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 20px 64px' }}>
         <h1 style={{ margin: '0 0 4px', fontFamily: SERIF, fontSize: 'clamp(24px, 4vw, 30px)', fontWeight: 700, letterSpacing: '-0.02em', color: COLORS.burgundy }}>
           Reports

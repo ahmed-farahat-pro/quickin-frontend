@@ -230,6 +230,10 @@ describe('alertsFor — the permission boundary', () => {
     for (const s of ALERT_SOURCES) {
       assert.ok(s.module.length > 0, `${s.key} needs a module`)
       assert.match(s.href, /^\/ops/, `${s.key} must link into /ops`)
+      // A query string here is the old ?tab= form, which nothing ever read — the
+      // link landed on the Overview and the operator had to find the queue by hand.
+      // Every section is a real route now, so a link must be a path.
+      assert.doesNotMatch(s.href, /\?/, `${s.key} must link to a route, not a query string`)
     }
   })
 })

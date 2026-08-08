@@ -8,8 +8,7 @@
 // The timer is a convenience, NOT the security boundary: the server rejects an idle
 // session on the next request regardless (see resolveStaffSession). Without it the UI
 // would simply sit on a dead session until the operator clicked something.
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react'
 import type { StaffModule, StaffRole } from '@/lib/local/staff'
 
 export type OpsSession = {
@@ -49,7 +48,6 @@ export function OpsSessionProvider({
   idleMs: number
   children: React.ReactNode
 }) {
-  const router = useRouter()
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const signOut = useCallback(
@@ -94,166 +92,7 @@ export function OpsSessionProvider({
   return <OpsSessionContext.Provider value={value}>{children}</OpsSessionContext.Provider>
 }
 
-/** Console pages beyond the tabbed dashboard, each gated by its own module.
- *  'staff' is super-admin-only, which staffCan() already enforces — so listing it
- *  here needs no extra role check. */
-const NAV: Array<{ href: string; label: string; module: StaffModule }> = [
-  { href: '/ops/users', label: 'Users', module: 'users' },
-  { href: '/ops/activity', label: 'Activity', module: 'overview' },
-  { href: '/ops/reports', label: 'Reports', module: 'reports' },
-  { href: '/ops/analytics', label: 'Analytics', module: 'analytics' },
-  { href: '/ops/payments', label: 'Payments', module: 'payments' },
-  { href: '/ops/pricing', label: 'Pricing', module: 'pricing' },
-  { href: '/ops/resorts', label: 'Resorts', module: 'resorts' },
-  { href: '/ops/audit', label: 'Audit', module: 'audit' },
-  { href: '/ops/staff', label: 'Staff', module: 'staff' },
-]
-
-/**
- * The alert count, polled in the header so it follows the operator across every /ops
- * screen rather than only existing on the dashboard.
- *
- * Deliberately quiet about failure: a bell that can't reach the server shows nothing
- * rather than a zero, because "0 alerts" and "I don't know" must not look the same.
- */
-function useAlertCount(): number | null {
-  const [total, setTotal] = useState<number | null>(null)
-  useEffect(() => {
-    let stop = false
-    const tick = async () => {
-      if (document.visibilityState === 'hidden') return
-      try {
-        const res = await fetch('/api/local/admin/alerts', { credentials: 'same-origin', cache: 'no-store' })
-        if (!res.ok) return
-        const body = await res.json()
-        if (!stop) setTotal(Number(body?.total ?? 0))
-      } catch { /* leave the previous value; never show a wrong zero */ }
-    }
-    void tick()
-    const t = setInterval(() => void tick(), 60_000)
-    return () => { stop = true; clearInterval(t) }
-  }, [])
-  return total
-}
-
-/** Shared header strip for the console pages: logo, who's signed in, sign out. */
-export function OpsHeader({ title }: { title: string }) {
-  const { session, can, signOut } = useOpsSession()
-  const router = useRouter()
-  const pathname = usePathname()
-  const alertCount = useAlertCount()
-  // Inline styles can't express :hover, and /ops has no stylesheet — so hover is
-  // tracked in state, the same way the rest of this console handles it.
-  const [hovered, setHovered] = useState<string | null>(null)
-
-  /** A nav entry is current on its own page AND on anything nested under it, so
-   *  /ops/users/<id> still shows Users as selected. */
-  const isCurrent = (href: string) =>
-    pathname === href || pathname.startsWith(`${href}/`)
-
-  return (
-    <header
-      style={{
-        background: 'linear-gradient(180deg, #EFE6D8 0%, #F6F1E6 100%)',
-        borderBottom: '1px solid rgba(91,15,22,0.10)',
-        padding: '16px 24px',
-      }}
-    >
-      <div
-        style={{
-          maxWidth: 1100,
-          margin: '0 auto',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 16,
-          flexWrap: 'wrap',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="QuickIn" height={36} style={{ height: 36, width: 'auto', display: 'block' }} />
-          <span style={{ color: '#5B0F16', fontWeight: 700, fontSize: 14 }}>{title}</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 13 }}>
-          <div style={{ textAlign: 'right', lineHeight: 1.3 }}>
-            <div style={{ fontWeight: 700, color: '#2A2220' }}>{session.fullName || session.email}</div>
-            <div style={{ color: '#6B6055', fontSize: 12 }}>
-              {session.role === 'super_admin' ? 'Super admin' : 'Moderator'}
-              {session.legacy ? ' · legacy' : ''}
-            </div>
-          </div>
-          {/* Module-gated nav. Each entry is hidden unless the operator holds the
-              module — the page and its API re-check independently, so this is
-              convenience, not the boundary. */}
-          {can('overview') && (
-            <button
-              type="button"
-              onClick={() => router.push('/ops/alerts')}
-              title={alertCount == null ? 'Alerts' : `${alertCount} waiting`}
-              style={{
-                position: 'relative',
-                padding: '8px 12px',
-                borderRadius: 12,
-                border: '1px solid rgba(91,15,22,0.25)',
-                background: alertCount ? '#5B0F16' : 'transparent',
-                color: alertCount ? '#F6F1E6' : '#5B0F16',
-                fontWeight: 700,
-                fontSize: 13,
-                cursor: 'pointer',
-              }}
-            >
-              {alertCount ? `\u2022 ${alertCount}` : '\u2022'} Alerts
-            </button>
-          )}
-          {NAV.filter((n) => can(n.module)).map((n) => {
-            const current = isCurrent(n.href)
-            const hot = hovered === n.href
-            return (
-              <button
-                key={n.href}
-                type="button"
-                aria-current={current ? 'page' : undefined}
-                // Already here — don't push the same route again. Re-navigating a
-                // screen you're on re-runs its server component and refetches for
-                // nothing, which is what made repeated clicks look like a loop.
-                onClick={() => { if (!current) router.push(n.href) }}
-                onMouseEnter={() => setHovered(n.href)}
-                onMouseLeave={() => setHovered((h) => (h === n.href ? null : h))}
-                style={{
-                  padding: '8px 14px',
-                  borderRadius: 12,
-                  border: `1px solid ${current ? '#5B0F16' : 'rgba(91,15,22,0.25)'}`,
-                  background: current ? '#5B0F16' : hot ? 'rgba(91,15,22,0.08)' : 'transparent',
-                  color: current ? '#F6F1E6' : '#5B0F16',
-                  fontWeight: 700,
-                  fontSize: 13,
-                  cursor: current ? 'default' : 'pointer',
-                  transition: 'background .15s, color .15s, border-color .15s',
-                }}
-              >
-                {n.label}
-              </button>
-            )
-          })}
-          <button
-            type="button"
-            onClick={signOut}
-            style={{
-              padding: '8px 14px',
-              borderRadius: 12,
-              border: 'none',
-              background: '#5B0F16',
-              color: '#F6F1E6',
-              fontWeight: 700,
-              fontSize: 13,
-              cursor: 'pointer',
-            }}
-          >
-            Sign out
-          </button>
-        </div>
-      </div>
-    </header>
-  )
-}
+// The navigation, the alert bell and the sign-out control used to live here as
+// OpsHeader, a strip every page rendered for itself. They now belong to the
+// console shell (ops-shell.tsx), which the layout renders once around all of them.
+// This module is back to what its name says: the session.

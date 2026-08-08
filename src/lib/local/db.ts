@@ -6,6 +6,8 @@ import type { PaymentConfig } from './payment-config-core'
 import {
   COMMISSION_RATE_KEY,
   COMMISSION_RATE_SQL,
+  bookingCommissionSql,
+  bookingRateSql,
   parseRate,
   rateToStored,
   roundUpToStep,
@@ -301,13 +303,12 @@ export async function getListingById(id: string, opts: { asHost?: boolean } = {}
 
 // ---- Bookings ---------------------------------------------------------------
 
-/**
- * The commission rate to price a booking by: the rate SNAPSHOTTED when it was
- * taken, falling back to the live rate for rows written before the column
- * existed. Never the live rate for a booking that already has one — an admin
- * changing the rate must not restate a reservation a guest already agreed to.
- */
-const BOOKING_RATE_SQL = `COALESCE(b.commission_rate, ${COMMISSION_RATE_SQL})`
+/** The rate to price a booking by — its own snapshot, not the live rate. Defined
+ *  in commission-core so every reader of a booking's money agrees; see there. */
+const BOOKING_RATE_SQL = bookingRateSql()
+
+/** Guest price − host's raw price, for one booking. See bookingCommissionSql(). */
+const COMMISSION_AMOUNT_SQL = bookingCommissionSql()
 
 // bookings.total_price stores the host's RAW stay total. This projection exposes
 // only the COMMISSION-INCLUSIVE figure, because a booking response is read by the
@@ -2441,6 +2442,12 @@ export interface AdminStats {
   pending_applications: number
   pending_verifications: number
   gross_paid: number
+  /** The platform's cut — guest price minus the host's raw price — summed over
+   *  bookings that were actually collected. Refunded rows drop out with PAID_SQL. */
+  commission_paid: number
+  /** The same cut on bookings still expected to be collected: live reservations
+   *  that have not been paid yet. Expected, not earned. */
+  commission_pending: number
   /** F3/F4 — the "needs attention" counts behind the alert tiles and the alert centre. */
   bookings_today: number
   pending_listings: number
@@ -2458,7 +2465,9 @@ export interface AdminStats {
 }
 
 /** Top-line counts for the admin dashboard, plus the alert queues (F3/F4).
- *  gross_paid = SUM(total_price) of paid bookings. */
+ *  gross_paid = SUM(total_price) of paid bookings — the HOST side, before the
+ *  markup; commission_paid is the platform's cut on the same population, so
+ *  gross_paid + commission_paid is what guests actually handed over. */
 export async function adminStats(): Promise<AdminStats> {
   const { rows } = await pool.query(
     `SELECT
@@ -2479,6 +2488,19 @@ export async function adminStats(): Promise<AdminStats> {
        (SELECT COUNT(*) FROM host_applications WHERE status = 'pending')::int AS pending_applications,
        (SELECT COUNT(*) FROM id_verifications WHERE status = 'pending')::int AS pending_verifications,
        COALESCE((SELECT SUM(total_price) FROM bookings WHERE COALESCE(payment_status, 'unpaid') = 'paid'), 0)::float8 AS gross_paid,
+       -- The platform's margin. Because the commission is a MARKUP, it is the gap
+       -- between what the guest was charged and the host's raw price — not a
+       -- percentage of total_price, which would ignore the round-up to 10 EGP.
+       -- Each booking prices at ITS OWN snapshot, so changing the rate never
+       -- restates what has already been earned.
+       COALESCE((SELECT SUM(${COMMISSION_AMOUNT_SQL}) FROM bookings b
+                  WHERE COALESCE(b.payment_status, 'unpaid') = 'paid'), 0)::float8 AS commission_paid,
+       -- Expected, not earned: live reservations with the money still outstanding.
+       -- Cancelled/rejected bookings and refunded ones are excluded — that money is
+       -- never arriving.
+       COALESCE((SELECT SUM(${COMMISSION_AMOUNT_SQL}) FROM bookings b
+                  WHERE b.status IN ('pending', 'confirmed')
+                    AND COALESCE(b.payment_status, 'unpaid') NOT IN ('paid', 'refunded', 'voided')), 0)::float8 AS commission_pending,
        -- F3/F4: the queues that need someone's attention. These drive both the
        -- dashboard's alert tiles and the alert centre, so they live in the same single
        -- query rather than fanning out per poll.
@@ -3459,6 +3481,10 @@ export interface AdminBookingRow {
   total_price: number
   /** The host's raw share of it. */
   host_payout: number
+  /** The platform's cut: total_price − host_payout, at this booking's own rate. */
+  commission: number
+  /** The rate this booking was taken at, as a fraction. Snapshot, not the live rate. */
+  commission_rate: number
   currency: string
   check_in: string
   check_out: string
@@ -3475,9 +3501,13 @@ export async function adminListBookings(): Promise<AdminBookingRow[]> {
             NULLIF(b.reservation_code, '') AS reservation_code,
             b.status,
             CASE WHEN b.paid_at IS NULL THEN 'unpaid' ELSE 'paid' END AS payment_status,
-            -- What the guest owes; host_payout is the host's raw share of it.
+            -- What the guest owes; host_payout is the host's raw share of it, and
+            -- commission is the gap between them — the platform's margin on this
+            -- one booking, priced at the rate it was taken at.
             ${sqlWithCommission('b.total_price', BOOKING_RATE_SQL)}::float8 AS total_price,
             b.total_price::float8 AS host_payout,
+            ${COMMISSION_AMOUNT_SQL}::float8 AS commission,
+            ${BOOKING_RATE_SQL}::float8 AS commission_rate,
             COALESCE(l.currency, 'USD') AS currency,
             to_char(b.check_in, 'YYYY-MM-DD') AS check_in,
             to_char(b.check_out, 'YYYY-MM-DD') AS check_out,

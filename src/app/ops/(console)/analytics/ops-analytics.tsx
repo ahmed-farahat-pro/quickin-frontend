@@ -6,7 +6,6 @@
 // because it reuses the identical querystring.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { COLORS, SERIF } from '../../ops-theme'
-import { OpsHeader } from '../ops-session'
 import {
   BarList,
   Stat,
@@ -116,7 +115,6 @@ export function OpsAnalytics() {
 
   return (
     <main style={pageStyle}>
-      <OpsHeader title="Analytics" />
       <section style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 20px 64px' }}>
         <h1
           style={{
@@ -269,17 +267,20 @@ function RevenueView({ data }: { data: { totals: Record<string, number>; trend: 
     <>
       <div style={section}>
         <StatGrid>
-          <Stat label="Gross revenue" value={money(t.gross)} hint={`${t.paidCount} paid bookings`} />
-          <Stat label="Commission earned" value={money(t.commission)} />
-          <Stat label="Host net" value={money(t.hostNet)} />
+          <Stat label="Guests paid" value={money(t.gross)} hint={`${t.paidCount} paid bookings`} />
+          <Stat label="Commission earned" value={money(t.commission)} hint="QuickIn's markup" />
+          <Stat label="Host payouts" value={money(t.hostPayouts)} hint="their price, in full" />
           <Stat label="Refunded" value={money(t.refunded)} hint={`${t.refundedCount} refunded`} />
           <Stat label="Pending payout" value={money(t.pendingPayout)} hint="Estimate — stays not ended" />
           <Stat label="Settled payout" value={money(t.settledPayout)} hint="Estimate — stays ended" />
         </StatGrid>
         <p style={{ margin: '12px 0 0', fontSize: 11, color: COLORS.muted, lineHeight: 1.6 }}>
-          Commission uses the rate stored on each booking at the time it was taken, so changing the
-          platform rate never rewrites history. <strong>Payout figures are derived estimates</strong> — there is
-          no payouts ledger, so they are simply host net split by whether the stay has ended.
+          The commission is a <strong>markup on the host&rsquo;s price</strong>, not a deduction from it:
+          &ldquo;Guests paid&rdquo; is what was collected, &ldquo;Host payouts&rdquo; is the price the host
+          named and receives in full, and the commission is the gap. Each booking counts at the rate
+          stored on it when it was taken, so changing the platform rate never rewrites history.{' '}
+          <strong>Payout figures are derived estimates</strong> — there is no payouts ledger, so they are
+          the host&rsquo;s price split by whether the stay has ended.
         </p>
       </div>
       <div style={section}>

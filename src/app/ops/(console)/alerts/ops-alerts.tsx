@@ -7,7 +7,6 @@
 // the answer people most want.
 import { useCallback, useEffect, useState } from 'react'
 import { COLORS, SERIF } from '../../ops-theme'
-import { OpsHeader } from '../ops-session'
 import { adminGetQuiet, pageStyle, panelStyle } from '../ops-ui'
 import { useLivePoll, agoLabel } from '../use-live-stats'
 import { alertTotal, waitingLabel, type Alert } from '@/lib/local/activity-core'
@@ -40,7 +39,6 @@ export function OpsAlerts({
 
   return (
     <main style={pageStyle}>
-      <OpsHeader title="Alerts" />
       <section style={{ maxWidth: 900, margin: '0 auto', padding: '24px 20px 64px' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <h1 style={{ margin: '0 0 4px', fontFamily: SERIF, fontSize: 'clamp(24px, 4vw, 30px)', fontWeight: 700, letterSpacing: '-0.02em', color: COLORS.burgundy }}>

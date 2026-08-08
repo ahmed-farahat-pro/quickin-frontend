@@ -223,23 +223,24 @@ export function bucketSql(granularity: Granularity, expr: string): string {
 }
 
 // ---- Money ------------------------------------------------------------------
-// The platform rate lives in app_settings.platform_commission_rate and is
-// snapshotted onto each booking as commission_rate. These take the snapshot and
-// fall back to the historical hardcoded 0.1 for rows predating it.
-
-export const DEFAULT_COMMISSION_RATE = 0.1
+//
+// THE COMMISSION MATH IS NOT HERE. It lives in commission-core.ts —
+// commissionAmount(), withCommission(), bookingCommissionSql() — because the
+// markup has to round identically in TypeScript and in SQL, and because that file
+// is byte-parity-guarded against the backend's copy. Reach for it, not for a
+// percentage of total_price.
+//
+// This module used to carry commissionFor()/hostNetFor(), written for the OLD fee
+// model: commission = total × rate, host net = total − commission. Both are wrong
+// now — the commission is a markup ADDED to the host's price, and the host is paid
+// that price in full. They had no callers outside their own tests, so they are gone
+// rather than corrected; a second, subtly different definition of the platform's
+// margin is exactly the drift commission-core exists to prevent.
+//
+// refundFor() stays: a refund is a percentage of a charge, which is true under any
+// model. Pass it the GUEST figure, since that is what was actually collected.
 
 const round2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100
-
-export function commissionFor(total: number, rate: number | null | undefined): number {
-  const r = rate === null || rate === undefined || Number.isNaN(Number(rate)) ? DEFAULT_COMMISSION_RATE : Number(rate)
-  return round2((Number(total) || 0) * r)
-}
-
-/** What the host keeps. */
-export function hostNetFor(total: number, rate: number | null | undefined): number {
-  return round2((Number(total) || 0) - commissionFor(total, rate))
-}
 
 /**
  * Refund value. NEVER read bookings.refund_amount — the web cancel path writes
