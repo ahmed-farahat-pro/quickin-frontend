@@ -10,6 +10,7 @@
 import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import { resolveStaffSession, staffCan, STAFF_COOKIE } from '@/lib/local/staff'
+import { adminListDisputes, adminListPendingProofs, getPaymentConfig } from '@/lib/local/db'
 import { OpsPayments } from './ops-payments'
 
 export const dynamic = 'force-dynamic'
@@ -32,6 +33,33 @@ const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
 export default async function OpsPaymentsPage() {
   const staff = await resolveStaffSession((await cookies()).get(STAFF_COOKIE)?.value)
   const allowed = Boolean(staff && staffCan(staff, 'payments'))
+
+  // Load the three payloads here rather than letting the client fetch them after it
+  // mounts. The screen used to arrive fully drawn and empty, then fill in — and the
+  // two queues each requested /api/local/admin/payments separately, so the same rows
+  // came down the wire twice. One pass on the server, one set of rows.
+  //
+  // `null` means the load failed, and is not the same as "no rows": the client falls
+  // back to fetching for itself, so a DB hiccup here costs a moment rather than the
+  // whole screen. Same reasoning as /ops/users and /ops/staff.
+  let initial: {
+    config: Awaited<ReturnType<typeof getPaymentConfig>>
+    pending: Awaited<ReturnType<typeof adminListPendingProofs>>
+    disputes: Awaited<ReturnType<typeof adminListDisputes>>
+  } | null = null
+
+  if (allowed) {
+    try {
+      const [config, pending, disputes] = await Promise.all([
+        getPaymentConfig(),
+        adminListPendingProofs(),
+        adminListDisputes(),
+      ])
+      initial = { config, pending, disputes }
+    } catch (err) {
+      console.error('ops/payments initial load:', err)
+    }
+  }
 
   return (
     <main
@@ -87,7 +115,7 @@ export default async function OpsPaymentsPage() {
             </p>
           </div>
         ) : (
-          <OpsPayments />
+          <OpsPayments initial={initial} />
         )}
       </section>
     </main>

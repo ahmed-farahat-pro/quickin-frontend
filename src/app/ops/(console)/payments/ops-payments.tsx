@@ -76,12 +76,30 @@ const inputStyle: React.CSSProperties = {
   background: '#fff',
 }
 
-export function OpsPayments() {
+/**
+ * The three payloads page.tsx loads on the server, or null if that load failed.
+ *
+ * Each panel seeds its state from this and skips its mount fetch. When it is null
+ * every panel falls back to fetching for itself, which is what used to happen
+ * unconditionally — so a DB hiccup during the render costs a moment, not the screen.
+ */
+export interface OpsPaymentsInitial {
+  config: {
+    instapay_handle?: string
+    instapay_link?: string
+    instapay_qr_image?: string
+    instructions?: string
+  }
+  pending: PendingProof[]
+  disputes: Dispute[]
+}
+
+export function OpsPayments({ initial }: { initial: OpsPaymentsInitial | null }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
-      <InstapaySettings />
-      <PendingPaymentsQueue />
-      <DisputesQueue />
+      <InstapaySettings initial={initial?.config ?? null} />
+      <PendingPaymentsQueue initial={initial?.pending ?? null} />
+      <DisputesQueue initial={initial?.disputes ?? null} />
     </div>
   )
 }
@@ -108,8 +126,8 @@ interface PendingProof {
  * booking to be 'pending'. So a normal payment had no reviewer — the money was sent
  * and nothing ever moved.
  */
-function PendingPaymentsQueue() {
-  const [rows, setRows] = useState<PendingProof[] | null>(null)
+function PendingPaymentsQueue({ initial }: { initial: PendingProof[] | null }) {
+  const [rows, setRows] = useState<PendingProof[] | null>(initial)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [rowError, setRowError] = useState<{ id: string; msg: string } | null>(null)
@@ -128,7 +146,9 @@ function PendingPaymentsQueue() {
     }
   }, [])
 
-  useEffect(() => { load() }, [load])
+  // Only when the server didn't hand us rows. `initial` is a prop that never changes,
+  // so this runs at most once; every later refresh comes from an action instead.
+  useEffect(() => { if (initial === null) load() }, [initial, load])
 
   async function showProof(id: string) {
     if (proofs[id]?.image) {
@@ -271,12 +291,12 @@ async function fileToQrDataUrl(file: File): Promise<string> {
   return canvas.toDataURL('image/png')
 }
 
-function InstapaySettings() {
-  const [handle, setHandle] = useState('')
-  const [link, setLink] = useState('')
-  const [qrImage, setQrImage] = useState('')
-  const [instructions, setInstructions] = useState('')
-  const [loading, setLoading] = useState(true)
+function InstapaySettings({ initial }: { initial: OpsPaymentsInitial['config'] | null }) {
+  const [handle, setHandle] = useState(initial?.instapay_handle ?? '')
+  const [link, setLink] = useState(initial?.instapay_link ?? '')
+  const [qrImage, setQrImage] = useState(initial?.instapay_qr_image ?? '')
+  const [instructions, setInstructions] = useState(initial?.instructions ?? '')
+  const [loading, setLoading] = useState(initial === null)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -310,9 +330,10 @@ function InstapaySettings() {
     }
   }, [])
 
+  // See PendingPaymentsQueue — only fetch when the server render didn't supply it.
   useEffect(() => {
-    load()
-  }, [load])
+    if (initial === null) load()
+  }, [initial, load])
 
   async function pickQr(file: File | undefined) {
     if (!file) return
@@ -503,8 +524,8 @@ interface ProofState {
   error: string | null
 }
 
-function DisputesQueue() {
-  const [disputes, setDisputes] = useState<Dispute[] | null>(null)
+function DisputesQueue({ initial }: { initial: Dispute[] | null }) {
+  const [disputes, setDisputes] = useState<Dispute[] | null>(initial)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [rowError, setRowError] = useState<{ id: string; msg: string } | null>(null)
@@ -527,9 +548,12 @@ function DisputesQueue() {
     }
   }, [])
 
+  // See PendingPaymentsQueue — only fetch when the server render didn't supply it.
+  // This is also what stops the two queues requesting the same endpoint twice on
+  // every visit, since both read /api/local/admin/payments for their half of it.
   useEffect(() => {
-    load()
-  }, [load])
+    if (initial === null) load()
+  }, [initial, load])
 
   async function resolve(id: string, action: 'approve' | 'uphold') {
     let note: string | undefined
