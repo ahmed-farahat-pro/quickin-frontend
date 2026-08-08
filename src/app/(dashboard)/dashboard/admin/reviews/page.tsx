@@ -72,7 +72,14 @@ export default async function AdminReviewsPage({
                 {reviews.length === 0 ? (
                     <Card>
                         <CardContent className="py-12 text-center text-muted-foreground">
-                            No reviews found matching your criteria.
+                            <p className="font-medium text-foreground">
+                                {search || statusFilter !== 'all' ? 'No reviews match these filters' : 'No reviews yet'}
+                            </p>
+                            <p className="mt-1 text-sm">
+                                {search || statusFilter !== 'all'
+                                    ? 'Clear the search or switch tabs to see reviews in another state.'
+                                    : 'Reviews appear here as guests rate the stays they have finished.'}
+                            </p>
                         </CardContent>
                     </Card>
                 ) : (

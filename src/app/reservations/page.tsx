@@ -302,6 +302,9 @@ async function ReservationsList({
             color: COLORS.muted,
           }}
         >
+          <p style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700, color: COLORS.ink }}>
+            {t('emptyTitle')}
+          </p>
           <p style={{ margin: '0 0 18px', fontSize: 15 }}>
             {t('emptyState')}
           </p>

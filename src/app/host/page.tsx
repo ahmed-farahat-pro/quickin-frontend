@@ -393,6 +393,9 @@ async function HostDashboard({ userId, firstName, t }: { userId: string; firstNa
         color: COLORS.muted,
       }}
     >
+      <p style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700, color: COLORS.ink }}>
+        {t('dashboard.emptyTitle')}
+      </p>
       <p style={{ margin: '0 0 18px', fontSize: 15 }}>
         {t('dashboard.emptyHint')}
       </p>
@@ -439,6 +442,8 @@ async function HostDashboard({ userId, firstName, t }: { userId: string; firstNa
         rejected: t('dashboard.filters.rejected'),
       }}
       emptyLabel={t('dashboard.emptyFiltered')}
+      emptyTitle={t('dashboard.emptyFilteredTitle')}
+      showAllLabel={t('dashboard.showAll')}
     />
   )
 

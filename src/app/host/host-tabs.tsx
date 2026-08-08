@@ -76,10 +76,16 @@ export function HostListingsFilter({
   items,
   labels,
   emptyLabel,
+  emptyTitle,
+  showAllLabel,
 }: {
   items: HostListingItem[]
   labels: Record<HostListingFilter, string>
   emptyLabel: string
+  emptyTitle: string
+  /** Label for the way out of an empty filter — the only action that can change
+   *  the result, since the host cannot conjure a listing into a status. */
+  showAllLabel: string
 }) {
   const [filter, setFilter] = useState<HostListingFilter>('all')
   const visible = filter === 'all' ? items : items.filter((item) => item.status === filter)
@@ -107,22 +113,38 @@ export function HostListingsFilter({
       </div>
 
       {visible.length === 0 ? (
-        <p
+        <div
           role="status"
           style={{
-            margin: 0,
             background: '#fff',
             borderRadius: 22,
             border: '1px solid rgba(42,34,32,0.06)',
             boxShadow: '0 6px 24px rgba(42,34,32,0.06)',
             padding: '36px 24px',
             textAlign: 'center',
-            fontSize: 15,
             color: COLORS.muted,
           }}
         >
-          {emptyLabel}
-        </p>
+          <p style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700, color: COLORS.ink }}>{emptyTitle}</p>
+          <p style={{ margin: 0, fontSize: 15 }}>{emptyLabel}</p>
+          <button
+            type="button"
+            onClick={() => setFilter('all')}
+            style={{
+              marginTop: 14,
+              padding: '9px 18px',
+              borderRadius: 999,
+              border: `1px solid ${COLORS.burgundy}`,
+              background: 'transparent',
+              color: COLORS.burgundy,
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            {showAllLabel}
+          </button>
+        </div>
       ) : (
         <div
           className="qk-host-grid"

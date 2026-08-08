@@ -558,7 +558,10 @@
     "empty": {
       "pending": "No pending booking requests",
       "confirmed": "No confirmed bookings",
-      "all": "No booking requests yet"
+      "all": "No booking requests yet",
+      "pendingDesc": "Requests waiting on your answer show up here.",
+      "confirmedDesc": "Stays you've approved appear here until they end.",
+      "allDesc": "Every request for your listings will be listed here."
     },
     "card": {
       "resBadge": "Res",
@@ -1772,7 +1775,8 @@
       "cancelFailed": "Could not cancel",
       "reviewFailed": "Could not submit review"
     },
-    "tripsHint": "Stays you've booked as a guest."
+    "tripsHint": "Stays you've booked as a guest.",
+    "emptyTitle": "No stays booked yet"
   },
   "signupLocal": {
     "subtitle": "Create your account to start exploring",
@@ -1913,7 +1917,8 @@
     "countSaved": "{count, plural, one {# saved stay.} other {# saved stays.}}",
     "emptyHint": "Tap the heart on any stay to save it for later.",
     "browseStays": "Browse stays",
-    "perNight": "/ night"
+    "perNight": "/ night",
+    "emptyTitle": "Nothing saved yet"
   },
   "hostPage": {
     "meta": {
@@ -1968,7 +1973,10 @@
         "rejected": "Rejected"
       },
       "listingsHint": "The places you host.",
-      "reservationsHint": "Booking requests from guests for your places."
+      "reservationsHint": "Booking requests from guests for your places.",
+      "emptyTitle": "You haven't listed a space yet",
+      "emptyFilteredTitle": "No listings in this status",
+      "showAll": "Show all listings"
     },
     "reservations": {
       "heading": "Incoming reservations",

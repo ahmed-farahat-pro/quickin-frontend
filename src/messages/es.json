@@ -558,7 +558,10 @@
     "empty": {
       "pending": "No hay solicitudes de reserva pendientes",
       "confirmed": "No hay reservas confirmadas",
-      "all": "Aún no hay solicitudes de reserva"
+      "all": "Aún no hay solicitudes de reserva",
+      "pendingDesc": "Las solicitudes que esperan tu respuesta aparecen aquí.",
+      "confirmedDesc": "Las estancias que has aceptado se quedan aquí hasta que terminen.",
+      "allDesc": "Todas las solicitudes de tus alojamientos se listarán aquí."
     },
     "card": {
       "resBadge": "Res",
@@ -1715,7 +1718,8 @@
       "cancelFailed": "No se pudo cancelar",
       "reviewFailed": "No se pudo enviar la reseña"
     },
-    "tripsHint": "Las estancias que has reservado como huésped."
+    "tripsHint": "Las estancias que has reservado como huésped.",
+    "emptyTitle": "Aún no has reservado ninguna estancia"
   },
   "verifyIdPage": {
     "meta": {
@@ -1913,7 +1917,8 @@
     "countSaved": "{count, plural, one {# estancia guardada.} other {# estancias guardadas.}}",
     "emptyHint": "Toca el corazón en cualquier estancia para guardarla para más tarde.",
     "browseStays": "Explorar estancias",
-    "perNight": "/ noche"
+    "perNight": "/ noche",
+    "emptyTitle": "Nada guardado todavía"
   },
   "hostPage": {
     "meta": {
@@ -1968,7 +1973,10 @@
         "rejected": "Rechazado"
       },
       "listingsHint": "Los alojamientos que gestionas.",
-      "reservationsHint": "Solicitudes de reserva de huéspedes para tus alojamientos."
+      "reservationsHint": "Solicitudes de reserva de huéspedes para tus alojamientos.",
+      "emptyTitle": "Todavía no has publicado un alojamiento",
+      "emptyFilteredTitle": "No hay alojamientos con este estado",
+      "showAll": "Mostrar todos los alojamientos"
     },
     "reservations": {
       "heading": "Reservas entrantes",

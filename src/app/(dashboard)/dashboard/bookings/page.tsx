@@ -376,7 +376,8 @@ export default async function BookingsPage({
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
                 <Clock className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>{t('empty.pending')}</p>
+                <p className="font-medium text-foreground">{t('empty.pending')}</p>
+                <p className="mt-1 text-sm">{t('empty.pendingDesc')}</p>
               </CardContent>
             </Card>
           ) : (
@@ -391,7 +392,8 @@ export default async function BookingsPage({
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
                 <CheckCircle className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>{t('empty.confirmed')}</p>
+                <p className="font-medium text-foreground">{t('empty.confirmed')}</p>
+                <p className="mt-1 text-sm">{t('empty.confirmedDesc')}</p>
               </CardContent>
             </Card>
           ) : (
@@ -406,7 +408,8 @@ export default async function BookingsPage({
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
                 <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>{t('empty.all')}</p>
+                <p className="font-medium text-foreground">{t('empty.all')}</p>
+                <p className="mt-1 text-sm">{t('empty.allDesc')}</p>
               </CardContent>
             </Card>
           ) : (

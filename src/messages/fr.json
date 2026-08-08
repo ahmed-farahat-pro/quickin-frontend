@@ -558,7 +558,10 @@
     "empty": {
       "pending": "Aucune demande de réservation en attente",
       "confirmed": "Aucune réservation confirmée",
-      "all": "Aucune demande de réservation pour le moment"
+      "all": "Aucune demande de réservation pour le moment",
+      "pendingDesc": "Les demandes en attente de votre réponse apparaissent ici.",
+      "confirmedDesc": "Les séjours que vous avez acceptés restent ici jusqu'à leur fin.",
+      "allDesc": "Toutes les demandes pour vos logements seront listées ici."
     },
     "card": {
       "resBadge": "Rés",
@@ -1715,7 +1718,8 @@
       "cancelFailed": "Annulation impossible",
       "reviewFailed": "Impossible d'envoyer l'avis"
     },
-    "tripsHint": "Les séjours que vous avez réservés en tant que voyageur."
+    "tripsHint": "Les séjours que vous avez réservés en tant que voyageur.",
+    "emptyTitle": "Aucun séjour réservé pour l'instant"
   },
   "verifyIdPage": {
     "meta": {
@@ -1913,7 +1917,8 @@
     "countSaved": "{count, plural, one {# séjour enregistré.} other {# séjours enregistrés.}}",
     "emptyHint": "Touchez le cœur sur un séjour pour l’enregistrer pour plus tard.",
     "browseStays": "Parcourir les séjours",
-    "perNight": "/ nuit"
+    "perNight": "/ nuit",
+    "emptyTitle": "Rien d'enregistré pour l'instant"
   },
   "hostPage": {
     "meta": {
@@ -1968,7 +1973,10 @@
         "rejected": "Refusée"
       },
       "listingsHint": "Les logements que vous hébergez.",
-      "reservationsHint": "Demandes de réservation des voyageurs pour vos logements."
+      "reservationsHint": "Demandes de réservation des voyageurs pour vos logements.",
+      "emptyTitle": "Vous n'avez pas encore publié de logement",
+      "emptyFilteredTitle": "Aucun logement dans ce statut",
+      "showAll": "Afficher tous les logements"
     },
     "reservations": {
       "heading": "Réservations entrantes",
