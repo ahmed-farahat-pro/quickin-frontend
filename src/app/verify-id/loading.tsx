@@ -6,6 +6,7 @@ import {
   SKELETON_COLORS as C,
   SKELETON_FONT as FONT,
 } from '@/components/ui/skeleton-block'
+import { RouteProgress } from '@/components/ui/route-progress'
 
 export default function Loading() {
   return (
@@ -18,6 +19,7 @@ export default function Loading() {
         padding: '40px 16px',
       }}
     >
+      <RouteProgress />
       <ShimmerStyles />
 
       <div style={{ maxWidth: 512, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 24 }}>

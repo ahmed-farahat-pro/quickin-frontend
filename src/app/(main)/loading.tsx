@@ -6,11 +6,14 @@
 // =============================================================================
 
 import { Skeleton } from '@/components/ui/skeleton'
+import { RouteProgress } from '@/components/ui/route-progress'
 
 export default function MainLoading()
 {
   return (
     <div className="space-y-6">
+      <RouteProgress />
+
       {/* Category bar skeleton */}
       <div className="flex items-center gap-3 overflow-hidden px-6 py-4 border-b border-border">
         {Array.from({ length: 10 }).map((_, i) => (

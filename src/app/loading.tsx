@@ -1,45 +1,64 @@
 // =============================================================================
-// GLOBAL LOADING PAGE
+// ROOT LOADING BOUNDARY
 // =============================================================================
-// Description: Loading UI shown during route transitions
-// Uses Next.js loading.tsx convention for Suspense boundaries
+// The last-resort fallback: shown only when a route has no nearer loading.tsx of
+// its own. In practice that now means a cold app boot and the handful of client-
+// rendered guest screens (/login, /signup, /messages, /auth/*) whose payloads are
+// small enough that this barely flashes.
+//
+// It used to be a dark, blurred, fullscreen overlay — and because /ops declared no
+// loading boundary anywhere in its 16 pages, EVERY sidebar click in the console
+// landed here and wiped the entire screen, sidebar and top bar included, before
+// redrawing it. The console (and the guest routes that hit the DB) now own their
+// own skeletons; this is left as the cold-boot screen it was always meant to be.
+//
+// Cream rather than dimmed black: dimming implies something is still behind it, and
+// on a first load there is nothing behind it to dim.
 // =============================================================================
 
-import { LoadingSpinner } from '@/components/ui/loading-spinner'
+import { QuickInMark } from '@/components/ui/quickin-mark'
+import { RouteProgress } from '@/components/ui/route-progress'
 import { getTranslations } from 'next-intl/server'
+
+const C = { burgundy: '#5B0F16', cream: '#F6F1E6', muted: '#6B6055' }
+const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
 
 export default async function Loading() {
   const t = await getTranslations('common')
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
-      {/* Animated Logo */}
-      <div className="relative mb-8">
-        <svg
-          viewBox="0 0 32 32"
-          xmlns="http://www.w3.org/2000/svg"
-          className="h-16 w-16 text-primary animate-pulse"
-          fill="currentColor"
-        >
-          <path d="M16 1C7.716 1 1 7.716 1 16s6.716 15 15 15 15-6.716 15-15S24.284 1 16 1zm0 27.5c-6.893 0-12.5-5.607-12.5-12.5S9.107 3.5 16 3.5 28.5 9.107 28.5 16 22.893 28.5 16 28.5zM16 8a8 8 0 100 16 8 8 0 000-16z" />
-        </svg>
-        
-        {/* Spinning ring around logo */}
-        <div className="absolute inset-0 -m-2">
-          <LoadingSpinner size="lg" className="h-20 w-20" />
-        </div>
-      </div>
+    <div
+      role="status"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 22,
+        background: C.cream,
+        fontFamily: FONT,
+      }}
+    >
+      <RouteProgress />
 
-      {/* Brand name */}
-      <h1 className="text-2xl font-bold text-primary mb-2">QuickIn</h1>
-      
-      {/* Loading text */}
-      <p className="text-background animate-pulse">{t('loadingStays')}</p>
-      
-      {/* Decorative dots */}
-      <div className="flex gap-1 mt-6">
-        <div className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
-        <div className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
-        <div className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+      <QuickInMark size={64} label={null} />
+
+      <div style={{ textAlign: 'center' }}>
+        <p
+          style={{
+            margin: 0,
+            fontFamily: '"Playfair Display", Georgia, serif',
+            fontSize: 22,
+            fontWeight: 700,
+            letterSpacing: '-0.01em',
+            color: C.burgundy,
+          }}
+        >
+          {t('brand')}
+        </p>
+        <p style={{ margin: '6px 0 0', fontSize: 14, color: C.muted }}>{t('loadingStays')}</p>
       </div>
     </div>
   )

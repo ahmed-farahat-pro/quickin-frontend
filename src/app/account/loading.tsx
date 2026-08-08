@@ -6,10 +6,12 @@ import {
   SKELETON_COLORS as C,
   SKELETON_FONT as FONT,
 } from '@/components/ui/skeleton-block'
+import { RouteProgress } from '@/components/ui/route-progress'
 
 export default function Loading() {
   return (
     <div style={{ background: C.cream, color: C.ink, fontFamily: FONT, minHeight: '100vh' }}>
+      <RouteProgress />
       <ShimmerStyles />
 
       {/* Header */}

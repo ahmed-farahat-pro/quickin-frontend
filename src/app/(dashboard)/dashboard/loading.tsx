@@ -1,9 +1,12 @@
 import { Skeleton } from '@/components/ui/skeleton'
+import { RouteProgress } from '@/components/ui/route-progress'
 import { Loader2 } from 'lucide-react'
 
 export default function DashboardLoading() {
   return (
     <div className="space-y-6">
+      <RouteProgress />
+
       {/* Page header skeleton */}
       <div className="space-y-2">
         <Skeleton className="h-8 w-48" />

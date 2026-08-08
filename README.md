@@ -104,6 +104,31 @@ The two app rows render as a dashed **"coming soon"** row until the matching lin
 /ops and the rows go live on their own; the page is `revalidate = 300`, so an /ops edit
 shows up within 5 minutes without a redeploy.
 
+## Loading states
+
+Every route that awaits data on the server needs its own `loading.tsx`. Without one,
+Next.js walks up to the nearest boundary — and the root `src/app/loading.tsx` is a
+**fullscreen** takeover, so a missing boundary means an entire screen (sidebar, top
+bar and all) is torn down and rebuilt on every navigation. That was the state of all
+16 `/ops` pages until the console got `src/app/ops/(console)/loading.tsx`; put a new
+boundary beside the layout you want to survive, not above it.
+
+| Piece | Where | For |
+| --- | --- | --- |
+| `<RouteProgress />` | `src/components/ui/route-progress.tsx` | The top-of-viewport bar. Drop it in every `loading.tsx` — a route skeleton's lifetime *is* the pending navigation, so no router subscription is needed. |
+| `<QuickInMark />` | `src/components/ui/quickin-mark.tsx` | The Q that draws itself. Cold boot and sign-in screens only — never in place of a populated screen. |
+| `SkeletonBlock`, `SkeletonCard`, `SkeletonRow`, `ShimmerStyles` | `src/components/ui/skeleton-block.tsx` | Boutique-palette shimmer for the guest site. One `<ShimmerStyles />` per loading tree. |
+| `OpsSkeletonPage`, `…Header`, `…Stats`, `…Table`, `…Filters`, `…Form`, `…Chart`, `…Panel` | `src/app/ops/(console)/ops-skeleton.tsx` | The console's shapes, in its inline-style idiom. |
+| `<Skeleton />` | `src/components/ui/skeleton.tsx` | The shadcn kit, for the Tailwind-styled pages (`/dashboard`, `/links`). |
+
+A `loading.tsx` must stay server-renderable — no `'use client'`, no hooks. Shipping
+JavaScript to draw a placeholder defeats the point.
+
+Skip the boundary when there is no server wait to cover: client-component pages
+(`/messages`, `/login`, `/signup`, `/auth/*`) and pages that read no database
+(`/plan`, `/progress`) resolve instantly, so a skeleton there only flashes. Those
+screens fetch on mount instead, and own their loading state in-component.
+
 ## Develop
 
 ```bash
