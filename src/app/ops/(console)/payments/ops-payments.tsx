@@ -9,6 +9,7 @@
 //     admin-gated server-side. Strings are hardcoded English to keep the change contained.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
+import { OpsSkeletonFields, OpsSkeletonQueueRows } from '../ops-skeleton'
 import { MAX_QR_CHARS, qrPayload } from '@/lib/local/payment-config-core'
 
 const C = {
@@ -181,7 +182,7 @@ function PendingPaymentsQueue() {
       </p>
 
       {error && <p style={{ margin: '0 0 12px', fontSize: 13, color: '#b3261e', fontWeight: 600 }}>{error}</p>}
-      {rows === null && <p style={{ fontSize: 13, color: C.muted }}>Loading…</p>}
+      {rows === null && <OpsSkeletonQueueRows rows={3} />}
       {rows?.length === 0 && <p style={{ fontSize: 13, color: C.muted }}>No payments waiting.</p>}
 
       <div style={{ display: 'grid', gap: 12 }}>
@@ -366,7 +367,7 @@ function InstapaySettings() {
       </p>
 
       {loading ? (
-        <p style={{ fontSize: 14, color: C.muted }}>Loading…</p>
+        <OpsSkeletonFields fields={4} />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 560 }}>
           <label style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>
@@ -592,7 +593,7 @@ function DisputesQueue() {
       </p>
 
       {disputes === null ? (
-        <p style={{ fontSize: 14, color: C.muted }}>Loading…</p>
+        <OpsSkeletonQueueRows rows={2} />
       ) : error && disputes.length === 0 ? (
         <div style={{ textAlign: 'center', color: C.muted }}>
           <p style={{ margin: '0 0 12px', fontSize: 14, color: '#b3261e' }}>{error}</p>

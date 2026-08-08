@@ -12,9 +12,13 @@
 // rather than the app's shadcn kit (see ops-ui.tsx for why). The shimmer itself is
 // reused from the shared skeleton-block module so /ops and /explore pulse alike.
 //
-// NOT a client component on purpose — a loading.tsx should never ship JavaScript to
-// render a placeholder. That means importing the palette from ops-theme.ts (plain
-// constants) rather than the 'use client' ops-ui.tsx.
+// This module carries no 'use client' of its own, which lets it serve both waits.
+// The loading.tsx files import it as server components — a route placeholder should
+// never ship JavaScript to draw itself. OpsDashboard and OpsPayments import the same
+// primitives from the client, for the SECOND wait: those screens arrive as real
+// chrome and then fetch their own data, and used to sit on the words "Loading live
+// data…" while they did. Same shapes, so the two waits look like one.
+import type { SectionId } from './ops-dashboard'
 import { ShimmerStyles, SkeletonBlock } from '@/components/ui/skeleton-block'
 import { RouteProgress } from '@/components/ui/route-progress'
 import { COLORS, FONT } from '../ops-theme'
@@ -26,6 +30,17 @@ const panel: React.CSSProperties = {
   border: '1px solid rgba(42,34,32,0.06)',
   boxShadow: '0 6px 24px rgba(42,34,32,0.06)',
   padding: 18,
+}
+
+/** ops-dashboard.tsx builds its own card shape (tan border, lighter shadow) rather
+ *  than using ops-ui's panel. In-place skeletons sit among those cards, so they have
+ *  to match that one and not the panel above. */
+const dashCard: React.CSSProperties = {
+  background: '#fff',
+  border: `1px solid ${COLORS.tan}`,
+  borderRadius: 18,
+  padding: 18,
+  boxShadow: '0 1px 3px rgba(42,34,32,0.06)',
 }
 
 /**
@@ -185,6 +200,176 @@ export function OpsSkeletonTable({ rows = 8, cols = 5 }: { rows?: number; cols?:
           {Array.from({ length: cols }).map((_, c) => (
             <SkeletonBlock key={c} width={widths[(r + c) % widths.length]} height={12} />
           ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * A stack of dashboard cards. `image` adds the 120×90 thumbnail the listings queue
+ * puts on the left of each row.
+ */
+export function OpsSkeletonCardList({
+  rows = 4,
+  image = false,
+  lines = 3,
+}: {
+  rows?: number
+  image?: boolean
+  lines?: number
+}) {
+  return (
+    <div style={{ display: 'grid', gap: 14 }}>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} style={{ ...dashCard, display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+          {image ? (
+            <SkeletonBlock width={120} height={90} radius={12} style={{ flex: '0 0 auto' }} />
+          ) : null}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+              <SkeletonBlock width="42%" height={16} radius={7} />
+              <SkeletonBlock width={78} height={11} style={{ flex: '0 0 auto' }} />
+            </div>
+            <div style={{ marginTop: 12, display: 'grid', gap: 9 }}>
+              {Array.from({ length: lines }).map((_, j) => (
+                <SkeletonBlock key={j} width={j === lines - 1 ? '48%' : '78%'} height={12} />
+              ))}
+            </div>
+          </div>
+          <SkeletonBlock width={86} height={31} radius={11} style={{ flex: '0 0 auto' }} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** The pill row the verifications queue filters through. */
+export function OpsSkeletonChips({ count = 4 }: { count?: number }) {
+  const widths = [72, 78, 74, 54]
+  return (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+      {Array.from({ length: count }).map((_, i) => (
+        <SkeletonBlock key={i} width={widths[i % widths.length]} height={31} radius={11} />
+      ))}
+    </div>
+  )
+}
+
+/**
+ * What one dashboard section looks like while its own fetch is in flight.
+ *
+ * OpsDashboard renders five routes from one component and loads each section's data
+ * from the browser after the page has already arrived. Before this, all five showed
+ * the same sentence — "Loading live data…" — under a fully-drawn header, which reads
+ * as a page that failed rather than a page that is working. Each section now holds
+ * its own shape instead, so the content lands in the space already reserved for it.
+ */
+export function OpsSectionSkeleton({ section }: { section: SectionId }) {
+  if (section === 'overview') {
+    return (
+      <div>
+        <ShimmerStyles />
+        <SkeletonBlock width={168} height={14} radius={6} style={{ marginBottom: 10 }} />
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+            gap: 10,
+            marginBottom: 14,
+          }}
+        >
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} style={{ ...dashCard, padding: '14px 16px' }}>
+              <SkeletonBlock width="50%" height={22} radius={8} />
+              <SkeletonBlock width="82%" height={11} style={{ marginTop: 9 }} />
+            </div>
+          ))}
+        </div>
+        <OpsSkeletonStats count={6} />
+      </div>
+    )
+  }
+
+  if (section === 'listings') {
+    return (
+      <div>
+        <ShimmerStyles />
+        <OpsSkeletonCardList rows={4} image lines={3} />
+      </div>
+    )
+  }
+
+  if (section === 'bookings') {
+    return (
+      <div>
+        <ShimmerStyles />
+        <OpsSkeletonStats count={3} />
+        <OpsSkeletonCardList rows={5} lines={2} />
+      </div>
+    )
+  }
+
+  if (section === 'verifications') {
+    return (
+      <div>
+        <ShimmerStyles />
+        <OpsSkeletonChips count={4} />
+        <OpsSkeletonCardList rows={4} lines={3} />
+      </div>
+    )
+  }
+
+  // applications
+  return (
+    <div>
+      <ShimmerStyles />
+      <OpsSkeletonCardList rows={4} lines={4} />
+    </div>
+  )
+}
+
+/**
+ * Label + input pairs with NO card around them, for a form that is already inside
+ * one. OpsSkeletonForm brings its own panel; dropping that into the Instapay
+ * settings card would nest a card in a card.
+ */
+export function OpsSkeletonFields({ fields = 4, button = true }: { fields?: number; button?: boolean }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 560 }}>
+      <ShimmerStyles />
+      {Array.from({ length: fields }).map((_, i) => (
+        <div key={i}>
+          <SkeletonBlock width={150} height={11} radius={5} />
+          <SkeletonBlock height={40} radius={12} style={{ marginTop: 7 }} />
+        </div>
+      ))}
+      {button ? <SkeletonBlock width={132} height={40} radius={12} style={{ marginTop: 4 }} /> : null}
+    </div>
+  )
+}
+
+/**
+ * The bordered rows the payment queues stack — tan hairline, 14px radius, not the
+ * shadowed dashboard card.
+ */
+export function OpsSkeletonQueueRows({ rows = 3 }: { rows?: number }) {
+  return (
+    <div style={{ display: 'grid', gap: 12 }}>
+      <ShimmerStyles />
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} style={{ border: `1px solid ${COLORS.tan}`, borderRadius: 14, padding: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <SkeletonBlock width="38%" height={15} radius={7} />
+              <SkeletonBlock width="66%" height={12} style={{ marginTop: 8 }} />
+            </div>
+            <SkeletonBlock width={84} height={16} radius={7} style={{ flex: '0 0 auto' }} />
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+            <SkeletonBlock width={124} height={31} radius={11} />
+            <SkeletonBlock width={92} height={31} radius={11} />
+          </div>
         </div>
       ))}
     </div>

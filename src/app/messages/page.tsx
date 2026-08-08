@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import LocalChatPanel from '@/components/local-chat-panel'
+import { ShimmerStyles, SkeletonBlock } from '@/components/ui/skeleton-block'
 
 const C = { burgundy: '#5B0F16', cream: '#F6F1E6', tan: '#EFE6D8', ink: '#2A2220', muted: '#6B6055' }
 
@@ -17,6 +18,52 @@ interface Convo {
   last_message: string | null
   last_message_at: string
   is_host: boolean
+}
+
+/**
+ * The inbox fetches its threads from the browser after the page has arrived, so no
+ * route-level loading.tsx can cover the gap — it has to be filled in place. These
+ * two mirror the real rows and bubbles so the content lands where the placeholder
+ * already was.
+ */
+function ThreadListSkeleton() {
+  const widths = ['62%', '48%', '70%', '54%']
+  return (
+    <div>
+      <ShimmerStyles />
+      {widths.map((w, i) => (
+        <div key={i} style={{ padding: '13px 15px', borderBottom: '1px solid rgba(42,34,32,0.06)' }}>
+          <SkeletonBlock width={w} height={14} />
+          <SkeletonBlock width="80%" height={11} style={{ marginTop: 7 }} />
+          <SkeletonBlock width="90%" height={11} style={{ marginTop: 6 }} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ThreadSkeleton() {
+  // Alternating sides, so it reads as a conversation rather than a list.
+  const bubbles: Array<{ w: string; mine: boolean }> = [
+    { w: '58%', mine: false },
+    { w: '44%', mine: true },
+    { w: '68%', mine: false },
+    { w: '36%', mine: true },
+  ]
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <ShimmerStyles />
+      {bubbles.map((b, i) => (
+        <SkeletonBlock
+          key={i}
+          width={b.w}
+          height={38}
+          radius={14}
+          style={{ alignSelf: b.mine ? 'flex-end' : 'flex-start' }}
+        />
+      ))}
+    </div>
+  )
 }
 
 export default function MessagesPage() {
@@ -72,7 +119,7 @@ export default function MessagesPage() {
           <div className="qk-msg-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 300px) 1fr', gap: 20, alignItems: 'stretch' }}>
             {/* Thread list */}
             <div style={{ background: '#fff', borderRadius: 18, border: '1px solid rgba(42,34,32,0.06)', overflow: 'hidden' }}>
-              {state === 'loading' && <p style={{ padding: 16, fontSize: 14, color: C.muted }}>{t('loading')}</p>}
+              {state === 'loading' && <ThreadListSkeleton />}
               {state === 'ready' && convos.length === 0 && <p style={{ padding: 16, fontSize: 14, color: C.muted }}>{t('noThreads')}</p>}
               {convos.map((c) => (
                 <button
@@ -99,6 +146,10 @@ export default function MessagesPage() {
             <div style={{ background: '#fff', borderRadius: 18, border: '1px solid rgba(42,34,32,0.06)', padding: 16, height: '62vh', minHeight: 380 }}>
               {active ? (
                 <LocalChatPanel key={active} conversationId={active} />
+              ) : state === 'loading' ? (
+                // "Pick a thread" is wrong while the list is still arriving — there
+                // is nothing to pick yet, and it reads as an empty inbox.
+                <ThreadSkeleton />
               ) : (
                 <p style={{ fontSize: 14, color: C.muted }}>{t('pickThread')}</p>
               )}
