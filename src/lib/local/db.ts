@@ -3,6 +3,14 @@ import { pool } from './pool'
 import { resolveResortSelection } from './resorts'
 import { INSTAPAY_KEYS, rowsToPaymentConfig } from './payment-config-core'
 import type { PaymentConfig } from './payment-config-core'
+import {
+  COMMISSION_RATE_KEY,
+  COMMISSION_RATE_SQL,
+  parseRate,
+  rateToStored,
+  roundUpToStep,
+  sqlWithCommission,
+} from './commission-core'
 import { buildUserListWhere, hidesListings, normalizeStatus, orderBySql } from './user-admin-core'
 import type { AccountStatus, UserListFilter } from './user-admin-core'
 import { idColumnFor, statusForAction } from './document-core'
@@ -74,9 +82,16 @@ export interface Listing {
   description: string | null
   location: string | null
   country: string | null
+  /** Guest projection: commission-inclusive. Host projection: the host's raw
+   *  price. See LISTING_COLS vs LISTING_COLS_HOST. */
   price_per_night: number
   weekend_price: number | null
   weekend_days: number[] | null
+  /** The commission rate these prices were projected with (0.1 = 10%). */
+  commission_rate?: number
+  /** Host projection only — what a guest is quoted for the same nights. */
+  guest_price_per_night?: number
+  guest_weekend_price?: number | null
   currency: string
   bedrooms: number | null
   beds: number | null
@@ -151,10 +166,33 @@ export interface Booking {
   host_notes: string | null
 }
 
-const LISTING_COLS = `
-  l.id, l.title, l.description, l.location, l.country,
+// ---- Price projection (platform commission) ---------------------------------
+// A listing carries ONE price in the database: the raw amount its host set and
+// is paid. What a guest is quoted is that raw price marked up by the platform
+// commission (see commission-core.ts, byte-identical in the backend repo).
+// Which of the two lands in `price_per_night` is decided HERE, by whether the
+// caller asked for the guest projection or the host one — so no read path can
+// forget to apply the markup, and no guest response can leak the raw price.
+//
+// Guest reads  → price_per_night = marked up. No raw fields at all.
+// Host reads   → price_per_night = raw (the number the host edits and saves back,
+//                so a load→save round trip must not inflate it), plus read-only
+//                guest_* companions for "guests pay X".
+
+const GUEST_PRICE_COLS = `
+  ${sqlWithCommission('l.price_per_night')}::float8 AS price_per_night,
+  ${sqlWithCommission('l.weekend_price')}::float8 AS weekend_price, l.weekend_days,
+  ${COMMISSION_RATE_SQL}::float8 AS commission_rate,`
+
+const HOST_PRICE_COLS = `
   l.price_per_night::float8 AS price_per_night,
   l.weekend_price::float8 AS weekend_price, l.weekend_days,
+  ${sqlWithCommission('l.price_per_night')}::float8 AS guest_price_per_night,
+  ${sqlWithCommission('l.weekend_price')}::float8 AS guest_weekend_price,
+  ${COMMISSION_RATE_SQL}::float8 AS commission_rate,`
+
+/** Everything that isn't a price — identical in both projections. */
+const LISTING_COMMON_COLS = `
   l.currency,
   l.bedrooms, l.beds, l.bathrooms, l.max_guests, l.property_type,
   l.region, COALESCE(l.amenities, '{}') AS amenities,
@@ -172,6 +210,21 @@ const LISTING_COLS = `
     (SELECT json_agg(json_build_object('url', li.url, 'order', li."order") ORDER BY li."order")
      FROM listing_images li WHERE li.listing_id = l.id), '[]'
   ) AS listing_images
+`
+
+/** Guest projection — prices include the platform commission. */
+const LISTING_COLS = `
+  l.id, l.title, l.description, l.location, l.country,
+  ${GUEST_PRICE_COLS}
+  ${LISTING_COMMON_COLS}
+`
+
+/** Host/staff projection — the host's raw prices, with guest_* companions.
+ *  Never serve this to a guest. */
+const LISTING_COLS_HOST = `
+  l.id, l.title, l.description, l.location, l.country,
+  ${HOST_PRICE_COLS}
+  ${LISTING_COMMON_COLS}
 `
 
 export async function getListings(filters: SearchFilters = {}): Promise<Listing[]> {
@@ -227,10 +280,17 @@ export async function getListings(filters: SearchFilters = {}): Promise<Listing[
   return rows as Listing[]
 }
 
-export async function getListingById(id: string): Promise<Listing | null> {
+/**
+ * One listing. Defaults to the GUEST projection (commission-inclusive prices,
+ * no raw host figures). Pass `{ asHost: true }` only when the response goes to
+ * the listing's own host — the edit form loads these values and saves them
+ * straight back, so it must see the raw price it typed.
+ */
+export async function getListingById(id: string, opts: { asHost?: boolean } = {}): Promise<Listing | null> {
   if (!isUuid(id)) return null
+  const cols = opts.asHost ? LISTING_COLS_HOST : LISTING_COLS
   const { rows } = await pool.query(
-    `SELECT ${LISTING_COLS}, l.host_id, u.full_name AS host_name, u.avatar_url AS host_avatar,
+    `SELECT ${cols}, l.host_id, u.full_name AS host_name, u.avatar_url AS host_avatar,
             u.host_type AS host_type, u.company AS host_company
        FROM listings l LEFT JOIN users u ON u.id = l.host_id WHERE l.id = $1`,
     [id]
@@ -240,12 +300,25 @@ export async function getListingById(id: string): Promise<Listing | null> {
 
 // ---- Bookings ---------------------------------------------------------------
 
+/**
+ * The commission rate to price a booking by: the rate SNAPSHOTTED when it was
+ * taken, falling back to the live rate for rows written before the column
+ * existed. Never the live rate for a booking that already has one — an admin
+ * changing the rate must not restate a reservation a guest already agreed to.
+ */
+const BOOKING_RATE_SQL = `COALESCE(b.commission_rate, ${COMMISSION_RATE_SQL})`
+
+// bookings.total_price stores the host's RAW stay total. This projection exposes
+// only the COMMISSION-INCLUSIVE figure, because a booking response is read by the
+// guest and the raw price would hand them the platform's margin. A host's payout
+// is added explicitly by the host-only readers (see getHostBookings).
 const BOOKING_COLS = `
   b.id, b.listing_id,
   to_char(b.check_in, 'YYYY-MM-DD') AS check_in,
   to_char(b.check_out, 'YYYY-MM-DD') AS check_out,
   b.guests, b.adults, b.children, b.infants, b.pets,
-  b.total_price::float8 AS total_price, b.status,
+  ${sqlWithCommission('b.total_price', BOOKING_RATE_SQL)}::float8 AS total_price,
+  b.status,
   CASE WHEN b.paid_at IS NULL THEN 'unpaid' ELSE 'paid' END AS payment_status,
   COALESCE(b.payment_status, 'unpaid') AS payment_state,
   b.payment_method,
@@ -339,6 +412,10 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
        INSERT INTO bookings (listing_id, user_id, check_in, check_out, guests, adults, children, infants, pets, total_price, status,
                              cancellation_policy, commission_rate)
        SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9,
+              -- total_price is the host's RAW stay total — what the host is owed.
+              -- The guest's figure is derived as total_price × (1 + commission_rate)
+              -- using the rate snapshotted below, so an admin changing the rate can
+              -- never restate a live reservation.
               (SELECT COALESCE(SUM(
                  CASE WHEN l.weekend_price IS NOT NULL AND l.weekend_days IS NOT NULL
                            AND EXTRACT(DOW FROM gs)::int = ANY(l.weekend_days)
@@ -347,7 +424,7 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
                FROM generate_series($3::date, $4::date - interval '1 day', interval '1 day') AS gs),
               'pending',
               COALESCE(l.cancellation_policy, 'moderate'),
-              COALESCE((SELECT value::numeric FROM app_settings WHERE key = 'platform_commission_rate'), 0.1)
+              ${COMMISSION_RATE_SQL}
        FROM listings l WHERE l.id = $1
        RETURNING *
      )
@@ -385,7 +462,10 @@ function moderateRefundPercent(daysUntilCheckIn: number): number {
 
 async function loadCancelable(userId: string, bookingId: string) {
   const { rows } = await pool.query(
-    `SELECT b.status, b.total_price::float8 AS total, COALESCE(l.currency,'EGP') AS currency,
+    // Commission-inclusive: a refund is a percentage of what the GUEST paid, not
+    // of the host's raw price.
+    `SELECT b.status, ${sqlWithCommission('b.total_price', BOOKING_RATE_SQL)}::float8 AS total,
+            COALESCE(l.currency,'EGP') AS currency,
             (b.check_in - CURRENT_DATE)::int AS days_until
        FROM bookings b JOIN listings l ON l.id = b.listing_id
       WHERE b.id = $1 AND b.user_id = $2`,
@@ -1585,10 +1665,11 @@ export async function updateUserProfile(
 // ---- Host: listings & incoming reservations ---------------------------------
 
 /** Listings owned by a host. */
+/** A host's own listings — raw prices, plus guest_* for "guests pay X". */
 export async function getHostListings(hostId: string): Promise<Listing[]> {
   if (!isUuid(hostId)) return []
   const { rows } = await pool.query(
-    `SELECT ${LISTING_COLS},
+    `SELECT ${LISTING_COLS_HOST},
             (SELECT url FROM listing_images li WHERE li.listing_id = l.id ORDER BY li."order" LIMIT 1) AS image_url
        FROM listings l
       WHERE l.host_id = $1
@@ -1604,7 +1685,10 @@ export async function getHostBookings(
 ): Promise<Array<Booking & { guest_name: string | null; listing_title: string | null }>> {
   if (!isUuid(hostId)) return []
   const { rows } = await pool.query(
-    `SELECT ${BOOKING_COLS}, gu.full_name AS guest_name, l.title AS listing_title
+    // Host-only, so it also carries host_payout — the raw amount this host is
+    // owed, which the shared projection deliberately withholds from guests.
+    `SELECT ${BOOKING_COLS}, b.total_price::float8 AS host_payout,
+            gu.full_name AS guest_name, l.title AS listing_title
        FROM bookings b
        JOIN listings l ON l.id = b.listing_id
        LEFT JOIN users gu ON gu.id = b.user_id
@@ -1663,7 +1747,9 @@ export async function getHostProfile(hostId: string): Promise<HostProfile | null
 
   const [{ rows: lrows }, { rows: rvrows }] = await Promise.all([
     pool.query(
-      `SELECT l.id, l.title, l.location, l.price_per_night::float8 AS price_per_night,
+      // A public host profile — guests browse it, so prices carry the commission.
+      `SELECT l.id, l.title, l.location,
+              ${sqlWithCommission('l.price_per_night')}::float8 AS price_per_night,
               COALESCE(l.currency, 'EGP') AS currency,
               (SELECT url FROM listing_images li WHERE li.listing_id = l.id
                 ORDER BY li."order" LIMIT 1) AS image_url,
@@ -2356,7 +2442,10 @@ export interface AdminListingRow {
   /** Display name, whichever column it came from. */
   resort: string | null
   currency: string
+  /** Commission-inclusive — what a guest is quoted. */
   price_per_night: number
+  /** The host's raw price, before the platform commission. */
+  host_price_per_night: number
   is_published: boolean
   approval_status: string
   host_id: string | null
@@ -2376,7 +2465,10 @@ export interface AdminListingRow {
 export async function adminListListings(): Promise<AdminListingRow[]> {
   const { rows } = await pool.query(
     `SELECT l.id, l.title, l.location, COALESCE(l.currency, 'USD') AS currency,
-            l.price_per_night::float8 AS price_per_night, l.is_published,
+            -- Staff see both: the price guests are quoted, and the host's own.
+            ${sqlWithCommission('l.price_per_night')}::float8 AS price_per_night,
+            l.price_per_night::float8 AS host_price_per_night,
+            l.is_published,
             COALESCE(l.approval_status, 'approved') AS approval_status,
             (l.ownership_doc IS NOT NULL AND l.ownership_doc <> '') AS has_ownership_doc,
             l.host_id, u.full_name AS host_name, l.region,
@@ -2763,7 +2855,7 @@ export async function getActivityFeed(
   if (wantsKind(filter, 'booking_created')) branches.push(`
     (SELECT 'booking_created' AS kind, b.created_at AS at, u.id AS actor_id, u.email AS actor_email,
             u.full_name AS actor_name, l.title AS subject, 'booking' AS subject_type,
-            b.id::text AS subject_id, b.total_price::float8 AS amount, b.status AS detail
+            b.id::text AS subject_id, ${sqlWithCommission('b.total_price', BOOKING_RATE_SQL)}::float8 AS amount, b.status AS detail
        FROM bookings b LEFT JOIN users u ON u.id = b.user_id
                        LEFT JOIN listings l ON l.id = b.listing_id
       WHERE ${windowFor('b.created_at')}${match("COALESCE(u.email, '')", 'u.full_name')}
@@ -2772,7 +2864,7 @@ export async function getActivityFeed(
   if (wantsKind(filter, 'payment_submitted')) branches.push(`
     (SELECT 'payment_submitted' AS kind, pp.submitted_at AS at, u.id AS actor_id, u.email AS actor_email,
             u.full_name AS actor_name, l.title AS subject, 'booking' AS subject_type,
-            b.id::text AS subject_id, COALESCE(pp.amount, b.total_price)::float8 AS amount,
+            b.id::text AS subject_id, COALESCE(pp.amount, ${sqlWithCommission('b.total_price', BOOKING_RATE_SQL)})::float8 AS amount,
             pp.status AS detail
        FROM payment_proofs pp JOIN bookings b ON b.id = pp.booking_id
                               LEFT JOIN users u ON u.id = b.user_id
@@ -2786,7 +2878,7 @@ export async function getActivityFeed(
   if (wantsKind(filter, 'payment_approved')) branches.push(`
     (SELECT 'payment_approved' AS kind, b.paid_at AS at, u.id AS actor_id, u.email AS actor_email,
             u.full_name AS actor_name, l.title AS subject, 'booking' AS subject_type,
-            b.id::text AS subject_id, b.total_price::float8 AS amount, b.payment_status AS detail
+            b.id::text AS subject_id, ${sqlWithCommission('b.total_price', BOOKING_RATE_SQL)}::float8 AS amount, b.payment_status AS detail
        FROM bookings b LEFT JOIN users u ON u.id = b.user_id
                        LEFT JOIN listings l ON l.id = b.listing_id
       WHERE ${windowFor('b.paid_at')} AND ${PAID_SQL}${match("COALESCE(u.email, '')", 'u.full_name')}
@@ -3173,7 +3265,10 @@ export interface AdminBookingRow {
   reservation_code: string | null
   status: string
   payment_status: string
+  /** Commission-inclusive — what the guest owes. */
   total_price: number
+  /** The host's raw share of it. */
+  host_payout: number
   currency: string
   check_in: string
   check_out: string
@@ -3190,7 +3285,9 @@ export async function adminListBookings(): Promise<AdminBookingRow[]> {
             NULLIF(b.reservation_code, '') AS reservation_code,
             b.status,
             CASE WHEN b.paid_at IS NULL THEN 'unpaid' ELSE 'paid' END AS payment_status,
-            b.total_price::float8 AS total_price,
+            -- What the guest owes; host_payout is the host's raw share of it.
+            ${sqlWithCommission('b.total_price', BOOKING_RATE_SQL)}::float8 AS total_price,
+            b.total_price::float8 AS host_payout,
             COALESCE(l.currency, 'USD') AS currency,
             to_char(b.check_in, 'YYYY-MM-DD') AS check_in,
             to_char(b.check_out, 'YYYY-MM-DD') AS check_out,
@@ -3465,6 +3562,49 @@ export async function setSetting(key: string, value: string, updatedBy: string |
 
 export type { PaymentConfig }
 
+// ---- Platform commission -----------------------------------------------------
+
+export interface CommissionConfig {
+  /** Fraction, e.g. 0.1 = 10%. */
+  rate: number
+  /** The same value as the percentage the admin form edits, e.g. 10. */
+  percent: number
+  updated_at: string | null
+  updated_by: string | null
+}
+
+/** The live commission rate and who last changed it (the /ops/pricing screen). */
+export async function getCommissionConfig(): Promise<CommissionConfig> {
+  const { rows } = await pool.query(
+    `SELECT value, to_char(updated_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS updated_at, updated_by
+       FROM app_settings WHERE key = $1`,
+    [COMMISSION_RATE_KEY]
+  )
+  const rate = parseRate(rows[0]?.value)
+  return {
+    rate,
+    percent: Math.round(rate * 10_000) / 100,
+    updated_at: rows[0]?.updated_at ?? null,
+    updated_by: rows[0]?.updated_by ?? null,
+  }
+}
+
+/** Write a validated rate (a fraction — validate with rateFromPercent first). */
+export async function setCommissionRate(rate: number, updatedBy: string | null = null): Promise<CommissionConfig> {
+  await setSetting(COMMISSION_RATE_KEY, rateToStored(rate), updatedBy)
+  return getCommissionConfig()
+}
+
+/** How many listings and services the current rate is repricing. Shown on the
+ *  admin screen so an operator sees the blast radius before they change it. */
+export async function getCommissionImpact(): Promise<{ listings: number; services: number }> {
+  const { rows } = await pool.query(
+    `SELECT (SELECT count(*) FROM listings WHERE is_published = true)::int AS listings,
+            (SELECT count(*) FROM services WHERE is_published = true)::int AS services`
+  )
+  return { listings: Number(rows[0]?.listings ?? 0), services: Number(rows[0]?.services ?? 0) }
+}
+
 /**
  * The public-facing Instapay destination shown to guests at checkout: the
  * handle/number, the optional deep link, and the optional admin-uploaded QR.
@@ -3574,8 +3714,12 @@ export async function adminListPendingProofs(): Promise<PendingProofRow[]> {
             (SELECT full_name FROM users u WHERE u.id = b.user_id) AS guest_name,
             (SELECT email     FROM users u WHERE u.id = b.user_id) AS guest_email,
             l.host_id,
-            b.total_price::float8 AS total_price,
-            COALESCE(pp.amount, b.total_price)::float8 AS amount,
+            -- Commission-inclusive on BOTH: the reviewer compares these against
+            -- the sum on a guest's Instapay screenshot, and the guest transferred
+            -- the marked-up total. Showing the raw price here would make every
+            -- correct payment look like an overpayment.
+            ${sqlWithCommission('b.total_price', BOOKING_RATE_SQL)}::float8 AS total_price,
+            COALESCE(pp.amount, ${sqlWithCommission('b.total_price', BOOKING_RATE_SQL)})::float8 AS amount,
             pp.method,
             to_char(pp.submitted_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS submitted_at,
             to_char(b.check_in, 'YYYY-MM-DD') AS check_in,
@@ -3660,7 +3804,8 @@ export async function adminListDisputes(): Promise<DisputeRow[]> {
             b.user_id AS guest_id,
             (SELECT full_name FROM users u WHERE u.id = b.user_id) AS guest_name,
             (SELECT email     FROM users u WHERE u.id = b.user_id) AS guest_email,
-            l.host_id, b.total_price::float8 AS total_price,
+            -- What the guest was asked to transfer (see adminListPendingProofs).
+            l.host_id, ${sqlWithCommission('b.total_price', BOOKING_RATE_SQL)}::float8 AS total_price,
             pp.reject_reason, pp.dispute_note,
             to_char(pp.submitted_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS submitted_at,
             to_char(pp.disputed_at,  'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS disputed_at

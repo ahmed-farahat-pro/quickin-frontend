@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { useTranslations } from 'next-intl'
+import { GuestPriceHint } from '@/components/features/host/guest-price-hint'
 import { PROPERTY_TYPES, MAX_WEB_LISTING_PHOTOS } from '@/lib/property-types'
 import { REGIONS, AMENITIES } from '@/lib/listing-options'
 import { fileToCompressedDataUrl } from '@/lib/image'
@@ -113,7 +114,14 @@ const OTHER_RESORT = '__other__'
 
 export type ResortOption = { id: string; name: string; region: string }
 
-export function NewListingForm({ resorts = [] }: { resorts?: ResortOption[] }) {
+export function NewListingForm({
+  resorts = [],
+  commissionRate = 0,
+}: {
+  resorts?: ResortOption[]
+  /** Platform commission as a fraction — drives the "guests will see" hint. */
+  commissionRate?: number
+}) {
   const router = useRouter()
   const t = useTranslations('hostPage.create')
   const [busy, setBusy] = useState(false)
@@ -529,6 +537,7 @@ export function NewListingForm({ resorts = [] }: { resorts?: ResortOption[] }) {
             placeholder="1200"
             required
           />
+          <GuestPriceHint value={price} rate={commissionRate} currency={currency} />
         </div>
         <div>
           <label style={label} htmlFor="currency">{t('fields.currency')}</label>
@@ -558,6 +567,7 @@ export function NewListingForm({ resorts = [] }: { resorts?: ResortOption[] }) {
           onChange={(e) => setWeekendPrice(e.target.value)}
           placeholder={t('placeholders.weekendPrice')}
         />
+        <GuestPriceHint value={weekendPrice} rate={commissionRate} currency={currency} />
         <p style={{ margin: '8px 0 8px', fontSize: 12.5, color: C.muted }}>{t('fields.weekendDays')}</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {WEEKDAY_KEYS.map((k, day) => {

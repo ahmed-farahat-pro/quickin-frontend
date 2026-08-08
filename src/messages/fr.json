@@ -2116,7 +2116,11 @@
       "resortOther": "Autre — non répertorié",
       "resortOtherPlaceholder": "Saisissez le nom du resort ou de la résidence",
       "resortHint": "Choisissez la résidence où se trouve votre logement. Ce choix définit aussi la zone.",
-      "resortOtherHint": "Nous montrerons ce que vous saisissez aux voyageurs, et notre équipe l'ajoutera à la liste."
+      "resortOtherHint": "Nous montrerons ce que vous saisissez aux voyageurs, et notre équipe l'ajoutera à la liste.",
+      "commission": {
+        "guestsSee": "Les voyageurs verront {price}",
+        "note": "commission QuickIn de {percent}% incluse — vous recevez le prix que vous avez saisi"
+      }
     },
     "edit": {
       "meta": {

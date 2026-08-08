@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
 import { verifyToken, getUserRowByEmail } from '@/lib/local/auth'
 import { listActiveResorts } from '@/lib/local/resorts'
+import { getCommissionConfig } from '@/lib/local/db'
 import { NewListingForm } from './new-listing-form'
 
 export const dynamic = 'force-dynamic'
@@ -53,6 +54,15 @@ export default async function NewListingPage() {
     resorts = await listActiveResorts()
   } catch (err) {
     console.error('host/new resorts:', err)
+  }
+  // The commission drives the "guests will see EGP X" hint under the price
+  // fields. A failure degrades to 0, which hides the hint rather than showing a
+  // wrong number — the server prices the listing either way.
+  let commissionRate = 0
+  try {
+    commissionRate = (await getCommissionConfig()).rate
+  } catch (err) {
+    console.error('host/new commission:', err)
   }
   if (!(await isSignedIn())) redirect('/login')
 
@@ -124,7 +134,7 @@ export default async function NewListingPage() {
           {t('subtitle')}
         </p>
 
-        <NewListingForm resorts={resorts} />
+        <NewListingForm resorts={resorts} commissionRate={commissionRate} />
       </section>
     </main>
   )

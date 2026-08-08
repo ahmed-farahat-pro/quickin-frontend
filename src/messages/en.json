@@ -2116,7 +2116,11 @@
       "resortOther": "Other — not listed",
       "resortOtherPlaceholder": "Type the resort or compound name",
       "resortHint": "Pick the compound your place is in. Choosing one also sets the area.",
-      "resortOtherHint": "We'll show what you type to guests, and our team will add it to the list."
+      "resortOtherHint": "We'll show what you type to guests, and our team will add it to the list.",
+      "commission": {
+        "guestsSee": "Guests will see {price}",
+        "note": "includes QuickIn's {percent}% commission — you receive the price you entered"
+      }
     },
     "edit": {
       "meta": {

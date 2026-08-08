@@ -8,7 +8,7 @@ import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
-import { getListingById, hostListingHasOwnershipDoc } from '@/lib/local/db'
+import { getCommissionConfig, getListingById, hostListingHasOwnershipDoc } from '@/lib/local/db'
 import { verifyToken, getUserRowByEmail } from '@/lib/local/auth'
 import { ListingStatusChip } from '../../listing-status-chip'
 import type { HostListingStatus } from '../../host-tabs'
@@ -57,11 +57,22 @@ export default async function EditListingPage({ params }: { params: Promise<{ id
   const me = await getUserRowByEmail(claims.email)
   if (!me) redirect('/login')
 
-  const listing = await getListingById(id)
+  // asHost: the form loads price_per_night and saves it straight back, so it
+  // must see the host's RAW price — not the commission-inclusive guest price,
+  // which would inflate the listing a little more on every save.
+  const listing = await getListingById(id, { asHost: true })
   // Only the owner may edit — anyone else (or a missing listing) gets a 404.
   if (!listing || listing.host_id !== me.id) notFound()
   // Just a flag — the document itself is admin-only (reviewed in /ops).
   const hasOwnershipDoc = await hostListingHasOwnershipDoc(listing.id, me.id)
+  // Drives the "guests will see EGP X" hint under the price fields. A failure
+  // degrades to 0, hiding the hint rather than showing a wrong number.
+  let commissionRate = 0
+  try {
+    commissionRate = (await getCommissionConfig()).rate
+  } catch (err) {
+    console.error('host/edit commission:', err)
+  }
 
   const t = await getTranslations('hostPage.edit')
   const tDash = await getTranslations('hostPage.dashboard')
@@ -110,7 +121,12 @@ export default async function EditListingPage({ params }: { params: Promise<{ id
         <p style={{ margin: '0 0 24px', fontSize: 15, color: COLORS.muted, lineHeight: 1.55 }}>
           {t('subtitle')}
         </p>
-        <EditListingForm listing={listing} hasOwnershipDoc={hasOwnershipDoc} resorts={resorts} />
+        <EditListingForm
+          listing={listing}
+          hasOwnershipDoc={hasOwnershipDoc}
+          resorts={resorts}
+          commissionRate={commissionRate}
+        />
       </section>
     </main>
   )

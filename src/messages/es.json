@@ -2116,7 +2116,11 @@
       "resortOther": "Otro — no está en la lista",
       "resortOtherPlaceholder": "Escribe el nombre del resort o complejo",
       "resortHint": "Elige el complejo donde está tu alojamiento. Al elegirlo también se define la zona.",
-      "resortOtherHint": "Mostraremos lo que escribas a los huéspedes y nuestro equipo lo añadirá a la lista."
+      "resortOtherHint": "Mostraremos lo que escribas a los huéspedes y nuestro equipo lo añadirá a la lista.",
+      "commission": {
+        "guestsSee": "Los huéspedes verán {price}",
+        "note": "incluye la comisión del {percent}% de QuickIn: tú recibes el precio que introdujiste"
+      }
     },
     "edit": {
       "meta": {

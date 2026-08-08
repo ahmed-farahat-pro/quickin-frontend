@@ -20,6 +20,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { GuestPriceHint } from '@/components/features/host/guest-price-hint'
 import dynamic from 'next/dynamic'
 import { PROPERTY_TYPES, MAX_WEB_LISTING_PHOTOS, iconForPropertyType } from '@/lib/property-types'
 import { REGIONS, AMENITIES } from '@/lib/listing-options'
@@ -147,12 +148,15 @@ export function EditListingForm({
   listing,
   hasOwnershipDoc,
   resorts = [],
+  commissionRate = 0,
 }: {
   listing: Listing
   /** A proof-of-ownership document is already stored for this listing. Its bytes
    *  stay admin-only, so the host only ever sees this flag. */
   hasOwnershipDoc: boolean
   resorts?: ResortOption[]
+  /** Platform commission as a fraction — drives the "guests will see" hint. */
+  commissionRate?: number
 }) {
   const router = useRouter()
   const t = useTranslations('hostPage.create')
@@ -701,6 +705,7 @@ export function EditListingForm({
             placeholder="1200"
             required
           />
+          <GuestPriceHint value={price} rate={commissionRate} currency={currency} />
         </div>
         <div>
           <label style={label} htmlFor="edit-currency">{t('fields.currency')}</label>
@@ -730,6 +735,7 @@ export function EditListingForm({
           onChange={(e) => setWeekendPrice(e.target.value)}
           placeholder={t('placeholders.weekendPrice')}
         />
+        <GuestPriceHint value={weekendPrice} rate={commissionRate} currency={currency} />
         <p style={{ margin: '8px 0 8px', fontSize: 12.5, color: C.muted }}>{t('fields.weekendDays')}</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {WEEKDAY_KEYS.map((k, day) => {

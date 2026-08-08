@@ -103,6 +103,7 @@ const NAV: Array<{ href: string; label: string; module: StaffModule }> = [
   { href: '/ops/reports', label: 'Reports', module: 'reports' },
   { href: '/ops/analytics', label: 'Analytics', module: 'analytics' },
   { href: '/ops/payments', label: 'Payments', module: 'payments' },
+  { href: '/ops/pricing', label: 'Pricing', module: 'pricing' },
   { href: '/ops/resorts', label: 'Resorts', module: 'resorts' },
   { href: '/ops/audit', label: 'Audit', module: 'audit' },
   { href: '/ops/staff', label: 'Staff', module: 'staff' },
