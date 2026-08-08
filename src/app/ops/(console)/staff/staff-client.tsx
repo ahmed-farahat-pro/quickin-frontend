@@ -11,6 +11,7 @@
 // console. See ../../ops-theme.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { COLORS, FONT, SERIF, cardStyle, inputStyle, labelStyle } from '../../ops-theme'
+import { EmptyRow } from '../ops-ui'
 
 type Account = {
   id: string
@@ -258,11 +259,13 @@ export function StaffClient({
               </thead>
               <tbody>
                 {accounts.length === 0 && (
-                  <tr>
-                    <td style={{ ...td, textAlign: 'center', color: COLORS.muted, padding: '34px 12px' }} colSpan={6}>
-                      No staff accounts yet.
-                    </td>
-                  </tr>
+                  <EmptyRow
+                    colSpan={6}
+                    tone="blank"
+                    title="Add your first moderator"
+                    body="Moderators sign in at /ops with only the modules you grant them. Super admins always see everything."
+                    action={{ label: 'Add moderator', onClick: () => setDraft(emptyDraft()) }}
+                  />
                 )}
                 {accounts.map((a) => {
                   const self = currentStaffId === a.id

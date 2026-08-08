@@ -8,7 +8,7 @@
 // with a Next that disables at the end, not "of 4,213".
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { COLORS, SERIF } from '../../ops-theme'
-import { adminGet, controlStyle, fieldLabel, ghostBtn, numTd, pageStyle, panelStyle, td, th, money } from '../ops-ui'
+import { ClearFilters, EmptyRow, adminGet, controlStyle, fieldLabel, ghostBtn, numTd, pageStyle, panelStyle, td, th, money } from '../ops-ui'
 import {
   DEFAULT_ACTIVITY_LIMIT,
   EVENT_KINDS,
@@ -63,6 +63,15 @@ export function OpsActivity({ initial }: { initial: { events: ActivityEvent[]; h
 
   const set = useCallback((patch: Partial<Filters>) => {
     setFilters((f) => ({ ...f, ...patch, offset: patch.offset ?? 0 }))
+  }, [])
+
+  /** Whether anything is actually narrowing the feed. Zero rows with nothing set is
+   *  a quiet platform, not a bad filter, and the two want different sentences. */
+  const narrowed = filters.kind !== '' || filters.q !== '' || filters.from !== '' || filters.to !== ''
+
+  const clearFilters = useCallback(() => {
+    setSearch('')
+    setFilters({ kind: '', q: '', from: '', to: '', offset: 0 })
   }, [])
 
   const query = useMemo(() => {
@@ -172,7 +181,22 @@ export function OpsActivity({ initial }: { initial: { events: ActivityEvent[]; h
                   )
                 })}
                 {events.length === 0 && !loading && (
-                  <tr><td style={{ ...td, color: COLORS.muted }} colSpan={5}>Nothing matches these filters.</td></tr>
+                  narrowed ? (
+                    <EmptyRow
+                      colSpan={5}
+                      tone="filtered"
+                      title="No activity matches these filters"
+                      body="Events exist outside the kind, search or date range you picked."
+                      meta={<ClearFilters onClear={clearFilters} />}
+                    />
+                  ) : (
+                    <EmptyRow
+                      colSpan={5}
+                      tone="blank"
+                      title="No activity recorded yet"
+                      body="Bookings, payments and moderation all write here as they happen."
+                    />
+                  )
                 )}
               </tbody>
             </table>

@@ -7,7 +7,7 @@
 // somewhere to find out who they're deciding about.
 import { useCallback, useEffect, useState } from 'react'
 import { COLORS, SERIF } from '../../ops-theme'
-import { adminGet, adminSend, btnBase, ghostBtn, pageStyle, panelStyle, solidBtn, td, th } from '../ops-ui'
+import { EmptyRow, adminGet, adminSend, btnBase, ghostBtn, pageStyle, panelStyle, solidBtn, td, th } from '../ops-ui'
 import { waitingLabel } from '@/lib/local/activity-core'
 
 type Report = {
@@ -158,9 +158,21 @@ export function OpsReports({ initial }: { initial: Report[] }) {
                   )
                 })}
                 {reports.length === 0 && (
-                  <tr><td style={{ ...td, color: COLORS.muted }} colSpan={6}>
-                    {status === 'open' ? 'No open reports. Nothing to triage.' : `No ${status} reports.`}
-                  </td></tr>
+                  status === 'open' ? (
+                    <EmptyRow
+                      colSpan={6}
+                      tone="clear"
+                      title="Nothing to triage"
+                      body="Every report guests have filed has been actioned or dismissed."
+                    />
+                  ) : (
+                    <EmptyRow
+                      colSpan={6}
+                      tone="filtered"
+                      title={`No ${status} reports`}
+                      body="Switch the status above to see reports in another state."
+                    />
+                  )
                 )}
               </tbody>
             </table>

@@ -7,7 +7,7 @@
 // the answer people most want.
 import { useCallback, useEffect, useState } from 'react'
 import { COLORS, SERIF } from '../../ops-theme'
-import { adminGetQuiet, pageStyle, panelStyle } from '../ops-ui'
+import { Empty, adminGetQuiet, pageStyle, panelStyle } from '../ops-ui'
 import { useLivePoll, agoLabel } from '../use-live-stats'
 import { alertTotal, waitingLabel, type Alert } from '@/lib/local/activity-core'
 
@@ -59,12 +59,11 @@ export function OpsAlerts({
         )}
 
         {alerts.length === 0 ? (
-          <div style={{ ...panelStyle, textAlign: 'center', padding: '44px 24px' }}>
-            <p style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: COLORS.green }}>Nothing is waiting</p>
-            <p style={{ margin: 0, fontSize: 13, color: COLORS.muted }}>
-              Every queue you can act on is clear.
-            </p>
-          </div>
+          <Empty
+            tone="clear"
+            title="Nothing is waiting"
+            body="Every queue you can act on is clear."
+          />
         ) : (
           <div style={{ display: 'grid', gap: 10 }}>
             {alerts.map((a) => (

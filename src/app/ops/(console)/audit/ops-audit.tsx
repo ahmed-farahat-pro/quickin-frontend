@@ -6,7 +6,7 @@
 // something went wrong, so it is deliberately read-only with no bulk actions.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { COLORS, SERIF } from '../../ops-theme'
-import { adminGet, controlStyle, fieldLabel, ghostBtn, pageStyle, panelStyle, td, th } from '../ops-ui'
+import { ClearFilters, EmptyRow, adminGet, controlStyle, fieldLabel, ghostBtn, pageStyle, panelStyle, td, th } from '../ops-ui'
 import {
   AUDIT_TARGET_TYPES,
   DEFAULT_ACTIVITY_LIMIT,
@@ -69,6 +69,16 @@ export function OpsAudit({
 
   const set = useCallback((patch: Partial<Filters>) => {
     setFilters((f) => ({ ...f, ...patch, offset: patch.offset ?? 0 }))
+  }, [])
+
+  /** An untouched audit log and a filtered-to-nothing one look identical in a table
+   *  but mean opposite things, so the empty state asks which one this is. */
+  const narrowed =
+    filters.q !== '' || filters.action !== '' || filters.targetType !== '' || filters.from !== '' || filters.to !== ''
+
+  const clearFilters = useCallback(() => {
+    setSearch('')
+    setFilters({ q: '', action: '', targetType: '', from: '', to: '', offset: 0 })
   }, [])
 
   const query = useMemo(() => {
@@ -186,7 +196,22 @@ export function OpsAudit({
                   </tr>
                 ))}
                 {entries.length === 0 && !loading && (
-                  <tr><td style={{ ...td, color: COLORS.muted }} colSpan={6}>Nothing matches these filters.</td></tr>
+                  narrowed ? (
+                    <EmptyRow
+                      colSpan={6}
+                      tone="filtered"
+                      title="No entries match these filters"
+                      body="The log has entries outside the action, target or date range you picked."
+                      meta={<ClearFilters onClear={clearFilters} />}
+                    />
+                  ) : (
+                    <EmptyRow
+                      colSpan={6}
+                      tone="blank"
+                      title="No staff actions logged yet"
+                      body="Every approval, ban and settings change a moderator makes is recorded here."
+                    />
+                  )
                 )}
               </tbody>
             </table>

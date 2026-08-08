@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { OpsSkeletonFields, OpsSkeletonQueueRows } from '../ops-skeleton'
+import { Empty } from '../ops-ui'
 import { MAX_QR_CHARS, qrPayload } from '@/lib/local/payment-config-core'
 
 const C = {
@@ -203,7 +204,14 @@ function PendingPaymentsQueue({ initial }: { initial: PendingProof[] | null }) {
 
       {error && <p style={{ margin: '0 0 12px', fontSize: 13, color: '#b3261e', fontWeight: 600 }}>{error}</p>}
       {rows === null && <OpsSkeletonQueueRows rows={3} />}
-      {rows?.length === 0 && <p style={{ fontSize: 13, color: C.muted }}>No payments waiting.</p>}
+      {rows?.length === 0 && (
+        <Empty
+          inset
+          tone="clear"
+          title="All payments reviewed"
+          body="No receipts are waiting on you. New uploads appear here as guests transfer."
+        />
+      )}
 
       <div style={{ display: 'grid', gap: 12 }}>
         {rows?.map((r) => (
@@ -624,7 +632,12 @@ function DisputesQueue({ initial }: { initial: Dispute[] | null }) {
           <button onClick={load} style={ghostBtn}>Try again</button>
         </div>
       ) : disputes.length === 0 ? (
-        <p style={{ margin: 0, fontSize: 14, color: C.muted }}>No open disputes.</p>
+        <Empty
+          inset
+          tone="clear"
+          title="No open disputes"
+          body="Every dispute a guest or host raised has been resolved."
+        />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {disputes.map((d) => {

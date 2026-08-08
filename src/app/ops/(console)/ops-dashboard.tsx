@@ -27,7 +27,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useOpsSession } from './ops-session'
 import { useLivePoll, agoLabel } from './use-live-stats'
-import { adminGetQuiet, money } from './ops-ui'
+import { Empty, adminGetQuiet, money } from './ops-ui'
 import { OverviewMetrics } from './overview-trend'
 import { OpsSectionSkeleton } from './ops-skeleton'
 import { alertsFor, alertTotal, waitingLabel } from '@/lib/local/activity-core'
@@ -852,7 +852,15 @@ export function OpsDashboard({ section }: { section: SectionId }) {
             })()}
           </>
           ) : (
-            <p style={{ color: MUTED, fontSize: 14 }}>No stats available.</p>
+            /* Not an empty state: forbidden and failed-fetch both render as
+               sectionError above this. Reaching here means the request succeeded and
+               came back without a stats payload, so say that rather than implying the
+               platform has no numbers yet. */
+            <Empty
+              tone="blank"
+              title="Stats didn't come through"
+              body="The overview loaded but returned no figures. Reload to try again."
+            />
           )
         ) : null}
 
@@ -898,7 +906,11 @@ export function OpsDashboard({ section }: { section: SectionId }) {
         {/* ===================== USERS ===================== */}
         {tab === 'listings' && loaded.listings ? (
           listings.length === 0 ? (
-            <p style={{ color: MUTED, fontSize: 14 }}>No listings.</p>
+            <Empty
+              tone="blank"
+              title="No listings yet"
+              body="Every listing a host publishes shows up here, newest first."
+            />
           ) : (
             <div style={{ display: 'grid', gap: 14 }}>
               {listings.map((l) => (
@@ -1041,7 +1053,11 @@ export function OpsDashboard({ section }: { section: SectionId }) {
         {/* ===================== BOOKINGS ===================== */}
         {tab === 'bookings' && loaded.bookings ? (
           bookings.length === 0 ? (
-            <p style={{ color: MUTED, fontSize: 14 }}>No bookings.</p>
+            <Empty
+              tone="blank"
+              title="No bookings yet"
+              body="Reservations appear here as soon as guests start booking."
+            />
           ) : (
             <>
               {/* The three money columns are the same sum read three ways, so the
@@ -1143,7 +1159,11 @@ export function OpsDashboard({ section }: { section: SectionId }) {
         {/* ===================== HOST APPLICATIONS ===================== */}
         {tab === 'applications' && loaded.applications ? (
           apps.length === 0 ? (
-            <p style={{ color: MUTED, fontSize: 14 }}>No pending applications.</p>
+            <Empty
+              tone="clear"
+              title="No applications waiting"
+              body="Every host application has been approved or declined."
+            />
           ) : (
             <div style={{ display: 'grid', gap: 14 }}>
               {apps.map((a) => (
@@ -1250,9 +1270,29 @@ export function OpsDashboard({ section }: { section: SectionId }) {
               ))}
             </div>
             {verifs.length === 0 ? (
-              <p style={{ color: MUTED, fontSize: 14 }}>
-                No {verifFilter === 'all' ? '' : verifFilter} verifications.
-              </p>
+              /* 'pending' empty is the good kind — the queue drained. The other chips
+                 are just a filter that found nothing, and 'all' means the table is
+                 genuinely bare. Interpolating the chip into one sentence used to give
+                 "No  verifications." on the 'all' chip. */
+              verifFilter === 'pending' ? (
+                <Empty
+                  tone="clear"
+                  title="No verifications waiting"
+                  body="Every ID submitted has been verified or rejected."
+                />
+              ) : verifFilter === 'all' ? (
+                <Empty
+                  tone="blank"
+                  title="No verifications yet"
+                  body="IDs appear here as soon as hosts submit them."
+                />
+              ) : (
+                <Empty
+                  tone="filtered"
+                  title={`No ${verifFilter} verifications`}
+                  body="Pick another chip above to see IDs in a different state."
+                />
+              )
             ) : (
             <div style={{ display: 'grid', gap: 14 }}>
               {verifs.map((v) => (

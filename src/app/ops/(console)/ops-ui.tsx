@@ -107,18 +107,113 @@ export function StatGrid({ children }: { children: React.ReactNode }) {
   )
 }
 
+// ---- Empty states -----------------------------------------------------------
+// "No listings." and "No payments waiting." used to render identically: one muted
+// sentence naming the absent noun. They are not the same fact, and an operator
+// reading the second one wants to feel finished, not stuck. The three tones:
+//
+//   'clear'    — a queue drained. Good news, so it gets the green treatment.
+//   'blank'    — nothing has ever been created here. An invitation, plus the button.
+//   'filtered' — rows exist; the current filters hide them. Say so, offer the undo.
+//
+// Picking a tone needs no extra request: every page already knows whether its own
+// filters are at their defaults, which is the whole difference between the last two.
+
+export type EmptyTone = 'clear' | 'blank' | 'filtered'
+
+/** Every analytics panel is empty for the same reason and has the same fix, so the
+ *  sentence lives here rather than being retyped at nine call sites. */
+export const RANGE_HINT = 'Nothing was recorded between these dates. Try a wider range, or drop a filter.'
+
+export interface EmptyProps {
+  tone?: EmptyTone
+  /** One line, sentence case, no trailing period — it is a heading. */
+  title: string
+  /** The sentence under it. This one does take a period. */
+  body?: string
+  action?: { label: string; href?: string; onClick?: () => void }
+  /** Filter chips, a "clear all" control — anything the tone needs to be actionable. */
+  meta?: React.ReactNode
+  /** Drop the panel chrome, for when this already sits inside one (a table body). */
+  inset?: boolean
+}
+
+export function Empty({ tone = 'blank', title, body, action, meta, inset }: EmptyProps) {
+  const clear = tone === 'clear'
+  const frame: React.CSSProperties = inset
+    ? { padding: '30px 4px' }
+    : {
+        ...panelStyle,
+        padding: '30px 22px',
+        ...(clear ? { borderLeft: `4px solid ${COLORS.green}` } : null),
+      }
+
+  return (
+    <div style={frame}>
+      <p style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 700, color: clear ? COLORS.green : COLORS.ink }}>
+        {title}
+      </p>
+      {body ? (
+        <p style={{ margin: 0, fontSize: 13, color: COLORS.muted, lineHeight: 1.5, maxWidth: 460 }}>{body}</p>
+      ) : null}
+      {meta ? <div style={{ marginTop: 12 }}>{meta}</div> : null}
+      {action ? (
+        <div style={{ marginTop: 14 }}>
+          {action.href ? (
+            <a href={action.href} style={{ ...solidBtn, display: 'inline-block', textDecoration: 'none' }}>
+              {action.label}
+            </a>
+          ) : (
+            <button type="button" onClick={action.onClick} style={solidBtn}>
+              {action.label}
+            </button>
+          )}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+/** The same thing inside a table body, so an empty result keeps the columns it
+ *  had a moment ago instead of collapsing the header into a stub. */
+export function EmptyRow({ colSpan, ...rest }: EmptyProps & { colSpan: number }) {
+  return (
+    <tr>
+      <td colSpan={colSpan} style={{ padding: '0 11px', borderBottom: 'none' }}>
+        <Empty {...rest} inset />
+      </td>
+    </tr>
+  )
+}
+
+/** The "clear all" affordance for a 'filtered' empty state. Text-only on purpose:
+ *  the primary action on a filtered list is undoing the filter, not a new record. */
+export function ClearFilters({ onClear, label = 'Clear all filters' }: { onClear: () => void; label?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClear}
+      style={{ ...btnBase, background: 'transparent', color: COLORS.burgundy, padding: '6px 0', textDecoration: 'underline' }}
+    >
+      {label}
+    </button>
+  )
+}
+
 /** A horizontal bar list — a breakdown chart without pulling in a chart library
  *  for what is, visually, a table with a background fill. */
 export function BarList({
   rows,
   format = (n: number) => n.toLocaleString(),
-  emptyLabel = 'No data in this range.',
+  emptyTitle = 'No data in this range',
 }: {
   rows: Array<{ key: string; label: string; count: number; value: number }>
   format?: (n: number) => string
-  emptyLabel?: string
+  emptyTitle?: string
 }) {
-  if (!rows.length) return <p style={{ margin: 0, fontSize: 13, color: COLORS.muted }}>{emptyLabel}</p>
+  if (!rows.length) {
+    return <Empty inset tone="filtered" title={emptyTitle} body={RANGE_HINT} />
+  }
   const max = Math.max(...rows.map((r) => r.count), 1)
   return (
     <div style={{ display: 'grid', gap: 7 }}>
@@ -158,7 +253,9 @@ export function TrendBars({
   metric: string
   format?: (n: number) => string
 }) {
-  if (!points.length) return <p style={{ margin: 0, fontSize: 13, color: COLORS.muted }}>No data in this range.</p>
+  if (!points.length) {
+    return <Empty inset tone="filtered" title="No data in this range" body={RANGE_HINT} />
+  }
   const values = points.map((p) => Number(p[metric]) || 0)
   const max = Math.max(...values, 1)
   return (

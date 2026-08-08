@@ -13,7 +13,7 @@
 import { useCallback, useState } from 'react'
 import Link from 'next/link'
 import { COLORS, SERIF } from '../../../ops-theme'
-import { adminGet, adminSend, ghostBtn, money, numTd, pageStyle, panelStyle, solidBtn, td, th, Stat, StatGrid } from '../../ops-ui'
+import { Empty, EmptyRow, adminGet, adminSend, ghostBtn, money, numTd, pageStyle, panelStyle, solidBtn, td, th, Stat, StatGrid } from '../../ops-ui'
 import { normalizeStatus, statusLabel, type AccountStatus, type UserStatusAction } from '@/lib/local/user-admin-core'
 import { StatusPill, actorLabel, fmtDay, fmtMoment, pill } from '../user-bits'
 
@@ -222,7 +222,7 @@ export function OpsUserDetail({ initial, isSuperAdmin }: { initial: Detail; isSu
           <h2 style={h2}>Listings ({data.listings.length})</h2>
           <Table
             head={['Title', 'Status', 'Approval', 'Price', 'Bookings', 'Created']}
-            empty="This user hosts no listings."
+            empty={{ title: 'Not hosting anything', body: 'This account has never published a listing.' }}
             rows={data.listings.map((l) => [
               <span key="t" style={{ fontWeight: 700 }}>{l.title}</span>,
               l.is_published
@@ -243,7 +243,7 @@ export function OpsUserDetail({ initial, isSuperAdmin }: { initial: Detail; isSu
           <h2 style={h2}>Bookings ({data.bookings.length})</h2>
           <Table
             head={['Reference', 'Listing', 'Dates', 'Status', 'Payment', 'Total']}
-            empty="No bookings yet."
+            empty={{ title: 'No bookings yet', body: 'Stays this account books or hosts will appear here.' }}
             rows={data.bookings.map((b) => [
               b.reservation_code || '—',
               b.listing_title || '—',
@@ -261,7 +261,7 @@ export function OpsUserDetail({ initial, isSuperAdmin }: { initial: Detail; isSu
           <p style={sub}>Instapay proofs submitted against this user&apos;s bookings. The screenshot itself is reviewed on the Payments screen.</p>
           <Table
             head={['Reference', 'Listing', 'Amount', 'Status', 'Submitted', 'Reviewed']}
-            empty="No payment submissions."
+            empty={{ title: 'No payments submitted', body: 'Instapay screenshots this account uploads land here for review.' }}
             rows={data.payments.map((p) => [
               p.reservation_code || '—',
               p.listing_title || '—',
@@ -281,7 +281,7 @@ export function OpsUserDetail({ initial, isSuperAdmin }: { initial: Detail; isSu
           </p>
           <Table
             head={['With', 'Listing', 'Role', 'Messages', 'Last activity', '']}
-            empty="No conversations."
+            empty={{ title: 'No conversations', body: 'This account has never messaged a host or a guest.' }}
             rows={data.conversations.map((c) => [
               <span key="w">{c.counterparty_name || c.counterparty_email || '—'}</span>,
               c.listing_title || '—',
@@ -301,7 +301,9 @@ export function OpsUserDetail({ initial, isSuperAdmin }: { initial: Detail; isSu
           />
           {thread && (
             <div style={{ marginTop: 12, borderTop: `1px solid ${COLORS.tan}`, paddingTop: 12, display: 'grid', gap: 8 }}>
-              {thread.messages.length === 0 && <p style={{ margin: 0, fontSize: 13, color: COLORS.muted }}>This thread has no messages.</p>}
+              {thread.messages.length === 0 && (
+                <Empty inset tone="blank" title="This thread is empty" body="The conversation was opened but nothing was ever sent." />
+              )}
               {thread.messages.map((m) => (
                 <div key={m.id} style={{ fontSize: 13 }}>
                   <span style={{ fontWeight: 700, color: m.sender_id === u.id ? COLORS.burgundy : COLORS.ink }}>
@@ -327,7 +329,7 @@ export function OpsUserDetail({ initial, isSuperAdmin }: { initial: Detail; isSu
           <p style={sub}>ID verifications and host applications. Review the images themselves on the Verifications and Applications screens.</p>
           <Table
             head={['Kind', 'Status', 'Document', 'Submitted', 'Reviewed', 'Notes']}
-            empty="Nothing submitted."
+            empty={{ title: 'Nothing submitted', body: 'No ID verification or host application on file for this account.' }}
             rows={data.documents.map((d) => [
               d.kind === 'id_verification' ? 'ID verification' : 'Host application',
               d.status,
@@ -395,7 +397,9 @@ function Table({
 }: {
   head: string[]
   rows: Array<Array<React.ReactNode | { num: number }>>
-  empty: string
+  /** Every panel here is empty for the same reason — this particular user has never
+   *  done the thing — so the headline names that and the body says what would fill it. */
+  empty: { title: string; body?: string }
 }) {
   return (
     <div style={{ overflowX: 'auto' }}>
@@ -414,7 +418,7 @@ function Table({
             </tr>
           ))}
           {rows.length === 0 && (
-            <tr><td style={{ ...td, color: COLORS.muted }} colSpan={head.length}>{empty}</td></tr>
+            <EmptyRow colSpan={head.length} tone="blank" title={empty.title} body={empty.body} />
           )}
         </tbody>
       </table>

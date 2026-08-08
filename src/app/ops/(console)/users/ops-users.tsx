@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { COLORS, SERIF } from '../../ops-theme'
-import { adminGet, controlStyle, fieldLabel, ghostBtn, numTd, pageStyle, panelStyle, td, th } from '../ops-ui'
+import { ClearFilters, EmptyRow, adminGet, controlStyle, fieldLabel, ghostBtn, numTd, pageStyle, panelStyle, td, th } from '../ops-ui'
 import {
   DEFAULT_USER_LIMIT,
   statusLabel,
@@ -81,6 +81,17 @@ export function OpsUsers({ initial }: { initial: { users: AdminUser[]; total: nu
    *  that now has one page is how you get a confusing empty screen. */
   const set = useCallback((patch: Partial<Filters>) => {
     setFilters((f) => ({ ...f, ...patch, offset: patch.offset ?? 0 }))
+  }, [])
+
+  /** Zero rows means two different things, and the empty state has to say which.
+   *  With no filter narrowing the list, zero rows is genuinely an empty table —
+   *  telling that operator to check their filters sends them hunting for one that
+   *  isn't set. */
+  const narrowed = filters.q !== '' || filters.status !== 'all' || filters.role !== 'all'
+
+  const clearFilters = useCallback(() => {
+    setSearch('')
+    setFilters((f) => ({ ...f, q: '', status: 'all', role: 'all', offset: 0 }))
   }, [])
 
   const query = useMemo(() => {
@@ -209,11 +220,22 @@ export function OpsUsers({ initial }: { initial: { users: AdminUser[]; total: nu
                   </tr>
                 ))}
                 {users.length === 0 && !loading && (
-                  <tr>
-                    <td style={{ ...td, color: COLORS.muted }} colSpan={8}>
-                      No users match these filters.
-                    </td>
-                  </tr>
+                  narrowed ? (
+                    <EmptyRow
+                      colSpan={8}
+                      tone="filtered"
+                      title="No users match these filters"
+                      body="Every account is hidden by the current search, status or role."
+                      meta={<ClearFilters onClear={clearFilters} />}
+                    />
+                  ) : (
+                    <EmptyRow
+                      colSpan={8}
+                      tone="blank"
+                      title="No users yet"
+                      body="Guests and hosts appear here the moment they finish signing up."
+                    />
+                  )
                 )}
               </tbody>
             </table>

@@ -11,6 +11,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { COLORS, SERIF } from '../../ops-theme'
 import {
+  Empty,
   adminGet,
   adminSend,
   controlStyle,
@@ -149,7 +150,12 @@ export function OpsResorts({
             typed name to guests — approving just tidies the data.
           </p>
           {subs.length === 0 ? (
-            <p style={{ margin: 0, fontSize: 13, color: COLORS.muted }}>Nothing waiting.</p>
+            <Empty
+              inset
+              tone="clear"
+              title="No submissions to review"
+              body="Resort names hosts typed themselves land here for approval. Every one has been handled."
+            />
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
