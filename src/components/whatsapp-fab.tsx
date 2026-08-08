@@ -1,7 +1,7 @@
 'use client'
 
 // Floating WhatsApp contact button, shown on public pages. Hidden inside the
-// admin consoles + auth + checkout so it doesn't clutter those flows. The
+// ops console + auth + checkout so it doesn't clutter those flows. The
 // number comes from @/lib/contact.
 import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -10,7 +10,7 @@ import { whatsappHref } from '@/lib/contact'
 // Locale prefixes we strip before matching hidden routes. /links is the bio
 // linktree, which lists the WhatsApp chat as one of its rows — the floating
 // button would be the same link twice on one short page.
-const HIDDEN_PREFIXES = ['/ops', '/admin', '/login', '/signup', '/links']
+const HIDDEN_PREFIXES = ['/ops', '/login', '/signup', '/links']
 
 export default function WhatsAppFab() {
   const t = useTranslations('contact')

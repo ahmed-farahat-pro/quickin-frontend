@@ -58,8 +58,6 @@ export async function initiateRefund(
       p_notes: `Refund initiated: ${computedAmount ?? 'unknown'} EGP`
     })
 
-    revalidatePath('/admin/refunds')
-    revalidatePath('/admin/financials')
     revalidatePath('/dashboard/bookings')
 
     return { success: true, refund }
@@ -250,7 +248,6 @@ export async function approveRefund(refundId: string) {
       p_notes: `Refund of ${refundAmount ?? 'unknown'} EGP approved`
     })
 
-    revalidatePath('/admin/refunds')
     return { success: true }
   } catch (error) {
     console.error('Exception in approveRefund:', error)
@@ -340,7 +337,6 @@ export async function rejectRefund(refundId: string, reason: string) {
       p_notes: `Refund rejected: ${reason}`
     })
 
-    revalidatePath('/admin/refunds')
     return { success: true }
   } catch (error) {
     console.error('Exception in rejectRefund:', error)
@@ -408,7 +404,6 @@ export async function processRefund(refundId: string) {
       p_notes: `Refund of ${refundAmount ?? 'unknown'} EGP marked as processed (money movement complete)`
     })
 
-    revalidatePath('/admin/refunds')
     return { success: true }
   } catch (error) {
     console.error('Exception in processRefund:', error)

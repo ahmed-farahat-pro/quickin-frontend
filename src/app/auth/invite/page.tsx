@@ -54,20 +54,7 @@ export default function InviteCallbackPage() {
               return
             }
 
-            // Check if user is staff and redirect accordingly
-            const { data: staffProfile } = await supabase
-              .from('staff_profiles')
-              .select('id')
-              .eq('id', data.user.id)
-              .eq('is_active', true)
-              .single()
-
-            if (staffProfile) {
-              toast.success('Welcome! You are now logged in.')
-              router.push('/admin')
-            } else {
-              router.push('/dashboard')
-            }
+            router.push('/dashboard')
           }
         } else {
           // No tokens found, redirect to login
@@ -111,9 +98,9 @@ export default function InviteCallbackPage() {
       setIsSuccess(true)
       toast.success('Password set successfully!')
 
-      // Redirect to admin after a short delay
+      // Redirect to the dashboard after a short delay
       setTimeout(() => {
-        router.push('/admin')
+        router.push('/dashboard')
       }, 2000)
     } catch (error) {
       console.error('Set password error:', error)

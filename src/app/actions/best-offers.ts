@@ -164,7 +164,6 @@ export async function approveBestOffer(offerId: string) {
     }
   }
 
-  revalidatePath('/admin/approvals/best-offers')
   revalidatePath(`/listings/${offer.listing_id}`)
   revalidatePath(`/dashboard/listings/${offer.listing_id}/manage`)
   return { success: true }
@@ -217,7 +216,6 @@ export async function rejectBestOffer(offerId: string) {
       revalidatePath(`/listings/${offer.listing_id}`)
   }
 
-  revalidatePath('/admin/approvals/best-offers')
   if (offer) {
     revalidatePath(`/dashboard/listings/${offer.listing_id}/manage`)
   }

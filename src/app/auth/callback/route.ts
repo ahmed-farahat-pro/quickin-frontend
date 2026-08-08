@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     const resolvedLocale = locale ?? defaultLocale
     const safePath = pathname.startsWith('/auth/callback') ? '/' : pathname
 
-    if (safePath.startsWith('/dashboard') || safePath.startsWith('/admin')) {
+    if (safePath.startsWith('/dashboard')) {
       return safePath
     }
 

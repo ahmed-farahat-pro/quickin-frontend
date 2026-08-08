@@ -13,7 +13,6 @@ import
     Plane,
     User,
     LayoutDashboard,
-    Shield,
     Wallet,
     type LucideIcon,
   } from "lucide-react"
@@ -59,15 +58,12 @@ export interface NavGroup
   items: NavItem[]
 }
 
-export type StaffRole = 'admin' | 'moderator' | null
-
 interface UserSidebarProps extends React.ComponentProps<typeof Sidebar>
 {
   user: SidebarUser
-  staffRole?: StaffRole
 }
 
-export function UserSidebar({ user, staffRole, ...props }: UserSidebarProps)
+export function UserSidebar({ user, ...props }: UserSidebarProps)
 {
   const pathname = usePathname()
   const locale = useLocale() as Locale
@@ -144,21 +140,6 @@ export function UserSidebar({ user, staffRole, ...props }: UserSidebarProps)
       ],
     },
   ]
-
-  // Add Admin group if user is staff
-  if (staffRole) {
-    navGroups.push({
-      label: t(staffRole === 'admin' ? 'groups.admin' : 'groups.staff'),
-      items: [
-        {
-          title: t(staffRole === 'admin' ? 'items.adminDashboard' : 'items.moderatorPanel'),
-          url: getLocalizedUrl("/admin"),
-          icon: Shield,
-          isActive: pathname.startsWith(getLocalizedUrl('/admin')),
-        },
-      ],
-    })
-  }
 
   return (
     <Sidebar collapsible="icon" {...props}>

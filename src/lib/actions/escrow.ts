@@ -1,7 +1,6 @@
 'use server'
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { revalidatePath } from 'next/cache'
 import { sendFCMNotification } from './notifications'
 
 interface BookingFees {
@@ -277,8 +276,6 @@ export async function releaseEscrow(bookingId: string) {
       }).catch(console.error)
   }
 
-  revalidatePath('/admin/financials')
-  revalidatePath('/admin/payouts')
   return { success: true }
 }
 
@@ -478,8 +475,6 @@ export async function refundEscrow(
       }).catch(console.error)
   }
 
-  revalidatePath('/admin/financials')
-  revalidatePath('/admin/refunds')
   return { success: true }
 }
 

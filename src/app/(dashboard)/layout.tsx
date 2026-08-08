@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar'
-import { UserSidebar, type StaffRole } from '@/components/user-sidebar'
+import { UserSidebar } from '@/components/user-sidebar'
 import { Separator } from '@/components/ui/separator'
 import { DashboardFooter } from '@/components/layout/dashboard-footer'
 import { getRequestLocale } from '@/i18n/request-locale'
@@ -36,16 +36,6 @@ export default async function DashboardLayout({
     .eq('id', user.id)
     .single()
 
-  // Check if user is staff (to show Admin link in sidebar)
-  const { data: staffProfile } = await supabase
-    .from('staff_profiles')
-    .select('role')
-    .eq('id', user.id)
-    .eq('is_active', true)
-    .single()
-
-  const staffRole: StaffRole = staffProfile?.role as StaffRole || null
-
   const locale = await getRequestLocale()
   const dir = getDirection(locale)
 
@@ -57,7 +47,7 @@ export default async function DashboardLayout({
 
   return (
     <SidebarProvider>
-      <UserSidebar user={sidebarUser} staffRole={staffRole} />
+      <UserSidebar user={sidebarUser} />
       <SidebarInset className="flex flex-col">
         <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 border-b">
           <div className="flex items-center gap-2 px-4">

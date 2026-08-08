@@ -158,7 +158,6 @@ export async function unpublishListing(listingId: string) {
 
   // Revalidate both paths
   revalidatePath('/dashboard/listings')
-  revalidatePath('/admin/listings')
   revalidatePath(`/listings/${listingId}`)
 
   return { success: true }
@@ -218,7 +217,6 @@ export async function publishListing(listingId: string) {
   })
 
   revalidatePath('/dashboard/listings')
-  revalidatePath('/admin/listings')
   revalidatePath(`/listings/${listingId}`)
 
   return { success: true }

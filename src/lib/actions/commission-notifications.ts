@@ -1,7 +1,6 @@
 'use server'
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { revalidatePath } from 'next/cache'
 import { sendFCMNotification } from '@/lib/actions/notifications'
 
 /**
@@ -87,6 +86,5 @@ export async function notifyHostsOfCommissionChange(
     p_notes: `Notified ${uniqueHostIds.length} hosts about commission rate change`
   })
 
-  revalidatePath('/admin/settings/commissions')
   return { success: true, notified: uniqueHostIds.length }
 }

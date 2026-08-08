@@ -61,7 +61,6 @@ function LoginForm({ onSuccess, onForgotPassword, isLoading, setIsLoading }: {
 {
   const t = useTranslations('auth')
   const [showPassword, setShowPassword] = useState(false)
-  const supabase = createClient()
 
   const form = useForm<SignInInput>({
     resolver: zodResolver(signInSchema),
@@ -98,22 +97,6 @@ function LoginForm({ onSuccess, onForgotPassword, isLoading, setIsLoading }: {
       toast.success(t('welcomeBack'))
       onSuccess()
 
-      // Check if user is staff and redirect to admin
-      if (result.user && supabase) {
-        const { data: staffProfile } = await supabase
-          .from('staff_profiles')
-          .select('id')
-          .eq('id', result.user.id)
-          .eq('is_active', true)
-          .single()
-
-        if (staffProfile) {
-          window.location.href = '/admin'
-          return
-        }
-      }
-
-      // Regular user - reload page
       window.location.reload()
     } catch (error) {
       console.error('Login error:', error)
