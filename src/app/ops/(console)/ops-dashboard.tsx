@@ -29,6 +29,7 @@ import { useOpsSession } from './ops-session'
 import { useLivePoll, agoLabel } from './use-live-stats'
 import { Empty, adminGetQuiet, money } from './ops-ui'
 import { OverviewMetrics } from './overview-trend'
+import type { TrendPayload } from '@/lib/local/overview-trends-core'
 import { OpsSectionSkeleton } from './ops-skeleton'
 import { alertsFor, alertTotal, waitingLabel } from '@/lib/local/activity-core'
 import type { StaffModule } from '@/lib/local/staff'
@@ -194,7 +195,17 @@ function fmtPercent(rate: number | null | undefined): string {
   return `${Math.round(n * 10_000) / 100}%`
 }
 
-export function OpsDashboard({ section }: { section: SectionId }) {
+export function OpsDashboard({
+  section,
+  initialTrends = null,
+}: {
+  section: SectionId
+  /** The Overview's default-range trend payload, loaded on the server by page.tsx so
+   *  the graph is drawn on arrival instead of fetching for itself after it mounts.
+   *  Null on the other four sections, and when that load failed — the chart then
+   *  falls back to fetching, which is the behaviour this replaced. */
+  initialTrends?: TrendPayload | null
+}) {
   const { session, can } = useOpsSession()
 
   // The route decides the section; `tab` is kept as the local name because a dozen
@@ -842,7 +853,7 @@ export function OpsDashboard({ section }: { section: SectionId }) {
                 <>
                   {banner}
                   {/* 1 — the counts, and the graph they drive. */}
-                  <OverviewMetrics stats={stats} />
+                  <OverviewMetrics stats={stats} initial={initialTrends} />
                   {/* 2 — money. */}
                   <MoneySection stats={stats} can={can} />
                   {/* 3 — the queues in full. */}

@@ -22,8 +22,8 @@ import type { PaymentReviewAction } from './payment-flow-core'
 import { branchLimit, wantsKind } from './activity-core'
 import type { ActivityFilter, AuditFilter } from './activity-core'
 import { PAID_SQL } from './analytics-core'
-import { buildSeries, bucketsFor, METRICS, RANGES, windowFor } from './overview-trends-core'
-import type { MetricId, MetricSpec, RangeId, SeriesPoint } from './overview-trends-core'
+import { buildSeries, bucketsFor, METRICS, publicMetrics, RANGES, windowFor } from './overview-trends-core'
+import type { MetricId, MetricSpec, RangeId, SeriesPoint, TrendPayload } from './overview-trends-core'
 import type { DocumentKind, VerificationAction, VerificationFilter } from './document-core'
 import { isLiveStayStatus, normalizeReservationCode } from '@/lib/stay-code'
 // The catalogs the host forms offer — one source of truth for what the API
@@ -2555,7 +2555,7 @@ export async function adminStats(): Promise<AdminStats> {
 export async function adminStatTrends(
   range: RangeId,
   now: Date = new Date(),
-): Promise<Record<MetricId, SeriesPoint[]>> {
+): Promise<TrendPayload> {
   const spec = RANGES[range]
   const buckets = bucketsFor(range, now)
   const { from, toExclusive } = windowFor(range, now)
@@ -2602,11 +2602,15 @@ export async function adminStatTrends(
     rowsOf.set(r.metric, list)
   }
 
-  const out = {} as Record<MetricId, SeriesPoint[]>
+  const series = {} as Record<MetricId, SeriesPoint[]>
   for (const id of ids) {
-    out[id] = buildSeries(buckets, rowsOf.get(id) ?? [], baselineOf.get(id) ?? 0, METRICS[id].cumulative)
+    series[id] = buildSeries(buckets, rowsOf.get(id) ?? [], baselineOf.get(id) ?? 0, METRICS[id].cumulative)
   }
-  return out
+
+  // The whole response, not just the series: /ops/page.tsx seeds the client with
+  // this on the server and the API route returns it verbatim, so assembling it here
+  // is what stops the two paths shipping subtly different shapes.
+  return { range, granularity: spec.granularity, series, metrics: publicMetrics() }
 }
 
 export interface AdminUserRow {

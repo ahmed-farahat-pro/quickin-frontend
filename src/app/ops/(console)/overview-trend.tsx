@@ -29,6 +29,8 @@ import {
 } from 'recharts'
 import { COLORS, FONT } from '../ops-theme'
 import { adminGetQuiet } from './ops-ui'
+import { OpsSkeletonChart } from './ops-skeleton'
+import { ShimmerStyles, SkeletonBlock } from '@/components/ui/skeleton-block'
 import type { AdminStats } from './ops-dashboard'
 
 type MetricId =
@@ -126,68 +128,101 @@ const chip = (active: boolean): React.CSSProperties => ({
   border: `1px solid ${active ? COLORS.burgundy : 'rgba(42,34,32,0.16)'}`,
 })
 
-export function OverviewMetrics({ stats }: { stats: AdminStats }) {
-  const [range, setRange] = useState<RangeId>('30d')
+export function OverviewMetrics({
+  stats,
+  initial = null,
+}: {
+  stats: AdminStats
+  /** The default range, loaded on the server by page.tsx. When present the chart is
+   *  drawn on arrival and the mount fetch never runs. */
+  initial?: TrendResponse | null
+}) {
+  const [range, setRange] = useState<RangeId>(initial?.range ?? '30d')
   const [metric, setMetric] = useState<MetricId>('users')
   const [mode, setMode] = useState<Mode>('total')
-  // One slot holding the range its contents belong to. `loading` and `error` are
-  // DERIVED from it rather than being separate flags set at the top of the effect:
-  // that flips three pieces of state before the fetch even starts (cascading
-  // renders, which the lint rule objects to), and it lets the previous range's
-  // series render for a frame under the new range's axis and caption.
-  const [result, setResult] = useState<{
-    range: RangeId
-    data: TrendResponse | null
-    error: string | null
-  } | null>(null)
 
-  // Fetch on range change only. The response carries EVERY metric, so switching
-  // tiles is instant and costs no request — and the Overview's 30-second stats poll
-  // deliberately does not drag these queries along with it. A trend line does not
-  // move meaningfully inside half a minute.
+  // Every range that has been loaded, keyed by range. Seeded from the server payload,
+  // so the default range is already in here on the very first render — that is what
+  // makes arrival wait-free. It doubles as a cache: switching back to a range you
+  // have already looked at is instant and costs no request.
+  const [cache, setCache] = useState<Partial<Record<RangeId, TrendResponse>>>(() =>
+    initial ? { [initial.range]: initial } : {},
+  )
+  const [errors, setErrors] = useState<Partial<Record<RangeId, string>>>({})
+  // Which range to keep on screen while a new one loads. Advanced in the click
+  // handler — not in an effect — so it is set exactly when the switch is made.
+  const [prevRange, setPrevRange] = useState<RangeId | null>(initial?.range ?? null)
+
+  const selectRange = (next: RangeId) => {
+    if (next === range) return
+    // Only hold over something that is actually drawn: mid-switch, the range being
+    // left may itself still be loading, and the one before it is what to keep.
+    if (cache[range]) setPrevRange(range)
+    setRange(next)
+  }
+
+  // Fetch a range the first time it is asked for. The response carries EVERY metric,
+  // so switching TILES is free — and the Overview's 30-second stats poll deliberately
+  // does not drag these queries along with it. A trend line does not move meaningfully
+  // inside half a minute.
   useEffect(() => {
+    if (cache[range]) return
     let cancelled = false
     void (async () => {
       const res = await adminGetQuiet<TrendResponse>(`stats/trends?range=${range}`)
       if (cancelled) return
-      const fail = (error: string) => setResult({ range, data: null, error })
+      const fail = (error: string) => setErrors((e) => ({ ...e, [range]: error }))
       if (res === 'forbidden') fail('Your account does not have the Overview module.')
       else if (res === 'expired') fail('Your session has ended. Reload to sign in again.')
       else if (!res) fail('Could not load the graph. Try Refresh.')
-      else setResult({ range, data: res, error: null })
+      else setCache((c) => ({ ...c, [range]: res }))
     })()
     return () => {
       cancelled = true
     }
-  }, [range])
+  }, [range, cache])
 
-  // Anything belonging to a different range is not this chart's data.
-  const fresh = result?.range === range ? result : null
-  const loading = fresh === null
-  const data = fresh?.data ?? null
-  const error = fresh?.error ?? null
+  const data = cache[range] ?? null
+  const error = errors[range] ?? null
+  const loading = !data && !error
 
-  const meta: MetricMeta | null = data?.metrics?.[metric] ?? null
+  // `data` when this range is loaded; otherwise the range that was on screen when the
+  // switch happened, held over and dimmed until the new one arrives.
+  //
+  // ops-skeleton.tsx makes the same argument about section refreshes: replacing what
+  // someone is reading with a placeholder is worse than leaving it up while the new
+  // rows arrive. A skeleton is for a FIRST paint, when there is nothing to keep.
+  //
+  // Tracked as the previous range's KEY rather than a held payload, so it stays a
+  // plain derivation off `cache` — a ref would have to be read during render, which
+  // is exactly the bug that makes a component not re-render when it should.
+  const shown = data ?? (prevRange ? cache[prevRange] ?? null : null)
+  const stale = data === null && shown !== null && !error
+
+  const meta: MetricMeta | null = shown?.metrics?.[metric] ?? null
   // A metric with no meaningful running total is pinned to 'new' whatever the
   // toggle last said — otherwise clicking Pending IDs after Users would draw a
   // cumulative line labelled as a queue.
   const effectiveMode: Mode = meta && !meta.cumulative ? 'new' : mode
 
   const points = useMemo(() => {
-    const raw = data?.series?.[metric] ?? []
+    const raw = shown?.series?.[metric] ?? []
     return raw.map((p) => ({
       bucket: p.bucket,
       value: effectiveMode === 'total' ? (p.total ?? p.count) : p.count,
     }))
-  }, [data, metric, effectiveMode])
+  }, [shown, metric, effectiveMode])
 
   const delta = useMemo(
-    () => (data?.series?.[metric] ?? []).reduce((n, p) => n + p.count, 0),
-    [data, metric],
+    () => (shown?.series?.[metric] ?? []).reduce((n, p) => n + p.count, 0),
+    [shown, metric],
   )
 
-  const granularity = data?.granularity ?? 'day'
-  const rangeLabel = RANGES.find((r) => r.id === range)?.label ?? ''
+  const granularity = shown?.granularity ?? 'day'
+  // The range the DRAWN series belongs to, which during a switch is not the pressed
+  // chip. Captioning a held-over 30-day line "in the last 90 days" would be a plain
+  // lie, so while it is stale the caption shimmers instead.
+  const shownRangeLabel = RANGES.find((r) => r.id === shown?.range)?.label ?? ''
   const selectedCard = CARDS.find((c) => c.metric === metric)
 
   const pick = (card: (typeof CARDS)[number]) => {
@@ -270,7 +305,8 @@ export function OverviewMetrics({ stats }: { stats: AdminStats }) {
       </div>
 
       {/* ---- The graph ---- */}
-      <div style={panel}>
+      <div style={panel} aria-busy={loading || stale}>
+        <ShimmerStyles />
         <div
           style={{
             display: 'flex',
@@ -285,11 +321,17 @@ export function OverviewMetrics({ stats }: { stats: AdminStats }) {
             <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: COLORS.burgundy }}>
               {meta?.label ?? selectedCard?.label ?? 'Trend'}
             </h2>
-            <p style={{ margin: '3px 0 0', fontSize: 12, color: COLORS.muted }}>
-              {loading
-                ? 'Loading…'
-                : `${delta >= 0 ? '+' : ''}${delta.toLocaleString()} in the last ${rangeLabel.toLowerCase()}`}
-            </p>
+            {/* The caption has a fixed 15px line box in every state, so the chart
+                below it never shifts when the words arrive. */}
+            <div style={{ height: 15, marginTop: 4, display: 'flex', alignItems: 'center' }}>
+              {loading || stale ? (
+                <SkeletonBlock width={148} height={11} radius={5} />
+              ) : error ? null : (
+                <p style={{ margin: 0, fontSize: 12, color: COLORS.muted, lineHeight: 1 }}>
+                  {`${delta >= 0 ? '+' : ''}${delta.toLocaleString()} in the last ${shownRangeLabel.toLowerCase()}`}
+                </p>
+              )}
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -306,7 +348,7 @@ export function OverviewMetrics({ stats }: { stats: AdminStats }) {
               </div>
             )}
             {RANGES.map((r) => (
-              <button key={r.id} type="button" style={chip(range === r.id)} onClick={() => setRange(r.id)}>
+              <button key={r.id} type="button" style={chip(range === r.id)} onClick={() => selectRange(r.id)}>
                 {r.label}
               </button>
             ))}
@@ -319,11 +361,27 @@ export function OverviewMetrics({ stats }: { stats: AdminStats }) {
           </p>
         ) : null}
 
-        <div style={{ height: 260, marginTop: 12 }}>
+        {/* Three states, in the order they cost the operator:
+              error   — say so.
+              nothing drawn yet — shapes, not a sentence. Only reachable when the
+                        server seed failed, or on a range never loaded before.
+              held over — the previous range's chart, dimmed and non-interactive
+                        while the new one arrives. Blanking a chart someone is
+                        reading in order to redraw the same shape is the jarring
+                        part; fading it says "updating" without taking it away. */}
+        <div
+          style={{
+            height: 260,
+            marginTop: 12,
+            opacity: stale ? 0.4 : 1,
+            transition: 'opacity .18s ease',
+            pointerEvents: stale ? 'none' : undefined,
+          }}
+        >
           {error ? (
             <p style={{ fontSize: 13, color: COLORS.red, fontWeight: 700 }}>{error}</p>
-          ) : loading && !data ? (
-            <p style={{ fontSize: 13, color: COLORS.muted }}>Loading…</p>
+          ) : !shown ? (
+            <OpsSkeletonChart bars={30} height={230} />
           ) : points.length === 0 ? (
             <p style={{ fontSize: 13, color: COLORS.muted }}>No data in this range.</p>
           ) : (

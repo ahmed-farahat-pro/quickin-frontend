@@ -434,12 +434,31 @@ Three more things worth knowing when reading these lines:
 The `paid` metric is decided by `payment_status`, never `paid_at IS NOT NULL` — the
 same refund trap the Analytics API documents below.
 
-The whole response is fetched **once per range**, not per tile and not on the
-Overview's 30-second stats poll: switching tiles is then free, and a trend line does
-not move meaningfully inside half a minute. Range parsing, bucket math and series
-filling are pure in `src/lib/local/overview-trends-core.ts` and covered by
+**The default range is loaded on the server**, by `(console)/page.tsx` beside the
+module check, and handed to the client as a prop — the same shape `/ops/payments`,
+`/ops/users` and `/ops/staff` use. The graph is therefore drawn on arrival rather
+than fetching for itself after it mounts, which on Vercel meant paying a cold
+function and a Neon wake-up the page had already paid for once. If that server load
+fails the prop is `null` and the client falls back to fetching, so a hiccup costs a
+moment rather than the panel.
+
+Only a **range switch** goes through the API, and each range is cached once fetched,
+so going back to one already seen is instant. Switching *tiles* never fetches at all —
+every metric is in one response. None of this rides the Overview's 30-second stats
+poll; a trend line does not move meaningfully inside half a minute.
+
+Three loading states, in the order they cost an operator: an error says so; nothing
+drawn yet gets `OpsSkeletonChart` (only reachable when the server seed failed, or on
+a range never loaded); and a range switch **keeps the current chart on screen**,
+dimmed, until the new one arrives. Blanking a chart someone is reading in order to
+redraw the same shape is the jarring part — the caption shimmers rather than
+captioning a held-over 30-day line "in the last 90 days".
+
+Range parsing, bucket math and series filling are pure in
+`src/lib/local/overview-trends-core.ts` and covered by
 `test/unit/overview-trends-core.test.mjs`; only the two SQL round trips live in
-`db.ts`.
+`db.ts`, which assembles the whole payload so the route and the server component
+cannot drift into shipping different shapes.
 
 ### Analytics API
 

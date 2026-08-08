@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireStaff } from '@/lib/local/staff'
 import { adminStatTrends } from '@/lib/local/db'
-import { METRICS, parseRange, RANGES, TrendInputError } from '@/lib/local/overview-trends-core'
+import { parseRange, TrendInputError } from '@/lib/local/overview-trends-core'
 
 // Admin (staff session + `overview` module): GET → the history behind the Overview's
 // number cards, one dense series per chartable metric.
@@ -20,21 +20,10 @@ export async function GET(req: Request) {
   if ('error' in gate) return gate.error
   try {
     const range = parseRange(new URL(req.url).searchParams.get('range'))
-    const series = await adminStatTrends(range)
-
-    // The client renders titles, notes and the cumulative/new toggle from this, so
-    // the wording and the "can this be a running total?" rule live in one place —
-    // next to the SQL that makes the claim true. Only the presentational fields go
-    // over the wire: METRICS also carries the from/where/at SQL, and a table and
-    // column map is not something a page needs in order to draw a line.
-    const metrics = Object.fromEntries(
-      Object.entries(METRICS).map(([id, m]) => [id, { label: m.label, cumulative: m.cumulative, note: m.note ?? null }]),
-    )
-
-    return NextResponse.json(
-      { range, granularity: RANGES[range].granularity, series, metrics },
-      { headers: CORS },
-    )
+    // adminStatTrends assembles the whole payload — series, granularity and the
+    // SQL-free metric descriptions. /ops/page.tsx seeds the client with the identical
+    // call on the server, so this route is only what a RANGE SWITCH goes through.
+    return NextResponse.json(await adminStatTrends(range), { headers: CORS })
   } catch (err) {
     // Bad input is the caller's fault: 400, never a 500.
     if (err instanceof TrendInputError) {

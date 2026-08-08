@@ -31,6 +31,7 @@ import {
   windowFor,
   buildSeries,
   seriesDelta,
+  publicMetrics,
 } from '../../src/lib/local/overview-trends-core.ts'
 
 const AUG_8 = new Date('2026-08-08T13:45:00Z')
@@ -94,6 +95,34 @@ describe('the metric whitelist', () => {
     // drops refunded rows. adminStats shipped with exactly that bug once.
     assert.match(METRICS.paid.where, /payment_status/)
     assert.doesNotMatch(String(METRICS.paid.where), /paid_at\s+IS\s+NOT\s+NULL/i)
+  })
+})
+
+describe('publicMetrics', () => {
+  test('carries every metric, keyed identically to the series', () => {
+    // The client looks up metrics[metric] with the same id it indexes series by; a
+    // missing key silently drops the chart title and the Total/New toggle.
+    assert.deepEqual(Object.keys(publicMetrics()).sort(), [...METRIC_IDS].sort())
+  })
+
+  test('strips the SQL — the browser never receives a table or column map', () => {
+    for (const m of Object.values(publicMetrics())) {
+      assert.deepEqual(Object.keys(m).sort(), ['cumulative', 'label', 'note'])
+    }
+  })
+
+  test('note is null rather than undefined, so it survives JSON', () => {
+    // JSON.stringify drops undefined keys entirely; the client types note as
+    // `string | null` and would read undefined off a missing property instead.
+    assert.equal(publicMetrics().users.note, null)
+    assert.equal(typeof publicMetrics().applications.note, 'string')
+  })
+
+  test('label and cumulative match METRICS exactly', () => {
+    for (const id of METRIC_IDS) {
+      assert.equal(publicMetrics()[id].label, METRICS[id].label, id)
+      assert.equal(publicMetrics()[id].cumulative, METRICS[id].cumulative, id)
+    }
   })
 })
 

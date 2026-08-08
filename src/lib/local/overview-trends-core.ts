@@ -197,6 +197,35 @@ export const METRICS: Record<MetricId, MetricSpec> = {
   },
 }
 
+/** A metric as the BROWSER sees it. METRICS also carries the from/where/at SQL, and
+ *  a table and column map is not something a page needs in order to draw a line. */
+export interface PublicMetric {
+  label: string
+  cumulative: boolean
+  note: string | null
+}
+
+/** The whole trend response. Assembled in one place so the API route and the server
+ *  component that seeds the page cannot drift into shipping different shapes. */
+export interface TrendPayload {
+  range: RangeId
+  granularity: 'day' | 'month'
+  series: Record<MetricId, SeriesPoint[]>
+  metrics: Record<MetricId, PublicMetric>
+}
+
+/** METRICS with the SQL stripped off. The client renders titles, notes and the
+ *  cumulative/new toggle from this, so the wording and the "can this be a running
+ *  total?" rule stay next to the SQL that makes the claim true. */
+export function publicMetrics(): Record<MetricId, PublicMetric> {
+  const out = {} as Record<MetricId, PublicMetric>
+  for (const id of METRIC_IDS) {
+    const m = METRICS[id]
+    out[id] = { label: m.label, cumulative: m.cumulative, note: m.note ?? null }
+  }
+  return out
+}
+
 export function parseMetric(value: string | null | undefined): MetricId {
   const raw = (value ?? '').trim()
   if (!raw) return 'users'
