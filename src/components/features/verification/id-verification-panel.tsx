@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { DOC_TYPES, normalizeDocType } from '@/lib/local/host-verification-core'
 import { fileToCompressedDataUrl, MAX_OWNERSHIP_DOC_CHARS as MAX_ID_IMAGE_CHARS } from '@/lib/image'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -28,6 +29,9 @@ export function IdVerificationPanel() {
   const [back, setBack] = useState<string | null>(null) // data URL of the back photo
   const [selfie, setSelfie] = useState<string | null>(null) // data URL of the personal photo
   const [idNumber, setIdNumber] = useState('')
+  // Which document this is. The reviewer checks the photo against the declared
+  // type, so it travels with the submission rather than being guessed from it.
+  const [docType, setDocType] = useState<string>(DOC_TYPES[0].key)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -39,6 +43,9 @@ export function IdVerificationPanel() {
       setStatus((d.status as Status) || 'unverified')
       setNotes(d.notes || null)
       setIdNumberSaved(d.id_number || null)
+      // Seed from the last submission so a rejected host resubmitting doesn't
+      // have to re-pick what they already told us.
+      if (d.doc_type) setDocType(normalizeDocType(d.doc_type))
     } catch {
       setStatus('unverified')
     }
@@ -84,7 +91,7 @@ export function IdVerificationPanel() {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ front, back, selfie, id_number: idNumber.trim() || undefined }),
+        body: JSON.stringify({ front, back, selfie, doc_type: docType, id_number: idNumber.trim() || undefined }),
       })
       if (res.status === 401) { setError('Please sign in to submit your ID.'); return }
       if (!res.ok) {
@@ -157,6 +164,21 @@ export function IdVerificationPanel() {
               <IdPhotoInput side="back" label="Back of ID" value={back} onPick={onPick} onClear={() => setBack(null)} disabled={submitting} />
             </div>
             <IdPhotoInput side="selfie" label="Personal photo (selfie)" value={selfie} capture="user" onPick={onPick} onClear={() => setSelfie(null)} disabled={submitting} />
+
+            <div className="space-y-1">
+              <label htmlFor="doc-type" className="text-xs font-medium text-muted-foreground">Document type</label>
+              <select
+                id="doc-type"
+                value={docType}
+                onChange={(e) => setDocType(e.target.value)}
+                disabled={submitting}
+                className="w-full rounded-input border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+              >
+                {DOC_TYPES.map((d) => (
+                  <option key={d.key} value={d.key}>{d.label}</option>
+                ))}
+              </select>
+            </div>
 
             <div className="space-y-1">
               <label htmlFor="id-number" className="text-xs font-medium text-muted-foreground">ID number (optional)</label>

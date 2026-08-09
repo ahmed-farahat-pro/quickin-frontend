@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
 import { getVerification, submitVerification } from '@/lib/local/db'
 import { getUserFromRequest } from '@/lib/local/auth'
+import { normalizeDocType } from '@/lib/local/host-verification-core'
 
 // ID verification API (no Supabase). Auth via Bearer token (mobile) or qk_token cookie (web).
 // No OCR anywhere — the user simply picks/captures a FRONT and a BACK photo of their ID.
 //   GET  /api/local/verification                                          → the signed-in user's status
-//   POST /api/local/verification { front, back, id_number?, full_name? }   → submit ID photos for review
+//   POST /api/local/verification { front, back, selfie?, doc_type?, id_number?, full_name? }
+//                                                                          → submit ID photos for review
 //
 // `front`/`back` are base64 JPEGs (with or without a `data:image/...;base64,` prefix); each is
 // normalized to a data URL. Back-compat: { doc } or { image } is treated as FRONT only. Images are
@@ -26,6 +28,9 @@ export async function GET(req: Request) {
         status: v.status,
         verified_at: v.reviewed_at,
         notes: v.notes,
+        // Returned so a rejected host resubmitting sees the type they declared
+        // last time rather than re-picking it.
+        doc_type: v.doc_type ?? null,
         id_number: v.id_number,
         submitted_at: v.submitted_at,
       },
@@ -73,6 +78,12 @@ export async function POST(req: Request) {
       selfieImageData: selfie,
       idNumber: body.id_number || body.idNumber || null,
       fullName: body.full_name || body.fullName || null,
+      // Which document this is, so the reviewer can check the photo against the
+      // declared type. Absent on rows that predate the field; normalizeDocType
+      // keeps an unknown value out of the column.
+      docType: body.doc_type === undefined && body.docType === undefined
+        ? null
+        : normalizeDocType(body.doc_type ?? body.docType),
       source: 'manual',
     })
     return NextResponse.json({ status: v.status, verified_at: v.reviewed_at }, { status: 201, headers: CORS })

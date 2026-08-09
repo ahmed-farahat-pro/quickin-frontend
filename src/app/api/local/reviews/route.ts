@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getListingReviews, getReviewableStays, submitReview } from '@/lib/local/db'
 import { getUserFromRequest } from '@/lib/local/auth'
+import { isContactBlockedError } from '@/lib/local/contentguard'
 
 // Reviews API (no Supabase) — guest reviews of a listing ("rate the place").
 //   GET  /api/local/reviews?listing_id=ID         (public) → Review[]
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error('POST /api/local/reviews failed:', err)
-    if (/eligible|Invalid|required/i.test(msg)) {
+    if (isContactBlockedError(err) || /eligible|Invalid|required/i.test(msg)) {
       return NextResponse.json({ error: msg }, { status: 400, headers: CORS })
     }
     return NextResponse.json({ error: 'Internal error' }, { status: 500, headers: CORS })

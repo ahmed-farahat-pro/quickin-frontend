@@ -188,12 +188,14 @@ describe('alertsFor — the permission boundary', () => {
     disputed_payments: 5,
     open_reports: 4,
     pending_resort_submissions: 6,
+    flagged_users: 9,
+    open_disputes: 5,
   }
 
   test('a super admin sees every non-zero queue', () => {
     const a = alertsFor(COUNTS, { modules: [], isSuperAdmin: true })
     assert.equal(a.length, ALERT_SOURCES.length)
-    assert.equal(alertTotal(a), 28)
+    assert.equal(alertTotal(a), 42)
   })
 
   test('an operator NEVER sees an alert for a module they do not hold', () => {

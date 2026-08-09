@@ -140,7 +140,7 @@
     "loading": "Cargando…",
     "empty": "Aún no hay mensajes, ¡saluda!",
     "send": "Enviar",
-    "guardNote": "Por tu seguridad, mantén los chats en QuickIn. Los números y enlaces se ocultan.",
+    "guardNote": "Por tu seguridad, mantén los chats en QuickIn. Números, correos, usuarios y enlaces externos están bloqueados.",
     "messageHost": "Mensaje al anfitrión",
     "host": "Anfitrión",
     "close": "Cerrar",
@@ -148,7 +148,10 @@
     "inboxTitle": "Mensajes",
     "noThreads": "Aún no hay conversaciones.",
     "pickThread": "Selecciona una conversación.",
-    "asHost": "Anfitrión"
+    "asHost": "Anfitrión",
+    "warningTitle": "Un mensaje de QuickIn",
+    "warningAck": "Entendido",
+    "warningAckFailed": "No se pudo guardar. Inténtalo de nuevo."
   },
   "bookingPage": {
     "title": "Confirmar y solicitar",

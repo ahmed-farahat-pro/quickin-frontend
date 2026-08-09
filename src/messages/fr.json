@@ -140,7 +140,7 @@
     "loading": "Chargement…",
     "empty": "Aucun message — dites bonjour !",
     "send": "Envoyer",
-    "guardNote": "Pour votre sécurité, gardez les échanges sur QuickIn. Les numéros et liens sont masqués.",
+    "guardNote": "Pour votre sécurité, gardez les échanges sur QuickIn. Numéros, e-mails, pseudos et liens externes sont bloqués.",
     "messageHost": "Message à l'hôte",
     "host": "Hôte",
     "close": "Fermer",
@@ -148,7 +148,10 @@
     "inboxTitle": "Messages",
     "noThreads": "Aucune conversation.",
     "pickThread": "Sélectionnez une conversation.",
-    "asHost": "Hôte"
+    "asHost": "Hôte",
+    "warningTitle": "Un message de QuickIn",
+    "warningAck": "J'ai compris",
+    "warningAckFailed": "Enregistrement impossible. Veuillez réessayer."
   },
   "bookingPage": {
     "title": "Confirmer et demander",

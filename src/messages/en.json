@@ -140,7 +140,7 @@
     "loading": "Loading…",
     "empty": "No messages yet — say hello!",
     "send": "Send",
-    "guardNote": "For your safety, keep chats on QuickIn. Phone numbers and links are hidden.",
+    "guardNote": "For your safety, keep chats on QuickIn. Phone numbers, emails, handles and outside links are blocked.",
     "messageHost": "Message host",
     "host": "Host",
     "close": "Close",
@@ -148,7 +148,10 @@
     "inboxTitle": "Messages",
     "noThreads": "No conversations yet.",
     "pickThread": "Select a conversation to read it.",
-    "asHost": "Host"
+    "asHost": "Host",
+    "warningTitle": "A note from QuickIn",
+    "warningAck": "I understand",
+    "warningAckFailed": "Couldn't save that. Please try again."
   },
   "bookingPage": {
     "title": "Confirm and Request",

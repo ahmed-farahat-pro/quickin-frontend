@@ -7,6 +7,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { ShimmerStyles, SkeletonChatBubbles } from '@/components/ui/skeleton-block'
+// The same module the server enforces with — imported here only so the sender
+// gets the answer instantly. The server still checks; this is never the gate.
+import { inspectContent } from '@/lib/local/contentguard'
+import { WARNING_GATE_STATUS } from '@/lib/local/moderation-core'
 
 const C = {
   burgundy: '#5B0F16',
@@ -36,6 +40,10 @@ export default function LocalChatPanel({
   const [text, setText] = useState('')
   const [state, setState] = useState<'loading' | 'ready' | 'needsLogin' | 'error'>('loading')
   const [errorMsg, setErrorMsg] = useState('')
+  // A policy warning the user must read before they can send again. Set from the
+  // send response; cleared once they acknowledge it.
+  const [warning, setWarning] = useState<{ id: string; message: string } | null>(null)
+  const [acking, setAcking] = useState(false)
   const [sending, setSending] = useState(false)
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
@@ -96,6 +104,15 @@ export default function LocalChatPanel({
     e.preventDefault()
     const body = text.trim()
     if (!body || !convoId || sending) return
+    // Answer locally first: same policy, no round trip, and the message stays in
+    // the box so the sender can edit rather than retype it. The server rejects
+    // it too — a client can always skip this, which is why it isn't the gate.
+    const verdict = inspectContent(body, 'chat')
+    if (verdict.blocked) {
+      setErrorMsg(verdict.message!)
+      return
+    }
+    setErrorMsg('')
     setSending(true)
     setText('')
     try {
@@ -107,6 +124,13 @@ export default function LocalChatPanel({
       })
       if (res.status === 401) { setState('needsLogin'); return }
       const data = await res.json().catch(() => ({}))
+      // A moderator has issued a warning that hasn't been read. The message is
+      // kept, not lost — acknowledging re-enables the box and they can send it.
+      if (res.status === WARNING_GATE_STATUS && data.policyWarning) {
+        setWarning(data.policyWarning)
+        setText(body)
+        return
+      }
       if (!res.ok) throw new Error(data.error || 'Failed to send')
       setMessages((prev) => [...prev, data.message])
     } catch (e) {
@@ -174,6 +198,48 @@ export default function LocalChatPanel({
 
       {errorMsg && <p style={{ margin: 0, fontSize: 12.5, color: '#b3261e' }}>{errorMsg}</p>}
 
+      {/* The acknowledge gate. It replaces the composer rather than sitting above
+          it: the point is that sending is not available until this is read, and a
+          notice you can ignore while still typing is not that. */}
+      {warning ? (
+        <div style={{ background: '#FDECEA', border: '1px solid #F3C0BA', borderRadius: 14, padding: '13px 15px' }}>
+          <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 700, color: '#8C1D18' }}>
+            {t('warningTitle')}
+          </p>
+          <p style={{ margin: '0 0 10px', fontSize: 13, lineHeight: 1.45, color: C.ink, whiteSpace: 'pre-wrap' }}>
+            {warning.message}
+          </p>
+          <button
+            type="button"
+            disabled={acking}
+            onClick={async () => {
+              setAcking(true)
+              try {
+                const res = await fetch('/api/local/policy-warning', {
+                  method: 'POST',
+                  credentials: 'same-origin',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ id: warning.id }),
+                })
+                // Only drop the gate if the server agrees. Clearing it locally on a
+                // failed call would just bounce their next message off the same 409.
+                if (res.ok) setWarning(null)
+                else setErrorMsg(t('warningAckFailed'))
+              } catch {
+                setErrorMsg(t('warningAckFailed'))
+              } finally {
+                setAcking(false)
+              }
+            }}
+            style={{
+              border: 'none', borderRadius: 999, padding: '9px 18px', cursor: acking ? 'default' : 'pointer',
+              background: C.burgundy, color: '#fff', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+            }}
+          >
+            {acking ? '…' : t('warningAck')}
+          </button>
+        </div>
+      ) : (
       <form onSubmit={send} style={{ display: 'flex', gap: 8 }}>
         <input
           value={text}
@@ -211,6 +277,7 @@ export default function LocalChatPanel({
           {t('send')}
         </button>
       </form>
+      )}
       <p style={{ margin: 0, fontSize: 11.5, color: C.muted, textAlign: 'center' }}>{t('guardNote')}</p>
     </div>
   )

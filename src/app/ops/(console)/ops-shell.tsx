@@ -71,6 +71,7 @@ const NAV: NavGroup[] = [
       { href: '/ops/bookings', label: 'Bookings', module: 'bookings' },
       { href: '/ops/payments', label: 'Payments & disputes', module: 'payments' },
       { href: '/ops/reports', label: 'Reports', module: 'reports' },
+      { href: '/ops/disputes', label: 'Guest disputes', module: 'disputes' },
       { href: '/ops/alerts', label: 'Alerts', module: 'overview' },
     ],
   },
@@ -78,6 +79,7 @@ const NAV: NavGroup[] = [
     title: 'People',
     items: [
       { href: '/ops/users', label: 'Users', module: 'users' },
+      { href: '/ops/moderation', label: 'Moderation', module: 'moderation' },
       { href: '/ops/applications', label: 'Host applications', module: 'applications' },
       { href: '/ops/verifications', label: 'ID verifications', module: 'verifications' },
     ],

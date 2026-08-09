@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireStaff, staffActor, logStaffAction, clientIpOf } from '@/lib/local/staff'
 import { resolveListingResort } from '@/lib/local/resorts'
-import { adminListListings, adminSetListingPublished, adminDeleteListing, adminSetListingApproval } from '@/lib/local/db'
+import { adminListListings, adminSetListingPublished, adminDeleteListing, adminSetListingApproval, isListingInputError } from '@/lib/local/db'
 
 // Admin (staff session + 'listings' module): GET → newest-first listings.
 //                    POST { id, action: 'publish'|'unpublish'|'delete'|'approve'|'reject', note? } → mutate.
@@ -77,7 +77,9 @@ export async function POST(req: Request) {
     // resolveListingResort throws human-readable input errors; pass them through so
     // the popup can show why the approval was refused.
     const msg = err instanceof Error ? err.message : 'Could not update'
-    const isInput = /required|Pick a|Invalid|no longer exists|no usable/.test(msg)
+    // isListingInputError covers the typed throws (the host-verification gate,
+    // the listing validators); the regex covers the older message-only ones.
+    const isInput = isListingInputError(err) || /required|Pick a|Invalid|no longer exists|no usable/.test(msg)
     return NextResponse.json({ error: isInput ? msg : 'Could not update' }, { status: isInput ? 400 : 500, headers: CORS })
   }
 }

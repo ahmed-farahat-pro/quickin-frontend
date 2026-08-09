@@ -1,6 +1,9 @@
 import { randomInt } from 'node:crypto'
 import { pool } from './pool'
 import { resolveResortSelection } from './resorts'
+import { isContactBlockedError } from './contentguard'
+import { guardContent, guardSplitContent, countFlaggedUsers, oldestFlaggedAt } from './moderation'
+import { countOpenDisputes, oldestOpenDisputeAt } from './disputes'
 import { INSTAPAY_KEYS, rowsToPaymentConfig } from './payment-config-core'
 import type { PaymentConfig } from './payment-config-core'
 import {
@@ -542,7 +545,7 @@ export async function getNotifications(userId: string): Promise<{ notifications:
   const { rows } = await pool.query(
     `SELECT id, type, title, body, link, read,
             to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
-       FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
+       FROM notifications WHERE user_id = $1 ORDER BY notifications.created_at DESC LIMIT 50`,
     [userId]
   )
   return { notifications: rows, unreadCount: rows.filter((r) => !r.read).length }
@@ -1186,6 +1189,9 @@ export async function submitReview(args: {
 }): Promise<void> {
   const { userId, bookingId, rating, comment = null, photos = [] } = args
   if (!isUuid(bookingId)) throw new Error('Invalid booking')
+  // A review is public and permanent, so it's the most attractive place to park
+  // a phone number. Same guard as chat.
+  await guardContent(userId, comment ?? '', 'review', { type: 'booking', id: bookingId })
   const r = Math.max(1, Math.min(5, Math.round(rating)))
   const { rows } = await pool.query(
     `SELECT listing_id FROM bookings
@@ -1841,6 +1847,9 @@ export async function updateUserProfile(
   fields: { full_name?: string; avatar_url?: string }
 ): Promise<void> {
   if (!isUuid(userId)) throw new Error('Invalid id')
+  // A display name is shown to the other party in every thread, so it's a way to
+  // publish a number without ever typing it into chat.
+  if (fields.full_name !== undefined) await guardContent(userId, fields.full_name ?? '', 'profile')
   const sets: string[] = []
   const params: unknown[] = [userId]
   if (fields.full_name !== undefined) { params.push(fields.full_name); sets.push(`full_name = $${params.length}`) }
@@ -2021,6 +2030,10 @@ export async function createListing(hostId: string, data: CreateListingInput): P
   if (!title) throw new Error('Title is required')
   const price = Number(data.price_per_night)
   if (!Number.isFinite(price) || price <= 0) throw new Error('A valid price per night is required')
+  // A number in the listing copy reaches every guest at once, so the same guard
+  // the chat runs applies to the fields a host writes freely.
+  await guardContent(hostId, title, 'listing')
+  await guardContent(hostId, String(data.description ?? ''), 'listing')
   const nn = (v: unknown, d: number) => {
     const n = Math.floor(Number(v))
     return Number.isFinite(n) && n >= 0 ? n : d
@@ -2156,6 +2169,9 @@ export class ListingInputError extends Error {
 /** Was this thrown by one of the listing validators below? (`name` is checked too
  *  so it still works if the module is instantiated twice in a bundle.) */
 export function isListingInputError(err: unknown): err is Error {
+  // A blocked contact detail counts: it is the host's input to fix, not a
+  // server fault, so the route answers 400 with the guard's wording.
+  if (isContactBlockedError(err)) return true
   return err instanceof ListingInputError || (err instanceof Error && err.name === 'ListingInputError')
 }
 
@@ -2289,8 +2305,18 @@ export async function updateListing(
   }
 
   // --- Moderation-relevant fields ---
-  if (data.title !== undefined) put('title', assertListingText(data.title, 'Title', 200))
-  if (data.description !== undefined) put('description', String(data.description ?? '').trim().slice(0, 5000) || null)
+  // Guarded on edit as well as on create — otherwise a clean listing could be
+  // published and then quietly edited to carry a number.
+  if (data.title !== undefined) {
+    const t = assertListingText(data.title, 'Title', 200)
+    await guardContent(hostId, t, 'listing', { type: 'listing', id })
+    put('title', t)
+  }
+  if (data.description !== undefined) {
+    const d = String(data.description ?? '').trim().slice(0, 5000) || null
+    await guardContent(hostId, d ?? '', 'listing', { type: 'listing', id })
+    put('description', d)
+  }
   if (data.location !== undefined) put('location', String(data.location ?? '').trim().slice(0, 200) || null)
   if (data.country !== undefined) put('country', String(data.country ?? '').trim().slice(0, 100) || null)
   // Resort is THREE columns (resort_id, resort_name, region) driven by one logical
@@ -2458,12 +2484,18 @@ export interface AdminStats {
   pending_payments: number
   pending_resort_submissions: number
   open_reports: number
+  /** Users with unreviewed content-guard blocks (F5) — the Moderation queue. */
+  flagged_users: number
+  /** Guest disputes still open or in review — the Disputes queue. */
+  open_disputes: number
   /** When the oldest item in each queue arrived, so an alert can show how long it has waited. */
   oldest_verification: string | null
   oldest_application: string | null
   oldest_listing: string | null
   oldest_report: string | null
   oldest_payment: string | null
+  oldest_flag: string | null
+  oldest_dispute: string | null
 }
 
 /** Top-line counts for the admin dashboard, plus the alert queues (F3/F4).
@@ -2530,7 +2562,19 @@ export async function adminStats(): Promise<AdminStats> {
        (SELECT to_char(MIN(created_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') FROM reports WHERE status = 'open') AS oldest_report,
        (SELECT to_char(MIN(submitted_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') FROM payment_proofs WHERE status = 'submitted') AS oldest_payment`
   )
-  return rows[0] as AdminStats
+  // The two newest queues are read through their own helpers rather than as
+  // subqueries above, ON PURPOSE: a subquery against a table that doesn't exist
+  // yet fails the WHOLE statement, which would take the dashboard and the alert
+  // centre down on any database where migrate-policy-violations / migrate-disputes
+  // hasn't run. Each helper answers 0 in that case, so the console degrades to
+  // "nothing in this queue" instead of breaking.
+  const [flagged_users, open_disputes, oldest_flag, oldest_dispute] = await Promise.all([
+    countFlaggedUsers(),
+    countOpenDisputes(),
+    oldestFlaggedAt(),
+    oldestOpenDisputeAt(),
+  ])
+  return { ...(rows[0] as AdminStats), flagged_users, open_disputes, oldest_flag, oldest_dispute }
 }
 
 /**
@@ -2808,6 +2852,26 @@ export async function adminSetListingApproval(
   note?: string | null,
 ): Promise<void> {
   if (!isUuid(id)) throw new Error('Invalid listing')
+  // Going live is the moment that matters: a listing can outlive the verification
+  // that allowed it to be created, so publishing re-checks the host rather than
+  // trusting the create-time gate. The backend project's setListingApproval has
+  // always done this; /ops — where approvals actually happen — did not, which
+  // meant the one path an operator uses could publish an unverified host.
+  if (action === 'approve') {
+    const { rows: hostRows } = await pool.query(
+      `SELECT COALESCE(u.verification_status, 'unverified') AS status
+         FROM listings l JOIN users u ON u.id = l.host_id
+        WHERE l.id = $1`,
+      [id],
+    )
+    const hostStatus = hostRows[0]?.status as string | undefined
+    if (hostStatus && hostStatus !== 'verified') {
+      throw new ListingInputError(
+        `This host is not identity-verified (${hostStatus}). Approve their ID in Verifications first — ` +
+        `a listing must not go live before its host is verified.`,
+      )
+    }
+  }
   const status = action === 'approve' ? 'approved' : 'rejected'
   const { rows } = await pool.query(
     `UPDATE listings SET approval_status = $2, is_published = $3 WHERE id = $1
@@ -3354,7 +3418,7 @@ export async function adminGetUserDetail(id: string): Promise<AdminUserDetail | 
               to_char(submitted_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS submitted_at,
               to_char(reviewed_at,  'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS reviewed_at,
               (image_data IS NOT NULL) AS has_document
-         FROM id_verifications WHERE user_id = $1 ORDER BY submitted_at DESC LIMIT 20`,
+         FROM id_verifications WHERE user_id = $1 ORDER BY id_verifications.submitted_at DESC LIMIT 20`,
       [id],
     ),
     pool.query(
@@ -3362,7 +3426,7 @@ export async function adminGetUserDetail(id: string): Promise<AdminUserDetail | 
               to_char(submitted_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS submitted_at,
               to_char(reviewed_at,  'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS reviewed_at,
               (national_id IS NOT NULL) AS has_document
-         FROM host_applications WHERE user_id = $1 ORDER BY submitted_at DESC LIMIT 20`,
+         FROM host_applications WHERE user_id = $1 ORDER BY host_applications.submitted_at DESC LIMIT 20`,
       [id],
     ),
     pool.query(
@@ -3607,20 +3671,6 @@ export async function adminListBookings(): Promise<AdminBookingRow[]> {
 
 // ---- Chat (pre-booking inquiry: guest ⇄ host) -------------------------------
 
-/**
- * Content guard: strip phone numbers, emails and links from a chat message so
- * guests + hosts keep the conversation (and payments) on-platform. Runs
- * server-side in postMessage — the client can't bypass it.
- */
-export function redactContact(text: string): string {
-  let s = String(text)
-  s = s.replace(/\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g, '[hidden]')
-  s = s.replace(/\bhttps?:\/\/\S+/gi, '[hidden]')
-  // Phone-like digit runs: 7+ digits, allowing +, spaces, dashes, parens, dots.
-  s = s.replace(/(\+?\d[\d\s().-]{5,}\d)/g, (m) => (m.replace(/\D/g, '').length >= 7 ? '[hidden]' : m))
-  return s
-}
-
 export interface ConversationSummary {
   id: string
   listing_id: string | null
@@ -3705,19 +3755,31 @@ export async function listMessages(userId: string, conversationId: string): Prom
   const { rows } = await pool.query(
     `SELECT id, sender_id, body,
             to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
-       FROM chat_messages WHERE conversation_id = $1 ORDER BY created_at ASC LIMIT 500`,
+       FROM chat_messages WHERE conversation_id = $1 ORDER BY chat_messages.created_at ASC LIMIT 500`,
     [conversationId]
   )
   return (rows as ChatMessage[]).map((m) => ({ ...m, mine: m.sender_id === userId }))
 }
 
-/** Post a message (contact info redacted). Notifies the other party. */
+/**
+ * Post a message. Phone numbers, email addresses, social handles and
+ * off-platform links are blocked outright (see contentguard) — including ones
+ * split across the sender's recent messages. This is the same module and the
+ * same policy the backend runs, so the web and the mobile apps behave
+ * identically on the same thread.
+ */
 export async function postMessage(userId: string, conversationId: string, rawBody: string): Promise<ChatMessage> {
   if (!isUuid(userId) || !isUuid(conversationId)) throw new Error('Invalid id')
-  const body = redactContact(String(rawBody || '').trim()).slice(0, 2000)
+  const body = String(rawBody || '').trim().slice(0, 2000)
   if (!body) throw new Error('Message is empty')
+  await guardContent(userId, body, 'chat', { type: 'conversation', id: conversationId })
   const convo = await conversationForUser(userId, conversationId)
   if (!convo) throw new Error('Conversation not found')
+  const recent = await pool.query(
+    `SELECT body FROM chat_messages WHERE conversation_id = $1 AND sender_id = $2 ORDER BY created_at DESC LIMIT 16`,
+    [conversationId, userId]
+  )
+  await guardSplitContent(userId, recent.rows.map((r) => String(r.body || '')).reverse(), body, 'chat', { type: 'conversation', id: conversationId })
   const { rows } = await pool.query(
     `WITH ins AS (
        INSERT INTO chat_messages (conversation_id, sender_id, body) VALUES ($1, $2, $3) RETURNING *
@@ -3949,7 +4011,7 @@ export async function getBookingProof(
     `SELECT image_data, method, status,
             to_char(submitted_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS submitted_at,
             reject_reason, dispute_note, amount::float8 AS amount
-       FROM payment_proofs WHERE booking_id = $1 ORDER BY submitted_at DESC LIMIT 1`,
+       FROM payment_proofs WHERE booking_id = $1 ORDER BY payment_proofs.submitted_at DESC LIMIT 1`,
     [bookingId]
   )
   return (rows[0] as PaymentProof) ?? null

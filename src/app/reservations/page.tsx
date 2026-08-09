@@ -3,11 +3,13 @@ import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { getUserBookings } from '@/lib/local/db'
+import { disputableBookingIds, listDisputesForGuest } from '@/lib/local/disputes'
 import { verifyToken, getUserRowByEmail } from '@/lib/local/auth'
 import { getRequestOrigin } from '@/lib/site-origin'
 import { localeToBcp47, type Locale } from '@/i18n/config'
 import { formatPrice } from '@/lib/utils'
 import { ReservationActions } from './reservation-actions'
+import { DisputePanel } from '@/components/dispute-panel'
 import { StayPassCard } from './stay-pass-card'
 
 export const dynamic = 'force-dynamic'
@@ -223,6 +225,17 @@ async function ReservationsList({
   isHost: boolean
 }) {
   const bookings = await getUserBookings(userId)
+  // Which of these can still be disputed, and which already have one — resolved
+  // server-side in one query so the eligibility rule lives in exactly one place
+  // (disputes-core) rather than being re-derived per client.
+  // Tolerated rather than awaited bare: if migrate-disputes hasn't run on this
+  // database, these throw — and a guest's reservations list must not 500 over a
+  // feature that simply isn't available yet. It degrades to "no dispute UI".
+  const [disputeState, myDisputes] = await Promise.all([
+    disputableBookingIds(userId).catch(() => ({ eligible: [] as string[], existing: {} })),
+    listDisputesForGuest(userId).catch(() => [] as Awaited<ReturnType<typeof listDisputesForGuest>>),
+  ])
+  const disputeByBooking = new Map(myDisputes.map((d) => [d.booking_id, d]))
   const t = await getTranslations('reservationsLocal')
   // Absolute origin for the stay-pass QR (see StayPassCard).
   const origin = await getRequestOrigin()
@@ -412,6 +425,13 @@ async function ReservationsList({
                   proofStatus={b.payment_proof_status}
                   checkIn={b.check_in}
                   checkOut={b.check_out}
+                />
+                {/* Raise an issue about this stay, or follow one already raised.
+                    Renders nothing on a reservation that isn't eligible. */}
+                <DisputePanel
+                  bookingId={b.id}
+                  eligible={disputeState.eligible.includes(b.id)}
+                  existing={disputeByBooking.get(b.id) ?? null}
                 />
                 {/* QR + link to the public pass — rendered only once the host
                     has approved and a code exists (see StayPassCard). */}

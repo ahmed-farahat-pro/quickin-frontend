@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getUserById, updateUserProfile, getVerification } from '@/lib/local/db'
 import { getUserFromRequest } from '@/lib/local/auth'
+import { isContactBlockedError } from '@/lib/local/contentguard'
 
 export const dynamic = 'force-dynamic'
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' }
@@ -61,6 +62,11 @@ export async function PATCH(
     await updateUserProfile(id, fields)
     return NextResponse.json({ ok: true }, { headers: CORS })
   } catch (err) {
+    // A display name carrying contact details is the user's input to fix, so it
+    // answers 400 with the guard's wording rather than a generic failure.
+    if (isContactBlockedError(err)) {
+      return NextResponse.json({ error: (err as Error).message }, { status: 400, headers: CORS })
+    }
     console.error('PATCH /api/local/users/[id] failed:', err)
     return NextResponse.json({ error: String(err) }, { status: 500, headers: CORS })
   }

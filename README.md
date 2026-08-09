@@ -517,6 +517,9 @@ npm run check     # same; the pre-deploy gate
 | `payment-flow-core.ts` | Which stage a booking is at (`paymentStageFor`), the shared `canPay` predicate, what an admin decision writes, and the proof-image validator — including that a submitted screenshot is never "awaiting payment" |
 | `document-core.ts` | Document-kind validation, the data-URL parser and its mime allowlist (SVG and HTML are rejected — these bytes render in an admin's browser), the verification state machine, and which module owns which document |
 | `xlsx.ts` | Cell typing (numbers stay numeric so Excel can sum them), sheet-name sanitizing, filename safety |
+| `moderation-core.ts` | The flag threshold (one attempt, and why not three), the three moderator actions and the fact that permanent removal is not one of them, the warning fallback copy, and the 409 `policyWarning` contract all three clients branch on — including that `error` repeats the warning so an old app build still shows it |
+| `disputes-core.ts` | Which bookings can be disputed (and why pending and cancelled can't), that `closed` is terminal while `resolved` can reopen, that a no-op transition is refused, and the validators — including that one bad attachment out of four doesn't lose the whole filing |
+| `contentguard.ts` | Every de-obfuscation the contact guard undoes (Arabic-Indic/fullwidth/enclosed digits, zero-width and soft hyphens, Cyrillic lookalikes, spelled-out EN/AR numbers, `at`/`dot` spelling), the four categories it blocks, the split-across-messages check — and an equally large **false-positive** half, because a guard that rejects "we are 2 adults arriving on the 12th" is worse than one that misses |
 
 Those modules deliberately have **no runtime imports** — Node's ESM resolver
 rejects the extension-less relative specifiers used elsewhere in `src/lib/local`, so a
@@ -527,6 +530,124 @@ README's Testing section is the fuller writeup.
 `src/lib/local/resort-core.ts` is **byte-identical** to the backend's copy — both
 projects write the same `resorts` table, so a drifted slug would fork the catalog.
 The backend's `scripts/check-resort-core-parity.mjs` fails if they diverge.
+`contentguard.ts` is duplicated the same way (`check-contentguard-parity.mjs`) — see
+below.
+
+## Contact details are blocked, everywhere a user can type
+
+`src/lib/local/contentguard.ts` keeps phone numbers, email addresses, social handles
+and off-platform links out of every free-text field, so a host and a guest can't take
+the booking (and the payment) off QuickIn. **The backend README's "Contact details are
+blocked" section is the full writeup** — what it detects, how it survives obfuscation,
+and why the two copies must stay byte-identical. What is specific to this project:
+
+| Surface | Enforced in |
+| --- | --- |
+| Pre-booking chat (`POST /api/local/chat`) | `postMessage` (db.ts) |
+| Reviews (`POST /api/local/reviews`) | `submitReview` (db.ts) |
+| Listing title + description | `createListing`, `updateListing` (db.ts) |
+| Profile display name (`PATCH /api/local/users/:id`) | `updateUserProfile` (db.ts) |
+
+This replaced a `redactContact()` helper that silently rewrote matches to `[hidden]`
+using three plain regexes. It was bypassed by anything that wasn't ASCII digits —
+`٠١٠…`, `０１０…`, "zero one zero", a soft hyphen between digits — and because it
+masked rather than refused, a sender got no signal and simply retried until something
+slipped through. The guard now **rejects** the write and says why.
+
+`LocalChatPanel` imports the same module client-side and checks before sending, so
+the sender gets the answer with no round trip and their text stays in the box. That is
+UX only — the server check is the gate, and a client can always skip it.
+
+Errors surface as **400** with the guard's own sentence: routes recognise them via
+`isContactBlockedError` (and `isListingInputError`, which now includes them).
+
+## /ops → Moderation
+
+Every blocked attempt is now recorded, so the guard refusing something is no longer
+invisible. `src/lib/local/moderation.ts` writes one `policy_violations` row per
+blocked attempt — who, which category, which surface, **the full text they typed**,
+and whether it was only caught by stitching their recent messages together. The
+backend project records the same rows for the mobile apps; the console is here.
+
+**Flagged at one attempt, not three.** The guard already refused the message, so a
+row is a recorded attempt rather than a suspicion — and a threshold would hide the
+first two attempts by everyone, which is exactly the population worth seeing.
+`FLAG_THRESHOLD` in `moderation-core.ts`.
+
+**The queue is people, not attempts.** One user trying forty times is one decision.
+Expanding a row loads their whole history verbatim, because a count alone can't tell
+a determined evader from someone whose booking reference tripped the guard.
+
+| Action | What it does |
+| --- | --- |
+| **Warn** | Issues a warning the user must acknowledge before they can send another message (`policy_warnings`). One pending warning at a time — a second would leave them acknowledging one and still gated by the other, with no way to see it |
+| **Suspend** | Reuses `adminSetAccountStatus(id, 'blocked')`, so listings hide and unhide exactly as they do from /ops → Users, and the same token check refuses them. Reversible from Users |
+| **Clear** | A false positive, or a first slip not worth acting on |
+
+Permanent **removal is deliberately absent** here: it stays behind the `users` module,
+so a moderator granted only `moderation` can stop someone without being able to erase
+them.
+
+**All three actions mark the user's outstanding rows reviewed**, which is what drains
+the alert. Without that the count only ever climbs and the alert centre trains people
+to ignore it — the same reason `ALERT_SOURCES` drops zero-count queues. Flagged users
+appear as `flagged_users` in `adminStats` and in the alert centre for anyone holding
+the module.
+
+Reading someone's attempts means reading what they wrote, so the read writes a
+`moderation_viewed` row to `staff_audit_log`, like documents already do.
+
+### The acknowledge gate
+
+While a warning is unacknowledged, every chat send answers **409** with
+`{ error, policyWarning: { id, message } }`; `POST /api/local/policy-warning { id }`
+clears it. Enforced server-side so no client can skip it, and `error` repeats the
+warning text so a mobile build that predates the dialog still *shows* it rather than a
+dead end. Nothing else notifies the user — no email, no push, by design — so the
+dialog is the delivery as well as the gate.
+
+`LocalChatPanel` swaps its composer for the warning rather than showing it above:
+a notice you can ignore while still typing is not a gate. The draft is kept, so
+acknowledging reopens the composer with the message still in it. iOS and Android do
+the same via `PolicyWarningBanner`.
+
+**Deploy order matters here.** Ship the migration first, then the two web projects,
+then the app builds. Between the server deploy and the app release, a warned user on
+an old build sees the warning text inline and cannot send — correct, but they can only
+clear it from the web until they update.
+
+## /ops → Guest disputes
+
+Issues guests raise about a stay — before, during or after. **The backend
+README's "Guest disputes" section is the full writeup**: how this differs from the
+payment dispute and from abuse reports, which bookings are eligible, and why the
+description is deliberately not content-guarded. What is specific to this project:
+
+| Surface | Where |
+| --- | --- |
+| Guest files / follows | `DisputePanel` on `/reservations` — collapsed to one link until tapped, replaced by the status and history once raised |
+| Admin queue | `/ops/disputes`, `disputes` staff module |
+| Admin API | `GET/POST /api/local/admin/disputes` |
+
+**A status change is a compare-and-set.** The route reads the dispute, checks the
+transition is legal, then updates `WHERE status = <what the operator saw>`. Two
+people working the queue at once can't both act on a stale screen — the loser gets
+a **409** telling them to refresh. Every change writes a `dispute_events` row and a
+`staff_audit_log` row.
+
+**On "Resolved" the note is the outcome.** The same text goes to
+`disputes.resolution` and to the history row, because it is what the guest reads —
+making the operator type it twice would guarantee the two drift.
+
+Flagged as `open_disputes` in `adminStats` and in the alert centre for anyone
+holding the module; `resolved` and `closed` both drain it.
+
+**A note on `ORDER BY` here.** These queries alias `to_char(created_at, …) AS
+created_at`, and Postgres resolves a *bare* identifier in `ORDER BY` to the output
+column first — so an unqualified `ORDER BY created_at` sorts by the
+second-precision **string**, and rows in the same second fall back to the uuid
+tiebreak. That scrambled the dispute timeline. Every such `ORDER BY` in both repos
+is now table-qualified; if you add one, qualify it.
 
 ## Build
 
