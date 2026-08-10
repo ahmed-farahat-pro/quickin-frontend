@@ -3718,6 +3718,40 @@ export async function adminListPendingBookings(): Promise<AdminPendingBookingRow
   return rows as AdminPendingBookingRow[]
 }
 
+const BOOKING_STATUSES = ['pending', 'confirmed', 'completed', 'rejected', 'cancelled'] as const
+
+/** Admin drives a reservation's lifecycle (pending → confirmed → completed, or
+ *  rejected/cancelled). Issues the reservation code on confirm/complete. */
+export async function adminSetBookingStatus(
+  bookingId: string,
+  status: string,
+): Promise<{ updated: boolean; status: string }> {
+  if (!/^[0-9a-fA-F-]{36}$/.test(bookingId)) throw new Error('Invalid id')
+  if (!(BOOKING_STATUSES as readonly string[]).includes(status)) throw new Error('Invalid status')
+  const { rows } = await pool.query(
+    `UPDATE bookings b SET status = $2,
+            reservation_code = CASE WHEN $2 IN ('confirmed', 'completed')
+                                    THEN COALESCE(b.reservation_code, $3)
+                                    ELSE b.reservation_code END
+       FROM listings l
+      WHERE b.id = $1 AND l.id = b.listing_id
+      RETURNING b.user_id, l.title`,
+    [bookingId, status, genReservationCode()]
+  )
+  const row = rows[0]
+  if (row) {
+    const completed = status === 'completed'
+    await createNotification(row.user_id, 'booking',
+      completed ? 'Your stay is complete' : `Reservation ${status}`,
+      completed
+        ? `How was ${row.title}? Tap to leave a review.`
+        : `Your reservation for ${row.title} is now ${status}.`,
+      `/reservation/${bookingId}`
+    )
+  }
+  return { updated: rows.length > 0, status }
+}
+
 // ---- Chat (pre-booking inquiry: guest ⇄ host) -------------------------------
 
 export interface ConversationSummary {
