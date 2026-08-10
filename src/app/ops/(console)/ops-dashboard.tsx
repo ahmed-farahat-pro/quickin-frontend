@@ -48,13 +48,14 @@ const NO_ACCESS = 'Your access to this section has been removed.'
 
 // Each SectionId is also a STAFF_MODULES key, so a section maps 1:1 to the
 // permission that guards its API route — no lookup table needed.
-export type SectionId = 'overview' | 'listings' | 'bookings' | 'applications' | 'verifications'
+export type SectionId = 'overview' | 'listings' | 'bookings' | 'booking-requests' | 'applications' | 'verifications'
 
 /** Heading shown above each section, and the wording of its no-access card. */
 const SECTION_TITLES: Record<SectionId, string> = {
   overview: 'Overview',
   listings: 'Listings',
   bookings: 'Bookings',
+  'booking-requests': 'Booking Requests',
   applications: 'Host applications',
   verifications: 'ID verifications',
 }
@@ -135,6 +136,27 @@ type AdminBooking = {
   created_at: string
 }
 
+type AdminPendingBooking = {
+  id: string
+  reservation_code: string | null
+  status: string
+  payment_status: string
+  total_price: number
+  currency: string
+  check_in: string
+  check_out: string
+  guests: number
+  guest_name: string | null
+  guest_email: string | null
+  listing_title: string | null
+  listing_location: string | null
+  host_name: string | null
+  host_email: string | null
+  host_id: string | null
+  image: string | null
+  created_at: string
+}
+
 type HostApplication = {
   id: string
   user_id?: string | null
@@ -211,12 +233,18 @@ export function OpsDashboard({
   // The route decides the section; `tab` is kept as the local name because a dozen
   // handlers below report errors against "the current section".
   const tab = section
-  const allowed = can(section)
+  // booking-requests shares the bookings module permission.
+  const moduleForSection: Record<SectionId, StaffModule> = {
+    overview: 'overview', listings: 'listings', bookings: 'bookings',
+    'booking-requests': 'bookings', applications: 'applications', verifications: 'verifications',
+  }
+  const allowed = can(moduleForSection[section])
 
   // Per-section data.
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [listings, setListings] = useState<AdminListing[]>([])
   const [bookings, setBookings] = useState<AdminBooking[]>([])
+  const [pendingBookings, setPendingBookings] = useState<AdminPendingBooking[]>([])
   const [apps, setApps] = useState<HostApplication[]>([])
   const [verifs, setVerifs] = useState<Verification[]>([])
   // E2: the queue is a work list, so it defaults to pending — but a decided case must
@@ -228,6 +256,7 @@ export function OpsDashboard({
     overview: false,
     listings: false,
     bookings: false,
+    'booking-requests': false,
     applications: false,
     verifications: false,
   })
@@ -235,6 +264,7 @@ export function OpsDashboard({
     overview: null,
     listings: null,
     bookings: null,
+    'booking-requests': null,
     applications: null,
     verifications: null,
   })
@@ -242,6 +272,7 @@ export function OpsDashboard({
     overview: false,
     listings: false,
     bookings: false,
+    'booking-requests': false,
     applications: false,
     verifications: false,
   })
@@ -343,6 +374,14 @@ export function OpsDashboard({
             return
           }
           setBookings(Array.isArray(json.bookings) ? json.bookings : [])
+        } else if (id === 'booking-requests') {
+          const json = await adminGet<{ bookings?: AdminPendingBooking[] }>('bookings/pending')
+          if (json === 'forbidden') return setSectionError(id, NO_ACCESS)
+          if (!json) {
+            setSectionError(id, 'Could not load booking requests. Please retry.')
+            return
+          }
+          setPendingBookings(Array.isArray(json.bookings) ? json.bookings : [])
         } else if (id === 'applications') {
           const json = await adminGet<{ applications?: HostApplication[] }>('host-applications')
           if (json === 'forbidden') return setSectionError(id, NO_ACCESS)
@@ -544,6 +583,28 @@ export function OpsDashboard({
     // belongs but with a new status, so refetch rather than lie about it.
     if (verifFilter === 'all') setLoaded((p) => ({ ...p, verifications: false }))
     else setVerifs((prev) => prev.filter((v) => v.id !== id))
+  }
+
+  // ---- booking request actions (admin approves/declines on behalf of host) ----
+  const decideBookingRequest = async (id: string, action: 'confirmed' | 'rejected') => {
+    if (action === 'rejected') {
+      const note = window.prompt('Optional note for the guest (why declined):')
+      if (note === null) return
+    }
+    setBusyId(id)
+    const res = await fetch(`/api/local/admin/bookings/${id}`, {
+      method: 'PATCH',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: action }),
+    })
+    setBusyId(null)
+    if (res.status === 401) { sessionEnded(); return }
+    if (res.ok) {
+      setPendingBookings((prev) => prev.filter((b) => b.id !== id))
+    } else {
+      setSectionError('booking-requests', `Could not ${action === 'confirmed' ? 'approve' : 'decline'} the booking. Please retry.`)
+    }
   }
 
   /**
@@ -1164,6 +1225,143 @@ export function OpsDashboard({
                 </table>
               </div>
             </>
+          )
+        ) : null}
+
+        {/* ===================== BOOKING REQUESTS ===================== */}
+        {tab === 'booking-requests' && loaded['booking-requests'] ? (
+          pendingBookings.length === 0 ? (
+            <Empty
+              tone="clear"
+              title="No pending booking requests"
+              body="All booking requests have been handled."
+            />
+          ) : (
+            <div style={{ display: 'grid', gap: 14 }}>
+              {pendingBookings.map((b) => (
+                <div key={b.id} style={cardStyle}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 16,
+                      alignItems: 'flex-start',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    {b.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={b.image}
+                        alt={b.listing_title || 'Listing'}
+                        style={{
+                          width: 100,
+                          height: 75,
+                          objectFit: 'cover',
+                          borderRadius: 12,
+                          border: `1px solid ${TAN}`,
+                          flexShrink: 0,
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: 100,
+                          height: 75,
+                          borderRadius: 12,
+                          background: TAN,
+                          flexShrink: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: MUTED,
+                          fontSize: 11,
+                        }}
+                      >
+                        No image
+                      </div>
+                    )}
+                    <div style={{ flex: '1 1 240px', minWidth: 0 }}>
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 16, fontWeight: 700, color: INK }}>
+                          {b.listing_title || 'Untitled listing'}
+                        </span>
+                        {badge('Pending', '#FBF1DD', '#8A6D1F')}
+                      </div>
+                      <div style={{ fontSize: 13, color: MUTED, marginTop: 4 }}>
+                        {b.listing_location || '—'}
+                      </div>
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+                          gap: '8px 18px',
+                          margin: '12px 0',
+                        }}
+                      >
+                        <div>
+                          <div style={labelStyle}>Guest</div>
+                          <div style={{ fontSize: 14, fontWeight: 600 }}>{b.guest_name || '—'}</div>
+                          {b.guest_email ? (
+                            <div style={{ fontSize: 12, color: MUTED }}>{b.guest_email}</div>
+                          ) : null}
+                        </div>
+                        <div>
+                          <div style={labelStyle}>Host</div>
+                          <div style={{ fontSize: 14, fontWeight: 600 }}>{b.host_name || '—'}</div>
+                          {b.host_email ? (
+                            <div style={{ fontSize: 12, color: MUTED }}>{b.host_email}</div>
+                          ) : null}
+                        </div>
+                        <div>
+                          <div style={labelStyle}>Dates</div>
+                          <div style={{ fontSize: 14, whiteSpace: 'nowrap' }}>
+                            {fmtDay(b.check_in)} → {fmtDay(b.check_out)}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={labelStyle}>Guests</div>
+                          <div style={{ fontSize: 14 }}>{b.guests}</div>
+                        </div>
+                        <div>
+                          <div style={labelStyle}>Total</div>
+                          <div style={{ fontSize: 14, fontWeight: 600 }}>
+                            {fmtMoney(b.total_price, b.currency)}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={labelStyle}>Requested</div>
+                          <div style={{ fontSize: 13, color: MUTED }}>{fmtDate(b.created_at)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 10,
+                      marginTop: 14,
+                      paddingTop: 14,
+                      borderTop: `1px solid ${TAN}`,
+                    }}
+                  >
+                    <button
+                      style={approveBtn}
+                      disabled={busyId === b.id}
+                      onClick={() => decideBookingRequest(b.id, 'confirmed')}
+                    >
+                      {busyId === b.id ? 'Working…' : 'Approve'}
+                    </button>
+                    <button
+                      style={outlineBtn}
+                      disabled={busyId === b.id}
+                      onClick={() => decideBookingRequest(b.id, 'rejected')}
+                    >
+                      {busyId === b.id ? 'Working…' : 'Decline'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           )
         ) : null}
 

@@ -3669,6 +3669,55 @@ export async function adminListBookings(): Promise<AdminBookingRow[]> {
   return rows as AdminBookingRow[]
 }
 
+export interface AdminPendingBookingRow {
+  id: string
+  reservation_code: string | null
+  status: string
+  payment_status: string
+  total_price: number
+  currency: string
+  check_in: string
+  check_out: string
+  guests: number
+  guest_name: string | null
+  guest_email: string | null
+  listing_title: string | null
+  listing_location: string | null
+  host_name: string | null
+  host_email: string | null
+  host_id: string | null
+  image: string | null
+  created_at: string
+}
+
+/** Pending bookings awaiting host (or admin) approval. Newest-first. */
+export async function adminListPendingBookings(): Promise<AdminPendingBookingRow[]> {
+  const { rows } = await pool.query(
+    `SELECT b.id,
+            NULLIF(b.reservation_code, '') AS reservation_code,
+            b.status,
+            CASE WHEN b.paid_at IS NULL THEN 'unpaid' ELSE 'paid' END AS payment_status,
+            b.total_price::float8 AS total_price,
+            COALESCE(l.currency, 'USD') AS currency,
+            to_char(b.check_in, 'YYYY-MM-DD') AS check_in,
+            to_char(b.check_out, 'YYYY-MM-DD') AS check_out,
+            b.guests,
+            gu.full_name AS guest_name, gu.email AS guest_email,
+            l.title AS listing_title, l.location AS listing_location,
+            hu.full_name AS host_name, hu.email AS host_email, l.host_id,
+            (SELECT url FROM listing_images li WHERE li.listing_id = l.id ORDER BY li."order" LIMIT 1) AS image,
+            to_char(b.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
+       FROM bookings b
+       LEFT JOIN listings l ON l.id = b.listing_id
+       LEFT JOIN users gu ON gu.id = b.user_id
+       LEFT JOIN users hu ON hu.id = l.host_id
+      WHERE b.status = 'pending'
+      ORDER BY b.created_at DESC
+      LIMIT 200`
+  )
+  return rows as AdminPendingBookingRow[]
+}
+
 // ---- Chat (pre-booking inquiry: guest ⇄ host) -------------------------------
 
 export interface ConversationSummary {
