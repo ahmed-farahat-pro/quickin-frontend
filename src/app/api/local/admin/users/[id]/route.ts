@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireStaff, staffActor, logStaffAction, clientIpOf } from '@/lib/local/staff'
-import { adminGetUserDetail, adminSetAccountStatus } from '@/lib/local/db'
+import { adminGetUserDetail, adminSetAccountStatus, adminDeleteUser } from '@/lib/local/db'
 import {
   nextStatusFor,
   normalizeReason,
@@ -14,20 +14,22 @@ import {
 // One user, for the /ops profile screen.
 //   GET  /api/local/admin/users/:id
 //        → { user, listings, bookings, payments, conversations, documents, stats } (D2)
-//   POST /api/local/admin/users/:id { action:'block'|'unblock'|'remove'|'restore', reason? }
+//   POST /api/local/admin/users/:id { action:'block'|'unblock'|'remove'|'restore'|'delete', reason? }
 //        → the account lifecycle (D3 block, D4 remove). Every call is audited.
+//        → action:'delete' permanently removes the user row (hard delete) so the
+//          email is free for re-signup. Requires super admin.
 //
-// `restore` additionally requires a super admin: removal is the most destructive
-// action /ops has, so undoing one is a deliberate second pair of hands.
+// `restore` and `delete` additionally require a super admin.
 export const dynamic = 'force-dynamic'
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' }
 
 /** Past-tense audit verb per action, e.g. 'user_blocked'. */
-const AUDIT_ACTION: Record<UserStatusAction, string> = {
+const AUDIT_ACTION: Record<string, string> = {
   block: 'user_blocked',
   unblock: 'user_unblocked',
   remove: 'user_removed',
   restore: 'user_restored',
+  delete: 'user_deleted',
 }
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -50,10 +52,39 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const { id } = await ctx.params
   try {
     const body = await req.json().catch(() => null)
-    const action = String(body?.action ?? '') as UserStatusAction
+    const action = String(body?.action ?? '')
+
+    // --- Hard delete (permanently remove the user row so the email is free) ---
+    if (action === 'delete') {
+      if (gate.staff.role !== 'super_admin') {
+        return NextResponse.json(
+          { error: 'Only a super admin can permanently delete an account' },
+          { status: 403, headers: CORS },
+        )
+      }
+      const detail = await adminGetUserDetail(id)
+      if (!detail) return NextResponse.json({ error: 'User not found' }, { status: 404, headers: CORS })
+      if (String(detail.user.role ?? '').toLowerCase() === 'admin') {
+        return NextResponse.json({ error: 'Cannot delete an admin account' }, { status: 400, headers: CORS })
+      }
+      const reason = normalizeReason(body?.reason) || 'Permanently deleted by admin'
+      await adminDeleteUser(id)
+      await logStaffAction({
+        staffId: gate.staff.legacy ? null : gate.staff.staffId,
+        staffEmail: gate.staff.email,
+        action: 'user_deleted',
+        targetType: 'user',
+        targetId: id,
+        detail: { email: detail.user.email, reason },
+        ip: clientIpOf(req),
+      })
+      return NextResponse.json({ ok: true, deleted: true }, { headers: CORS })
+    }
+
+    // --- Lifecycle: block / unblock / remove / restore ---
     if (!(USER_STATUS_ACTIONS as readonly string[]).includes(action)) {
       return NextResponse.json(
-        { error: `action must be one of: ${USER_STATUS_ACTIONS.join(', ')}` },
+        { error: `action must be one of: ${[...USER_STATUS_ACTIONS, 'delete'].join(', ')}` },
         { status: 400, headers: CORS },
       )
     }
