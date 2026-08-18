@@ -941,6 +941,7 @@
       "tagsMax": "You can select up to 2 tags",
       "titleMin": "Title must be at least 5 characters",
       "titleMax": "Title must be less than 100 characters",
+      "titleWords": "Please describe your listing in words — a title can’t be only symbols or numbers",
       "descMin": "Description must be at least 20 characters",
       "addressReq": "Address is required",
       "countryReq": "Country is required",
@@ -2143,8 +2144,19 @@
       "publishing": "Publishing…",
       "cancel": "Cancel",
       "errors": {
-        "titleRequired": "Please give your listing a title.",
+        "title": {
+          "required": "Please give your listing a title.",
+          "letters": "Please describe your listing in words — a title can’t be only symbols or numbers.",
+          "tooShort": "Please give your listing a real title — it needs at least {min} letters.",
+          "tooLong": "Listing title must be at most {max} characters."
+        },
+        "capacity": {
+          "required": "Please fill in {field}.",
+          "notWhole": "{field} must be a whole number.",
+          "tooFew": "{field} must be at least {min}."
+        },
         "priceInvalid": "Please enter a valid price per night.",
+        "resortNameRequired": "Please type the resort or compound name, or pick a different option.",
         "weekendPriceInvalid": "Weekend price must be more than zero. Leave it empty if you don't charge a different rate on weekends.",
         "invalidImageUrl": "This photo link doesn’t look like a valid URL: {url}",
         "createFailed": "Could not create the listing",

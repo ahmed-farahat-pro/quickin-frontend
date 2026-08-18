@@ -2,6 +2,10 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import {
+  checkListingCapacity,
+  listingCapacityProblemMessage,
+} from '@/lib/local/listing-capacity-policy'
 
 export async function updateHostListingSettings(listingId: string, data: any) {
   const supabase = await createClient()
@@ -21,7 +25,16 @@ export async function updateHostListingSettings(listingId: string, data: any) {
     return { error: 'Not authorized or listing not found' }
   }
 
-  // 2. Filter only allowed fields (Server-side guard)
+  // 2. Capacity floors — the input's `min` is a hint, this is the rule. A listing
+  //    saved here with 0 beds (or 0 guests) is the same defect the create form
+  //    had; see lib/local/listing-capacity-policy.ts.
+  for (const [key, field] of [['max_guests', 'guests'], ['beds', 'beds']] as const) {
+    if (data[key] === undefined) continue
+    const problem = checkListingCapacity(field, data[key])
+    if (problem) return { error: listingCapacityProblemMessage(problem) }
+  }
+
+  // 3. Filter only allowed fields (Server-side guard)
   // Allowed: description, description_ar (via translations), location, google_maps_link, 
   // max_guests, beds, price_per_night, cleaning_fee, currency, min_nights
   const allowedData: any = {}
@@ -64,7 +77,7 @@ export async function updateHostListingSettings(listingId: string, data: any) {
     return { error: updateError.message }
   }
 
-  // 3. Update Lifestyle categories if provided
+  // 4. Update Lifestyle categories if provided
   if (data.lifestyle_category_ids !== undefined) {
     await supabase.from('listing_lifestyles').delete().eq('listing_id', listingId)
     if (data.lifestyle_category_ids.length > 0) {
@@ -77,7 +90,7 @@ export async function updateHostListingSettings(listingId: string, data: any) {
     }
   }
 
-  // 4. Update Images if provided
+  // 5. Update Images if provided
   if (data.images !== undefined) {
     await supabase.from('listing_images').delete().eq('listing_id', listingId)
     if (data.images.length > 0) {

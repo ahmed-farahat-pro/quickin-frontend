@@ -405,6 +405,71 @@ either, since `0100@gmail.com` would otherwise seed the very thing the rule refu
 `name-policy.ts` is byte-identical to the backend's copy; the backend's
 `scripts/check-name-policy-parity.mjs` fails if they drift.
 
+## A listing title has to be a title
+
+Create-listing asked that the title field be non-empty, so `@@@@@` and `!!!!!`
+published a listing whose title is `@@@@@` — the whole listing on the explore grid,
+the line in a search result, the name in the booking request a host gets and in every
+notification about the stay. Presence was never the test.
+
+**`src/lib/local/listing-title-policy.ts`** decides now, and like `name-policy.ts` it
+has no imports, so the same code runs everywhere:
+
+| Caller | What it does |
+| --- | --- |
+| `createListing` (`lib/local/db.ts`) | The decision on the create door. Throws `ListingInputError`, so `POST /api/local/listings` answers 400 with the reason |
+| `updateListingDetails` (`lib/local/db.ts`) | The same rule on the edit door — otherwise a listing publishes with a real title and is edited down to `!!!!!` afterwards. It replaces `assertListingText`, which truncated at 200 rather than refusing |
+| `app/host/new/new-listing-form.tsx` | Checks before the request and localizes the problem code (`hostPage.create.errors.title.*`) |
+| `app/host/[id]/edit/edit-listing-form.tsx` | Same check on the edit form |
+| `components/features/host/listing-wizard.tsx` | A `.refine` on both `title` and `title_ar`; the schema's `.min(5)` counts characters, so `!!!!!` was a five-character title |
+
+The rule that does the work: a title must contain **letters** (`\p{L}`, so Arabic and
+Han count), at least three of them, in at most 200 characters. Deliberately **not** "no
+punctuation" — `Nile-view flat (2BR)` and `شقة بإطلالة على النيل` are real titles, and
+Franco-Arabic writes real words with numerals (`Sa7el chalet`). `letters` is reported
+before `tooShort` so `@@` hears the thing that is actually wrong with it.
+
+Not yet ported to `quickin-backend`, so a listing created from the mobile apps still
+clears only the non-empty check — the copy-and-parity treatment `name-policy.ts` gets
+is the follow-up.
+
+## A listing has to have somewhere to sleep
+
+Create-listing accepted **0 bedrooms, 0 beds and 0 bathrooms**. The form's `num()`
+helper kept anything `>= 0`, the number inputs carried `min="0"`, and `createListing`
+wrote the value through — so a host could publish a chalet with nowhere to sleep. The
+same three numbers are the line under every listing card (`0 bedrooms · 0 beds · 0
+baths`), they are what a guest filters and compares on, and `max_guests` at 0 makes a
+listing nobody can book at all, since every booking checks `guests <= max_guests`.
+
+**`src/lib/local/listing-capacity-policy.ts`** decides now, and like
+`listing-title-policy.ts` it has no imports, so the same code runs everywhere:
+
+| Caller | What it does |
+| --- | --- |
+| `createListing` (`lib/local/db.ts`) | The decision on the create door. Throws `ListingInputError`, so `POST /api/local/listings` answers 400 with the reason. An **omitted** field still falls back to the old defaults (1/1/1/2) — the mobile clients don't all send them, and "absent" was never the bug |
+| `updateListingDetails` (`lib/local/db.ts`) | The same floor on the edit door — otherwise a listing publishes with a real capacity and is edited down to zero bedrooms afterwards. It replaces `assertListingInt`, whose floor for these three fields was 0 |
+| `app/host/new/new-listing-form.tsx` | Checks before the request and localizes the problem code (`hostPage.create.errors.capacity.*`); the inputs now say `min="1"`, so the browser refuses first |
+| `app/host/[id]/edit/edit-listing-form.tsx` | Same check on the edit form. `buildPatch` runs on every render, so a half-typed count falls back to what the listing already holds rather than patching a 0 |
+| `components/features/host/listing-wizard.tsx` | `.min(MIN_CAPACITY)` in the zod schema, where the three fields were `.min(0)` |
+| `dashboard/listings/[id]/manage/actions.ts` | The server action behind the manage screen validates `beds` and `max_guests` before writing — the input's `min` is a hint, this is the rule |
+
+The rule that does the work: each count is a **whole number of at least one**.
+Deliberately **no** upper bound — a 40-bedroom villa is not an error, and a cap
+invented here would start refusing edits to rows that already exist. `required` is
+reported before `notWhole` so a blank field hears "you skipped this" rather than
+"that is not a number" — `Number('')` is 0, which is how an empty field used to
+arrive as a zero nobody typed. Fractions are refused rather than floored (`Math.floor`
+turned `0.5` bathrooms into the zero the rule exists to prevent), and Arabic-Indic
+digits are folded like everywhere else, so `٣` is three.
+
+A **studio** is entered as 1 bedroom, not 0 — the property type already says `Studio`.
+If studios should instead be modelled with 0 bedrooms the way some other platforms do
+it, `MIN_CAPACITY` is the one constant to change.
+
+Not yet ported to `quickin-backend`, so a listing created from the mobile apps still
+clears only the old `>= 0` check — the same follow-up the title policy is waiting on.
+
 ## Loading states
 
 Every route that awaits data on the server needs its own `loading.tsx`. Without one,
@@ -686,6 +751,13 @@ pending. This is scoped to that one listing — others sharing the name stay in 
 queue — but the spelling is recorded as an alias, so future hosts typing it link
 automatically. `POST /api/local/admin/listings { id, action:'approve', resort: { mode } }`.
 
+Picking **Other** makes the name box **required** — the create and edit forms both
+refuse to submit while it is empty. `resort_id` and `resort_name` are one logical
+field, and a blank name is indistinguishable server-side from "not in a resort", so
+without this the listing saved with no resort at all: it missed every resort filter
+and nothing reached the /ops queue. The rule is `isResortNameMissing()` in
+`src/lib/resort-choice.ts`, which also owns the `__other__` sentinel both forms use.
+
 A host who picks **Other** and types a name keeps that text on the listing — it
 publishes normally and guests see it as typed — while the name queues for review. On
 approval the admin types the **canonical** spelling, so `amouge` becomes `Amouage`;
@@ -816,6 +888,7 @@ npm run check     # same; the pre-deploy gate
 | `analytics-core.ts` | Filter parsing and validation, the `buildReportWhere` SQL builder (placeholder numbering, the date-column injection guard), refund math, CSV escaping and formula-injection defusing. It holds **no** commission math on purpose — see `commission-core.ts` |
 | `commission-core.ts` | The markup and its round-up to 10 EGP, rate parsing and the blank-row trap (`Number('')` is 0, which would read as a 0% commission), and the SQL builders — including that `bookingCommissionSql()` is guest minus raw, never a percentage |
 | `resort-core.ts` | Resort name normalization, slug collision (`Amouage` = `amouage` = `AMOUAGE.`), typo distance |
+| `resort-choice.ts` | The resort dropdown's form rule: that **Other** with an empty or whitespace-only name is refused — it used to submit as `resort_name: undefined`, which the server cannot tell from "no resort chosen", so the host's answer was silently dropped — and the half that matters more, that the rule never fires for the no-resort choice or a catalog pick, including when stale text is left in the hidden box |
 | `user-admin-core.ts` | Users-list query parsing and clamping, the full block/remove transition matrix, the `ORDER BY` injection guard, blocked-login copy |
 | `activity-core.ts` | Activity/audit filter parsing, the UNION branch limits, the audit-action label map, and `alertsFor` — including that an operator never receives an alert for a module they don't hold |
 | `payment-flow-core.ts` | Which stage a booking is at (`paymentStageFor`), the shared `canPay` predicate, what an admin decision writes, and the proof-image validator — including that a submitted screenshot is never "awaiting payment" |
@@ -830,9 +903,12 @@ npm run check     # same; the pre-deploy gate
 | `phone-core.ts` | The host application's phone field: that a word is refused and that letters mixed into a real number are refused rather than quietly stripped (a wrong number on file is worse than a rejected form); that the nine ways of writing one Egyptian mobile all normalize to the same `01XXXXXXXXX`; that a mobile a digit short is caught while an Egyptian landline and a foreign E.164 number are not; that Arabic-Indic and Persian digits are digits; and that what survives typing still has to normalize — the filter is not the validator |
 | `profile-core.ts` | The age and "about you" fields on `/account`: that an empty field is accepted (all three are optional, and a form that demanded an age to save a name would be a new bug), that `3e2` and `0x22` are refused rather than coerced into 300 and 34, that `٣٤` is thirty-four, that a slipped number pad is caught at both ends — and for the bio, that line breaks survive while a paste's padding does not, that invisibles cannot fill it or its budget, and that the cap is measured on what gets stored, not on what was typed |
 | `name-policy.ts` | The signup name: that `12345`, `٠١٢٣٤`, `0100` and `-----` are refused, that `letters` is reported before `tooShort` so `5` hears the real problem, that invisible pasted characters don't make a name non-empty — and the half that matters more, that `Ma7moud`, `Bo`, `Ali M`, `محمد أحمد`, `李伟` and `O'Brien` still get in; plus the email fallback, which can never seed the numeric name the rule just refused |
+| `listing-title-policy.ts` | The listing title: that `@@@@@`, `!!!!!`, `.....`, `12345` and `🏖️🏖️🏖️` are refused, that `letters` is reported before `tooShort` so `@@` hears the real problem, that invisible pasted characters don't make a title non-empty, and that the 200-character cap counts code points — plus the half that matters more, that `Nile-view flat (2BR)`, `★ Sahel chalet ★`, `Sa7el chalet` and `شقة بإطلالة على النيل` still get in, because a rule that bans punctuation would refuse most real titles |
 | `auth-exit-core.ts` | The way out of `/login` and `/signup`: that the referring page wins and keeps its query string (a guest who came from a filtered search gets those filters back), and the four cases that fall back to `/explore` instead — no referrer, an unparseable one, another origin (otherwise any site could choose where our sign-in page sends people), and the auth pages themselves, with locale prefixes stripped first so `/ar/signup` doesn't slip through |
 | `currency-core.ts` | The display currency: that an unrecognised cookie falls back to EGP instead of leaving prices in a currency with no rate; that one typo'd code in the rate override drops alone rather than taking the other five down with it, and that a zero rate is refused (it would divide every price into Infinity); and the property the money depends on — a missing rate returns the **stored** price in the **stored** currency, unmarked, never a number invented from a rate we do not have |
 | `avatar-core.ts` | The profile photo: that a base64 `data:` JPEG/PNG/WebP gets in and an `https://` link does **not** (the reason is in `/account` → Profile photo above), that HTML, PDF and SVG data URLs are refused, that a mangled base64 payload is not a photo, the size ceiling and the decoded-bytes math behind it, that `null`/`''`/blank all mean "remove" while the literal string `null` does not — and that the 256px / q0.8 constants still match the iOS picker, since a drift there is a photo that weighs one thing on the phone and another on the site |
+| `listing-capacity-policy.ts` | The four capacity counts: that `0`, `'0'` and `٠` are refused for bedrooms, beds, bathrooms **and** guests (the bug the module was written for), that a fraction is refused rather than floored into that same zero, that the JSON shapes `Number()` would coerce into a count (`true`, `['2']`) are not counts — and the half that matters as much, that an omitted field still falls back to the create defaults so the mobile apps' partial payloads are never answered with a 400, that a 40-bedroom villa is not an error, and that `required` is reported before `notWhole` so a blank field hears the real problem |
+| `listing-pricing-core.ts` | The host's weekend rate: that `0`, `'0'`, `'0.0'` and `-50` are refused rather than silently stored as "no weekend rate" (the bug the module was written for), and the half that matters as much — that `null`, `undefined` and a blank field still mean "no weekend rate" so a host can turn the feature off and the apps' `null` is never answered with a 400; plus the JSON shapes `Number()` would happily coerce into a price (`true`, `[]`, `['1500']`) |
 | `contentguard.ts` | Every de-obfuscation the contact guard undoes (Arabic-Indic/fullwidth/enclosed digits, zero-width and soft hyphens, Cyrillic lookalikes, spelled-out EN/AR numbers, `at`/`dot` spelling, letters used as separators — `A0101 S416 M3280`), the four categories it blocks, the split-across-messages check — and an equally large **false-positive** half, because a guard that rejects "we are 2 adults arriving on the 12th" is worse than one that misses |
 
 Those modules deliberately have **no runtime imports** — Node's ESM resolver
@@ -851,6 +927,46 @@ the same two chalets in one order on the web and the other order in the apps. An
 `name-policy.ts` (`check-name-policy-parity.mjs`): both projects create accounts in the
 same `users` table, so a name rule that held on one door and not the other would not
 hold at all.
+
+## Weekend pricing — an empty field is optional, a `0` is not
+
+A host can charge a different rate on the days they call the weekend: a
+`weekend_price` plus a `weekend_days` set (Postgres DOW, `0`=Sun … `6`=Sat), both
+on `listings`. The quote picks per night — a night whose DOW is in `weekend_days`
+is charged `weekend_price`, everything else `price_per_night`.
+
+The whole feature is **optional**, and an empty field is how a host says they
+don't use it. Clearing the field clears the rate, and the days go with it: days
+without a rate mean nothing, and both mobile clients already send `null` (not
+`0`) to turn weekend pricing off — `HostService.swift` and `BookingService.kt`
+map "no rate" to JSON null.
+
+What used to fall through that door was `0`. Every layer coerced it away — the
+form dropped it before the fetch, `createListing` wrote NULL, `updateListing`
+wrote NULL — so the listing saved, the weekend-day pills stayed lit, and nothing
+told the host that the rate they had typed was gone. A host could leave that
+screen believing weekend nights were priced at 0 EGP, or priced at all.
+
+`src/lib/local/listing-pricing-core.ts` now holds the one rule and **both ends
+run it**: `/host/new` and `/host/:id/edit` refuse to submit and say why
+(`hostPage.create.errors.weekendPriceInvalid`, in all four locales), and
+`createListing` / `updateListing` answer 400 `Weekend price must be greater
+than 0` to anything that reaches the API another way. Empty still means null at
+both ends — that separation is the whole point of the module, and
+`test/unit/listing-pricing-core.test.mjs` spends as much of its length on the
+values that must still get in (`null` from the apps, a blank field, `1500`,
+`0.5`) as on the ones that must not (`0`, `'0'`, `-50`, `'abc'`, `true`, `[]` —
+`Number()` turns the last three into `0`, `1` and `0`).
+
+One thing the rule deliberately does **not** do is require a rate when weekend
+days are selected. `DEFAULT_WEEKEND_DAYS` is pre-selected on both forms, so
+"days chosen, no rate" is the normal resting state of a listing without weekend
+pricing, not a mistake to report.
+
+On the edit form the refusal also has to make the form *dirty*. An invalid rate
+patches to null, which usually equals what is already stored, so without that the
+Save button would stay greyed out under "No changes yet" — the host would press
+nothing and hear nothing, which is the original bug wearing a different hat.
 
 ## Display currency — what a guest reads, not what they pay
 

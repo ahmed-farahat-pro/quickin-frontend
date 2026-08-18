@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PhotoUploader, type ListingImageFile } from '@/components/features/host/photo-uploader'
 import { updateHostListingSettings } from './actions'
 import { useTranslations } from 'next-intl'
+import { MIN_CAPACITY } from '@/lib/local/listing-capacity-policy'
 
 interface ListingSettingsManagerProps
 {
@@ -223,7 +224,7 @@ export function ListingSettingsManager({ listing }: ListingSettingsManagerProps)
 
         <div className="space-y-2">
           <Label htmlFor="beds">{t('labels.beds')}</Label>
-          <Input id="beds" name="beds" type="number" min={0} value={formData.beds} onChange={handleChange} />
+          <Input id="beds" name="beds" type="number" min={MIN_CAPACITY} value={formData.beds} onChange={handleChange} />
         </div>
 
         <div className="space-y-2">

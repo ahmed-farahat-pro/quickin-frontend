@@ -941,6 +941,7 @@
       "tagsMax": "Vous pouvez sélectionner jusqu'à 2 étiquettes",
       "titleMin": "Le titre doit contenir au moins 5 caractères",
       "titleMax": "Le titre doit contenir moins de 100 caractères",
+      "titleWords": "Veuillez décrire votre annonce avec des mots : un titre ne peut pas contenir uniquement des symboles ou des chiffres",
       "descMin": "La description doit contenir au moins 20 caractères",
       "addressReq": "L'adresse est requise",
       "countryReq": "Le pays est requis",
@@ -2143,8 +2144,19 @@
       "publishing": "Publication…",
       "cancel": "Annuler",
       "errors": {
-        "titleRequired": "Veuillez donner un titre à votre annonce.",
+        "title": {
+          "required": "Veuillez donner un titre à votre annonce.",
+          "letters": "Veuillez décrire votre annonce avec des mots : un titre ne peut pas contenir uniquement des symboles ou des chiffres.",
+          "tooShort": "Veuillez donner un vrai titre à votre annonce : il lui faut au moins {min} lettres.",
+          "tooLong": "Le titre de l’annonce doit contenir au maximum {max} caractères."
+        },
+        "capacity": {
+          "required": "Veuillez renseigner le champ « {field} ».",
+          "notWhole": "Le champ « {field} » doit être un nombre entier.",
+          "tooFew": "Le champ « {field} » doit être d’au moins {min}."
+        },
         "priceInvalid": "Veuillez saisir un prix par nuit valide.",
+        "resortNameRequired": "Veuillez saisir le nom du resort ou de la résidence, ou choisir une autre option.",
         "weekendPriceInvalid": "Le prix du week-end doit être supérieur à zéro. Laissez le champ vide si vous n'appliquez pas de tarif différent le week-end.",
         "invalidImageUrl": "Ce lien de photo ne ressemble pas à une URL valide : {url}",
         "createFailed": "Impossible de créer l’annonce",

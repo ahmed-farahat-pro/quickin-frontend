@@ -81,10 +81,12 @@ export async function POST(req: Request) {
       weekend_price: num(body.weekend_price),
       weekend_days: weekendDays && weekendDays.length ? weekendDays : undefined,
       currency: body.currency ?? undefined,
-      bedrooms: num(body.bedrooms),
-      beds: num(body.beds),
-      bathrooms: num(body.bathrooms),
-      max_guests: num(body.max_guests),
+      // Deliberately NOT run through num(): `Number('')` is 0, and 0 bedrooms is
+      // the bug. createListing decides these through listing-capacity-policy.
+      bedrooms: body.bedrooms,
+      beds: body.beds,
+      bathrooms: body.bathrooms,
+      max_guests: body.max_guests,
       property_type: body.property_type ?? undefined,
       // Curated area + amenity chips — same catalogs the edit form uses.
       region: body.region ?? undefined,

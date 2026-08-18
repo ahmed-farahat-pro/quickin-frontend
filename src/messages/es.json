@@ -941,6 +941,7 @@
       "tagsMax": "Puedes seleccionar hasta 2 etiquetas",
       "titleMin": "El título debe tener al menos 5 caracteres",
       "titleMax": "El título debe tener menos de 100 caracteres",
+      "titleWords": "Describe tu anuncio con palabras: el título no puede ser solo símbolos o números",
       "descMin": "La descripción debe tener al menos 20 caracteres",
       "addressReq": "La dirección es obligatoria",
       "countryReq": "El país es obligatorio",
@@ -2143,8 +2144,19 @@
       "publishing": "Publicando…",
       "cancel": "Cancelar",
       "errors": {
-        "titleRequired": "Dale un título a tu anuncio.",
+        "title": {
+          "required": "Dale un título a tu anuncio.",
+          "letters": "Describe tu anuncio con palabras: el título no puede ser solo símbolos o números.",
+          "tooShort": "Dale a tu anuncio un título real: necesita al menos {min} letras.",
+          "tooLong": "El título del anuncio debe tener como máximo {max} caracteres."
+        },
+        "capacity": {
+          "required": "Completa el campo «{field}».",
+          "notWhole": "El campo «{field}» debe ser un número entero.",
+          "tooFew": "El campo «{field}» debe ser como mínimo {min}."
+        },
         "priceInvalid": "Introduce un precio por noche válido.",
+        "resortNameRequired": "Escribe el nombre del resort o complejo, o elige otra opción.",
         "weekendPriceInvalid": "El precio de fin de semana debe ser mayor que cero. Deja el campo vacío si no aplicas una tarifa diferente los fines de semana.",
         "invalidImageUrl": "Este enlace de foto no parece una URL válida: {url}",
         "createFailed": "No se pudo crear el anuncio",

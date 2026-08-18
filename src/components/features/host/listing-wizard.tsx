@@ -9,6 +9,8 @@ import dynamic from 'next/dynamic'
 import { Loader2, ArrowLeft, ArrowRight, Check, Home, Building, Tent, Warehouse, Castle, Ship, Hotel, TreePine } from 'lucide-react'
 import { toast } from 'sonner'
 import { useTranslations, useLocale } from 'next-intl'
+import { isValidListingTitle } from '@/lib/local/listing-title-policy'
+import { MIN_CAPACITY } from '@/lib/local/listing-capacity-policy'
 
 // Simple Icon Map
 const IconMap: Record<string, any> = {
@@ -67,8 +69,11 @@ export function ListingWizard()
   const listingSchema = useMemo(() => z.object({
     property_type_id: z.string().uuid(t('errors.propertyType')),
     lifestyle_category_ids: z.array(z.string()).min(1, t('errors.tagsMin')).max(2, t('errors.tagsMax')),
-    title: z.string().min(5, t('errors.titleMin')).max(100, t('errors.titleMax')).regex(/^[a-zA-Z0-9\s.,!?'"()\-]+$/, t('errors.englishOnly')),
-    title_ar: z.string().min(5, t('errors.titleMin')).max(100, t('errors.titleMax')).regex(/^[\u0600-\u06FF\s0-9.,!?'"()\-]+$/, t('errors.arabicOnly')),
+    // `.min(5)` counts characters, so `!!!!!` used to be a five-character title.
+    // A title has to contain words — same rule the /host create flow runs, see
+    // lib/local/listing-title-policy.ts.
+    title: z.string().min(5, t('errors.titleMin')).max(100, t('errors.titleMax')).regex(/^[a-zA-Z0-9\s.,!?'"()\-]+$/, t('errors.englishOnly')).refine(isValidListingTitle, t('errors.titleWords')),
+    title_ar: z.string().min(5, t('errors.titleMin')).max(100, t('errors.titleMax')).regex(/^[\u0600-\u06FF\s0-9.,!?'"()\-]+$/, t('errors.arabicOnly')).refine(isValidListingTitle, t('errors.titleWords')),
     description: z.string().min(20, t('errors.descMin')).regex(/^[a-zA-Z0-9\s.,!?'"()\-\n\r]+$/, t('errors.englishOnly')),
     description_ar: z.string().min(20, t('errors.descMin')).max(1000).regex(/^[\u0600-\u06FF\s0-9.,!?'"()\-\n\r]+$/, t('errors.arabicOnly')),
     location: z.string().min(1, t('errors.addressReq')),
@@ -83,9 +88,11 @@ export function ListingWizard()
     google_maps_link: z.string().optional(),
     listing_conditions: z.array(z.string()).optional(),
     max_guests: z.coerce.number().min(1),
-    bedrooms: z.coerce.number().min(0),
-    beds: z.coerce.number().min(0),
-    bathrooms: z.coerce.number().min(0),
+    // Same floor as the /host/new form and the API: a place with no bedrooms, no
+    // beds and no bathrooms is not a place. See lib/local/listing-capacity-policy.ts.
+    bedrooms: z.coerce.number().min(MIN_CAPACITY),
+    beds: z.coerce.number().min(MIN_CAPACITY),
+    bathrooms: z.coerce.number().min(MIN_CAPACITY),
     min_nights: z.coerce.number().min(1).default(1),
     price_per_night: z.coerce.number().min(1),
     cleaning_fee: z.coerce.number().min(0),

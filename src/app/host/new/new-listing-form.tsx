@@ -13,9 +13,21 @@ import { useTranslations } from 'next-intl'
 import { GuestPriceHint } from '@/components/features/host/guest-price-hint'
 import { PROPERTY_TYPES, MAX_WEB_LISTING_PHOTOS } from '@/lib/property-types'
 import { REGIONS, AMENITIES } from '@/lib/listing-options'
+import { OTHER_RESORT, isResortNameMissing } from '@/lib/resort-choice'
 import { fileToCompressedDataUrl } from '@/lib/image'
 import { DEFAULT_WEEKEND_DAYS } from '@/lib/geo'
 import { checkWeekendPrice } from '@/lib/local/listing-pricing-core'
+import {
+  checkListingTitle,
+  normalizeListingTitle,
+  MIN_TITLE_LETTERS,
+  MAX_TITLE_LENGTH,
+} from '@/lib/local/listing-title-policy'
+import {
+  CAPACITY_FIELDS,
+  MIN_CAPACITY,
+  checkListingCapacity,
+} from '@/lib/local/listing-capacity-policy'
 import { OwnershipDocField } from '../ownership-doc'
 
 const C = {
@@ -109,9 +121,6 @@ const dropdownStyle: React.CSSProperties = {
   maxHeight: 260,
   overflowY: 'auto',
 }
-
-/** Sentinel for the "my resort isn't listed" option. */
-const OTHER_RESORT = '__other__'
 
 export type ResortOption = { id: string; name: string; region: string }
 
@@ -293,9 +302,13 @@ export function NewListingForm({
     e.preventDefault()
     setError(null)
 
-    const trimmedTitle = title.trim()
-    if (!trimmedTitle) {
-      setError(t('errors.titleRequired'))
+    // A title has to read as a title: `@@@@@` cleared the old non-empty check
+    // and published as the listing's name. Same rule the API runs — see
+    // lib/local/listing-title-policy.ts.
+    const trimmedTitle = normalizeListingTitle(title)
+    const titleProblem = checkListingTitle(trimmedTitle)
+    if (titleProblem) {
+      setError(t(`errors.title.${titleProblem.code}`, { min: MIN_TITLE_LETTERS, max: MAX_TITLE_LENGTH }))
       return
     }
     const priceNum = Number(price)
@@ -303,10 +316,26 @@ export function NewListingForm({
       setError(t('errors.priceInvalid'))
       return
     }
+    // "Other" without a name is not "no resort" — see isResortNameMissing().
+    if (isResortNameMissing(resortId, resortOther)) {
+      setError(t('errors.resortNameRequired'))
+      return
+    }
 
-    const num = (v: string, d: number) => {
-      const n = Math.floor(Number(v))
-      return Number.isFinite(n) && n >= 0 ? n : d
+    // Capacity: a place with 0 bedrooms, 0 beds and 0 bathrooms was accepted here
+    // and published — the old `num()` helper kept anything >= 0, and an empty
+    // field became 0 rather than the default it was handed. Same rule the API
+    // runs — see lib/local/listing-capacity-policy.ts.
+    const capacity: Record<string, string> = { bedrooms, beds, bathrooms, guests: maxGuests }
+    for (const field of CAPACITY_FIELDS) {
+      const problem = checkListingCapacity(field, capacity[field])
+      if (problem) {
+        // 'guests' is `fields.maxGuests` in the copy — the only field whose
+        // policy name and label key differ.
+        const labelKey = field === 'guests' ? 'maxGuests' : field
+        setError(t(`errors.capacity.${problem.code}`, { field: t(`fields.${labelKey}`), min: MIN_CAPACITY }))
+        return
+      }
     }
     // Weekend pricing is optional, but a rate the host typed has to be a rate:
     // 0 used to be dropped here and the listing saved without weekend pricing at
@@ -335,10 +364,10 @@ export function NewListingForm({
           weekend_price,
           weekend_days: weekend_price ? weekendDays : undefined,
           currency: currency.trim() || 'EGP',
-          bedrooms: num(bedrooms, 1),
-          beds: num(beds, 1),
-          bathrooms: num(bathrooms, 1),
-          max_guests: num(maxGuests, 2),
+          bedrooms,
+          beds,
+          bathrooms,
+          max_guests: maxGuests,
           property_type: propertyType || undefined,
           region: region || undefined,
           resort_id: resortId && resortId !== OTHER_RESORT ? resortId : undefined,
@@ -509,6 +538,7 @@ export function NewListingForm({
             onChange={(e) => setResortOther(e.target.value)}
             placeholder={t('resortOtherPlaceholder')}
             maxLength={120}
+            required
           />
         )}
         <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.muted }}>
@@ -569,7 +599,7 @@ export function NewListingForm({
           id="weekendPrice"
           style={input}
           type="number"
-          min="1"
+          min="0"
           step="1"
           value={weekendPrice}
           onChange={(e) => setWeekendPrice(e.target.value)}
@@ -608,15 +638,15 @@ export function NewListingForm({
       <div className="qk-new-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, ...fieldWrap }}>
         <div>
           <label style={label} htmlFor="bedrooms">{t('fields.bedrooms')}</label>
-          <input id="bedrooms" style={input} type="number" min="0" step="1" value={bedrooms} onChange={(e) => setBedrooms(e.target.value)} />
+          <input id="bedrooms" style={input} type="number" min="1" step="1" value={bedrooms} onChange={(e) => setBedrooms(e.target.value)} />
         </div>
         <div>
           <label style={label} htmlFor="beds">{t('fields.beds')}</label>
-          <input id="beds" style={input} type="number" min="0" step="1" value={beds} onChange={(e) => setBeds(e.target.value)} />
+          <input id="beds" style={input} type="number" min="1" step="1" value={beds} onChange={(e) => setBeds(e.target.value)} />
         </div>
         <div>
           <label style={label} htmlFor="bathrooms">{t('fields.bathrooms')}</label>
-          <input id="bathrooms" style={input} type="number" min="0" step="1" value={bathrooms} onChange={(e) => setBathrooms(e.target.value)} />
+          <input id="bathrooms" style={input} type="number" min="1" step="1" value={bathrooms} onChange={(e) => setBathrooms(e.target.value)} />
         </div>
         <div>
           <label style={label} htmlFor="maxGuests">{t('fields.maxGuests')}</label>

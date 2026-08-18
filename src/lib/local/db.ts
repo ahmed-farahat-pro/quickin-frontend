@@ -25,6 +25,12 @@ import type { AccountStatus, UserListFilter } from './user-admin-core'
 import { idChangeColumnFor, idColumnFor, statusForAction } from './document-core'
 import { normalizeDocType, normalizeVerificationStatus, revokesListingPrivileges } from './host-verification-core'
 import { checkWeekendPrice, weekendPriceMessage } from './listing-pricing-core'
+import { normalizeListingTitle, validateListingTitle } from './listing-title-policy'
+import {
+  checkListingCapacity,
+  listingCapacityProblemMessage,
+  parseCapacity,
+} from './listing-capacity-policy'
 import { normalizePhone } from './phone-core'
 import { normalizeName, validateName } from './name-policy'
 import { assertProofImage, canPay, outcomeFor, PaymentProofError } from './payment-flow-core'
@@ -2144,10 +2150,13 @@ export interface CreateListingInput {
   weekend_price?: number
   weekend_days?: number[]
   currency?: string
-  bedrooms?: number
-  beds?: number
-  bathrooms?: number
-  max_guests?: number
+  // Strings too: the clients post whatever their number field held, and folding
+  // that to a number here would throw away exactly what listing-capacity-policy
+  // needs to see (`''`, `'2.5'`, `'٣'`).
+  bedrooms?: number | string
+  beds?: number | string
+  bathrooms?: number | string
+  max_guests?: number | string
   property_type?: string
   /** Curated browse area — one of REGION_VALUES (optional). */
   region?: string
@@ -2165,17 +2174,29 @@ export interface CreateListingInput {
 /** Create a listing owned by [hostId], plus any provided images. */
 export async function createListing(hostId: string, data: CreateListingInput): Promise<Listing> {
   if (!isUuid(hostId)) throw new Error('Invalid host')
-  const title = String(data.title || '').trim()
-  if (!title) throw new Error('Title is required')
+  // A title is what the listing IS everywhere it appears — the explore card, the
+  // search result, the booking request. `@@@@@` cleared a non-empty check and
+  // published as the listing's name; listing-title-policy is what decides now.
+  const title = normalizeListingTitle(data.title)
+  const titleProblem = validateListingTitle(title)
+  if (titleProblem) throw new ListingInputError(titleProblem)
   const price = Number(data.price_per_night)
   if (!Number.isFinite(price) || price <= 0) throw new Error('A valid price per night is required')
   // A number in the listing copy reaches every guest at once, so the same guard
   // the chat runs applies to the fields a host writes freely.
   await guardContent(hostId, title, 'listing')
   await guardContent(hostId, String(data.description ?? ''), 'listing')
-  const nn = (v: unknown, d: number) => {
-    const n = Math.floor(Number(v))
-    return Number.isFinite(n) && n >= 0 ? n : d
+  // Capacity: a count the host actually sent has to be a real count, while an
+  // omitted one still falls back to the defaults the mobile apps have always
+  // relied on (they don't all send these fields). `Math.floor(Number(v))` used
+  // to stand here and accepted 0 for all four, which is how a chalet with no
+  // bedrooms, no beds and no bathrooms got published. See
+  // listing-capacity-policy.ts.
+  const cap = (v: unknown, field: Parameters<typeof checkListingCapacity>[0], d: number) => {
+    if (v === undefined || v === null || v === '') return d
+    const problem = checkListingCapacity(field, v)
+    if (problem) throw new ListingInputError(listingCapacityProblemMessage(problem))
+    return parseCapacity(v) as number
   }
   const fin = (v: unknown): number | null => {
     const n = Number(v)
@@ -2223,7 +2244,8 @@ export async function createListing(hostId: string, data: CreateListingInput): P
       weekendPrice,
       weekendPrice && weekendDays.length ? weekendDays : null,
       data.currency || 'EGP',
-      nn(data.bedrooms, 1), nn(data.beds, 1), nn(data.bathrooms, 1), nn(data.max_guests, 2),
+      cap(data.bedrooms, 'bedrooms', 1), cap(data.beds, 'beds', 1),
+      cap(data.bathrooms, 'bathrooms', 1), cap(data.max_guests, 'guests', 2),
       data.property_type ?? null, resort.region, amenities, ownershipDoc,
       resort.resort_id, resort.resort_name,
     ]
@@ -2316,20 +2338,23 @@ export function isListingInputError(err: unknown): err is Error {
   return err instanceof ListingInputError || (err instanceof Error && err.name === 'ListingInputError')
 }
 
-/** Non-blank text, else a per-field error (the form highlights the input). */
-function assertListingText(v: unknown, label: string, max: number): string {
-  const s = String(v ?? '').trim()
-  if (!s) throw new ListingInputError(`${label} is required`)
-  return s.slice(0, max)
+/** A title that reads as a title, else a per-field error. Shares its rule with
+ *  `createListing` through listing-title-policy, so the create and edit doors
+ *  can never disagree about what a listing may be called. */
+function assertListingTitle(v: unknown): string {
+  const s = normalizeListingTitle(v)
+  const problem = validateListingTitle(s)
+  if (problem) throw new ListingInputError(problem)
+  return s
 }
 
-/** A whole number >= min, else a per-field error. */
-function assertListingInt(v: unknown, label: string, min: number): number {
-  const n = Number(v)
-  if (!Number.isFinite(n) || !Number.isInteger(n) || n < min) {
-    throw new ListingInputError(`${label} must be a whole number of at least ${min}`)
-  }
-  return n
+/** A capacity count that clears the shared floor, else a per-field error in the
+ *  same words the create door and the host forms use. Shares its rule with
+ *  `createListing` through listing-capacity-policy. */
+function assertCapacity(v: unknown, field: Parameters<typeof checkListingCapacity>[0]): number {
+  const problem = checkListingCapacity(field, v)
+  if (problem) throw new ListingInputError(listingCapacityProblemMessage(problem))
+  return parseCapacity(v) as number
 }
 
 /**
@@ -2462,7 +2487,9 @@ export async function updateListing(
   // Guarded on edit as well as on create — otherwise a clean listing could be
   // published and then quietly edited to carry a number.
   if (data.title !== undefined) {
-    const t = assertListingText(data.title, 'Title', 200)
+    // Same policy the create path runs — a listing that published with a real
+    // title must not be editable down to `!!!!!` afterwards.
+    const t = assertListingTitle(data.title)
     await guardContent(hostId, t, 'listing', { type: 'listing', id })
     put('title', t)
   }
@@ -2494,11 +2521,13 @@ export async function updateListing(
   if (data.lat !== undefined) put('lat', assertCoord(data.lat, 'Latitude', 90))
   if (data.lng !== undefined) put('lng', assertCoord(data.lng, 'Longitude', 180))
   if (data.property_type !== undefined) put('property_type', normalizePropertyType(data.property_type))
-  // max_guests keeps createListing's floor of 1 — a 0-guest listing can't be booked.
-  if (data.max_guests !== undefined) put('max_guests', assertListingInt(data.max_guests, 'Guests', 1))
-  if (data.bedrooms !== undefined) put('bedrooms', assertListingInt(data.bedrooms, 'Bedrooms', 0))
-  if (data.beds !== undefined) put('beds', assertListingInt(data.beds, 'Beds', 0))
-  if (data.bathrooms !== undefined) put('bathrooms', assertListingInt(data.bathrooms, 'Bathrooms', 0))
+  // All four counts share createListing's floor through listing-capacity-policy,
+  // so a listing can't be published with a real capacity and then edited down to
+  // zero bedrooms afterwards — the hole a create-only fix would have left open.
+  if (data.max_guests !== undefined) put('max_guests', assertCapacity(data.max_guests, 'guests'))
+  if (data.bedrooms !== undefined) put('bedrooms', assertCapacity(data.bedrooms, 'bedrooms'))
+  if (data.beds !== undefined) put('beds', assertCapacity(data.beds, 'beds'))
+  if (data.bathrooms !== undefined) put('bathrooms', assertCapacity(data.bathrooms, 'bathrooms'))
   if (data.amenities !== undefined) put('amenities', normalizeAmenities(data.amenities))
 
   // --- Commercial fields (same re-review rule today — see REVIEW_TRIGGERING_FIELDS) ---

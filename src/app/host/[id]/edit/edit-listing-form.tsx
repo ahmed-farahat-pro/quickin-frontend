@@ -24,9 +24,22 @@ import { GuestPriceHint } from '@/components/features/host/guest-price-hint'
 import dynamic from 'next/dynamic'
 import { PROPERTY_TYPES, MAX_WEB_LISTING_PHOTOS, iconForPropertyType } from '@/lib/property-types'
 import { REGIONS, AMENITIES } from '@/lib/listing-options'
+import { OTHER_RESORT, isResortNameMissing } from '@/lib/resort-choice'
 import { fileToCompressedDataUrl } from '@/lib/image'
 import { DEFAULT_WEEKEND_DAYS } from '@/lib/geo'
 import { checkWeekendPrice } from '@/lib/local/listing-pricing-core'
+import {
+  checkListingTitle,
+  normalizeListingTitle,
+  MIN_TITLE_LETTERS,
+  MAX_TITLE_LENGTH,
+} from '@/lib/local/listing-title-policy'
+import {
+  CAPACITY_FIELDS,
+  MIN_CAPACITY,
+  checkListingCapacity,
+  parseCapacity,
+} from '@/lib/local/listing-capacity-policy'
 import { OwnershipDocField } from '../../ownership-doc'
 import { ListingStatusChip } from '../../listing-status-chip'
 import type { HostListingStatus } from '../../host-tabs'
@@ -139,9 +152,6 @@ function sameSet(a: readonly string[], b: readonly string[]): boolean {
   const [x, y] = [norm(a), norm(b)]
   return x.every((v, i) => v === y[i])
 }
-
-/** Sentinel for the "my resort isn't listed" option. */
-const OTHER_RESORT = '__other__'
 
 export type ResortOption = { id: string; name: string; region: string }
 
@@ -407,10 +417,10 @@ export function EditListingForm({
   function buildPatch(): Record<string, unknown> | null {
     const patch: Record<string, unknown> = {}
     const text = (v: string) => v.trim()
-    const int = (v: string, d: number) => {
-      const n = Math.floor(Number(v))
-      return Number.isFinite(n) && n >= 0 ? n : d
-    }
+    // A capacity the host is midway through typing (blank, `0`, `2.5`) is not an
+    // edit — buildPatch runs on every render, so it falls back to what the
+    // listing already holds and lets onSubmit be the one that objects.
+    const int = (v: string, current: number | null, d: number) => parseCapacity(v) ?? current ?? d
 
     if (text(title) !== (listing.title ?? '').trim()) patch.title = text(title)
     if (text(description) !== (listing.description ?? '').trim()) patch.description = text(description) || null
@@ -448,10 +458,14 @@ export function EditListingForm({
     if (daysChanged) patch.weekend_days = nextWeekendDays
     if (text(currency) !== (listing.currency ?? '').trim()) patch.currency = text(currency) || 'EGP'
 
-    if (int(bedrooms, 1) !== (listing.bedrooms ?? 1)) patch.bedrooms = int(bedrooms, 1)
-    if (int(beds, 1) !== (listing.beds ?? 1)) patch.beds = int(beds, 1)
-    if (int(bathrooms, 1) !== (listing.bathrooms ?? 1)) patch.bathrooms = int(bathrooms, 1)
-    if (int(maxGuests, 2) !== (listing.max_guests ?? 2)) patch.max_guests = int(maxGuests, 2)
+    const nextBedrooms = int(bedrooms, listing.bedrooms, 1)
+    const nextBeds = int(beds, listing.beds, 1)
+    const nextBathrooms = int(bathrooms, listing.bathrooms, 1)
+    const nextGuests = int(maxGuests, listing.max_guests, 2)
+    if (nextBedrooms !== (listing.bedrooms ?? 1)) patch.bedrooms = nextBedrooms
+    if (nextBeds !== (listing.beds ?? 1)) patch.beds = nextBeds
+    if (nextBathrooms !== (listing.bathrooms ?? 1)) patch.bathrooms = nextBathrooms
+    if (nextGuests !== (listing.max_guests ?? 2)) patch.max_guests = nextGuests
     if (propertyType !== (listing.property_type ?? '')) patch.property_type = propertyType || null
     if (!sameSet(amenities, listing.amenities ?? [])) patch.amenities = amenities
 
@@ -464,16 +478,26 @@ export function EditListingForm({
   }
 
   const patch = buildPatch()
-  const dirty = patch !== null
+  // A weekend rate the host typed but that isn't a rate (0, a negative) is not a
+  // change buildPatch can carry — it patches to null, which usually equals what
+  // is already stored, and the form would sit there saying "No changes yet"
+  // while the host waits for the 0 they typed to save. Counting it as dirty is
+  // what lets them press Save and be told why it can't.
+  const weekendPriceOk = checkWeekendPrice(weekendPrice).ok
+  const dirty = patch !== null || !weekendPriceOk
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     if (busy || savedStatus) return
 
-    const trimmedTitle = title.trim()
-    if (!trimmedTitle) {
-      setError(t('errors.titleRequired'))
+    // A title has to read as a title: `@@@@@` cleared the old non-empty check
+    // and published as the listing's name. Same rule the API runs — see
+    // lib/local/listing-title-policy.ts.
+    const trimmedTitle = normalizeListingTitle(title)
+    const titleProblem = checkListingTitle(trimmedTitle)
+    if (titleProblem) {
+      setError(t(`errors.title.${titleProblem.code}`, { min: MIN_TITLE_LETTERS, max: MAX_TITLE_LENGTH }))
       return
     }
     const priceNum = Number(price)
@@ -481,9 +505,28 @@ export function EditListingForm({
       setError(t('errors.priceInvalid'))
       return
     }
+    // "Other" without a name is not "no resort" — see isResortNameMissing().
+    if (isResortNameMissing(resortId, resortOther)) {
+      setError(t('errors.resortNameRequired'))
+      return
+    }
+    // The same floor the create form and the API apply: a listing edited down to
+    // 0 bedrooms would be the create bug arriving through the other door. See
+    // lib/local/listing-capacity-policy.ts.
+    const capacity: Record<string, string> = { bedrooms, beds, bathrooms, guests: maxGuests }
+    for (const field of CAPACITY_FIELDS) {
+      const problem = checkListingCapacity(field, capacity[field])
+      if (problem) {
+        // 'guests' is `fields.maxGuests` in the copy — the only field whose
+        // policy name and label key differ.
+        const labelKey = field === 'guests' ? 'maxGuests' : field
+        setError(t(`errors.capacity.${problem.code}`, { field: t(`fields.${labelKey}`), min: MIN_CAPACITY }))
+        return
+      }
+    }
     // A weekend rate of 0 is a typo, not "no weekend rate" — clearing the field
     // is how you say that. Without this the patch would quietly save null.
-    if (!checkWeekendPrice(weekendPrice).ok) {
+    if (!weekendPriceOk) {
       setError(t('errors.weekendPriceInvalid'))
       return
     }
@@ -678,6 +721,7 @@ export function EditListingForm({
             onChange={(e) => setResortOther(e.target.value)}
             placeholder={t('resortOtherPlaceholder')}
             maxLength={120}
+            required
           />
         )}
         <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.muted }}>
@@ -738,7 +782,7 @@ export function EditListingForm({
           id="edit-weekend"
           style={input}
           type="number"
-          min="1"
+          min="0"
           step="1"
           value={weekendPrice}
           onChange={(e) => setWeekendPrice(e.target.value)}
@@ -777,15 +821,15 @@ export function EditListingForm({
       <div className="qk-edit-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, ...fieldWrap }}>
         <div>
           <label style={label} htmlFor="edit-bedrooms">{t('fields.bedrooms')}</label>
-          <input id="edit-bedrooms" style={input} type="number" min="0" step="1" value={bedrooms} onChange={(e) => setBedrooms(e.target.value)} />
+          <input id="edit-bedrooms" style={input} type="number" min="1" step="1" value={bedrooms} onChange={(e) => setBedrooms(e.target.value)} />
         </div>
         <div>
           <label style={label} htmlFor="edit-beds">{t('fields.beds')}</label>
-          <input id="edit-beds" style={input} type="number" min="0" step="1" value={beds} onChange={(e) => setBeds(e.target.value)} />
+          <input id="edit-beds" style={input} type="number" min="1" step="1" value={beds} onChange={(e) => setBeds(e.target.value)} />
         </div>
         <div>
           <label style={label} htmlFor="edit-baths">{t('fields.bathrooms')}</label>
-          <input id="edit-baths" style={input} type="number" min="0" step="1" value={bathrooms} onChange={(e) => setBathrooms(e.target.value)} />
+          <input id="edit-baths" style={input} type="number" min="1" step="1" value={bathrooms} onChange={(e) => setBathrooms(e.target.value)} />
         </div>
         <div>
           <label style={label} htmlFor="edit-guests">{t('fields.maxGuests')}</label>
