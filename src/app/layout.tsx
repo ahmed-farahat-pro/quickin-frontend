@@ -1,3 +1,4 @@
+// retrigger deploy
 import type { Metadata } from "next";
 import { DM_Sans, Playfair_Display, Noto_Sans_Arabic, Amiri, Geist_Mono } from "next/font/google";
 import { NextIntlClientProvider } from 'next-intl'

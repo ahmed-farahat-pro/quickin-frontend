@@ -77,6 +77,7 @@ const NAV: NavGroup[] = [
     items: [
       { href: '/ops/listings', label: 'Listings', module: 'listings' },
       { href: '/ops/bookings', label: 'Bookings', module: 'bookings' },
+      { href: '/ops/booking-requests', label: 'Booking Requests', module: 'bookings' },
       { href: '/ops/payments', label: 'Payments & disputes', module: 'payments' },
       { href: '/ops/reports', label: 'Reports', module: 'reports' },
       { href: '/ops/disputes', label: 'Guest disputes', module: 'disputes' },

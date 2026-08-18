@@ -17,13 +17,14 @@ export const mailRelayConfigured = Boolean(BACKEND && SECRET)
 
 /**
  * Send the 6-digit verification code via the backend mail relay.
+ * Returns true if the email was accepted, false on failure.
  * Never throws — a delivery failure must not break signup; it's logged instead so
  * the cause is diagnosable (and the code is logged when the relay isn't configured).
  */
-export async function sendOtpEmail(to: string, code: string): Promise<void> {
+export async function sendOtpEmail(to: string, code: string): Promise<boolean> {
   if (!BACKEND || !SECRET) {
     console.log(`[OTP][dev] mail relay not configured — verification code for ${to}: ${code}`)
-    return
+    return false
   }
   try {
     const res = await fetch(`${BACKEND}/api/mail/send-otp`, {
@@ -35,10 +36,12 @@ export async function sendOtpEmail(to: string, code: string): Promise<void> {
     if (!res.ok) {
       const detail = await res.text().catch(() => '')
       console.error(`[OTP] relay rejected send for ${to}: ${res.status} ${detail}`)
-      return
+      return false
     }
     console.log(`[OTP] verification code sent to ${to} via backend relay`)
+    return true
   } catch (e) {
     console.error(`[OTP] relay request failed for ${to}: ${e}`)
+    return false
   }
 }

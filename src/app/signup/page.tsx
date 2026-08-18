@@ -107,6 +107,7 @@ export default function SignupPage() {
   const [pendingEmail, setPendingEmail] = useState<string | null>(null)
   const [otpCode, setOtpCode] = useState('')
   const [resendCooldown, setResendCooldown] = useState(0)
+  const [devCode, setDevCode] = useState<string | null>(null)
 
   // Tick the resend cooldown down to zero.
   useEffect(() => {
@@ -164,6 +165,7 @@ export default function SignupPage() {
       })
       const data = await res.json().catch(() => ({}))
       setResendCooldown(Number(data?.cooldown) || 30)
+      if (data?.devCode) setDevCode(data.devCode)
       if (!res.ok) setError(data?.error || null)
       else setNotice(t('otp.newCodeSent'))
     } catch {
@@ -312,6 +314,7 @@ export default function SignupPage() {
         // Email verification required — switch to the OTP step.
         setPendingEmail(data.email || email)
         setNotice(t('otp.codeSentTo', { email: data.email || email }))
+        setDevCode(data.devCode || null)
         setResendCooldown(30)
         setLoading(false)
         return
@@ -420,6 +423,19 @@ export default function SignupPage() {
 
         {pendingEmail ? (
           <form onSubmit={verifyOtp}>
+            {devCode && (
+              <div style={{
+                background: COLORS.burgundy + '12',
+                color: COLORS.burgundy,
+                fontSize: 13,
+                padding: '12px 16px',
+                borderRadius: 12,
+                marginBottom: 16,
+                textAlign: 'center',
+              }}>
+                Email couldn't be delivered. Use code: <strong>{devCode}</strong>
+              </div>
+            )}
             <label style={{ display: 'block', marginBottom: 16 }}>
               <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: COLORS.ink, marginBottom: 6 }}>
                 {t('otp.label')}
