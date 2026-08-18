@@ -46,6 +46,14 @@ type NavItem = {
   /** The permission that reveals it. The page and its API re-check independently,
    *  so hiding an item is convenience, not the security boundary. */
   module: StaffModule
+  /** A second permission that also reveals this item, for a screen carrying two
+   *  independently-granted queues. Only the verifications screen has one today: it
+   *  holds both the ID verification queue and the ID change requests, and either
+   *  module is reason enough to be there. */
+  altModule?: StaffModule
+  /** What to call the item for someone who holds only `altModule` — "ID verifications"
+   *  would be a lie to an operator who can only see the change requests on it. */
+  altLabel?: string
   /** `/ops` is a prefix of every other route, so Overview must match exactly. */
   exact?: boolean
 }
@@ -81,7 +89,13 @@ const NAV: NavGroup[] = [
       { href: '/ops/users', label: 'Users', module: 'users' },
       { href: '/ops/moderation', label: 'Moderation', module: 'moderation' },
       { href: '/ops/applications', label: 'Host applications', module: 'applications' },
-      { href: '/ops/verifications', label: 'ID verifications', module: 'verifications' },
+      {
+        href: '/ops/verifications',
+        label: 'ID verifications',
+        module: 'verifications',
+        altModule: 'id_changes',
+        altLabel: 'ID change requests',
+      },
     ],
   },
   {
@@ -222,9 +236,15 @@ export function OpsShell({ children }: { children: React.ReactNode }) {
   // Only the groups with something in them for this operator.
   const groups = useMemo(
     () =>
-      NAV.map((g) => ({ ...g, items: g.items.filter((i) => can(i.module)) })).filter(
-        (g) => g.items.length > 0
-      ),
+      NAV.map((g) => ({
+        ...g,
+        items: g.items
+          .filter((i) => can(i.module) || (i.altModule ? can(i.altModule) : false))
+          // Named for what this operator can actually do on the screen: someone with
+          // only the change queue sees "ID change requests", not a verification queue
+          // that will render empty for them.
+          .map((i) => (!can(i.module) && i.altLabel ? { ...i, label: i.altLabel } : i)),
+      })).filter((g) => g.items.length > 0),
     [can]
   )
 

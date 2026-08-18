@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { getLocale, getTranslations } from "next-intl/server";
 import { Navbar, Footer, BannersStack } from "@/components/layout";
 import { LocaleSwitcher } from "@/components/layout/locale-switcher";
+import { CurrencySwitcher } from '@/components/layout/currency-switcher'
 import { ChatWidget } from "@/components/features/ai";
 import { AuthModal } from "@/components/features/auth";
 import { SearchBar } from "@/components/features/search/search-bar";
@@ -132,6 +133,8 @@ async function SignedInHeader({
             </Button>
 
             <LocaleSwitcher className='hidden lg:flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-full border border-border' />
+
+            <CurrencySwitcher className='hidden lg:flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-full border border-border' />
 
             <Link href='/reservations' className={utilityLink}>
               {t('trips')}

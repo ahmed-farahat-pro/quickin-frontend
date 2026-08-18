@@ -11,10 +11,22 @@ export function cn(...inputs: ClassValue[]) {
  * renders as "<amount> <CODE>" (e.g. "1,200 EGP"). The amount always carries
  * thousands separators. An invalid/empty currency falls back to a bare number
  * rather than echoing a bogus code.
+ *
+ * `minFractionDigits` is for converted prices, which land on values like 6.8 —
+ * money with one decimal reads as a typo, so the caller asks for both. It
+ * defaults to 0 so a whole price stays "1,200 EGP" and not "1,200.00 EGP".
  */
-export function formatPrice(amount: number, currency?: string | null): string {
+export function formatPrice(
+  amount: number,
+  currency?: string | null,
+  options?: { minFractionDigits?: number },
+): string {
   const value = Number.isFinite(amount) ? amount : 0
-  const num = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value)
+  const minimumFractionDigits = options?.minFractionDigits ?? 0
+  const num = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits,
+    maximumFractionDigits: Math.max(2, minimumFractionDigits),
+  }).format(value)
 
   const code = typeof currency === 'string' ? currency.trim() : ''
   if (!code || code === 'USD') return `$${num}`

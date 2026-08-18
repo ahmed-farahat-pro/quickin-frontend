@@ -26,6 +26,7 @@ import { PROPERTY_TYPES, MAX_WEB_LISTING_PHOTOS, iconForPropertyType } from '@/l
 import { REGIONS, AMENITIES } from '@/lib/listing-options'
 import { fileToCompressedDataUrl } from '@/lib/image'
 import { DEFAULT_WEEKEND_DAYS } from '@/lib/geo'
+import { checkWeekendPrice } from '@/lib/local/listing-pricing-core'
 import { OwnershipDocField } from '../../ownership-doc'
 import { ListingStatusChip } from '../../listing-status-chip'
 import type { HostListingStatus } from '../../host-tabs'
@@ -428,8 +429,10 @@ export function EditListingForm({
 
     const priceNum = Number(price)
     if (priceNum !== Number(listing.price_per_night)) patch.price_per_night = priceNum
-    const wk = Number(weekendPrice)
-    const nextWeekendPrice = weekendPrice.trim() && Number.isFinite(wk) && wk > 0 ? wk : null
+    // buildPatch also runs on every render (it is what `dirty` is), so it never
+    // throws on a bad rate — onSubmit is the one that stops and says so.
+    const wk = checkWeekendPrice(weekendPrice)
+    const nextWeekendPrice = wk.ok ? wk.value : null
     const weekendPriceChanged = nextWeekendPrice !== (listing.weekend_price ?? null)
     if (weekendPriceChanged) patch.weekend_price = nextWeekendPrice
     // Weekend days are only meaningful alongside a weekend price — they are
@@ -476,6 +479,12 @@ export function EditListingForm({
     const priceNum = Number(price)
     if (!Number.isFinite(priceNum) || priceNum <= 0) {
       setError(t('errors.priceInvalid'))
+      return
+    }
+    // A weekend rate of 0 is a typo, not "no weekend rate" — clearing the field
+    // is how you say that. Without this the patch would quietly save null.
+    if (!checkWeekendPrice(weekendPrice).ok) {
+      setError(t('errors.weekendPriceInvalid'))
       return
     }
     if (!dirty) return
@@ -729,7 +738,7 @@ export function EditListingForm({
           id="edit-weekend"
           style={input}
           type="number"
-          min="0"
+          min="1"
           step="1"
           value={weekendPrice}
           onChange={(e) => setWeekendPrice(e.target.value)}

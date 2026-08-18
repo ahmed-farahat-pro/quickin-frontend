@@ -1,5 +1,5 @@
-// Route-segment skeleton for /verify-id — mirrors the heading, subtitle and the
-// ID upload panel (centered max-w-lg column on the cream background).
+// Route-segment skeleton for /verify-id — mirrors the gradient header, heading,
+// subtitle and the ID upload panel (centered max-w-lg column on the cream background).
 import {
   ShimmerStyles,
   SkeletonBlock,
@@ -16,13 +16,35 @@ export default function Loading() {
         color: C.ink,
         fontFamily: FONT,
         minHeight: '100vh',
-        padding: '40px 16px',
       }}
     >
       <RouteProgress />
       <ShimmerStyles />
 
-      <div style={{ maxWidth: 512, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* Header (logo + back to account) */}
+      <header
+        style={{
+          background: `linear-gradient(180deg, ${C.tan} 0%, ${C.cream} 100%)`,
+          borderBottom: '1px solid rgba(91,15,22,0.10)',
+          padding: '20px 24px',
+        }}
+      >
+        <div
+          style={{
+            maxWidth: 720,
+            margin: '0 auto',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 16,
+          }}
+        >
+          <SkeletonBlock width={96} height={40} radius={8} />
+          <SkeletonBlock width={120} height={16} />
+        </div>
+      </header>
+
+      <div style={{ maxWidth: 512, margin: '0 auto', padding: '40px 16px', display: 'flex', flexDirection: 'column', gap: 24 }}>
         {/* Heading + subtitle */}
         <div>
           <SkeletonBlock width="55%" height={28} radius={10} />

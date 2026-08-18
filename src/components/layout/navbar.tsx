@@ -34,6 +34,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { localizeHrefWithQuery } from '@/lib/i18n/pathname'
 import type { Locale } from '@/i18n/config'
 import { LocaleSwitcher } from '@/components/layout/locale-switcher'
+import { CurrencySwitcher } from '@/components/layout/currency-switcher'
 import { UserNotificationBell } from '@/components/notifications/user-notification-bell'
 import type { NavbarConfig } from '@/types/site-settings'
 
@@ -211,6 +212,8 @@ export function Navbar({ attributes, destinations, config }: NavbarProps) {
             </Button>
 
             <LocaleSwitcher className='hidden lg:flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-full border border-border' />
+
+            <CurrencySwitcher className='hidden lg:flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-full border border-border' />
 
             {isAuthenticated && <UserNotificationBell />}
 

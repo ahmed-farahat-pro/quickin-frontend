@@ -1,4 +1,15 @@
 import { z } from 'zod'
+import { checkEmail, emailProblemMessage } from '@/lib/local/email-core'
+import { checkPassword, passwordProblemMessage } from '@/lib/local/password-policy'
+import { validateName } from '@/lib/local/name-policy'
+
+// `z.string().email()` only checks the shape, so it accepts layla@email.con.
+// This field also checks the extension against the IANA root zone — the same
+// rules the /signup form and the signup API route apply.
+const emailField = z.string().superRefine((value, ctx) => {
+  const problem = checkEmail(value)
+  if (problem) ctx.addIssue({ code: 'custom', message: emailProblemMessage(problem) })
+})
 
 // Listing schemas
 export const listingCategorySchema = z.enum([
@@ -79,10 +90,25 @@ export const searchSchema = z.object({
 export type SearchInput = z.infer<typeof searchSchema>
 
 // Auth schemas
+// `.min(8)` let `12345678` through. The strength rules live in password-policy.ts
+// so this form and the /signup form refuse exactly the same passwords.
+const newPasswordField = z.string().superRefine((value, ctx) => {
+  const problem = checkPassword(value)
+  if (problem) ctx.addIssue({ code: 'custom', message: passwordProblemMessage(problem) })
+})
+
+// `.min(6)` counted characters, so `123456` was a valid name here while `Ali M`
+// was not. The rule lives in name-policy.ts — the same one the host application
+// and both signup API routes apply.
+const nameField = z.string().superRefine((value, ctx) => {
+  const message = validateName(value)
+  if (message) ctx.addIssue({ code: 'custom', message })
+})
+
 export const signUpSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  fullName: z.string().min(6, 'Name must be at least 6 characters'),
+  email: emailField,
+  password: newPasswordField,
+  fullName: nameField,
   acceptTerms: z.boolean().refine(val => val === true, {
     message: 'You must accept the terms and conditions to continue'
   }),
@@ -91,7 +117,7 @@ export const signUpSchema = z.object({
 export type SignUpInput = z.infer<typeof signUpSchema>
 
 export const signInSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  email: emailField,
   password: z.string().min(1, 'Password is required'),
 })
 

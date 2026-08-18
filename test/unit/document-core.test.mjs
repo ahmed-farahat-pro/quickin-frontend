@@ -36,9 +36,9 @@ import {
 const PNG = 'data:image/png;base64,iVBORw0KGgo='
 
 describe('document kinds', () => {
-  test('recognises exactly the four kinds', () => {
+  test('recognises exactly the six kinds', () => {
     for (const k of DOCUMENT_KINDS) assert.equal(isDocumentKind(k), true)
-    assert.equal(DOCUMENT_KINDS.length, 4)
+    assert.equal(DOCUMENT_KINDS.length, 6)
   })
 
   test('rejects anything else, including SQL-ish input', () => {

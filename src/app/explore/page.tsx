@@ -4,6 +4,7 @@
 import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import { LocaleSwitcher } from '@/components/layout/locale-switcher'
+import { CurrencySwitcher } from '@/components/layout/currency-switcher'
 import { NotificationsBell } from './notifications-bell'
 import { MobileMenu } from './mobile-menu'
 import { getTranslations, getLocale } from 'next-intl/server'
@@ -200,6 +201,7 @@ export default async function ExplorePage({
           <nav className="qk-nav-desktop">
             <NotificationsBell />
             <LocaleSwitcher className="font-semibold text-[color:var(--qk-ink,#3a2a23)]" />
+            <CurrencySwitcher className="font-semibold text-[color:var(--qk-ink,#3a2a23)]" />
             {firstName && (
               // Messages inbox — the mobile apps surface chat as a top-level
               // icon, so the web header carries the same affordance rather than

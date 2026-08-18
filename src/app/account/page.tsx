@@ -5,9 +5,13 @@ import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
-import { getVerification } from '@/lib/local/db'
+import { getVerification, getPayoutMethod, getOwnProfileFields } from '@/lib/local/db'
 import { verifyToken, getUserRowByEmail, getHostState, type HostStatus } from '@/lib/local/auth'
+import type { PayoutMethodView } from '@/lib/local/payout-method-core'
 import { AccountForms, BecomeHostButton } from './account-forms'
+import { AvatarPicker } from './avatar-picker'
+import { PayoutMethodCard } from './payout-method-card'
+import { PreferencesCard } from './preferences-card'
 
 export const dynamic = 'force-dynamic'
 
@@ -129,6 +133,15 @@ export default async function AccountPage() {
 
   const t = await getTranslations('accountPage')
   const verification = await getVerification(user.id)
+  // Only a host is paid by QuickIn, so only a host has a payout method to show.
+  // Read it server-side so an already-added method renders with the page rather
+  // than flashing the empty form first.
+  const payoutMethod: PayoutMethodView | null =
+    user.host_status === 'approved' ? await getPayoutMethod(user.id) : null
+  // Age / phone / bio live on the same row the apps write, so a bio typed on the
+  // phone is already filled in here. Read server-side with the rest of the page
+  // so the form renders populated rather than empty-then-filled.
+  const profileFields = await getOwnProfileFields(user.id)
   const chipColors = VERIFY_CHIP_COLORS[verification.status] ?? VERIFY_CHIP_COLORS.unverified
   const chipKey = VERIFY_CHIP_COLORS[verification.status]
     ? verification.status
@@ -189,38 +202,15 @@ export default async function AccountPage() {
             flexWrap: 'wrap',
           }}
         >
-          <div
-            style={{
-              width: 72,
-              height: 72,
-              borderRadius: 999,
-              background: COLORS.tan,
-              color: COLORS.burgundy,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 800,
-              fontSize: 24,
-              overflow: 'hidden',
-              flexShrink: 0,
-            }}
+          {/* The avatar is the control now, not just a picture: the circle, the
+              name and the add/change/remove buttons are one client component, and
+              the email + verification chip below stay server-rendered inside it. */}
+          <AvatarPicker
+            userId={user.id}
+            initialUrl={user.avatar_url}
+            initials={initials(user.full_name, user.email)}
+            displayName={displayName}
           >
-            {user.avatar_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={user.avatar_url}
-                alt={displayName}
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-              />
-            ) : (
-              initials(user.full_name, user.email)
-            )}
-          </div>
-
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: 20, fontWeight: 700, color: COLORS.ink }}>
-              {displayName}
-            </div>
             <div style={{ fontSize: 14, color: COLORS.muted, wordBreak: 'break-all' }}>
               {user.email}
             </div>
@@ -252,7 +242,7 @@ export default async function AccountPage() {
                 </a>
               )}
             </div>
-          </div>
+          </AvatarPicker>
         </div>
 
         {/* Unified account: one person, one login. Becoming a host is an
@@ -382,11 +372,20 @@ export default async function AccountPage() {
           </div>
         )}
 
+        {/* Payment information — where QuickIn sends this host's earnings. */}
+        {user.host_status === 'approved' && <PayoutMethodCard initial={payoutMethod} />}
+
         {/* Profile + password forms (client) */}
         <AccountForms
           userId={user.id}
           initialName={user.full_name ?? ''}
+          initialAge={profileFields.age === null ? '' : String(profileFields.age)}
+          initialPhone={profileFields.phone ?? ''}
+          initialBio={profileFields.bio ?? ''}
         />
+
+        {/* Display currency + language */}
+        <PreferencesCard />
 
         {/* Quick links to the rest of the account surface */}
         <div

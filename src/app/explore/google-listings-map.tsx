@@ -10,6 +10,8 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import type { Listing } from '@/lib/local/db'
 import { approxLatLng } from '@/lib/geo'
+import { formatDisplayPrice } from '@/lib/currency/display'
+import { useDisplayCurrency } from '@/components/providers/display-currency-provider'
 
 const FALLBACK_IMG =
   'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=1200&q=80'
@@ -113,9 +115,10 @@ function loadGoogleMaps(apiKey: string): Promise<GMapsApi> {
   return window.__quickinGmapsPromise
 }
 
-function priceLabel(listing: Listing): string {
-  const dollar = listing.currency === 'USD' || !listing.currency ? '$' : ''
-  return `${dollar}${listing.price_per_night}`
+// Same string as the list view's card, so switching between List and Map
+// doesn't switch currency with it.
+function priceLabel(listing: Listing, displayCurrency: string): string {
+  return formatDisplayPrice(listing.price_per_night, listing.currency, displayCurrency)
 }
 
 // Burgundy price-pill DOM node for an AdvancedMarkerElement.
@@ -129,9 +132,13 @@ function makePill(label: string): HTMLDivElement {
 
 // InfoWindow body: photo thumbnail + title + location + price + link.
 // `perNightLabel` is the already-translated "/ night" suffix.
-function infoHtml(listing: GeoListing, perNightLabel: string): string {
+function infoHtml(
+  listing: GeoListing,
+  perNightLabel: string,
+  displayCurrency: string,
+): string {
   const thumb = listing.listing_images[0]?.url || FALLBACK_IMG
-  const price = priceLabel(listing)
+  const price = priceLabel(listing, displayCurrency)
   const esc = (s: string) =>
     s
       .replace(/&/g, '&amp;')
@@ -161,6 +168,7 @@ export default function GoogleListingsMap({
 }) {
   const t = useTranslations('explorePage')
   const perNightLabel = t('card.perNight')
+  const { currency: displayCurrency } = useDisplayCurrency()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<GMap | null>(null)
   const apiRef = useRef<GMapsApi | null>(null)
@@ -204,7 +212,7 @@ export default function GoogleListingsMap({
     for (const listing of points) {
       const position = { lat: listing.lat, lng: listing.lng }
       bounds.extend(position)
-      const label = priceLabel(listing)
+      const label = priceLabel(listing, displayCurrency)
 
       let marker: GMarkerLike
       if (useAdvanced && api.marker) {
@@ -238,7 +246,7 @@ export default function GoogleListingsMap({
       }
 
       marker.addListener('click', () => {
-        info.setContent(infoHtml(listing, perNightLabel))
+        info.setContent(infoHtml(listing, perNightLabel, displayCurrency))
         info.open({ map, anchor: marker })
       })
       markersRef.current.push(marker)
@@ -288,9 +296,10 @@ export default function GoogleListingsMap({
     return () => {
       cancelled = true
     }
-    // Markers are rebuilt whenever the point set changes (pointsKey).
+    // Markers are rebuilt whenever the point set changes (pointsKey) — or the
+    // guest picks another currency, which is what the pills read.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiKey, pointsKey])
+  }, [apiKey, pointsKey, displayCurrency])
 
   // Clean up markers/InfoWindow on unmount (e.g. List/Map toggle).
   useEffect(() => {

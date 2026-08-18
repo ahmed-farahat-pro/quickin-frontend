@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireStaff, staffActor, logStaffAction, clientIpOf } from '@/lib/local/staff'
-import { adminGetUserDetail, adminSetAccountStatus } from '@/lib/local/db'
+import { adminGetUserDetail, adminRemoveUserAvatar, adminSetAccountStatus } from '@/lib/local/db'
 import {
   nextStatusFor,
   normalizeReason,
@@ -16,6 +16,8 @@ import {
 //        → { user, listings, bookings, payments, conversations, documents, stats } (D2)
 //   POST /api/local/admin/users/:id { action:'block'|'unblock'|'remove'|'restore', reason? }
 //        → the account lifecycle (D3 block, D4 remove). Every call is audited.
+//   POST /api/local/admin/users/:id { action:'remove_photo' }
+//        → takes the profile photo down and leaves the account alone.
 //
 // `restore` additionally requires a super admin: removal is the most destructive
 // action /ops has, so undoing one is a deliberate second pair of hands.
@@ -50,10 +52,35 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const { id } = await ctx.params
   try {
     const body = await req.json().catch(() => null)
-    const action = String(body?.action ?? '') as UserStatusAction
+    // Read as a plain string: not every action here is a status transition.
+    const requested = String(body?.action ?? '')
+
+    // Taking a photo down is not an account-status change, so it is answered
+    // before the status machine below rather than bolted into it: a reported
+    // profile picture is a reason to remove the picture, and blocking the person
+    // over it is a separate decision a moderator makes separately.
+    if (requested === 'remove_photo') {
+      const result = await adminRemoveUserAvatar(id)
+      if (!result) return NextResponse.json({ error: 'User not found' }, { status: 404, headers: CORS })
+      // Audited even when there was nothing to remove: "a moderator opened this
+      // profile and pressed Remove photo" is the fact worth keeping, and a photo
+      // that was already gone by the time they pressed it is part of that story.
+      await logStaffAction({
+        staffId: gate.staff.legacy ? null : gate.staff.staffId,
+        staffEmail: gate.staff.email,
+        action: 'user_photo_removed',
+        targetType: 'user',
+        targetId: id,
+        detail: { email: result.email, had_photo: result.removed },
+        ip: clientIpOf(req),
+      })
+      return NextResponse.json({ ok: true, removed: result.removed }, { headers: CORS })
+    }
+
+    const action = requested as UserStatusAction
     if (!(USER_STATUS_ACTIONS as readonly string[]).includes(action)) {
       return NextResponse.json(
-        { error: `action must be one of: ${USER_STATUS_ACTIONS.join(', ')}` },
+        { error: `action must be one of: ${[...USER_STATUS_ACTIONS, 'remove_photo'].join(', ')}` },
         { status: 400, headers: CORS },
       )
     }

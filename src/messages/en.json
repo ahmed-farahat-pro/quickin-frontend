@@ -42,7 +42,6 @@
     "terms": "Terms",
     "sitemap": "Sitemap",
     "privacy": "Privacy",
-    "currency": "EGP",
     "supportLinks": {
       "helpCenter": "Help Center",
       "safetyInfo": "Safety Information",
@@ -59,6 +58,14 @@
       "about": "About Us",
       "contact": "Contact"
     }
+  },
+  "currency": {
+    "title": "Display currency",
+    "change": "Change currency",
+    "disclaimer": "Rates are approximate and for reference only. Bookings are charged in the listing's own currency.",
+    "chargedIn": "Charged in {currency}",
+    "approx": "Approximate — charged in {currency}",
+    "ratesAsOf": "Rates as of {date}"
   },
   "auth": {
     "loginTitle": "Log in",
@@ -1570,9 +1577,11 @@
   },
   "loginLocal": {
     "subtitle": "Welcome back — sign in to continue",
+    "exitToBrowsing": "Keep browsing without an account",
     "logoAlt": "QuickIn",
     "emailLabel": "Email",
     "passwordLabel": "Password",
+    "forgotPassword": "Forgot password?",
     "signIn": "Sign in",
     "signingIn": "Signing in…",
     "or": "or",
@@ -1593,11 +1602,28 @@
       "newCodeSent": "A new code is on its way.",
       "codeSentTo": "We sent a 6-digit code to {email}."
     },
+    "forgot": {
+      "title": "Reset your password",
+      "enterCodeTitle": "Check your email",
+      "intro": "Enter your email and we'll send you a 6-digit reset code.",
+      "sendCode": "Send reset code",
+      "sending": "Sending…",
+      "codeSent": "If that email has an account, a 6-digit code is on its way to {email}.",
+      "devCode": "Mail relay is off — your reset code is {code}.",
+      "codeLabel": "Reset code",
+      "newPasswordLabel": "New password",
+      "submit": "Reset password & sign in",
+      "submitting": "Resetting…",
+      "resendCode": "Send a new code",
+      "backToSignIn": "Back to sign in"
+    },
     "errors": {
       "googleFailed": "Google sign-in failed. Please try again.",
       "unableToSignIn": "Unable to sign in. Please try again.",
       "invalidCode": "That code didn't work. Please try again.",
-      "network": "Network error. Please try again."
+      "network": "Network error. Please try again.",
+      "resetRequestFailed": "Couldn't send the reset code. Please try again.",
+      "resetFailed": "Couldn't reset your password. Please try again."
     },
     "notices": {
       "appleSetup": "Apple sign-in requires HTTPS + an Apple Developer Services ID (see OAUTH-SETUP.md)."
@@ -1740,6 +1766,7 @@
       "ogDescription": "View and manage your upcoming QuickIn stays."
     },
     "backToExplore": "Back to Explore",
+    "backToAccount": "Back to account",
     "signedOut": {
       "title": "Sign in to see your reservations",
       "subtitle": "Your upcoming stays will appear here once you log in.",
@@ -1783,11 +1810,16 @@
   },
   "signupLocal": {
     "subtitle": "Create your account to start exploring",
+    "exitToBrowsing": "Keep browsing without an account",
     "errors": {
       "invalidCode": "That code is invalid or expired.",
       "network": "Network error. Please try again.",
       "googleFailed": "Google sign-in failed. Please try again.",
-      "createFailed": "Unable to create account. Please try again."
+      "createFailed": "Unable to create account. Please try again.",
+      "emailInvalid": "Please enter a valid email address.",
+      "emailBadTld": "“.{tld}” isn't a valid domain extension.",
+      "emailDidYouMean": "Did you mean {suggestion}?",
+      "emailDisposable": "Temporary or disposable email addresses are not allowed. Please use a permanent personal or work email."
     },
     "otp": {
       "label": "Verification code",
@@ -1798,13 +1830,14 @@
       "resendIn": "Resend in {seconds}s",
       "resendCode": "Resend code",
       "newCodeSent": "A new code is on its way.",
-      "codeSentTo": "We sent a 6-digit code to {email}."
+      "codeSentTo": "We sent a 6-digit code to {email}.",
+      "back": "Back to sign up"
     },
     "fields": {
       "fullName": "Full name",
       "email": "Email",
       "password": "Password",
-      "passwordPlaceholder": "At least 6 characters"
+      "passwordPlaceholder": "At least 8 characters"
     },
     "submit": {
       "creating": "Creating account…",
@@ -1837,7 +1870,8 @@
       "description": "Upload your National ID to verify your QuickIn account."
     },
     "heading": "Verify your identity",
-    "subtitle": "Boutique stays need a verified guest — it only takes a minute."
+    "subtitle": "Boutique stays need a verified guest — it only takes a minute.",
+    "backToAccount": "Back to account"
   },
   "accountPage": {
     "meta": {
@@ -1866,6 +1900,29 @@
       "unverified": "Not verified"
     },
     "verifyIdCta": "Verify your ID",
+    "photo": {
+      "add": "Add a photo",
+      "change": "Change photo",
+      "remove": "Remove",
+      "saving": "Uploading…",
+      "removing": "Removing…",
+      "saved": "Photo updated.",
+      "hint": "JPEG, PNG or WebP. Hosts see it when you book.",
+      "error": "Could not save your photo. Please try again.",
+      "unreadable": "That file could not be read as an image.",
+      "problem": {
+        "notAnImage": "Please choose an image file.",
+        "unsupportedType": "Profile photos must be JPEG, PNG or WebP.",
+        "tooLarge": "That photo is too large — please choose a smaller one."
+      }
+    },
+    "preferences": {
+      "title": "Preferences",
+      "subtitle": "How QuickIn shows prices and text to you.",
+      "currencyLabel": "Currency",
+      "currencyHelp": "Prices across QuickIn are shown in this currency. Bookings are still charged in the listing's own currency.",
+      "languageLabel": "Language"
+    },
     "links": {
       "reservations": "My trips",
       "saved": "My favorites",
@@ -1877,6 +1934,25 @@
       "title": "Profile",
       "fullName": "Full name",
       "fullNamePlaceholder": "Your name",
+      "age": "Age",
+      "agePlaceholder": "34",
+      "ageHelp": "Only shown as part of your profile. Between {min} and {max}.",
+      "phone": "Phone number",
+      "phonePlaceholder": "010 1234 5678",
+      "phoneHelp": "Only you and our team can see this. Hosts and guests never do.",
+      "bio": "About you",
+      "bioPlaceholder": "A line or two about yourself — where you're from, what you love about travelling.",
+      "bioCount": "{count} / {max} characters",
+      "optional": "(optional)",
+      "errors": {
+        "age": {
+          "notANumber": "Enter your age as a number, like 34.",
+          "tooYoung": "Enter an age of at least {min}.",
+          "tooOld": "Enter an age of at most {max}."
+        },
+        "phoneInvalid": "That doesn't look like a phone number. Try 010 1234 5678 or +20 10 1234 5678.",
+        "bioTooLong": "Keep this to {max} characters or fewer."
+      },
       "avatarUrl": "Avatar URL",
       "save": "Save profile",
       "saving": "Saving…",
@@ -1891,7 +1967,6 @@
       "update": "Update password",
       "updating": "Updating…",
       "updated": "Password updated.",
-      "tooShort": "New password must be at least 8 characters.",
       "mismatch": "New passwords do not match.",
       "error": "Could not change your password."
     },
@@ -1915,6 +1990,7 @@
       "description": "Your saved boutique stays on QuickIn."
     },
     "backToExplore": "Back to Explore",
+    "backToAccount": "Back to account",
     "title": "My favorites",
     "noneYet": "You haven’t saved any stays yet.",
     "countSaved": "{count, plural, one {# saved stay.} other {# saved stays.}}",
@@ -2069,6 +2145,7 @@
       "errors": {
         "titleRequired": "Please give your listing a title.",
         "priceInvalid": "Please enter a valid price per night.",
+        "weekendPriceInvalid": "Weekend price must be more than zero. Leave it empty if you don't charge a different rate on weekends.",
         "invalidImageUrl": "This photo link doesn’t look like a valid URL: {url}",
         "createFailed": "Could not create the listing",
         "tooManyPhotos": "You can upload up to {max} photos.",
@@ -2226,6 +2303,7 @@
     "errors": {
       "nationalIdRequired": "Please enter your national ID.",
       "phoneRequired": "Please enter your phone number.",
+      "phoneInvalid": "That doesn’t look like a phone number. Try 010 1234 5678 or +20 10 1234 5678.",
       "addressRequired": "Please enter your address.",
       "submitFailed": "Could not submit your application. Please try again.",
       "idRequired": "Please add the front and back of your ID.",
@@ -2418,5 +2496,90 @@
     "comingSoon": "Coming soon",
     "followUs": "Follow us",
     "rights": "All rights reserved."
+  },
+  "payoutMethod": {
+    "title": "Payment information",
+    "subtitleEmpty": "Add a payout method so QuickIn can send you your earnings.",
+    "subtitleSet": "This is where QuickIn sends your earnings.",
+    "chooseMethod": "How you want to be paid",
+    "badgeAdded": "Added",
+    "methods": {
+      "bank_account": "Bank account",
+      "instapay": "InstaPay",
+      "wallet": "Wallet"
+    },
+    "walletProviders": {
+      "vodafone_cash": "Vodafone Cash",
+      "etisalat_cash": "Etisalat Cash",
+      "orange_money": "Orange Money",
+      "we_pay": "WE Pay",
+      "other": "Other wallet"
+    },
+    "fields": {
+      "accountName": "Name on the account",
+      "bank": "Bank",
+      "iban": "IBAN",
+      "accountNumber": "Account number",
+      "swift": "SWIFT / BIC",
+      "swiftOptional": "SWIFT / BIC (optional)",
+      "branch": "Branch",
+      "branchOptional": "Branch (optional)",
+      "instapayAddress": "InstaPay address",
+      "walletProvider": "Wallet",
+      "walletNumber": "Wallet number",
+      "updated": "Last updated"
+    },
+    "placeholders": {
+      "accountName": "As it appears on the account",
+      "bank": "e.g. Banque Misr",
+      "iban": "EG38 0019 0005 0000 0000 2631 8000 2",
+      "accountNumber": "Your bank account number",
+      "swift": "e.g. NBEGEGCX",
+      "branch": "e.g. Zamalek",
+      "instapayAddress": "name@instapay",
+      "walletNumber": "01XXXXXXXXX"
+    },
+    "bankHint": "Enter your IBAN or your account number — either one is enough, and both is better.",
+    "instapayHint": "Your InstaPay address, for example name@instapay or name@banquemisr.",
+    "save": "Save payout method",
+    "update": "Save changes",
+    "saving": "Saving…",
+    "saved": "Your payout method has been saved.",
+    "change": "Change",
+    "cancel": "Cancel",
+    "remove": "Remove",
+    "removing": "Removing…",
+    "removed": "Your payout method has been removed.",
+    "removeConfirm": "Remove this payout method? QuickIn will have nowhere to send your earnings until you add another one.",
+    "error": "Couldn't save your payout method. Please try again."
+  },
+  "passwordPolicy": {
+    "rules": {
+      "length": "At least 8 characters",
+      "uppercase": "An uppercase letter (A–Z)",
+      "lowercase": "A lowercase letter (a–z)",
+      "digit": "A number (0–9)",
+      "symbol": "A symbol (! ? @ # …)"
+    },
+    "errors": {
+      "required": "Please choose a password.",
+      "tooLong": "That password is too long (128 characters max).",
+      "whitespace": "Your password cannot be only spaces.",
+      "length": "Your password must be at least 8 characters.",
+      "uppercase": "Your password must contain an uppercase letter.",
+      "lowercase": "Your password must contain a lowercase letter.",
+      "digit": "Your password must contain a number.",
+      "symbol": "Your password must contain a symbol, for example ! ? @ #.",
+      "email": "Your password cannot be your email address.",
+      "common": "That password is too common. Please choose a less guessable one."
+    }
+  },
+  "namePolicy": {
+    "errors": {
+      "required": "Please enter your name.",
+      "letters": "Please enter your name — a name contains letters, not only numbers.",
+      "tooShort": "Please enter your name in full (at least 2 letters).",
+      "tooLong": "That name is too long (60 characters max)."
+    }
   }
 }

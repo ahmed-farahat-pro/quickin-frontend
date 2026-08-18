@@ -32,6 +32,7 @@ import { OverviewMetrics } from './overview-trend'
 import type { TrendPayload } from '@/lib/local/overview-trends-core'
 import { OpsSectionSkeleton } from './ops-skeleton'
 import { alertsFor, alertTotal, waitingLabel } from '@/lib/local/activity-core'
+import { docTypeLabel } from '@/lib/local/host-verification-core'
 import type { StaffModule } from '@/lib/local/staff'
 
 // Boutique palette.
@@ -167,6 +168,28 @@ type Verification = {
   notes?: string | null
 }
 
+/** A request to change the ID number already stored on an account. Shares this
+ *  screen with Verification but is a different decision on a different table: this
+ *  one rewrites users.id_document and never touches verification_status. */
+type IdChangeRequest = {
+  id: string
+  user_id: string
+  user_name?: string | null
+  user_email?: string | null
+  verification_status?: string | null
+  current_value?: string | null
+  requested_value: string
+  doc_type?: string | null
+  reason?: string | null
+  status?: string | null
+  has_front?: boolean
+  has_back?: boolean
+  submitted_at?: string | null
+  reviewed_at?: string | null
+  reviewed_by?: string | null
+  notes?: string | null
+}
+
 function fmtDate(value?: string | null): string {
   if (!value) return ''
   const d = new Date(value)
@@ -211,7 +234,12 @@ export function OpsDashboard({
   // The route decides the section; `tab` is kept as the local name because a dozen
   // handlers below report errors against "the current section".
   const tab = section
-  const allowed = can(section)
+  // The verifications screen carries TWO queues that are granted separately: the ID
+  // verifications themselves and the requests to change an already-stored ID number.
+  // Holding either is enough to open the screen; each queue below then renders only
+  // for the operator who holds it, and its API route re-checks the same permission.
+  const canIdChanges = can('id_changes')
+  const allowed = section === 'verifications' ? can('verifications') || canIdChanges : can(section)
 
   // Per-section data.
   const [stats, setStats] = useState<AdminStats | null>(null)
@@ -222,6 +250,9 @@ export function OpsDashboard({
   // E2: the queue is a work list, so it defaults to pending — but a decided case must
   // stay reachable, otherwise it can never be reopened.
   const [verifFilter, setVerifFilter] = useState<'pending' | 'verified' | 'rejected' | 'all'>('pending')
+  // Requests to change a stored ID number — the second queue on this screen.
+  const [idChanges, setIdChanges] = useState<IdChangeRequest[]>([])
+  const [idChangeFilter, setIdChangeFilter] = useState<'pending' | 'approved' | 'rejected'>('pending')
 
   // Per-section loading / error.
   const [loading, setLoading] = useState<Record<SectionId, boolean>>({
@@ -352,13 +383,31 @@ export function OpsDashboard({
           }
           setApps(Array.isArray(json.applications) ? json.applications : [])
         } else if (id === 'verifications') {
-          const json = await adminGet<{ verifications?: Verification[] }>(`verifications?status=${verifFilter}`)
-          if (json === 'forbidden') return setSectionError(id, NO_ACCESS)
-          if (!json) {
+          // Two independently-granted queues on one screen, so they are fetched
+          // independently: an operator holding only `id_changes` must not have the
+          // whole section fail on the 403 from a verifications queue they were never
+          // given, and vice-versa.
+          const [verifJson, changeJson] = await Promise.all([
+            can('verifications')
+              ? adminGet<{ verifications?: Verification[] }>(`verifications?status=${verifFilter}`)
+              : Promise.resolve(null),
+            can('id_changes')
+              ? adminGet<{ requests?: IdChangeRequest[] }>(`id-changes?status=${idChangeFilter}`)
+              : Promise.resolve(null),
+          ])
+          if (verifJson === 'forbidden' || changeJson === 'forbidden') {
+            return setSectionError(id, NO_ACCESS)
+          }
+          if (can('verifications') && !verifJson) {
             setSectionError(id, 'Could not load verifications. Please retry.')
             return
           }
-          setVerifs(Array.isArray(json.verifications) ? json.verifications : [])
+          if (can('id_changes') && !changeJson) {
+            setSectionError(id, 'Could not load ID change requests. Please retry.')
+            return
+          }
+          setVerifs(Array.isArray(verifJson?.verifications) ? verifJson.verifications : [])
+          setIdChanges(Array.isArray(changeJson?.requests) ? changeJson.requests : [])
         }
       } finally {
         // Mark the section loaded on EVERY exit path, including the error returns
@@ -369,7 +418,7 @@ export function OpsDashboard({
         setSectionLoading(id, false)
       }
     },
-    [adminGet, verifFilter],
+    [adminGet, can, verifFilter, idChangeFilter],
   )
 
   // Lazy-fetch this section on first open. Skipped without the module — the API
@@ -384,6 +433,13 @@ export function OpsDashboard({
   useEffect(() => {
     setLoaded((prev) => (prev.verifications ? { ...prev, verifications: false } : prev))
   }, [verifFilter])
+
+  // Same for the change-request chips. Separate effect rather than one with both
+  // dependencies: they are independent queues, and combining them would refetch the
+  // verification list every time someone flipped a chip on the other panel.
+  useEffect(() => {
+    setLoaded((prev) => (prev.verifications ? { ...prev, verifications: false } : prev))
+  }, [idChangeFilter])
 
 
   // Load the app download links once. They sit on the console shell above the tabs,
@@ -544,6 +600,39 @@ export function OpsDashboard({
     // belongs but with a new status, so refetch rather than lie about it.
     if (verifFilter === 'all') setLoaded((p) => ({ ...p, verifications: false }))
     else setVerifs((prev) => prev.filter((v) => v.id !== id))
+  }
+
+  /**
+   * Approve or reject a request to change an account's ID number.
+   *
+   * Approving rewrites the number on the profile, so the confirm step names the exact
+   * value being written — this is the one action in the console that changes what the
+   * platform believes a person's identity is, and "approve" on its own does not show
+   * the operator what they are approving.
+   *
+   * A rejection REQUIRES a reason (the API refuses without one): the user is shown
+   * this text and has nothing else to act on.
+   */
+  const decideIdChange = async (r: IdChangeRequest, action: 'approve' | 'reject') => {
+    let note: string | null = null
+    if (action === 'reject') {
+      note = window.prompt('Why is this being rejected? (shown to the user)')?.trim() || null
+      if (!note) return void window.alert('A rejection needs a reason — the user is shown it.')
+    } else if (
+      !window.confirm(
+        `Set this account's ID number to ${r.requested_value}?` +
+          (r.current_value ? `\n\nIt is currently ${r.current_value}.` : '\n\nNothing is on file yet.'),
+      )
+    ) {
+      return
+    }
+    setBusyId(r.id)
+    const ok = await post('id-changes', { id: r.id, action, note })
+    setBusyId(null)
+    if (!ok) return
+    // The row no longer matches the chip it was listed under, so drop it rather than
+    // leave a decided request sitting in the pending list.
+    setIdChanges((prev) => prev.filter((x) => x.id !== r.id))
   }
 
   /**
@@ -1262,6 +1351,181 @@ export function OpsDashboard({
         {/* ===================== ID VERIFICATIONS ===================== */}
         {tab === 'verifications' && loaded.verifications ? (
           <>
+            {/* ---- ID change requests ----------------------------------------
+                Someone asking to correct the ID number already on their account.
+                A different decision from the verification queue below: this one
+                rewrites users.id_document and deliberately leaves
+                verification_status alone, so approving a typo fix never pulls a
+                host's listings off the market. Granted by its own `id_changes`
+                module, so this panel can be an operator's only reason to be here. */}
+            {canIdChanges ? (
+              <section style={{ marginBottom: 28 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+                  <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: INK }}>ID change requests</h2>
+                  <span style={{ fontSize: 12, color: MUTED }}>
+                    Approving rewrites the ID number on the account.
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+                  {(['pending', 'approved', 'rejected'] as const).map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setIdChangeFilter(f)}
+                      style={{
+                        ...btnBase,
+                        background: idChangeFilter === f ? BURGUNDY : 'transparent',
+                        color: idChangeFilter === f ? CREAM : INK,
+                        border: `1px solid ${idChangeFilter === f ? BURGUNDY : TAN}`,
+                        textTransform: 'capitalize',
+                      }}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+                {idChanges.length === 0 ? (
+                  idChangeFilter === 'pending' ? (
+                    <Empty
+                      tone="clear"
+                      title="No ID changes waiting"
+                      body="Every request to change an ID number has been decided."
+                    />
+                  ) : (
+                    <Empty
+                      tone="filtered"
+                      title={`No ${idChangeFilter} requests`}
+                      body="Pick another chip above to see requests in a different state."
+                    />
+                  )
+                ) : (
+                  <div style={{ display: 'grid', gap: 14 }}>
+                    {idChanges.map((r) => (
+                      <div key={r.id} style={cardStyle}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                          <div style={{ fontSize: 16, fontWeight: 700, color: INK }}>
+                            {r.user_name || r.user_email || 'Account'}
+                          </div>
+                          <div style={{ fontSize: 12, color: MUTED }}>{fmtDate(r.submitted_at)}</div>
+                        </div>
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                            gap: '10px 18px',
+                            margin: '14px 0',
+                          }}
+                        >
+                          {r.user_email ? (
+                            <div>
+                              <div style={labelStyle}>Email</div>
+                              <div style={{ fontSize: 14 }}>{r.user_email}</div>
+                            </div>
+                          ) : null}
+                          {/* The before/after side by side — the whole decision is
+                              whether the document supports the new value. */}
+                          <div>
+                            <div style={labelStyle}>Current</div>
+                            <div style={{ fontSize: 14, color: r.current_value ? INK : MUTED }}>
+                              {r.current_value || 'Nothing on file'}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={labelStyle}>Requested</div>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: BURGUNDY }}>
+                              {r.requested_value}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={labelStyle}>Document</div>
+                            <div style={{ fontSize: 14 }}>{docTypeLabel(r.doc_type)}</div>
+                          </div>
+                          {/* Whether the account is verified is context for how much
+                              this number is load-bearing, not something this decision
+                              changes. */}
+                          <div>
+                            <div style={labelStyle}>Account</div>
+                            <div style={{ fontSize: 14 }}>
+                              {r.verification_status === 'verified' ? 'Verified' : 'Not verified'}
+                            </div>
+                          </div>
+                        </div>
+                        {r.reason ? (
+                          <div style={{ marginBottom: 14 }}>
+                            <div style={labelStyle}>Their reason</div>
+                            <div style={{ fontSize: 14 }}>{r.reason}</div>
+                          </div>
+                        ) : null}
+                        <div style={{ marginBottom: 14 }}>
+                          <p
+                            style={{
+                              margin: '0 0 8px',
+                              fontSize: 12,
+                              lineHeight: 1.6,
+                              color: INK,
+                              background: '#FDF0DC',
+                              padding: '8px 10px',
+                              borderRadius: 10,
+                            }}
+                          >
+                            Opening a document reveals this person&apos;s identity papers and is
+                            recorded in the staff audit log.
+                          </p>
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            {([
+                              ['id_change_front', 'View front', r.has_front],
+                              ['id_change_back', 'View back', r.has_back],
+                            ] as Array<[string, string, boolean | undefined]>).map(([kind, label, present]) =>
+                              present ? (
+                                <button
+                                  key={kind}
+                                  style={outlineBtn}
+                                  disabled={busyId === r.id}
+                                  onClick={() => openDocument(kind, r.id)}
+                                >
+                                  {label}
+                                </button>
+                              ) : null,
+                            )}
+                          </div>
+                        </div>
+                        {r.status === 'pending' ? (
+                          <div style={{ display: 'flex', gap: 10 }}>
+                            <button
+                              style={approveBtn}
+                              disabled={busyId === r.id}
+                              onClick={() => decideIdChange(r, 'approve')}
+                            >
+                              {busyId === r.id ? 'Working…' : 'Approve change'}
+                            </button>
+                            <button
+                              style={outlineBtn}
+                              disabled={busyId === r.id}
+                              onClick={() => decideIdChange(r, 'reject')}
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        ) : null}
+                        {r.reviewed_at ? (
+                          <p style={{ margin: '10px 0 0', fontSize: 12, color: MUTED }}>
+                            {r.status === 'approved' ? 'Approved' : 'Rejected'} {fmtDate(r.reviewed_at)}
+                            {r.reviewed_by ? ` by ${r.reviewed_by.replace(/^staff:/, 'staff ').slice(0, 20)}` : ''}
+                            {r.notes ? ` — ${r.notes}` : ''}
+                          </p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            ) : null}
+
+            {/* ---- ID verifications ------------------------------------------ */}
+            {can('verifications') ? (
+              <>
+                <h2 style={{ margin: '0 0 10px', fontSize: 17, fontWeight: 700, color: INK }}>
+                  ID verifications
+                </h2>
             {/* Filter chips — a decided case must stay reachable so it can be reopened. */}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
               {(['pending', 'verified', 'rejected', 'all'] as const).map((f) => (
@@ -1421,6 +1685,8 @@ export function OpsDashboard({
               ))}
             </div>
             )}
+              </>
+            ) : null}
           </>
         ) : null}
       </div>

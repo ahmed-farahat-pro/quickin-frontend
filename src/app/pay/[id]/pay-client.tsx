@@ -9,6 +9,9 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
+import { formatDisplayPrice, isConverted } from '@/lib/currency/display'
+import { useDisplayCurrency } from '@/components/providers/display-currency-provider'
 import { InstapayDetails } from '@/components/instapay-details'
 import { fileToCompressedDataUrl } from '@/lib/image'
 import { MAX_PROOF_CHARS } from '@/lib/local/payment-flow-core'
@@ -50,6 +53,12 @@ export function PayClient({
   rejectedReason: string | null
 }) {
   const router = useRouter()
+  const tCurrency = useTranslations('currency')
+  // The transfer is made in the booking's currency, so that figure stays the
+  // headline. The guest's currency is a second line to help them recognise the
+  // amount in their banking app, never to tell them what to send.
+  const { currency: displayCurrency } = useDisplayCurrency()
+  const converted = isConverted(currency, displayCurrency)
   const [image, setImage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -141,9 +150,23 @@ export function PayClient({
         <p style={{ margin: '0 0 6px', fontSize: 14.5, color: C.muted }}>
           {title} · {checkIn} → {checkOut}
         </p>
-        <p style={{ margin: '0 0 20px', fontSize: 22, fontWeight: 800, color: C.ink }}>
+        <p
+          style={{
+            margin: converted ? '0 0 4px' : '0 0 20px',
+            fontSize: 22,
+            fontWeight: 800,
+            color: C.ink,
+          }}
+        >
           {currency} {total.toLocaleString(undefined, { maximumFractionDigits: 2 })}
         </p>
+        {converted && (
+          <p style={{ margin: '0 0 20px', fontSize: 13, color: C.muted }}>
+            {formatDisplayPrice(total, currency, displayCurrency)}
+            {' · '}
+            {tCurrency('chargedIn', { currency })}
+          </p>
+        )}
 
         {rejectedReason && (
           <div style={{ ...card, marginBottom: 16, borderLeft: `4px solid ${C.red}`, padding: 16 }}>

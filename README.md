@@ -47,6 +47,7 @@ This app is configured with a single public environment variable:
 | `NEXT_PUBLIC_SOCIAL_INSTAGRAM`  | Overrides the Instagram profile linked from `/links`.         |
 | `NEXT_PUBLIC_SOCIAL_TIKTOK`     | Overrides the TikTok profile linked from `/links`.            |
 | `NEXT_PUBLIC_SOCIAL_FACEBOOK`   | Overrides the Facebook page linked from `/links`.             |
+| `NEXT_PUBLIC_FX_RATES_PER_EGP`  | JSON object of EGP-per-unit exchange rates, e.g. `{"USD":49.10,"EUR":53.40}`. Overrides the built-in snapshot — see **Display currency** below. |
 
 The live values are the defaults in [`src/lib/contact.ts`](src/lib/contact.ts) and
 [`src/lib/social.ts`](src/lib/social.ts), so none of these need to be set in production —
@@ -68,15 +69,193 @@ fails if one slips into the defaults.
 | POST   | `/api/local/bookings`                                       | Bearer |
 | GET    | `/api/local/bookings`                                       | Bearer |
 | POST   | `/api/auth/login` · `/signup` · `/social` · `/google` · `/apple` | — (returns `{ token, user }`) |
+| POST   | `/api/auth/forgot-password` `{ email }`                     | — (always `{ sent: true, cooldown }`) |
+| POST   | `/api/auth/reset-password` `{ email, code, password }`      | — (returns `{ token, user }`) |
+
+### Password reset
+
+`/login` → **Forgot password?** → email → 6-digit code + new password → signed in.
+Two routes, the same pair and the same contract the backend serves to the iOS and
+Android apps (`ForgotPasswordView.swift`, `ForgotPasswordScreen.kt`), so a guest who
+resets on their phone and a guest who resets on the web go through one flow.
+
+The code is the same 6-digit OTP signup and login already mail — `otp_codes`, a 10
+minute TTL, five wrong tries and it dies — so this added **no** table and no migration.
+
+Two properties worth keeping:
+
+- **It cannot be used to find out who has an account.** `forgot-password` answers
+  `{ sent: true }` for every address, and `reset-password` gives one message —
+  *"That code is invalid or has expired."* — for a wrong code, an expired code and an
+  email with no account alike. A blocked or removed account is the one exception and
+  is told so plainly: it can't reset its way back in, and saying so saves a support
+  round trip that the generic reply above has already made safe.
+- **`devCode` never travels once mail is live.** With no `MAIL_BACKEND_URL` /
+  `MAIL_RELAY_SECRET` (local dev) the code comes back in the response so the flow
+  works offline; `mailRelayConfigured` gates it and
+  `test/unit/password-reset-core.test.mjs` fails if that gate is ever inverted.
+
+A successful reset also signs the user in and marks the account email-verified —
+holding a code we mailed is exactly the proof the OTP gate asks for, and without it a
+never-verified user would reset their password only to be bounced to the OTP screen.
 
 ## Pages
 
 - `/explore` — searchable listings grid + List/Map toggle.
 - `/explore/[id]` — listing detail + reserve panel.
-- `/login`, `/signup` — auth (stores token in `localStorage`).
+- `/login`, `/signup` — auth (stores token in `localStorage`). `/login` also carries the
+  email-verification step and the **password reset** — see above.
 - `/reservations` — the signed-in user's bookings.
+- `/account` — profile, identity, password, **Preferences** (display currency + language) and — for an approved host — **Payment information**. See below.
+- `/host/apply` — the "become a host" application. See below.
 - `/links` — the bio linktree. See below.
 - `/plan` — static launch-plan page.
+
+### `/login` and `/signup` — signing in is optional, so the exit is always on screen
+
+Most of QuickIn is browsable without an account, but both auth pages are full-page
+cards with none of the site's chrome around them. That made them one-way doors: a
+guest who opened sign-in and changed their mind had only the browser's Back button.
+
+`AuthExitLink` (`src/components/features/auth/auth-exit-link.tsx`) is the way back —
+a "Keep browsing without an account" link above the card, plus the logo, which is now
+a link to the same place. It sits outside every view switch, so it survives the OTP,
+forgot-password and reset steps too; those keep their own "Back to sign in", which is
+the other, narrower escape.
+
+Where it goes is `resolveReturnHref` in `src/lib/local/auth-exit-core.ts`: the
+referring page when that's usable — query string and all, so a guest who came from a
+filtered search gets those filters back — and `/explore` otherwise. "Otherwise" covers
+a missing or unparseable referrer, another origin (an external referrer isn't
+"browsing", and honouring one would let any site choose where our sign-in page sends
+people), and the auth pages themselves, which would be a bounce rather than an exit.
+
+The referrer only exists on the client, so the hook reads it through
+`useSyncExternalStore` with `/explore` as the server snapshot. The rendered element is
+a real `<a href>` either way — it still works when JS is what broke.
+
+### `/host/apply` — the phone number has to be a phone number
+
+The application is how our team reaches an applicant, so the phone field is validated
+rather than merely required: it used to accept anything a keyboard produced, and `asdf`
+reached review as a number nobody could dial.
+
+`src/lib/local/phone-core.ts` holds the rule, and **both ends run it** — the form
+(`filterPhoneInput` drops non-phone characters as they are typed, so a letter never
+lands in the field at all, then `isValidPhone` checks the shape on submit) and
+`submitHostApplication` in `db.ts`, which answers `400 { fields: { phone } }` for
+anything the browser let through. `type="tel"` is a keyboard hint, not a filter, which
+is why the filtering is ours.
+
+It normalizes as well as validates, on the same reasoning as the payout wallet number:
+the same mobile typed `+20 10…`, `0020 10…` and `010…` is stored once, as
+`01XXXXXXXXX`, so one applicant is one row in `/ops` and not three. Egyptian numbers
+come back in the local form (a mobile is 01 + 9 digits **exactly**, so a number typed a
+digit short is caught here rather than by the person calling it); everything else keeps
+`+<digits>` E.164, because a host abroad still has to be reachable. Arabic-Indic and
+Persian digits fold to ASCII — the site runs in Arabic, and a filter that dropped `٠١٠…`
+would empty the field of a host typing their own number correctly.
+
+Refusal is a `null`, not a throw: every caller is building a per-field error map and the
+message belongs to the caller — the form's is localized (`hostApply.errors.phoneInvalid`
+in all four locales), the API's is not.
+
+`phone-core.ts` is **byte-identical to the backend's copy**, guarded by
+`quickin-backend/scripts/check-phone-core-parity.mjs`: the iOS and Android apps apply
+through `quickin-backend`, and both projects write the same `host_applications.phone`.
+A number the web stored as `01012345678` and the apps stored as `+201012345678` is one
+host filed twice, and no operator reading `/ops` can tell that from two people.
+
+`national_id` next to it is deliberately **not** validated this way — a foreign
+applicant's passport number has letters in it.
+
+### `/account` — Profile photo
+
+`users.avatar_url` had been **read** everywhere since the beginning — the identity card
+on `/account`, the host card on a listing, comments, reviews — while the only thing that
+ever **wrote** it was the Google sign-in merge. Both apps have had a photo picker for as
+long as they have had an Edit profile screen; the web form sent `full_name` and nothing
+else, so anyone who signed up with an email address had no way to have a face on this
+site at all. That was the bug.
+
+The control is the avatar itself (`src/app/account/avatar-picker.tsx`): the circle, the
+name and add/change/remove are one client component mounted inside the identity card,
+and the email and verification chip below stay server-rendered as its children. A photo
+**saves on pick**, not on a Save button — it has nothing to share with the profile form,
+and picking a photo is already the confirmation.
+
+**It is stored, not linked.** The bytes are a base64 `data:` URL in the column, the same
+way listing photos and ID documents are stored (this stack has no object storage of any
+kind — see `src/lib/image.ts`), and the same shape both apps already send. The browser
+downscales to **256px at JPEG q0.8** before upload, which is exactly what iOS's
+`QKAvatarImage.makeDataURL` does, so the same photo weighs the same whichever client it
+was picked on — `test/unit/avatar-core.test.mjs` fails if either side moves.
+
+`src/lib/local/avatar-core.ts` holds the rules, and the one that matters is that an
+`https://` URL is **refused**. Before this, `PATCH /api/local/users/:id` stored
+`String(body.avatar_url)` — whatever arrived. A remote URL there would be fetched by
+every guest who opened a listing that person hosts, handing whoever owns that host an IP
+log of the people browsing it, and the bytes behind it could be swapped for something
+else the day after a moderator cleared the photo. Neither is possible when the image
+*is* the value. The same module caps a photo at `MAX_AVATAR_CHARS` (~300KB decoded,
+about ten times what a real 256px photo comes out at) because this column does not stay
+on the profile page: `getListingById` selects it as `host_avatar`. `null` or `''` clears
+the photo to SQL NULL — the old code stored the literal text `null` when a client meant
+"remove it".
+
+**Moderation is a way down, not a queue in front.** A photo goes live the moment it is
+picked, on the site and in both apps, and it is the one field on a profile that no filter
+can read: `contentguard` catches a phone number typed into a name or a bio, but not one
+written on paper and photographed. So `/ops → Users → (a user)` now shows the photo next
+to the name — a report that says "profile picture" is unanswerable from a table of
+bookings — with a **Remove photo** button beside the account actions. It takes the
+picture down and touches nothing else; blocking the account over it stays a separate,
+reasoned decision. Every press is audited as `user_photo_removed`, including one that
+found no photo to remove, and `/ops → Reports` already links a `target_type='user'`
+report straight to that screen.
+
+### `/account` — the profile the apps already had
+
+Age, phone number and "About you" are editable here, next to the name. They were on
+Edit profile in both mobile apps from the start and on no web screen at all: the apps
+wrote `users.age`, `users.phone` and `users.bio` through the backend's
+`/api/local/profile`, while the web's profile form sent `full_name` and nothing else.
+Someone who signed up on the site could not fill in the profile the site shows, and a
+bio typed on a phone was invisible on the web. All four now write the same three
+columns, so one person editing on either has one profile.
+
+Each field is optional and each **clears** when emptied — a bio someone regrets has to
+be able to go away, which is why the web route sets the columns explicitly rather than
+`COALESCE`-ing them the way the mobile API does. What decides them:
+
+| Field | Rule | Where |
+| --- | --- | --- |
+| Age | A whole number between `MIN_AGE` and `MAX_AGE` (13–120). `3e2`, `0x22` and `34.5` are refused rather than coerced — `Number('3e2')` is 300, and an age nobody is, silently stored, is worse than a form that pushes back. Arabic-Indic digits are digits. | `src/lib/local/profile-core.ts` |
+| Phone | The same `normalizePhone` the host application and the mobile API use, so `+20 10…`, `0020 10…` and `010…` are one stored number. Only the user themselves ever reads it back — the public `GET /api/local/users/:id` does not carry it. | `src/lib/local/phone-core.ts` |
+| About you | At most `MAX_BIO_LENGTH` (500) characters, counted as characters and not UTF-16 units, on the **normalized** text — so trailing newlines from a paste are not what pushes it over. Line breaks survive; a bio is a paragraph, not a name. It also takes the contact guard, because it is free text shown next to the name. | `profile-core.ts` + `moderation.ts` |
+
+The plausibility bounds on age are deliberately not an eligibility rule. Whether an
+account has to be 18 to book belongs at the booking door, where it can be enforced
+against an ID, rather than on a self-declared profile field.
+
+The form runs the same cores before it submits, so the message a guest gets is the one
+the API would have given; the route echoes `{ field, ageProblem | bioProblem }` so a
+refusal lands under the input it belongs to rather than at the foot of the card.
+
+### `/account` — Payment information (host payout method)
+
+Where QuickIn sends a host's earnings. The card shows one of two states: the **form**
+(method picker — Bank account / InstaPay / Wallet — plus the fields that method needs)
+or a **preview** of what is on file, so the host can confirm it saved correctly. It
+renders only when `host_status === 'approved'`; the route behind it answers
+`403 {code:'not_host'}` to anyone else.
+
+The rules live in `src/lib/local/payout-method-core.ts`, byte-identical to the backend's
+copy and guarded by `quickin-backend/scripts/check-payout-method-core-parity.mjs`. All
+three destinations are stored and shown back **whole** — an IBAN exists to be handed
+out, and a masked one is one a host cannot check. A bank account needs the bank plus an
+IBAN *or* an account number; the IBAN is validated on its mod-97 checksum and its
+country length, and read back grouped in fours the way a bank prints it.
 
 ### `/links` — the bio linktree
 
@@ -103,6 +282,128 @@ The two app rows render as a dashed **"coming soon"** row until the matching lin
 /ops — a linktree that silently drops the apps looks broken rather than early. Set them in
 /ops and the rows go live on their own; the page is `revalidate = 300`, so an /ops edit
 shows up within 5 minutes without a redeploy.
+
+## `/signup` — email addresses are checked against the real root zone
+
+`layla@email.con` used to create an account. Nothing in the stack disagreed with it:
+`<input type="email">` and the old `/^[^\s@]+@[^\s@]+\.[^\s@]+$/` both only ask
+whether an address is *shaped* like one, and by that measure `.con` is fine. It isn't
+a delegated TLD, so the 6-digit code goes nowhere, the guest waits at the OTP step for
+an email that cannot arrive, and the row sits in `users` unverified forever.
+
+The rules now live in **`src/lib/local/email-core.ts`**, which holds a snapshot of the
+[IANA root zone](https://data.iana.org/TLD/tlds-alpha-by-domain.txt) — every delegated
+TLD, ~1,438 of them — and checks the extension against it. It has no imports, so the
+same code runs in all three places that need it:
+
+| Caller | What it does |
+| --- | --- |
+| `src/app/api/auth/signup/route.ts` | The decision. Returns 400 with a plain-English `error` **and** a structured `emailProblem` (`{ code, tld?, suggestion? }`) |
+| `src/app/signup/page.tsx` | Checks on blur and before submit, so a typo is caught without a round trip, and localizes `emailProblem` into the four locales |
+| `src/lib/validations/schemas.ts` | `signUpSchema` / `signInSchema` — the auth modal's `z.string().email()` accepted `.con` too |
+
+Five problem codes, in the order they are checked: `required`, `tooLong`, `format`,
+`unknownTld`, `disposable`. Order is the point — a guest who typed `a@mailinator.con`
+is told about the extension, fixes it, and *then* hears about the blocklist, so
+`unknownTld` is decided first. `isValidEmail` deliberately still returns `true` for a
+disposable address: that is a policy call for signup to make, not a claim that the
+string isn't an address, and `resend-otp` only asks the latter.
+
+**A rejected address gets a did-you-mean** (`layla@gmail.con` → "Did you mean
+layla@gmail.com?"), matched against a short list of popular mailbox providers and
+extensions with a transposition-aware edit distance — `gmial.com` is one edit, not two.
+The list is short on purpose: `con` is exactly one deletion from `cn` (China) as well as
+from `com`, so searching the whole root zone for a near match would confidently suggest
+whichever it reached first.
+
+What this does **not** do is check that the domain exists or accepts mail — no MX
+lookup, no network call in the signup path. The OTP already proves deliverability;
+this only stops the addresses that provably cannot receive one.
+
+New TLDs are delegated a few times a year, and the failure that matters is the
+opposite of the bug: an over-tight list turns away a paying guest with no appeal.
+`npm run check:tlds` diffs the snapshot against IANA and prints what to refresh. It
+needs the network, so it is **not** part of `npm run check`; run it by hand every few
+months, or the moment someone reports a valid address being refused.
+
+## Password policy — one floor, all three doors
+
+`123456` used to create an account. Signup asked for six characters of anything, and
+the two other doors into the same column disagreed with it and with each other:
+`/api/auth/change-password` wanted eight, `password-reset-core.ts` kept its own copy
+of the six-character rule, and `signUpSchema` a third. A floor only one door enforces
+is not a floor — signing up strong and immediately resetting weak was a two-request
+bypass.
+
+The rules now live in **`src/lib/local/password-policy.ts`**, which — like
+`email-core.ts` — has no imports, so the same code decides in every place that needs
+an answer:
+
+| Caller | What it does |
+| --- | --- |
+| `api/auth/signup`, `api/auth/reset-password`, `api/auth/change-password` | The decision. 400 with a plain-English `error` **and** a structured `passwordProblem` (`{ code }`) |
+| `app/signup/page.tsx`, `app/login/page.tsx` (reset step), `app/account/account-forms.tsx` | Check before the request and localize `passwordProblem` into the four locales |
+| `components/features/auth/password-checklist.tsx` | The live tick-list under the field — `passwordRuleStatus`, so what ticks is literally what the server will apply |
+| `lib/validations/schemas.ts` | `signUpSchema` — the auth modal's `.min(8)` accepted `12345678` |
+
+Five rules, checked in the order the checklist shows them: **8 characters**,
+**uppercase**, **lowercase**, **digit**, **symbol**. Order is the point — the message
+a guest gets names the first box they haven't ticked, not a paragraph of policy. Three
+more checks can't be drawn as a box and are decided after: `whitespace` (a password of
+only spaces), `email` (an account's own address is the top of every credential-stuffing
+list, and a reset is exactly where people reach for it), and `common`.
+
+**`common` strips the decoration people add to get past exactly this kind of rule.**
+`Password1!` and `P@ssw0rd123` both clear all five character rules; both reduce to
+`password` and are refused. The blocklist is a few dozen bases, not a dictionary, and
+it matches on the *whole* reduced password — `Cairo-Nights-42!` is not `cairo`.
+A longer list would start refusing passwords that merely contain a common word, which
+is a support ticket rather than a security win.
+
+Two limitations worth knowing. **A password written purely in a script without case
+(Arabic, for one) cannot satisfy `uppercase`/`lowercase`** — the checklist says so up
+front rather than failing on submit, but it is a real constraint on an app whose
+guests are Egyptian. And the policy is **not web-only**, because it can't be:
+`quickin-backend`, which the iOS and Android apps call, signs into the same `users`
+row, so a six-character rule there was a way to weaken a web account from the apps.
+`password-policy.ts` is copied into that repo byte-identical and guarded by
+`quickin-backend/scripts/check-password-policy-parity.mjs`, the same treatment
+`resort-core.ts` and `name-policy.ts` get. Edit one copy, copy it over the other.
+
+Existing weak passwords keep working — nothing rehashes or expires them; the rules
+apply the next time one is set.
+
+## A name has to be a name
+
+Signup asked that the name field be non-empty, so `12345` created an account whose
+display name is `12345` — what a host reads next to a booking request, what a review
+is signed with, and what an operator matches against an ID document. Presence was
+never the test.
+
+**`src/lib/local/name-policy.ts`** decides now, and like `email-core.ts` it has no
+imports, so the same code runs everywhere:
+
+| Caller | What it does |
+| --- | --- |
+| `api/auth/signup` (here and in `quickin-backend`) | The decision. 400 with a plain-English `error` **and** a structured `nameProblem` (`{ code }`) |
+| `app/signup/page.tsx` | Checks on blur and before the request, and localizes `nameProblem` into the four locales (`namePolicy.errors.*`) |
+| `lib/validations/schemas.ts` | `signUpSchema` — its `.min(6)` accepted `123456` while refusing `Ali M` |
+| `api/local/users/[id]` (PATCH) | The rename door. A gate only signup enforced would let a guest sign up as `Layla` and become `12345` a minute later |
+| `api/local/host/apply` + `app/host/apply/apply-form.tsx` | The name an operator reads against the ID photos |
+| iOS `Sources/NameRules.swift` | The Swift twin: same rule, same problem cases, so the app says it at the field instead of after a round trip |
+
+The rule that does the work: a name must contain **letters** (`\p{L}`, so Arabic and
+Han count), at least two of them, in at most 60 characters. Deliberately **not** "no
+digits" — Franco-Arabic writes real names with numerals (`Ma7moud`, `3omar`), and a
+digit ban would turn away exactly the guests this app is for. `letters` is reported
+before `tooShort` so `5` hears the thing that is actually wrong with it.
+
+A request with **no** name at all is still accepted, because social sign-in has none.
+It falls back to the local part of the address — and to `Guest` when that isn't a name
+either, since `0100@gmail.com` would otherwise seed the very thing the rule refuses.
+
+`name-policy.ts` is byte-identical to the backend's copy; the backend's
+`scripts/check-name-policy-parity.mjs` fails if they drift.
 
 ## Loading states
 
@@ -164,6 +465,7 @@ Reaching a section without its module gets a no-access card and a 403 from the A
 | `/ops/bookings` | `bookings` | Reservations with guest paid / host payout / commission per row, and totals over the loaded page |
 | `/ops/applications` | `applications` | The host-application queue |
 | `/ops/verifications` | `verifications` | Submitted ID documents, filterable by decision |
+| `/ops/verifications` | `id_changes` | **Same screen, second queue:** requests to change the ID number already on an account. Granted separately, so correcting a number can be delegated without handing over the decision that verifies an account and gates its listings. Holding either module opens the page; each queue renders only for the operator who holds it, and the sidebar names the item for whichever they have |
 | `/ops/users` | `users` | Searchable directory of every guest and host, and one person's full profile — listings, bookings, payments, messages, documents — plus block / remove / restore |
 | `/ops/activity` | `overview` | Everything that happened on the site — signups, sign-ins, listings, bookings, payments, cancellations. **Derived**, so it shows full history rather than starting at deploy |
 | `/ops/alerts` | `overview` | Every queue waiting on a human, filtered to the modules you hold, with how long the oldest item has waited. Also the bell in the header |
@@ -236,9 +538,11 @@ the Listings tab handed you every pending ownership document, with no record eit
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| GET | `/api/local/admin/documents/:kind/:id` | `kind` ∈ `id_front\|id_back\|id_selfie\|ownership`. Returns image **bytes**; `415` if the stored value isn't an allowlisted image, `404` if there's nothing there. Requires **both** `documents` and the owning module (`verifications` for IDs, `listings` for ownership) |
+| GET | `/api/local/admin/documents/:kind/:id` | `kind` ∈ `id_front\|id_back\|id_selfie\|ownership\|id_change_front\|id_change_back`. Returns image **bytes**; `415` if the stored value isn't an allowlisted image, `404` if there's nothing there. Requires **both** `documents` and the owning module (`verifications` for IDs, `listings` for ownership, `id_changes` for the change-request pair — whose `:id` is the `id_change_requests` row, not a verification) |
 | GET | `/api/local/admin/verifications?status=` | `pending` (default) `\|verified\|rejected\|all` — a decided case stays reachable so it can be reopened |
 | POST | `/api/local/admin/verifications` | `{ id, action:'verify'\|'reject'\|'pending', note? }`. Writes both tables in one transaction and records the deciding staff member |
+| GET | `/api/local/admin/id-changes?status=` | `pending` (default) `\|approved\|rejected` — requests to change an account's ID number, with the before/after values and the declared document type |
+| POST | `/api/local/admin/id-changes` | `{ id, action:'approve'\|'reject', note? }`. Approving is the **only** path that writes `users.id_document`, and it deliberately leaves `verification_status` alone — the operator has just examined a document, and resetting a verified host to pending would trip the publish gate and pull their live listings off the market as a side effect of a typo fix. A rejection **requires** a note; it is what the user is shown. Decided once: the guard is in the UPDATE's `WHERE status = 'pending'`, so two operators clicking at the same time cannot both win |
 
 The `documents` module is a **capability, not a screen** — it has no `/ops` tab, and
 holding it doesn't grant a queue you weren't given; it lets you open a document you
@@ -519,7 +823,17 @@ npm run check     # same; the pre-deploy gate
 | `xlsx.ts` | Cell typing (numbers stay numeric so Excel can sum them), sheet-name sanitizing, filename safety |
 | `moderation-core.ts` | The flag threshold (one attempt, and why not three), the three moderator actions and the fact that permanent removal is not one of them, the warning fallback copy, and the 409 `policyWarning` contract all three clients branch on — including that `error` repeats the warning so an old app build still shows it |
 | `disputes-core.ts` | Which bookings can be disputed (and why pending and cancelled can't), that `closed` is terminal while `resolved` can reopen, that a no-op transition is refused, and the validators — including that one bad attachment out of four doesn't lose the whole filing |
-| `contentguard.ts` | Every de-obfuscation the contact guard undoes (Arabic-Indic/fullwidth/enclosed digits, zero-width and soft hyphens, Cyrillic lookalikes, spelled-out EN/AR numbers, `at`/`dot` spelling), the four categories it blocks, the split-across-messages check — and an equally large **false-positive** half, because a guard that rejects "we are 2 adults arriving on the 12th" is worse than one that misses |
+| `ranking-core.ts` | The search score behind `/explore`'s default order: that a lone 5★ review loses to a large body of good ones **at every platform average** (the assertion that only asked at one average passed against an implementation that did not hold the property), where that rule stops applying, that cancelled and pending bookings are excluded from the SQL, the recency decay and its floor, and that the SQL twin carries the same constants as the TypeScript |
+| `password-reset-core.ts` | The guest password reset: code normalization (a code pasted out of a mail client with spaces or a hyphen is not a wrong code), and above all that the reply is byte-identical whether or not the address has an account — plus that `devCode` never appears once mail delivery is configured |
+| `password-policy.ts` | The strength rules: that `123456`, `password` and `qwerty` are refused; which single rule a password is told about first (the one the checklist shows unticked); that length counts characters and not UTF-16 units; that Arabic-Indic digits are digits and a space is not a symbol; the account-email rule; and the blocklist's decoration-stripping — `P@ssw0rd123` is `password`, while `Cairo-Nights-42!` is not `cairo` |
+| `email-core.ts` | That `.con` (and `cim`, `cmo`, `ocm`, `ner`, `ogr`…) is refused, that the did-you-mean answers `com` and never `cn`, the structural rules (double dots, edge hyphens, the 64/254 limits) — and an equally large half asserting that ordinary addresses still get in (`.eg`, `.com.eg`, `.co.uk`, `.photography`, punycode), because a too-tight TLD list turns away paying guests and is the worse failure |
+| `phone-core.ts` | The host application's phone field: that a word is refused and that letters mixed into a real number are refused rather than quietly stripped (a wrong number on file is worse than a rejected form); that the nine ways of writing one Egyptian mobile all normalize to the same `01XXXXXXXXX`; that a mobile a digit short is caught while an Egyptian landline and a foreign E.164 number are not; that Arabic-Indic and Persian digits are digits; and that what survives typing still has to normalize — the filter is not the validator |
+| `profile-core.ts` | The age and "about you" fields on `/account`: that an empty field is accepted (all three are optional, and a form that demanded an age to save a name would be a new bug), that `3e2` and `0x22` are refused rather than coerced into 300 and 34, that `٣٤` is thirty-four, that a slipped number pad is caught at both ends — and for the bio, that line breaks survive while a paste's padding does not, that invisibles cannot fill it or its budget, and that the cap is measured on what gets stored, not on what was typed |
+| `name-policy.ts` | The signup name: that `12345`, `٠١٢٣٤`, `0100` and `-----` are refused, that `letters` is reported before `tooShort` so `5` hears the real problem, that invisible pasted characters don't make a name non-empty — and the half that matters more, that `Ma7moud`, `Bo`, `Ali M`, `محمد أحمد`, `李伟` and `O'Brien` still get in; plus the email fallback, which can never seed the numeric name the rule just refused |
+| `auth-exit-core.ts` | The way out of `/login` and `/signup`: that the referring page wins and keeps its query string (a guest who came from a filtered search gets those filters back), and the four cases that fall back to `/explore` instead — no referrer, an unparseable one, another origin (otherwise any site could choose where our sign-in page sends people), and the auth pages themselves, with locale prefixes stripped first so `/ar/signup` doesn't slip through |
+| `currency-core.ts` | The display currency: that an unrecognised cookie falls back to EGP instead of leaving prices in a currency with no rate; that one typo'd code in the rate override drops alone rather than taking the other five down with it, and that a zero rate is refused (it would divide every price into Infinity); and the property the money depends on — a missing rate returns the **stored** price in the **stored** currency, unmarked, never a number invented from a rate we do not have |
+| `avatar-core.ts` | The profile photo: that a base64 `data:` JPEG/PNG/WebP gets in and an `https://` link does **not** (the reason is in `/account` → Profile photo above), that HTML, PDF and SVG data URLs are refused, that a mangled base64 payload is not a photo, the size ceiling and the decoded-bytes math behind it, that `null`/`''`/blank all mean "remove" while the literal string `null` does not — and that the 256px / q0.8 constants still match the iOS picker, since a drift there is a photo that weighs one thing on the phone and another on the site |
+| `contentguard.ts` | Every de-obfuscation the contact guard undoes (Arabic-Indic/fullwidth/enclosed digits, zero-width and soft hyphens, Cyrillic lookalikes, spelled-out EN/AR numbers, `at`/`dot` spelling, letters used as separators — `A0101 S416 M3280`), the four categories it blocks, the split-across-messages check — and an equally large **false-positive** half, because a guard that rejects "we are 2 adults arriving on the 12th" is worse than one that misses |
 
 Those modules deliberately have **no runtime imports** — Node's ESM resolver
 rejects the extension-less relative specifiers used elsewhere in `src/lib/local`, so a
@@ -531,7 +845,85 @@ README's Testing section is the fuller writeup.
 projects write the same `resorts` table, so a drifted slug would fork the catalog.
 The backend's `scripts/check-resort-core-parity.mjs` fails if they diverge.
 `contentguard.ts` is duplicated the same way (`check-contentguard-parity.mjs`) — see
-below.
+below. So is `ranking-core.ts` (`check-ranking-core-parity.mjs`): both projects rank
+the same listings from the same reviews and bookings, so a drifted weight would put
+the same two chalets in one order on the web and the other order in the apps. And so is
+`name-policy.ts` (`check-name-policy-parity.mjs`): both projects create accounts in the
+same `users` table, so a name rule that held on one door and not the other would not
+hold at all.
+
+## Display currency — what a guest reads, not what they pay
+
+A listing is priced by its host in one real currency (`listings.currency`, in
+practice EGP) and a booking is charged in that currency. Everything below is
+display: the guest picks a currency to *read* prices in, and nothing about the
+money changes.
+
+**Where the switcher is.** Beside the language switcher, everywhere that has one:
+the `/explore` header and its mobile menu, both footers, the `/` navbar — and a
+**Preferences** card on `/account`, which is where people look for a setting
+rather than a control. Before this it was nowhere: the dashboard footer had an
+`EGP` button that was a `<button>` with no handler.
+
+**How it is stored.** A `qk_currency` cookie, one year, exactly like `NEXT_LOCALE`
+— no column, no migration, and it works signed-out. Server components read it
+through `getRequestCurrency()`; client components read the same value out of
+`DisplayCurrencyProvider`, which the root layout seeds from the cookie so the
+first paint is already right. Switching writes the cookie, updates the provider's
+state (client prices change on the spot, including the map pills, without leaving
+the Map tab) and calls `router.refresh()` for the server-rendered pages.
+
+**The rates are a hand-maintained snapshot, not a feed.**
+`DEFAULT_EGP_PER_UNIT` in `src/lib/local/currency-core.ts` is a table of
+EGP-per-unit values with a `RATES_AS_OF` date beside it, shown to the guest on
+`/account`. `NEXT_PUBLIC_FX_RATES_PER_EGP` overrides any subset of it per deploy
+without a release. **Replace it with a real rate source before these numbers are
+treated as anything but an approximation.** Nothing is charged off them.
+
+**So every converted price says so.** `formatDisplayPrice` prefixes `≈`, and the
+listing page swaps "Prices in EGP" for "Approximate — charged in EGP". Two
+surfaces deliberately do *not* convert their headline number, because it is a
+real charge and not a quote: `/reservations` and `/pay/[id]` keep the booking's
+own currency in the big text and put the converted figure underneath it as a
+second line. A guest comparing the screen to their banking app has to be looking
+at the amount the bank will see.
+
+**When there is no rate**, `displayPrice` returns the original price in the
+original currency, unmarked. "No rate" and "a rate of zero" arrive as the same
+shape, and only one of them is a price — so the fallback is the stored number,
+never an invented one. A zero is exact in every currency, so an empty quote reads
+`$0` rather than `≈ $0`.
+
+`src/lib/local/currency-core.ts` holds all of the arithmetic and has no relative
+imports, so `test/unit/currency-core.test.mjs` can load it directly.
+
+## Search ranking — `/explore`'s default order
+
+The `Recommended` pill (the default, so it is what most guests see) is a performance
+score, not a recency list. `getListings` builds its `ORDER BY` from
+`src/lib/local/ranking-core.ts`:
+
+```
+score = 0.6 × rating component     (guest reviews, shrunk and discounted for doubt)
+      + 0.4 × bookings component   (COMPLETED stays only, log-damped)
+      + 0.05 if is_guest_favorite
+```
+
+Reviews are shrunk toward the platform average **and** discounted by `1.28 / √(n + 5)`,
+so a chalet with one 5★ review cannot outrank one with hundreds of good reviews — the
+shrinkage alone was not enough for that, see the backend README's "Search ranking" for
+the case that proved it. Bookings count only `completed` stays, or `confirmed` ones
+whose check-out has passed; **cancelled bookings never count**. Both halves fade with
+age. A listing with no history scores an unproven average — below a proven listing,
+above a badly-reviewed one — and `created_at DESC` breaks ties, so two brand-new
+listings keep exactly the order this replaced.
+
+The score is derived at read time from `reviews` and `bookings`, so a new review or a
+completed stay reorders search immediately, with nothing stored and nothing to backfill.
+The other three sorts (`price_asc`, `price_desc`, `newest`) are untouched.
+
+The backend README is the fuller writeup, including the weights and the boundary where
+the review rule stops applying.
 
 ## Contact details are blocked, everywhere a user can type
 

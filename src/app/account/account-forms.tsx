@@ -1,12 +1,31 @@
 'use client'
 
 // Profile-edit + change-password forms for /account.
-//   - Profile : PATCH /api/local/users/[id]      { full_name?, avatar_url? }
+//   - Profile : PATCH /api/local/users/[id]      { full_name?, age?, phone?, bio? }
 //   - Password: POST  /api/auth/change-password  { currentPassword, newPassword }
 // Inline success/error states; no global toast dependency.
+//
+// Age, phone and "about you" are here because they are on Edit profile in both
+// apps and were on no web screen at all: someone who signed up on the site could
+// not fill in the profile the site shows. The rules are the shared cores, so the
+// message a guest gets before submitting is the one the API would have given.
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { checkPassword } from '@/lib/local/password-policy'
+import PasswordChecklist from '@/components/features/auth/password-checklist'
+import { MAX_PHONE_CHARS, filterPhoneInput, isValidPhone } from '@/lib/local/phone-core'
+import {
+  MAX_AGE,
+  MAX_BIO_LENGTH,
+  MIN_AGE,
+  bioLength,
+  checkAge,
+  checkBio,
+  filterBioInput,
+  isBlankField,
+  toAsciiDigits,
+} from '@/lib/local/profile-core'
 
 const C = {
   burgundy: '#5B0F16',
@@ -30,6 +49,14 @@ const labelStyle: React.CSSProperties = {
   fontWeight: 700,
   color: C.ink,
   marginBottom: 6,
+}
+
+/** "Optional" next to a label. These three fields genuinely are, and a form that
+ *  doesn't say so reads as four things a guest has to hand over to save a name. */
+const optionalStyle: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 600,
+  color: C.muted,
 }
 
 const inputStyle: React.CSSProperties = {
@@ -120,25 +147,75 @@ function sectionTitle(text: string) {
   )
 }
 
+/** The message under a field that failed, in the field's own place rather than
+ *  in the form-wide notice — three optional fields share one Save button, and a
+ *  single line at the bottom cannot say which one to fix. */
+function FieldError({ text }: { text?: string }) {
+  if (!text) return null
+  return (
+    <p role="alert" style={{ margin: '6px 0 0', fontSize: 12.5, fontWeight: 600, color: '#b3261e' }}>
+      {text}
+    </p>
+  )
+}
+
+type ProfileField = 'full_name' | 'age' | 'phone' | 'bio'
+
 export function AccountForms({
   userId,
   initialName,
+  initialAge,
+  initialPhone,
+  initialBio,
 }: {
   userId: string
   initialName: string
+  initialAge: string
+  initialPhone: string
+  initialBio: string
 }) {
   const router = useRouter()
   const t = useTranslations('accountPage')
+  const tp = useTranslations('passwordPolicy')
 
   // ---- Profile form -----------------------------------------------------
   const [fullName, setFullName] = useState(initialName)
+  const [age, setAge] = useState(initialAge)
+  const [phone, setPhone] = useState(initialPhone)
+  const [bio, setBio] = useState(initialBio)
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileMsg, setProfileMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<ProfileField, string>>>({})
+
+  /** The localized reason each field is unacceptable, or {} when all are fine.
+   *  Same cores the API runs, so this never refuses what the server would take
+   *  (or promises to save what it would refuse). */
+  function validateProfile(): Partial<Record<ProfileField, string>> {
+    const invalid: Partial<Record<ProfileField, string>> = {}
+    const ageProblem = checkAge(age)
+    // The bounds are passed for every code, not only the two that print one:
+    // next-intl renders the key itself when a placeholder has no value, so a
+    // message that names a bound and a call that doesn't supply it produce
+    // `accountPage.profile.errors.age.tooYoung` on screen.
+    if (ageProblem) {
+      invalid.age = t(`profile.errors.age.${ageProblem.code}`, { min: MIN_AGE, max: MAX_AGE })
+    }
+    // Blank is not an error — every one of these is optional, and clearing one
+    // is how it gets removed.
+    if (!isBlankField(phone) && !isValidPhone(phone)) invalid.phone = t('profile.errors.phoneInvalid')
+    if (checkBio(bio)) invalid.bio = t('profile.errors.bioTooLong', { max: MAX_BIO_LENGTH })
+    return invalid
+  }
 
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault()
-    setSavingProfile(true)
     setProfileMsg(null)
+
+    const invalid = validateProfile()
+    setFieldErrors(invalid)
+    if (Object.keys(invalid).length) return
+
+    setSavingProfile(true)
     try {
       const res = await fetch(`/api/local/users/${userId}`, {
         method: 'PATCH',
@@ -146,6 +223,11 @@ export function AccountForms({
         credentials: 'same-origin',
         body: JSON.stringify({
           full_name: fullName.trim(),
+          // Sent as empty strings when cleared; the route reads a blank field as
+          // "remove this", which is what the person emptying it means.
+          age: age.trim(),
+          phone: phone.trim(),
+          bio: bio,
         }),
       })
       if (res.status === 401) {
@@ -154,8 +236,14 @@ export function AccountForms({
       }
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
+        // The route names the field it refused (and the contact guard refuses a
+        // bio without naming one). Put the reason under that input as well as in
+        // the notice, so it is next to the thing to change.
+        const field = data.field as ProfileField | undefined
+        if (field && data.error) setFieldErrors({ [field]: String(data.error) })
         throw new Error(data.error || t('profile.error'))
       }
+      setFieldErrors({})
       setProfileMsg({ kind: 'ok', text: t('profile.saved') })
       router.refresh()
     } catch (err) {
@@ -179,8 +267,11 @@ export function AccountForms({
     e.preventDefault()
     setPasswordMsg(null)
 
-    if (newPassword.length < 8) {
-      setPasswordMsg({ kind: 'error', text: t('password.tooShort') })
+    // The same policy signup and reset enforce (the route re-checks it, and also
+    // against this account's email, which the form doesn't hold).
+    const weak = checkPassword(newPassword)
+    if (weak) {
+      setPasswordMsg({ kind: 'error', text: tp(`errors.${weak.code}`) })
       return
     }
     if (newPassword !== confirmPassword) {
@@ -237,6 +328,87 @@ export function AccountForms({
             autoComplete="name"
             style={inputStyle}
           />
+          <FieldError text={fieldErrors.full_name} />
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label htmlFor="acct-age" style={labelStyle}>
+            {t('profile.age')} <span style={optionalStyle}>{t('profile.optional')}</span>
+          </label>
+          <input
+            id="acct-age"
+            // `inputMode` rather than type="number": a spinner on an age is
+            // noise, and type="number" also hands back '' for anything it
+            // dislikes, which would swallow what the guest typed.
+            type="text"
+            inputMode="numeric"
+            value={age}
+            // Folded to ASCII on the way in so an Arabic keyboard's ٣٤ shows as
+            // the number it is, and capped at three digits so the field cannot
+            // hold a year.
+            onChange={(e) => setAge(toAsciiDigits(e.target.value).replace(/[^\d]/g, '').slice(0, 3))}
+            placeholder={t('profile.agePlaceholder')}
+            aria-describedby="acct-age-help"
+            style={inputStyle}
+          />
+          <FieldError text={fieldErrors.age} />
+          <p id="acct-age-help" style={{ margin: '6px 0 0', fontSize: 12.5, color: C.muted }}>
+            {t('profile.ageHelp', { min: MIN_AGE, max: MAX_AGE })}
+          </p>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label htmlFor="acct-phone" style={labelStyle}>
+            {t('profile.phone')} <span style={optionalStyle}>{t('profile.optional')}</span>
+          </label>
+          <input
+            id="acct-phone"
+            type="tel"
+            value={phone}
+            // Filtered on every keystroke, the same as /host/apply: a letter
+            // never appears in the field at all, which is quieter than typing a
+            // word and being told about it on save.
+            onChange={(e) => setPhone(filterPhoneInput(e.target.value))}
+            placeholder={t('profile.phonePlaceholder')}
+            autoComplete="tel"
+            maxLength={MAX_PHONE_CHARS}
+            aria-describedby="acct-phone-help"
+            style={inputStyle}
+          />
+          <FieldError text={fieldErrors.phone} />
+          <p id="acct-phone-help" style={{ margin: '6px 0 0', fontSize: 12.5, color: C.muted }}>
+            {t('profile.phoneHelp')}
+          </p>
+        </div>
+
+        <div style={{ marginBottom: 4 }}>
+          <label htmlFor="acct-bio" style={labelStyle}>
+            {t('profile.bio')} <span style={optionalStyle}>{t('profile.optional')}</span>
+          </label>
+          <textarea
+            id="acct-bio"
+            value={bio}
+            onChange={(e) => setBio(filterBioInput(e.target.value))}
+            placeholder={t('profile.bioPlaceholder')}
+            rows={4}
+            aria-describedby="acct-bio-count"
+            style={{ ...inputStyle, minHeight: 108, resize: 'vertical', lineHeight: 1.55 }}
+          />
+          <FieldError text={fieldErrors.bio} />
+          <p
+            id="acct-bio-count"
+            // Live, because a cap discovered on submit is a cap that already
+            // cost someone their last paragraph.
+            aria-live="polite"
+            style={{
+              margin: '6px 0 0',
+              fontSize: 12.5,
+              color: bioLength(bio) > MAX_BIO_LENGTH ? '#b3261e' : C.muted,
+              textAlign: 'end',
+            }}
+          >
+            {t('profile.bioCount', { count: bioLength(bio), max: MAX_BIO_LENGTH })}
+          </p>
         </div>
 
         <div style={{ marginTop: 18 }}>
@@ -277,9 +449,11 @@ export function AccountForms({
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             autoComplete="new-password"
+            aria-describedby="acct-new-rules"
             style={inputStyle}
             required
           />
+          <PasswordChecklist id="acct-new-rules" password={newPassword} />
         </div>
 
         <div style={{ marginBottom: 4 }}>

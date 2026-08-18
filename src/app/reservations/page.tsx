@@ -8,6 +8,8 @@ import { verifyToken, getUserRowByEmail } from '@/lib/local/auth'
 import { getRequestOrigin } from '@/lib/site-origin'
 import { localeToBcp47, type Locale } from '@/i18n/config'
 import { formatPrice } from '@/lib/utils'
+import { formatDisplayPrice, isConverted } from '@/lib/currency/display'
+import { getRequestCurrency } from '@/lib/currency/request-currency'
 import { ReservationActions } from './reservation-actions'
 import { DisputePanel } from '@/components/dispute-panel'
 import { StayPassCard } from './stay-pass-card'
@@ -78,7 +80,22 @@ function fmtDate(d: string, bcp47: string): string {
   })
 }
 
-function Header({ backLabel }: { backLabel: string }) {
+const BACK_LINK_STYLE = {
+  color: COLORS.burgundy,
+  textDecoration: 'none',
+  fontWeight: 600,
+  fontSize: 14,
+} as const
+
+// `accountLabel` is only passed when the visitor is signed in — /account
+// redirects to /login, so offering it to a signed-out visitor would dead-end.
+function Header({
+  backLabel,
+  accountLabel,
+}: {
+  backLabel: string
+  accountLabel?: string
+}) {
   return (
     <header
       style={{
@@ -105,17 +122,24 @@ function Header({ backLabel }: { backLabel: string }) {
             style={{ height: 40, width: 'auto', display: 'block' }}
           />
         </a>
-        <a
-          href="/explore"
+        <nav
           style={{
-            color: COLORS.burgundy,
-            textDecoration: 'none',
-            fontWeight: 600,
-            fontSize: 14,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            flexWrap: 'wrap',
+            gap: 16,
           }}
         >
-          ← {backLabel}
-        </a>
+          {accountLabel && (
+            <a href="/account" style={BACK_LINK_STYLE}>
+              ← {accountLabel}
+            </a>
+          )}
+          <a href="/explore" style={BACK_LINK_STYLE}>
+            ← {backLabel}
+          </a>
+        </nav>
       </div>
     </header>
   )
@@ -157,7 +181,10 @@ export default async function ReservationsPage() {
         }
       `}</style>
 
-      <Header backLabel={t('backToExplore')} />
+      <Header
+        backLabel={t('backToExplore')}
+        accountLabel={user ? t('backToAccount') : undefined}
+      />
 
       <section
         style={{
@@ -241,6 +268,11 @@ async function ReservationsList({
   const origin = await getRequestOrigin()
   const tHost = await getTranslations('hostPage.dashboard')
   const bcp47 = localeToBcp47((await getLocale()) as Locale)
+  // A booking's total is a real charge, so it stays in the currency it was made
+  // in. The guest's chosen currency gets a second, clearly-approximate line
+  // under it rather than replacing the number they will actually be billed.
+  const displayCurrency = await getRequestCurrency()
+  const tCurrency = await getTranslations('currency')
 
   return (
     <>
@@ -460,6 +492,13 @@ async function ReservationsList({
                   {formatPrice(b.total_price, b.currency)}
                 </div>
                 <div style={{ fontSize: 13, color: COLORS.muted }}>{t('total')}</div>
+                {isConverted(b.currency, displayCurrency) && (
+                  <div style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 2 }}>
+                    {formatDisplayPrice(b.total_price, b.currency, displayCurrency)}
+                    {' · '}
+                    {tCurrency('chargedIn', { currency: b.currency })}
+                  </div>
+                )}
               </div>
             </article>
           ))}

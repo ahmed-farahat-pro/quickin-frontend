@@ -24,6 +24,7 @@ type Detail = {
     listing_count: number; booking_count: number
     account_status: string; status_reason: string | null; status_changed_at: string | null; status_changed_by: string | null
     phone: string | null; country: string | null; bio: string | null; role: string | null
+    avatar_url: string | null
     host_type: string | null; company: string | null; referral_code: string | null
   }
   listings: Array<{ id: string; title: string; is_published: boolean; approval_status: string; unpublished_by_admin: boolean; price_per_night: number; currency: string; created_at: string; booking_count: number }>
@@ -125,9 +126,22 @@ export function OpsUserDetail({ initial, isSuperAdmin }: { initial: Detail; isSu
           ← All users
         </Link>
 
-        <h1 style={{ margin: '8px 0 4px', fontFamily: SERIF, fontSize: 'clamp(24px, 4vw, 30px)', fontWeight: 700, letterSpacing: '-0.02em', color: COLORS.burgundy }}>
-          {u.full_name || u.email}
-        </h1>
+        {/* The photo is shown here because a moderator opening a reported profile
+            is usually here to look at exactly this, and a report that says
+            "profile picture" is unanswerable from a table of bookings. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '8px 0 4px' }}>
+          {u.avatar_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={u.avatar_url}
+              alt=""
+              style={{ width: 56, height: 56, borderRadius: 999, objectFit: 'cover', flexShrink: 0, border: `1px solid ${COLORS.tan}` }}
+            />
+          )}
+          <h1 style={{ margin: 0, fontFamily: SERIF, fontSize: 'clamp(24px, 4vw, 30px)', fontWeight: 700, letterSpacing: '-0.02em', color: COLORS.burgundy }}>
+            {u.full_name || u.email}
+          </h1>
+        </div>
         <p style={{ margin: '0 0 10px', fontSize: 13, color: COLORS.muted, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <span>{u.email}</span>
           <StatusPill status={status} />
@@ -168,6 +182,22 @@ export function OpsUserDetail({ initial, isSuperAdmin }: { initial: Detail; isSu
           )}
 
           <span style={{ flex: 1 }} />
+
+          {/* A photo goes live the moment it is picked — on the site and in both
+              apps — and no filter can read what is in it, so the moderation is
+              this button rather than a queue in front of the upload. It takes the
+              picture down and nothing else; blocking the account over it stays a
+              separate, reasoned decision on the left. */}
+          {u.avatar_url && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => run(() => adminSend(`users/${u.id}`, 'POST', { action: 'remove_photo' }) as Promise<{ ok: boolean; data: { error?: string } }>, 'Profile photo removed')}
+              style={ghostBtn}
+            >
+              Remove photo
+            </button>
+          )}
 
           {!u.email_verified && (
             <button

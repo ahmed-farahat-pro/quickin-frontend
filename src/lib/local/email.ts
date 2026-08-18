@@ -9,6 +9,13 @@ const BACKEND = (process.env.MAIL_BACKEND_URL || '').replace(/\/+$/, '')
 const SECRET = process.env.MAIL_RELAY_SECRET || ''
 
 /**
+ * True when both relay settings are present, i.e. a code will actually be mailed.
+ * The forgot-password route reads this to decide whether echoing the code back as
+ * `devCode` is safe — see password-reset-core.forgotPasswordBody.
+ */
+export const mailRelayConfigured = Boolean(BACKEND && SECRET)
+
+/**
  * Send the 6-digit verification code via the backend mail relay.
  * Never throws — a delivery failure must not break signup; it's logged instead so
  * the cause is diagnosable (and the code is logged when the relay isn't configured).

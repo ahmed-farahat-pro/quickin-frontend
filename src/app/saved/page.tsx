@@ -8,7 +8,8 @@ import { redirect } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
 import { getWishlistListings } from '@/lib/local/db'
 import { verifyToken, getUserRowByEmail } from '@/lib/local/auth'
-import { formatPrice } from '@/lib/utils'
+import { formatDisplayPrice } from '@/lib/currency/display'
+import { getRequestCurrency } from '@/lib/currency/request-currency'
 import WishlistButton from '@/app/explore/wishlist-button'
 
 export const dynamic = 'force-dynamic'
@@ -35,6 +36,13 @@ const COLORS = {
 }
 
 const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
+
+const BACK_LINK_STYLE = {
+  color: COLORS.burgundy,
+  textDecoration: 'none',
+  fontWeight: 600,
+  fontSize: 14,
+} as const
 
 async function getCurrentUserId(): Promise<string | null> {
   const token = (await cookies()).get('qk_token')?.value
@@ -64,6 +72,7 @@ export default async function SavedPage() {
 
   const t = await getTranslations('savedPage')
   const listings = await getWishlistListings(userId)
+  const displayCurrency = await getRequestCurrency()
 
   return (
     <main
@@ -116,17 +125,24 @@ export default async function SavedPage() {
               style={{ height: 40, width: 'auto', display: 'block' }}
             />
           </a>
-          <a
-            href="/explore"
+          {/* This page is reachable both from Explore and from /account, so it
+              offers a way back to each rather than only to Explore. */}
+          <nav
             style={{
-              color: COLORS.burgundy,
-              textDecoration: 'none',
-              fontWeight: 600,
-              fontSize: 14,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              flexWrap: 'wrap',
+              gap: 16,
             }}
           >
-            ← {t('backToExplore')}
-          </a>
+            <a href="/account" style={BACK_LINK_STYLE}>
+              ← {t('backToAccount')}
+            </a>
+            <a href="/explore" style={BACK_LINK_STYLE}>
+              ← {t('backToExplore')}
+            </a>
+          </nav>
         </div>
       </header>
 
@@ -268,7 +284,7 @@ export default async function SavedPage() {
                       color: COLORS.burgundy,
                     }}
                   >
-                    {formatPrice(listing.price_per_night, listing.currency)}
+                    {formatDisplayPrice(listing.price_per_night, listing.currency, displayCurrency)}
                     <span
                       style={{
                         fontWeight: 500,

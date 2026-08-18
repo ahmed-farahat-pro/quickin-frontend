@@ -14,6 +14,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { LocaleSwitcher } from '@/components/layout/locale-switcher'
+import { CurrencySwitcher } from '@/components/layout/currency-switcher'
 
 // Nav row: icon + label, with padding so text never sits against the edge.
 const ROW =
@@ -104,8 +105,9 @@ export function MobileMenu({ firstName, isHost }: { firstName: string | null; is
               </a>
             </>
           )}
-          <div className="mt-4 border-t border-[#5B0F16]/10 px-2 pt-4">
+          <div className="mt-4 flex flex-col gap-3 border-t border-[#5B0F16]/10 px-2 pt-4">
             <LocaleSwitcher className="font-semibold text-[#2A2220]" />
+            <CurrencySwitcher className="font-semibold text-[#2A2220]" />
           </div>
         </nav>
       </SheetContent>

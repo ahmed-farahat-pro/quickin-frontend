@@ -9,6 +9,8 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { fileToCompressedDataUrl } from '@/lib/image'
 import { DOC_TYPES, type DocType } from '@/lib/local/host-verification-core'
+import { MAX_PHONE_CHARS, filterPhoneInput, isValidPhone } from '@/lib/local/phone-core'
+import { checkName } from '@/lib/local/name-policy'
 
 const C = {
   burgundy: '#5B0F16',
@@ -60,9 +62,12 @@ export interface PreviousApplication {
 /** Server `fields` keys → localized messages; anything unmapped falls back to the
  *  server's own text. The client validates first, so this is the safety net. */
 const FIELD_ERROR_KEYS: Record<string, string> = {
-  full_name: 'errors.fullNameRequired',
+  // full_name is deliberately absent: a refused name is localized from its
+  // policy code in the `namePolicy` namespace, not from a message per field.
   national_id: 'errors.nationalIdRequired',
-  phone: 'errors.phoneRequired',
+  // A blank phone can't reach the server (the field is required and checked
+  // first), so a server refusal here is always about the format.
+  phone: 'errors.phoneInvalid',
   address: 'errors.addressRequired',
   host_type: 'errors.hostTypeInvalid',
 }
@@ -78,6 +83,8 @@ export function ApplyForm({
 }) {
   const router = useRouter()
   const t = useTranslations('hostApply')
+  // Shared with signup: one set of name messages, keyed by the policy's codes.
+  const tn = useTranslations('namePolicy')
 
   const [fullName, setFullName] = useState(initialName)
   const [hostType, setHostType] = useState<'individual' | 'company' | 'brokerage'>(
@@ -125,8 +132,17 @@ export function ApplyForm({
     // Same required set as the API: everything but company + notes.
     const invalid: Record<string, string> = {}
     if (!fullName.trim()) invalid.full_name = t('errors.fullNameRequired')
+    else {
+      // An admin reads this name against the ID photos, so it has to be a name.
+      // Same policy — and the same localized copy — as the one signup applies.
+      const nameProblem = checkName(fullName)
+      if (nameProblem) invalid.full_name = tn(`errors.${nameProblem.code}`)
+    }
     if (!nationalId.trim()) invalid.national_id = t('errors.nationalIdRequired')
     if (!phone.trim()) invalid.phone = t('errors.phoneRequired')
+    // Typing already keeps letters out; this catches what is still not a number —
+    // too few digits, or a field holding nothing but separators.
+    else if (!isValidPhone(phone)) invalid.phone = t('errors.phoneInvalid')
     if (!address.trim()) invalid.address = t('errors.addressRequired')
     if (Object.keys(invalid).length) {
       setFieldErrors(invalid)
@@ -181,6 +197,12 @@ export function ApplyForm({
           const mapped: Record<string, string> = {}
           for (const [name, msg] of Object.entries(err.fields as Record<string, string>)) {
             mapped[name] = FIELD_ERROR_KEYS[name] ? t(FIELD_ERROR_KEYS[name]) : String(msg)
+          }
+          // The name is localized from its policy code: the API echoes one when
+          // it has it, and otherwise the same rule run here says what it was.
+          if (mapped.full_name) {
+            const code = err.nameProblem?.code ?? checkName(fullName)?.code
+            if (code) mapped.full_name = tn(`errors.${code}`)
           }
           setFieldErrors(mapped)
           throw new Error(t('errors.checkFields'))
@@ -332,8 +354,13 @@ export function ApplyForm({
           id="apply-phone"
           style={input}
           type="tel"
+          inputMode="tel"
+          maxLength={MAX_PHONE_CHARS}
           value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          // Letters are dropped as they are typed rather than reported on submit:
+          // `type="tel"` is a keyboard hint, not a filter, so a browser will
+          // happily hold a word in it.
+          onChange={(e) => setPhone(filterPhoneInput(e.target.value))}
           placeholder={t('placeholders.phone')}
           autoComplete="tel"
           required

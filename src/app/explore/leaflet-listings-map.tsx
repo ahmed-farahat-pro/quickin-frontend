@@ -14,6 +14,8 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { Listing } from '@/lib/local/db'
 import { approxLatLng } from '@/lib/geo'
+import { formatDisplayPrice } from '@/lib/currency/display'
+import { useDisplayCurrency } from '@/components/providers/display-currency-provider'
 
 const FALLBACK_IMG =
   'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=1200&q=80'
@@ -38,8 +40,7 @@ function esc(s: string): string {
 // Build the rounded burgundy price-pill marker (Airbnb style). The pill scales
 // itself, so we let Leaflet size the icon to its content and anchor it at the
 // center so the pill sits exactly over the coordinate.
-function priceIcon(listing: GeoListing): L.DivIcon {
-  const price = `${listing.currency === 'USD' || !listing.currency ? '$' : ''}${listing.price_per_night}`
+function priceIcon(price: string): L.DivIcon {
   return L.divIcon({
     className: '',
     iconSize: undefined,
@@ -89,6 +90,8 @@ export default function LeafletListingsMap({ listings }: { listings: Listing[] }
     [listings]
   )
 
+  const { currency: displayCurrency } = useDisplayCurrency()
+
   // Stable initial view (markers + FitBounds refine it once mounted).
   // MapContainer only reads `center`/`zoom` on first mount, so compute these
   // once and never recompute — feeding fresh values on every keystroke would
@@ -125,12 +128,18 @@ export default function LeafletListingsMap({ listings }: { listings: Listing[] }
         <FitBounds points={points} />
         {points.map((listing) => {
           const thumb = listing.listing_images[0]?.url || FALLBACK_IMG
-          const price = `${listing.currency === 'USD' || !listing.currency ? '$' : ''}${listing.price_per_night}`
+          // Same string as the list view's card, so switching between List and
+          // Map doesn't switch currency with it.
+          const price = formatDisplayPrice(
+            listing.price_per_night,
+            listing.currency,
+            displayCurrency,
+          )
           return (
             <Marker
               key={listing.id}
               position={[listing.lat, listing.lng]}
-              icon={priceIcon(listing)}
+              icon={priceIcon(price)}
             >
               <Popup>
                 <a

@@ -10,7 +10,19 @@
 
 /** The four documents /ops can open. `ownership` hangs off a listing; the rest off
  *  an id_verifications row. */
-export const DOCUMENT_KINDS = ['id_front', 'id_back', 'id_selfie', 'ownership'] as const
+export const DOCUMENT_KINDS = [
+  'id_front',
+  'id_back',
+  'id_selfie',
+  'ownership',
+  // Documents attached to a request to CHANGE an ID number. They live in
+  // id_change_requests, not id_verifications, so they resolve through their own
+  // column map below — but they are identity documents like any other, so they get
+  // the same audited one-at-a-time channel rather than riding along in a queue
+  // payload. See migrate-id-change-requests.mjs for why the two tables are separate.
+  'id_change_front',
+  'id_change_back',
+] as const
 export type DocumentKind = (typeof DOCUMENT_KINDS)[number]
 
 /** Which `id_verifications` column backs each ID kind. Not a free-text lookup —
@@ -19,6 +31,22 @@ const ID_COLUMN: Record<string, string> = {
   id_front: 'image_data',
   id_back: 'back_image_data',
   id_selfie: 'selfie_image_data',
+}
+
+/** The same closed-map rule for `id_change_requests`. */
+const ID_CHANGE_COLUMN: Record<string, string> = {
+  id_change_front: 'image_data',
+  id_change_back: 'back_image_data',
+}
+
+/** True for the kinds stored on an id_change_requests row rather than a verification. */
+export function isIdChangeDocumentKind(kind: DocumentKind): boolean {
+  return kind in ID_CHANGE_COLUMN
+}
+
+/** The column holding this kind's bytes on `id_change_requests`, or null. */
+export function idChangeColumnFor(kind: DocumentKind): string | null {
+  return ID_CHANGE_COLUMN[kind] ?? null
 }
 
 export function isDocumentKind(value: unknown): value is DocumentKind {
@@ -37,8 +65,12 @@ export function idColumnFor(kind: DocumentKind): string | null {
  * could already reach, it does not grant you a queue you were never given. So an
  * operator needs `documents` AND the owning module.
  */
-export function owningModuleFor(kind: DocumentKind): 'verifications' | 'listings' {
-  return kind === 'ownership' ? 'listings' : 'verifications'
+export function owningModuleFor(kind: DocumentKind): 'verifications' | 'listings' | 'id_changes' {
+  if (kind === 'ownership') return 'listings'
+  // An operator granted only the change queue can open the documents attached to it,
+  // and nothing from the verification queue they were not given.
+  if (isIdChangeDocumentKind(kind)) return 'id_changes'
+  return 'verifications'
 }
 
 /** The audit `target_type` for a kind — the SUBJECT the document is about, not the

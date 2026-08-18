@@ -42,7 +42,6 @@
     "terms": "Conditions",
     "sitemap": "Plan du site",
     "privacy": "Confidentialité",
-    "currency": "EGP",
     "supportLinks": {
       "helpCenter": "Centre d'aide",
       "safetyInfo": "Informations de sécurité",
@@ -59,6 +58,14 @@
       "about": "À propos",
       "contact": "Contact"
     }
+  },
+  "currency": {
+    "title": "Devise d'affichage",
+    "change": "Changer de devise",
+    "disclaimer": "Les taux sont approximatifs et donnés à titre indicatif. Les réservations sont facturées dans la devise de l'annonce.",
+    "chargedIn": "Facturé en {currency}",
+    "approx": "Approximatif — facturé en {currency}",
+    "ratesAsOf": "Taux au {date}"
   },
   "auth": {
     "loginTitle": "Connexion",
@@ -1570,9 +1577,11 @@
   },
   "loginLocal": {
     "subtitle": "Bon retour — connectez-vous pour continuer",
+    "exitToBrowsing": "Continuer sans compte",
     "logoAlt": "QuickIn",
     "emailLabel": "E-mail",
     "passwordLabel": "Mot de passe",
+    "forgotPassword": "Mot de passe oublié ?",
     "signIn": "Se connecter",
     "signingIn": "Connexion en cours…",
     "or": "ou",
@@ -1593,11 +1602,28 @@
       "newCodeSent": "Un nouveau code est en route.",
       "codeSentTo": "Nous avons envoyé un code à 6 chiffres à {email}."
     },
+    "forgot": {
+      "title": "Réinitialisez votre mot de passe",
+      "enterCodeTitle": "Vérifiez votre e-mail",
+      "intro": "Saisissez votre e-mail et nous vous enverrons un code à 6 chiffres.",
+      "sendCode": "Envoyer le code",
+      "sending": "Envoi…",
+      "codeSent": "Si cette adresse a un compte, un code à 6 chiffres part vers {email}.",
+      "devCode": "L'envoi d'e-mails est désactivé — votre code est {code}.",
+      "codeLabel": "Code de réinitialisation",
+      "newPasswordLabel": "Nouveau mot de passe",
+      "submit": "Réinitialiser et se connecter",
+      "submitting": "Réinitialisation…",
+      "resendCode": "Envoyer un nouveau code",
+      "backToSignIn": "Retour à la connexion"
+    },
     "errors": {
       "googleFailed": "Échec de la connexion Google. Veuillez réessayer.",
       "unableToSignIn": "Impossible de se connecter. Veuillez réessayer.",
       "invalidCode": "Ce code n'a pas fonctionné. Veuillez réessayer.",
-      "network": "Erreur réseau. Veuillez réessayer."
+      "network": "Erreur réseau. Veuillez réessayer.",
+      "resetRequestFailed": "Impossible d'envoyer le code. Veuillez réessayer.",
+      "resetFailed": "Impossible de réinitialiser votre mot de passe. Veuillez réessayer."
     },
     "notices": {
       "appleSetup": "La connexion Apple nécessite HTTPS et un identifiant Apple Developer Services (voir OAUTH-SETUP.md)."
@@ -1612,11 +1638,16 @@
   },
   "signupLocal": {
     "subtitle": "Créez votre compte pour commencer à explorer",
+    "exitToBrowsing": "Continuer sans compte",
     "errors": {
       "invalidCode": "Ce code est invalide ou a expiré.",
       "network": "Erreur réseau. Veuillez réessayer.",
       "googleFailed": "Échec de la connexion avec Google. Veuillez réessayer.",
-      "createFailed": "Impossible de créer le compte. Veuillez réessayer."
+      "createFailed": "Impossible de créer le compte. Veuillez réessayer.",
+      "emailInvalid": "Veuillez saisir une adresse e-mail valide.",
+      "emailBadTld": "« .{tld} » n'est pas une extension de domaine valide.",
+      "emailDidYouMean": "Vouliez-vous dire {suggestion} ?",
+      "emailDisposable": "Les adresses e-mail temporaires ou jetables ne sont pas autorisées. Veuillez utiliser une adresse personnelle ou professionnelle permanente."
     },
     "otp": {
       "label": "Code de vérification",
@@ -1627,13 +1658,14 @@
       "resendIn": "Renvoyer dans {seconds} s",
       "resendCode": "Renvoyer le code",
       "newCodeSent": "Un nouveau code est en route.",
-      "codeSentTo": "Nous avons envoyé un code à 6 chiffres à {email}."
+      "codeSentTo": "Nous avons envoyé un code à 6 chiffres à {email}.",
+      "back": "Retour à l'inscription"
     },
     "fields": {
       "fullName": "Nom complet",
       "email": "E-mail",
       "password": "Mot de passe",
-      "passwordPlaceholder": "Au moins 6 caractères"
+      "passwordPlaceholder": "Au moins 8 caractères"
     },
     "submit": {
       "creating": "Création du compte…",
@@ -1683,6 +1715,7 @@
       "ogDescription": "Consultez et gérez vos prochains séjours QuickIn."
     },
     "backToExplore": "Retour à l'exploration",
+    "backToAccount": "Retour au compte",
     "signedOut": {
       "title": "Connectez-vous pour voir vos réservations",
       "subtitle": "Vos prochains séjours s'afficheront ici une fois connecté.",
@@ -1730,7 +1763,8 @@
       "description": "Téléchargez votre carte d'identité nationale pour vérifier votre compte QuickIn."
     },
     "heading": "Vérifiez votre identité",
-    "subtitle": "Les séjours boutique requièrent un voyageur vérifié — cela ne prend qu'une minute."
+    "subtitle": "Les séjours boutique requièrent un voyageur vérifié — cela ne prend qu'une minute.",
+    "backToAccount": "Retour au compte"
   },
   "planPage": {
     "meta": {
@@ -1866,6 +1900,29 @@
       "unverified": "Non vérifié"
     },
     "verifyIdCta": "Vérifier votre identité",
+    "photo": {
+      "add": "Ajouter une photo",
+      "change": "Changer la photo",
+      "remove": "Supprimer",
+      "saving": "Envoi…",
+      "removing": "Suppression…",
+      "saved": "Photo mise à jour.",
+      "hint": "JPEG, PNG ou WebP. Les hôtes la voient lors de vos réservations.",
+      "error": "Impossible d'enregistrer votre photo. Réessayez.",
+      "unreadable": "Ce fichier n'a pas pu être lu comme une image.",
+      "problem": {
+        "notAnImage": "Veuillez choisir un fichier image.",
+        "unsupportedType": "Les photos de profil doivent être en JPEG, PNG ou WebP.",
+        "tooLarge": "Cette photo est trop lourde — choisissez-en une plus petite."
+      }
+    },
+    "preferences": {
+      "title": "Préférences",
+      "subtitle": "La façon dont QuickIn vous affiche les prix et les textes.",
+      "currencyLabel": "Devise",
+      "currencyHelp": "Les prix sur QuickIn s'affichent dans cette devise. Les réservations restent facturées dans la devise de l'annonce.",
+      "languageLabel": "Langue"
+    },
     "links": {
       "reservations": "Mes voyages",
       "saved": "Mes favoris",
@@ -1877,6 +1934,25 @@
       "title": "Profil",
       "fullName": "Nom complet",
       "fullNamePlaceholder": "Votre nom",
+      "age": "Âge",
+      "agePlaceholder": "34",
+      "ageHelp": "Affiché uniquement dans votre profil. Entre {min} et {max}.",
+      "phone": "Numéro de téléphone",
+      "phonePlaceholder": "010 1234 5678",
+      "phoneHelp": "Visible seulement par vous et notre équipe. Jamais par les hôtes ni les voyageurs.",
+      "bio": "À propos de vous",
+      "bioPlaceholder": "Une ligne ou deux sur vous — d’où vous venez, ce que vous aimez dans les voyages.",
+      "bioCount": "{count} / {max} caractères",
+      "optional": "(facultatif)",
+      "errors": {
+        "age": {
+          "notANumber": "Saisissez votre âge en chiffres, par exemple 34.",
+          "tooYoung": "Saisissez un âge d’au moins {min}.",
+          "tooOld": "Saisissez un âge d’au plus {max}."
+        },
+        "phoneInvalid": "Cela ne ressemble pas à un numéro de téléphone. Essayez 010 1234 5678 ou +20 10 1234 5678.",
+        "bioTooLong": "Limitez ce texte à {max} caractères."
+      },
       "avatarUrl": "URL de l’avatar",
       "save": "Enregistrer le profil",
       "saving": "Enregistrement…",
@@ -1891,7 +1967,6 @@
       "update": "Mettre à jour le mot de passe",
       "updating": "Mise à jour…",
       "updated": "Mot de passe mis à jour.",
-      "tooShort": "Le nouveau mot de passe doit comporter au moins 8 caractères.",
       "mismatch": "Les nouveaux mots de passe ne correspondent pas.",
       "error": "Impossible de changer votre mot de passe."
     },
@@ -1915,6 +1990,7 @@
       "description": "Vos séjours boutique enregistrés sur QuickIn."
     },
     "backToExplore": "Retour à l’exploration",
+    "backToAccount": "Retour au compte",
     "title": "Mes favoris",
     "noneYet": "Vous n’avez encore enregistré aucun séjour.",
     "countSaved": "{count, plural, one {# séjour enregistré.} other {# séjours enregistrés.}}",
@@ -2069,6 +2145,7 @@
       "errors": {
         "titleRequired": "Veuillez donner un titre à votre annonce.",
         "priceInvalid": "Veuillez saisir un prix par nuit valide.",
+        "weekendPriceInvalid": "Le prix du week-end doit être supérieur à zéro. Laissez le champ vide si vous n'appliquez pas de tarif différent le week-end.",
         "invalidImageUrl": "Ce lien de photo ne ressemble pas à une URL valide : {url}",
         "createFailed": "Impossible de créer l’annonce",
         "tooManyPhotos": "Vous pouvez téléverser jusqu'à {max} photos.",
@@ -2226,6 +2303,7 @@
     "errors": {
       "nationalIdRequired": "Veuillez saisir votre numéro d’identité.",
       "phoneRequired": "Veuillez saisir votre numéro de téléphone.",
+      "phoneInvalid": "Cela ne ressemble pas à un numéro de téléphone. Essayez 010 1234 5678 ou +20 10 1234 5678.",
       "addressRequired": "Veuillez saisir votre adresse.",
       "submitFailed": "Impossible d’envoyer votre candidature. Veuillez réessayer.",
       "idRequired": "Veuillez ajouter le recto et le verso de votre pièce d'identité.",
@@ -2418,5 +2496,90 @@
     "comingSoon": "Bientôt disponible",
     "followUs": "Suivez-nous",
     "rights": "Tous droits réservés."
+  },
+  "payoutMethod": {
+    "title": "Informations de paiement",
+    "subtitleEmpty": "Ajoutez un moyen de versement pour que QuickIn puisse vous envoyer vos revenus.",
+    "subtitleSet": "C'est là que QuickIn envoie vos revenus.",
+    "chooseMethod": "Comment souhaitez-vous être payé",
+    "badgeAdded": "Ajouté",
+    "methods": {
+      "bank_account": "Compte bancaire",
+      "instapay": "InstaPay",
+      "wallet": "Portefeuille"
+    },
+    "walletProviders": {
+      "vodafone_cash": "Vodafone Cash",
+      "etisalat_cash": "Etisalat Cash",
+      "orange_money": "Orange Money",
+      "we_pay": "WE Pay",
+      "other": "Autre portefeuille"
+    },
+    "fields": {
+      "accountName": "Nom du titulaire",
+      "bank": "Banque",
+      "iban": "IBAN",
+      "accountNumber": "Numéro de compte",
+      "swift": "SWIFT / BIC",
+      "swiftOptional": "SWIFT / BIC (facultatif)",
+      "branch": "Agence",
+      "branchOptional": "Agence (facultatif)",
+      "instapayAddress": "Adresse InstaPay",
+      "walletProvider": "Portefeuille",
+      "walletNumber": "Numéro du portefeuille",
+      "updated": "Dernière mise à jour"
+    },
+    "placeholders": {
+      "accountName": "Tel qu’il apparaît sur le compte",
+      "bank": "ex. Banque Misr",
+      "iban": "EG38 0019 0005 0000 0000 2631 8000 2",
+      "accountNumber": "Votre numéro de compte bancaire",
+      "swift": "ex. NBEGEGCX",
+      "branch": "ex. Zamalek",
+      "instapayAddress": "nom@instapay",
+      "walletNumber": "01XXXXXXXXX"
+    },
+    "bankHint": "Saisissez votre IBAN ou votre numéro de compte — l’un suffit, les deux valent mieux.",
+    "instapayHint": "Votre adresse InstaPay, par exemple nom@instapay ou nom@banquemisr.",
+    "save": "Enregistrer le moyen de versement",
+    "update": "Enregistrer les modifications",
+    "saving": "Enregistrement…",
+    "saved": "Votre moyen de versement a été enregistré.",
+    "change": "Modifier",
+    "cancel": "Annuler",
+    "remove": "Supprimer",
+    "removing": "Suppression…",
+    "removed": "Votre moyen de versement a été supprimé.",
+    "removeConfirm": "Supprimer ce moyen de versement ? QuickIn n'aura nulle part où envoyer vos revenus tant que vous n'en ajoutez pas un autre.",
+    "error": "Impossible d'enregistrer votre moyen de versement. Veuillez réessayer."
+  },
+  "passwordPolicy": {
+    "rules": {
+      "length": "Au moins 8 caractères",
+      "uppercase": "Une majuscule (A–Z)",
+      "lowercase": "Une minuscule (a–z)",
+      "digit": "Un chiffre (0–9)",
+      "symbol": "Un symbole (! ? @ # …)"
+    },
+    "errors": {
+      "required": "Veuillez choisir un mot de passe.",
+      "tooLong": "Ce mot de passe est trop long (128 caractères maximum).",
+      "whitespace": "Votre mot de passe ne peut pas contenir uniquement des espaces.",
+      "length": "Votre mot de passe doit comporter au moins 8 caractères.",
+      "uppercase": "Votre mot de passe doit contenir une majuscule.",
+      "lowercase": "Votre mot de passe doit contenir une minuscule.",
+      "digit": "Votre mot de passe doit contenir un chiffre.",
+      "symbol": "Votre mot de passe doit contenir un symbole, par exemple ! ? @ #.",
+      "email": "Votre mot de passe ne peut pas être votre adresse e-mail.",
+      "common": "Ce mot de passe est trop courant. Choisissez-en un moins facile à deviner."
+    }
+  },
+  "namePolicy": {
+    "errors": {
+      "required": "Veuillez saisir votre nom.",
+      "letters": "Veuillez saisir votre nom — un nom contient des lettres, pas uniquement des chiffres.",
+      "tooShort": "Veuillez saisir votre nom complet (au moins 2 lettres).",
+      "tooLong": "Ce nom est trop long (60 caractères maximum)."
+    }
   }
 }

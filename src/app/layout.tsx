@@ -6,9 +6,12 @@ import { Toaster } from "@/components/ui/sonner";
 import { GlobalLoadingBar } from "@/components/ui/global-loading-bar";
 import { RouteProgressBar } from "@/components/ui/route-progress-bar";
 import { getDirection, type Locale } from '@/i18n/config'
+import type { DisplayCurrency } from '@/lib/local/currency-core'
 import { getMessages } from '@/i18n/messages'
 import { getRequestLocale } from '@/i18n/request-locale'
 import { AppDirectionProvider } from '@/components/providers/app-direction-provider'
+import { DisplayCurrencyProvider } from '@/components/providers/display-currency-provider'
+import { getRequestCurrency } from '@/lib/currency/request-currency'
 import { AuthNotification } from '@/components/features/auth/auth-notification'
 import WhatsAppFab from "@/components/whatsapp-fab";
 import AppStoreBar from "@/components/app-store-bar";
@@ -100,19 +103,27 @@ export default function RootLayout({
 }>)
 {
   const localePromise = getRequestLocale()
+  const currencyPromise = getRequestCurrency()
 
-  return <RootLayoutInner localePromise={localePromise}>{children}</RootLayoutInner>
+  return (
+    <RootLayoutInner localePromise={localePromise} currencyPromise={currencyPromise}>
+      {children}
+    </RootLayoutInner>
+  )
 }
 
 async function RootLayoutInner({
   children,
   localePromise,
+  currencyPromise,
 }: Readonly<{
   children: React.ReactNode;
   localePromise: Promise<Locale>;
+  currencyPromise: Promise<DisplayCurrency>;
 }>)
 {
   const locale = await localePromise
+  const currency = await currencyPromise
   const messages = getMessages(locale)
   const dir = getDirection(locale)
 
@@ -122,16 +133,18 @@ async function RootLayoutInner({
         className="font-sans antialiased min-h-screen flex flex-col"
       >
         <NextIntlClientProvider locale={locale} messages={messages} timeZone="Africa/Cairo">
-          <AppDirectionProvider dir={dir}>
-            <RouteProgressBar />
-            <GlobalLoadingBar />
-            <AuthNotification />
-            {/* Site-wide "Get the app" bar — sits above the header on every page. */}
-            <AppStoreBar />
-            {children}
-            <WhatsAppFab />
-            <Toaster position="top-center" />
-          </AppDirectionProvider>
+          <DisplayCurrencyProvider initial={currency}>
+            <AppDirectionProvider dir={dir}>
+              <RouteProgressBar />
+              <GlobalLoadingBar />
+              <AuthNotification />
+              {/* Site-wide "Get the app" bar — sits above the header on every page. */}
+              <AppStoreBar />
+              {children}
+              <WhatsAppFab />
+              <Toaster position="top-center" />
+            </AppDirectionProvider>
+          </DisplayCurrencyProvider>
         </NextIntlClientProvider>
       </body>
     </html>

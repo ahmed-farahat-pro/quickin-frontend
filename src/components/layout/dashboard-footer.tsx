@@ -1,10 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { DollarSign } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 import { localizeHrefWithQuery } from '@/lib/i18n/pathname'
 import { LocaleSwitcher } from '@/components/layout/locale-switcher'
+import { CurrencySwitcher } from '@/components/layout/currency-switcher'
 import type { Locale } from '@/i18n/config'
 
 export function DashboardFooter() {
@@ -26,10 +26,7 @@ export function DashboardFooter() {
         </div>
         <div className="flex items-center gap-4">
           <LocaleSwitcher className="flex items-center gap-1.5 hover:underline" />
-          <button className="flex items-center gap-1.5 hover:underline">
-            <DollarSign className="h-4 w-4" />
-            <span>{t('currency')}</span>
-          </button>
+          <CurrencySwitcher className="flex items-center gap-1.5 hover:underline" />
         </div>
       </div>
     </footer>

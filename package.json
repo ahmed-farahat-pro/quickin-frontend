@@ -9,6 +9,7 @@
     "lint": "eslint",
     "gen-types": "supabase gen types typescript --project-id xpvrgdpsvffmttlwwfuo > src/types/supabase.ts",
     "check:i18n": "node scripts/check-i18n-keys.mjs",
+    "check:tlds": "node scripts/check-tlds.mjs",
     "test": "node --test \"test/unit/*.test.mjs\"",
     "test:watch": "node --test --watch \"test/unit/*.test.mjs\"",
     "check": "npm test"

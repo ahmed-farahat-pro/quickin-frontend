@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Script from 'next/script'
 import { useTranslations } from 'next-intl'
+import { checkPassword, isStrongPassword, MIN_PASSWORD_LENGTH, type PasswordProblem } from '@/lib/local/password-policy'
+import PasswordChecklist from '@/components/features/auth/password-checklist'
+import AuthExitLink, { useAuthReturnHref } from '@/components/features/auth/auth-exit-link'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -79,8 +82,17 @@ function EyeIcon({ off }: { off: boolean }) {
   )
 }
 
+// Which card the page is showing. 'otp' is the email-verification step login can
+// force; 'forgot' and 'reset' are the two steps of the password reset, the same
+// request-then-code+password pair the iOS and Android apps already ship.
+type View = 'signin' | 'otp' | 'forgot' | 'reset'
+
 export default function LoginPage() {
   const t = useTranslations('loginLocal')
+  const tp = useTranslations('passwordPolicy')
+  // Shared with the exit link above the card so the logo is a second door out.
+  const returnHref = useAuthReturnHref()
+  const [view, setView] = useState<View>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -94,6 +106,12 @@ export default function LoginPage() {
   const [pendingEmail, setPendingEmail] = useState<string | null>(null)
   const [otpCode, setOtpCode] = useState('')
   const [resendCooldown, setResendCooldown] = useState(0)
+
+  // Password reset.
+  const [resetEmail, setResetEmail] = useState('')
+  const [resetCode, setResetCode] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [showNewPassword, setShowNewPassword] = useState(false)
 
   // Tick the resend cooldown down to zero.
   useEffect(() => {
@@ -141,6 +159,117 @@ export default function LoginPage() {
       else setNotice(t('otp.newCodeSent'))
     } catch {
       setError(t('errors.network'))
+    }
+  }
+
+  // ---- Password reset -------------------------------------------------------
+
+  function openForgot() {
+    setError(null)
+    setNotice(null)
+    // Carry over whatever they already typed — retyping the address they just
+    // failed to sign in with is pure friction.
+    setResetEmail(email)
+    setResetCode('')
+    setNewPassword('')
+    setView('forgot')
+  }
+
+  function backToSignIn() {
+    setError(null)
+    setNotice(null)
+    setView('signin')
+  }
+
+  /**
+   * Leave the OTP step and go back to the sign-in form. Never a dead end: the
+   * account still exists unverified, and signing in again re-sends a fresh code
+   * (login answers 403 `needsVerification`), which returns here.
+   */
+  function backFromOtp() {
+    setOtpCode('')
+    setPendingEmail(null)
+    setResendCooldown(0)
+    backToSignIn()
+  }
+
+  /**
+   * Ask for a code. Shared by the "send" button and the "resend" link, so the two
+   * can never drift; `advance` is false when we're only refreshing the code.
+   */
+  async function requestResetCode(advance: boolean) {
+    setError(null)
+    setNotice(null)
+    setLoading(true)
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        if (data?.cooldown) setResendCooldown(Number(data.cooldown))
+        setError(data?.error || t('errors.resetRequestFailed'))
+        setLoading(false)
+        return
+      }
+      setResendCooldown(Number(data?.cooldown) || 30)
+      // devCode only comes back in local dev, where no mail relay is configured.
+      setNotice(
+        typeof data?.devCode === 'string'
+          ? t('forgot.devCode', { code: data.devCode })
+          : t('forgot.codeSent', { email: resetEmail })
+      )
+      if (advance) setView('reset')
+    } catch {
+      setError(t('errors.network'))
+    }
+    setLoading(false)
+  }
+
+  async function submitResetRequest(e: React.FormEvent) {
+    e.preventDefault()
+    await requestResetCode(true)
+  }
+
+  /** Localized copy for a refused password — the same codes the API returns. */
+  function passwordMessage(problem: PasswordProblem): string {
+    return tp(`errors.${problem.code}`)
+  }
+
+  async function submitNewPassword(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    // The same policy signup enforces; caught here so a weak choice costs no
+    // round trip — and, more importantly, no burnt reset code.
+    const weak = checkPassword(newPassword, resetEmail)
+    if (weak) {
+      setError(passwordMessage(weak))
+      return
+    }
+    setLoading(true)
+    try {
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail, code: resetCode, password: newPassword }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(
+          data?.passwordProblem
+            ? passwordMessage(data.passwordProblem)
+            : data?.error || t('errors.resetFailed')
+        )
+        setLoading(false)
+        return
+      }
+      // The reset signs the user in, so land them where a sign-in would.
+      window.location.href = '/explore'
+    } catch {
+      setError(t('errors.network'))
+      setLoading(false)
     }
   }
 
@@ -221,6 +350,7 @@ export default function LoginPage() {
           // Email not verified — the server has re-sent a fresh code. Switch to
           // the OTP step instead of showing an error.
           setPendingEmail(data.email || email)
+          setView('otp')
           setNotice(t('verifyEmailNotice'))
           setResendCooldown(30)
           setLoading(false)
@@ -282,14 +412,25 @@ export default function LoginPage() {
           padding: '40px 36px 36px',
         }}
       >
+        {/* Signing in is optional on QuickIn — most of the site is browsable without
+            an account — so the way out stays on screen in every view of the flow,
+            including the OTP and reset steps a guest can be dropped into. */}
+        <AuthExitLink label={t('exitToBrowsing')} />
+
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <img
-            src="/logo.png"
-            alt={t('logoAlt')}
-            style={{ height: 54, width: 'auto', margin: '0 auto', display: 'block' }}
-          />
+          <a href={returnHref} aria-label={t('exitToBrowsing')}>
+            <img
+              src="/logo.png"
+              alt={t('logoAlt')}
+              style={{ height: 54, width: 'auto', margin: '0 auto', display: 'block' }}
+            />
+          </a>
           <p style={{ margin: '14px 0 0', fontSize: 15, color: COLORS.muted }}>
-            {t('subtitle')}
+            {view === 'forgot'
+              ? t('forgot.title')
+              : view === 'reset'
+                ? t('forgot.enterCodeTitle')
+                : t('subtitle')}
           </p>
         </div>
 
@@ -325,7 +466,7 @@ export default function LoginPage() {
           </div>
         )}
 
-        {pendingEmail ? (
+        {view === 'otp' ? (
           <form onSubmit={verifyOtp}>
             <label style={{ display: 'block', marginBottom: 16 }}>
               <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: COLORS.ink, marginBottom: 6 }}>
@@ -364,6 +505,106 @@ export default function LoginPage() {
                 </button>
               )}
             </p>
+            <p style={{ margin: '10px 0 0', textAlign: 'center' }}>
+              <button type="button" onClick={backFromOtp} style={linkButtonStyle}>
+                {t('forgot.backToSignIn')}
+              </button>
+            </p>
+          </form>
+        ) : view === 'forgot' ? (
+          <form onSubmit={submitResetRequest}>
+            <p style={{ margin: '0 0 18px', fontSize: 14, color: COLORS.muted, textAlign: 'center' }}>
+              {t('forgot.intro')}
+            </p>
+            <label style={{ display: 'block', marginBottom: 22 }}>
+              <span style={fieldLabelStyle}>{t('emailLabel')}</span>
+              <input
+                type="email"
+                required
+                autoComplete="email"
+                autoFocus
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                placeholder="layla@email.com"
+                style={inputStyle}
+              />
+            </label>
+            <button type="submit" disabled={loading} style={primaryButtonStyle(loading)}>
+              {loading ? t('forgot.sending') : t('forgot.sendCode')}
+            </button>
+            <p style={{ margin: '18px 0 0', textAlign: 'center' }}>
+              <button type="button" onClick={backToSignIn} style={linkButtonStyle}>
+                {t('forgot.backToSignIn')}
+              </button>
+            </p>
+          </form>
+        ) : view === 'reset' ? (
+          <form onSubmit={submitNewPassword}>
+            <label style={{ display: 'block', marginBottom: 16 }}>
+              <span style={fieldLabelStyle}>{t('forgot.codeLabel')}</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                required
+                maxLength={6}
+                autoFocus
+                value={resetCode}
+                onChange={(e) => setResetCode(e.target.value.replace(/\D/g, ''))}
+                placeholder={t('otp.placeholder')}
+                style={{ ...inputStyle, letterSpacing: 6, textAlign: 'center', fontSize: 20 }}
+              />
+            </label>
+
+            <label style={{ display: 'block', marginBottom: 22 }}>
+              <span style={fieldLabelStyle}>{t('forgot.newPasswordLabel')}</span>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showNewPassword ? 'text' : 'password'}
+                  required
+                  minLength={MIN_PASSWORD_LENGTH}
+                  aria-describedby="reset-password-rules"
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="••••••••"
+                  style={{ ...inputStyle, paddingInlineEnd: 46 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword((s) => !s)}
+                  aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                  style={eyeButtonStyle}
+                >
+                  <EyeIcon off={showNewPassword} />
+                </button>
+              </div>
+              <PasswordChecklist id="reset-password-rules" password={newPassword} />
+            </label>
+
+            <button
+              type="submit"
+              disabled={loading || resetCode.length < 6 || !isStrongPassword(newPassword, resetEmail)}
+              style={primaryButtonStyle(loading || resetCode.length < 6 || !isStrongPassword(newPassword, resetEmail))}
+            >
+              {loading ? t('forgot.submitting') : t('forgot.submit')}
+            </button>
+
+            <p style={{ margin: '18px 0 0', textAlign: 'center', fontSize: 14, color: COLORS.muted }}>
+              {t('otp.didntGet')}{' '}
+              {resendCooldown > 0 ? (
+                <span>{t('otp.resendIn', { seconds: resendCooldown })}</span>
+              ) : (
+                <button type="button" onClick={() => requestResetCode(false)} style={linkButtonStyle}>
+                  {t('forgot.resendCode')}
+                </button>
+              )}
+            </p>
+            <p style={{ margin: '10px 0 0', textAlign: 'center' }}>
+              <button type="button" onClick={backToSignIn} style={linkButtonStyle}>
+                {t('forgot.backToSignIn')}
+              </button>
+            </p>
           </form>
         ) : (
           <>
@@ -391,20 +632,34 @@ export default function LoginPage() {
             />
           </label>
 
-          <label style={{ display: 'block', marginBottom: 22 }}>
-            <span
+          {/* The label and the reset link sit side by side, so "Forgot password?"
+              is where you look the moment the password is the thing failing. The
+              button is a sibling of the label, not a child: a control nested
+              inside a <label> swallows part of its click target. */}
+          <div style={{ marginBottom: 22 }}>
+            <div
               style={{
-                display: 'block',
-                fontSize: 13,
-                fontWeight: 600,
-                color: COLORS.ink,
+                display: 'flex',
+                alignItems: 'baseline',
+                justifyContent: 'space-between',
+                gap: 12,
                 marginBottom: 6,
               }}
             >
-              {t('passwordLabel')}
-            </span>
+              <label htmlFor="login-password" style={{ ...fieldLabelStyle, marginBottom: 0 }}>
+                {t('passwordLabel')}
+              </label>
+              <button
+                type="button"
+                onClick={openForgot}
+                style={{ ...linkButtonStyle, fontSize: 13 }}
+              >
+                {t('forgotPassword')}
+              </button>
+            </div>
             <div style={{ position: 'relative' }}>
               <input
+                id="login-password"
                 type={showPassword ? 'text' : 'password'}
                 required
                 autoComplete="current-password"
@@ -422,7 +677,7 @@ export default function LoginPage() {
                 <EyeIcon off={showPassword} />
               </button>
             </div>
-          </label>
+          </div>
 
           <button type="submit" disabled={loading} style={primaryButtonStyle(loading)}>
             {loading ? t('signingIn') : t('signIn')}
@@ -502,12 +757,16 @@ export default function LoginPage() {
           </>
         )}
 
-        <p style={{ margin: '26px 0 0', textAlign: 'center', fontSize: 14, color: COLORS.muted }}>
-          {t('newHere')}{' '}
-          <a href="/signup" style={{ color: COLORS.burgundy, fontWeight: 600, textDecoration: 'none' }}>
-            {t('createAccount')}
-          </a>
-        </p>
+        {/* The reset steps carry their own "Back to sign in" — offering signup there
+            too would point at the wrong door. */}
+        {view !== 'forgot' && view !== 'reset' && (
+          <p style={{ margin: '26px 0 0', textAlign: 'center', fontSize: 14, color: COLORS.muted }}>
+            {t('newHere')}{' '}
+            <a href="/signup" style={{ color: COLORS.burgundy, fontWeight: 600, textDecoration: 'none' }}>
+              {t('createAccount')}
+            </a>
+          </p>
+        )}
       </div>
     </main>
   )
@@ -524,6 +783,26 @@ const inputStyle: React.CSSProperties = {
   borderRadius: 18,
   padding: '12px 16px',
   outline: 'none',
+}
+
+const fieldLabelStyle: React.CSSProperties = {
+  display: 'block',
+  fontSize: 13,
+  fontWeight: 600,
+  color: COLORS.ink,
+  marginBottom: 6,
+}
+
+/** A button that reads as a link — used for every inline action on this card. */
+const linkButtonStyle: React.CSSProperties = {
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  color: COLORS.burgundy,
+  fontFamily: FONT,
+  fontSize: 14,
+  fontWeight: 600,
+  cursor: 'pointer',
 }
 
 const eyeButtonStyle: React.CSSProperties = {

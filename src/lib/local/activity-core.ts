@@ -295,6 +295,11 @@ export function actorLabel(actor: string | null | undefined): string {
  */
 export const ALERT_SOURCES = [
   { key: 'pending_verifications', label: 'ID verifications to review', module: 'verifications', href: '/ops/verifications' },
+  // Its own alert rather than folding into the line above: the two are granted
+  // separately, so an operator holding only `id_changes` must still be told there is
+  // work, and one holding only `verifications` must not be nagged about a queue they
+  // cannot act on. Both land on the same screen.
+  { key: 'pending_id_changes', label: 'ID change requests to review', module: 'id_changes', href: '/ops/verifications' },
   { key: 'pending_applications', label: 'Host applications to review', module: 'applications', href: '/ops/applications' },
   { key: 'pending_listings', label: 'Listings awaiting approval', module: 'listings', href: '/ops/listings' },
   { key: 'pending_payments', label: 'Payments to confirm', module: 'payments', href: '/ops/payments' },

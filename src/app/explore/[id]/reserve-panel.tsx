@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { formatPrice } from '@/lib/utils'
+import { formatDisplayPrice, isConverted } from '@/lib/currency/display'
+import { useDisplayCurrency } from '@/components/providers/display-currency-provider'
 import { stayQuote } from '@/lib/geo'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 
@@ -49,6 +51,12 @@ export default function ReservePanel({
   maxGuests: number | null
 }) {
   const t = useTranslations('listingPage')
+  const tc = useTranslations('currency')
+  const { currency: displayCurrency } = useDisplayCurrency()
+  // A quote shown in the guest's currency is an estimate; the booking is
+  // created and charged in the listing's own currency, so say which that is.
+  const converted = isConverted(currency, displayCurrency)
+  const price = (amount: number) => formatDisplayPrice(amount, currency, displayCurrency)
   const [checkIn, setCheckIn] = useState('')
   const [checkOut, setCheckOut] = useState('')
   const [adults, setAdults] = useState(1)
@@ -115,12 +123,14 @@ export default function ReservePanel({
     <div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
         <span style={{ fontSize: 30, fontWeight: 800, color: COLORS.burgundy }}>
-          {formatPrice(pricePerNight, currency)}
+          {price(pricePerNight)}
         </span>
         <span style={{ fontSize: 15, color: COLORS.muted }}>{t('perNight')}</span>
       </div>
       <p style={{ margin: '6px 0 18px', fontSize: 13, color: COLORS.muted }}>
-        {t('pricesIn', { currency })}
+        {converted
+          ? tc('approx', { currency })
+          : t('pricesIn', { currency })}
       </p>
 
       {/* Date range picker (custom, replaces native date inputs) */}
@@ -176,9 +186,9 @@ export default function ReservePanel({
           <span>
             {weekendActive
               ? t('nightsCount', { nights })
-              : `${formatPrice(pricePerNight, currency)} × ${t('nightsCount', { nights })}`}
+              : `${price(pricePerNight)} × ${t('nightsCount', { nights })}`}
           </span>
-          <span style={{ fontWeight: 700 }}>{formatPrice(total, currency)}</span>
+          <span style={{ fontWeight: 700 }}>{price(total)}</span>
         </div>
         <div
           style={{
@@ -193,8 +203,15 @@ export default function ReservePanel({
           }}
         >
           <span>{t('total')}</span>
-          <span>{formatPrice(total, currency)}</span>
+          <span>{price(total)}</span>
         </div>
+        {converted && nights > 0 && (
+          // The authoritative number, under the estimate: this is what the
+          // booking will actually be for.
+          <p style={{ margin: '8px 0 0', fontSize: 12.5, color: COLORS.muted, textAlign: 'end' }}>
+            {formatPrice(total, currency)} · {tc('chargedIn', { currency })}
+          </p>
+        )}
       </div>
 
       <button
@@ -285,7 +302,12 @@ export default function ReservePanel({
           <strong style={{ display: 'block', marginBottom: 4 }}>
             {t('success.title')} ⏳
           </strong>
-          {t('success.summary', { nights: status.nights, total: status.total })}
+          {/* The request that was just created — in the currency it was created
+              in, never the converted estimate. */}
+          {t('success.summary', {
+            nights: status.nights,
+            total: formatPrice(status.total, currency),
+          })}
           {' '}{t('success.awaitingApproval')}{' '}
           <a
             href="/reservations"

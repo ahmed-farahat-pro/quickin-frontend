@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
 import {
   createUser, getUserRowByEmail, hashPassword, generateOtp,
-  isValidEmail, isDisposableEmail, rateLimit, clientIp, blockedAccountResponse,
+  checkEmail, emailProblemMessage, rateLimit, clientIp, blockedAccountResponse,
 } from '@/lib/local/auth'
 import { createOtpCode } from '@/lib/local/db'
 import { sendOtpEmail } from '@/lib/local/email'
+import { checkPassword, passwordProblemMessage } from '@/lib/local/password-policy'
+import { checkName, fallbackNameFromEmail, nameProblemMessage, normalizeName } from '@/lib/local/name-policy'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,17 +26,41 @@ export async function POST(req: Request) {
     if (!email || !password) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400, headers: CORS })
     }
-    if (!isValidEmail(email)) {
-      return NextResponse.json({ error: 'Please enter a valid email address' }, { status: 400, headers: CORS })
-    }
-    if (isDisposableEmail(email)) {
+    // Structure, a real TLD (`.con` is not one), then the disposable blocklist.
+    // `emailProblem` is echoed so a client can localize the reason and offer the
+    // did-you-mean without re-implementing the rules; `error` stays the plain
+    // English sentence every existing client already renders.
+    const problem = checkEmail(email)
+    if (problem) {
       return NextResponse.json(
-        { error: 'Temporary or disposable email addresses are not allowed. Please use a permanent personal or work email.' },
+        { error: emailProblemMessage(problem), emailProblem: problem },
         { status: 400, headers: CORS }
       )
     }
-    if (String(password).length < 6) {
-      return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400, headers: CORS })
+    // The strength policy, decided here and nowhere else. `passwordProblem` is
+    // echoed for the same reason `emailProblem` is: the form localizes the reason
+    // and lights up the failing rule without re-implementing the rules.
+    const weak = checkPassword(password, email)
+    if (weak) {
+      return NextResponse.json(
+        { error: passwordProblemMessage(weak), passwordProblem: weak },
+        { status: 400, headers: CORS }
+      )
+    }
+    // The name, by the same rule the host application uses — `12345` used to
+    // become a real display name, the one a host reads next to a booking request.
+    // A client that sends no name at all is still let through (social sign-in
+    // does): it falls back below. `nameProblem` is echoed so a client can
+    // localize the reason, exactly like `emailProblem` and `passwordProblem`.
+    const name = normalizeName(full_name)
+    if (name) {
+      const nameProblem = checkName(name)
+      if (nameProblem) {
+        return NextResponse.json(
+          { error: nameProblemMessage(nameProblem), nameProblem },
+          { status: 400, headers: CORS }
+        )
+      }
     }
     const existing = await getUserRowByEmail(email)
     if (existing) {
@@ -64,7 +90,9 @@ export async function POST(req: Request) {
     const user = await createUser({
       email: String(email).trim(),
       passwordHash: hashPassword(String(password)),
-      fullName: String(full_name || '').trim() || String(email).split('@')[0],
+      // No name sent → the local part of the address, which is guest input too:
+      // `0100@gmail.com` would seed exactly the numeric-only name refused above.
+      fullName: name || fallbackNameFromEmail(email),
     })
     // Email verification: send a 6-digit code; the session is issued by /verify-otp.
     const code = generateOtp()

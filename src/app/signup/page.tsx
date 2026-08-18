@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Script from 'next/script'
 import { useTranslations } from 'next-intl'
+import { checkEmail, type EmailProblem } from '@/lib/local/email-core'
+import { checkPassword, MIN_PASSWORD_LENGTH, type PasswordProblem } from '@/lib/local/password-policy'
+import { checkName, type NameProblem } from '@/lib/local/name-policy'
+import PasswordChecklist from '@/components/features/auth/password-checklist'
+import AuthExitLink, { useAuthReturnHref } from '@/components/features/auth/auth-exit-link'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -81,10 +86,17 @@ function EyeIcon({ off }: { off: boolean }) {
 
 export default function SignupPage() {
   const t = useTranslations('signupLocal')
+  const tp = useTranslations('passwordPolicy')
+  const tn = useTranslations('namePolicy')
+  // Shared with the exit link above the card so the logo is a second door out.
+  const returnHref = useAuthReturnHref()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [nameError, setNameError] = useState<string | null>(null)
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -125,6 +137,20 @@ export default function SignupPage() {
       setError(t('errors.network'))
       setLoading(false)
     }
+  }
+
+  /**
+   * Leave the OTP step and go back to the create-account form (fields intact, so
+   * a mistyped email can be corrected). Never a dead end: the account exists but
+   * is unverified, and re-submitting the form re-issues a code rather than
+   * failing with "already registered" — see `/api/auth/signup`.
+   */
+  function backToSignUp() {
+    setError(null)
+    setNotice(null)
+    setOtpCode('')
+    setPendingEmail(null)
+    setResendCooldown(0)
   }
 
   async function resendOtp() {
@@ -205,10 +231,65 @@ export default function SignupPage() {
     if (googleEnabled && (window as { google?: any }).google?.accounts?.id) initGis()
   }, [googleEnabled, initGis])
 
+  // Localized copy for a rejected address. `type="email"` only checks the shape,
+  // so it happily accepts layla@email.con — the extension is checked here (and
+  // again on the server, which is the one that decides).
+  function emailMessage(problem: EmailProblem): string {
+    if (problem.code === 'disposable') return t('errors.emailDisposable')
+    if (problem.code !== 'unknownTld') return t('errors.emailInvalid')
+    const bad = t('errors.emailBadTld', { tld: problem.tld ?? '' })
+    if (!problem.suggestion) return bad
+    const local = email.slice(0, email.lastIndexOf('@'))
+    return `${bad} ${t('errors.emailDidYouMean', { suggestion: `${local}@${problem.suggestion}` })}`
+  }
+
+  /** Validate on blur and before submit; returns true when the address is usable. */
+  function validateEmail(): boolean {
+    const problem = email.trim() ? checkEmail(email) : null
+    setEmailError(problem ? emailMessage(problem) : null)
+    return !problem
+  }
+
+  /** Localized copy for a refused name — the same codes the API returns. */
+  function nameMessage(problem: NameProblem): string {
+    return tn(`errors.${problem.code}`)
+  }
+
+  /**
+   * The name gate: `12345` is not a name. An empty field is left to the browser's
+   * own `required` message, so this only speaks about what was actually typed.
+   */
+  function validateNameField(): boolean {
+    const problem = fullName.trim() ? checkName(fullName) : null
+    setNameError(problem ? nameMessage(problem) : null)
+    return !problem
+  }
+
+  /** Localized copy for a refused password — the same codes the API returns. */
+  function passwordMessage(problem: PasswordProblem): string {
+    return tp(`errors.${problem.code}`)
+  }
+
+  /**
+   * The strength gate, run before the request. The checklist under the field
+   * already shows every rule, so this only names the ones it cannot draw.
+   */
+  function validatePasswordField(): boolean {
+    const problem = checkPassword(password, email)
+    setPasswordError(problem ? passwordMessage(problem) : null)
+    return !problem
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     setNotice(null)
+    // Every gate runs before any of them returns, so a form with three problems
+    // shows all three rather than one at a time.
+    const nameOk = validateNameField()
+    const emailOk = validateEmail()
+    const passwordOk = validatePasswordField()
+    if (!nameOk || !emailOk || !passwordOk) return
     setLoading(true)
     try {
       const res = await fetch('/api/auth/signup', {
@@ -218,7 +299,12 @@ export default function SignupPage() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setError(data?.error || t('errors.createFailed'))
+        // The server re-checks the address and can reject one this build's TLD
+        // snapshot still accepts. Show that under the field, in this locale.
+        if (data?.nameProblem) setNameError(nameMessage(data.nameProblem))
+        else if (data?.emailProblem) setEmailError(emailMessage(data.emailProblem))
+        else if (data?.passwordProblem) setPasswordError(passwordMessage(data.passwordProblem))
+        else setError(data?.error || t('errors.createFailed'))
         setLoading(false)
         return
       }
@@ -282,12 +368,19 @@ export default function SignupPage() {
           padding: '40px 36px 36px',
         }}
       >
+        {/* An account is optional for browsing QuickIn, so the way back out stays on
+            screen through every step — including the OTP one, where the account
+            already exists and the guest may just want to look around first. */}
+        <AuthExitLink label={t('exitToBrowsing')} />
+
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <img
-            src="/logo.png"
-            alt="QuickIn"
-            style={{ height: 54, width: 'auto', margin: '0 auto', display: 'block' }}
-          />
+          <a href={returnHref} aria-label={t('exitToBrowsing')}>
+            <img
+              src="/logo.png"
+              alt="QuickIn"
+              style={{ height: 54, width: 'auto', margin: '0 auto', display: 'block' }}
+            />
+          </a>
           <p style={{ margin: '14px 0 0', fontSize: 15, color: COLORS.muted }}>
             {t('subtitle')}
           </p>
@@ -364,6 +457,11 @@ export default function SignupPage() {
                 </button>
               )}
             </p>
+            <p style={{ margin: '10px 0 0', textAlign: 'center' }}>
+              <button type="button" onClick={backToSignUp} style={linkButtonStyle}>
+                {t('otp.back')}
+              </button>
+            </p>
           </form>
         ) : (
           <>
@@ -385,10 +483,33 @@ export default function SignupPage() {
               required
               autoComplete="name"
               value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+              onChange={(e) => {
+                setFullName(e.target.value)
+                if (nameError) setNameError(null)
+              }}
+              onBlur={validateNameField}
+              aria-invalid={nameError ? true : undefined}
+              aria-describedby={nameError ? 'signup-name-error' : undefined}
               placeholder="Layla Hassan"
-              style={inputStyle}
+              // The whole `border` shorthand, not just borderColor — React warns
+              // when a shorthand and its longhand are mixed across renders.
+              style={nameError ? { ...inputStyle, border: `1px solid ${COLORS.burgundy}` } : inputStyle}
             />
+            {nameError && (
+              <span
+                id="signup-name-error"
+                role="alert"
+                style={{
+                  display: 'block',
+                  marginTop: 6,
+                  fontSize: 13,
+                  lineHeight: 1.4,
+                  color: COLORS.burgundy,
+                }}
+              >
+                {nameError}
+              </span>
+            )}
           </label>
 
           <label style={{ display: 'block', marginBottom: 16 }}>
@@ -408,10 +529,33 @@ export default function SignupPage() {
               required
               autoComplete="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value)
+                if (emailError) setEmailError(null)
+              }}
+              onBlur={validateEmail}
+              aria-invalid={emailError ? true : undefined}
+              aria-describedby={emailError ? 'signup-email-error' : undefined}
               placeholder="layla@email.com"
-              style={inputStyle}
+              // The whole `border` shorthand, not just borderColor — React warns
+              // when a shorthand and its longhand are mixed across renders.
+              style={emailError ? { ...inputStyle, border: `1px solid ${COLORS.burgundy}` } : inputStyle}
             />
+            {emailError && (
+              <span
+                id="signup-email-error"
+                role="alert"
+                style={{
+                  display: 'block',
+                  marginTop: 6,
+                  fontSize: 13,
+                  lineHeight: 1.4,
+                  color: COLORS.burgundy,
+                }}
+              >
+                {emailError}
+              </span>
+            )}
           </label>
 
           <label style={{ display: 'block', marginBottom: 22 }}>
@@ -430,12 +574,18 @@ export default function SignupPage() {
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
-                minLength={6}
+                minLength={MIN_PASSWORD_LENGTH}
                 autoComplete="new-password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  if (passwordError) setPasswordError(null)
+                }}
+                onBlur={() => { if (password) validatePasswordField() }}
+                aria-invalid={passwordError ? true : undefined}
+                aria-describedby={passwordError ? 'signup-password-error signup-password-rules' : 'signup-password-rules'}
                 placeholder={t('fields.passwordPlaceholder')}
-                style={{ ...inputStyle, paddingInlineEnd: 46 }}
+                style={passwordError ? { ...inputStyle, paddingInlineEnd: 46, border: `1px solid ${COLORS.burgundy}` } : { ...inputStyle, paddingInlineEnd: 46 }}
               />
               <button
                 type="button"
@@ -446,6 +596,22 @@ export default function SignupPage() {
                 <EyeIcon off={showPassword} />
               </button>
             </div>
+            {passwordError && (
+              <span
+                id="signup-password-error"
+                role="alert"
+                style={{
+                  display: 'block',
+                  marginTop: 6,
+                  fontSize: 13,
+                  lineHeight: 1.4,
+                  color: COLORS.burgundy,
+                }}
+              >
+                {passwordError}
+              </span>
+            )}
+            <PasswordChecklist id="signup-password-rules" password={password} />
           </label>
 
           <button type="submit" disabled={loading} style={primaryButtonStyle(loading)}>
@@ -548,6 +714,17 @@ const inputStyle: React.CSSProperties = {
   borderRadius: 18,
   padding: '12px 16px',
   outline: 'none',
+}
+
+const linkButtonStyle: React.CSSProperties = {
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  color: COLORS.burgundy,
+  fontFamily: FONT,
+  fontSize: 14,
+  fontWeight: 600,
+  cursor: 'pointer',
 }
 
 const eyeButtonStyle: React.CSSProperties = {

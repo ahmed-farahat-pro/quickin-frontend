@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { useLocale, useTranslations } from 'next-intl'
 import { localizeHrefWithQuery } from '@/lib/i18n/pathname'
 import { LocaleSwitcher } from '@/components/layout/locale-switcher'
+import { CurrencySwitcher } from '@/components/layout/currency-switcher'
 import { IconBrandFacebook, IconBrandX, IconBrandInstagram, IconBrandLinkedin, IconBrandYoutube, IconBrandTiktok, IconLink } from '@tabler/icons-react'
 import type { Locale } from '@/i18n/config'
 import type { FooterConfig } from '@/types/site-settings'
@@ -267,6 +268,7 @@ export function Footer({ config }: FooterProps)
 
             <div className='flex items-center gap-4'>
               <LocaleSwitcher className='flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors' />
+              <CurrencySwitcher className='flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors' />
             </div>
           </div>
         </div>

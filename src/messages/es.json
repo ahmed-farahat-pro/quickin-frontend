@@ -42,7 +42,6 @@
     "terms": "Condiciones",
     "sitemap": "Mapa del sitio",
     "privacy": "Privacidad",
-    "currency": "EGP",
     "supportLinks": {
       "helpCenter": "Centro de ayuda",
       "safetyInfo": "Información de seguridad",
@@ -59,6 +58,14 @@
       "about": "Sobre nosotros",
       "contact": "Contacto"
     }
+  },
+  "currency": {
+    "title": "Moneda de visualización",
+    "change": "Cambiar moneda",
+    "disclaimer": "Los tipos de cambio son aproximados y solo orientativos. Las reservas se cobran en la moneda del alojamiento.",
+    "chargedIn": "Se cobra en {currency}",
+    "approx": "Aproximado: se cobra en {currency}",
+    "ratesAsOf": "Tipos de cambio del {date}"
   },
   "auth": {
     "loginTitle": "Iniciar sesión",
@@ -1570,9 +1577,11 @@
   },
   "loginLocal": {
     "subtitle": "Bienvenido de nuevo: inicia sesión para continuar",
+    "exitToBrowsing": "Seguir explorando sin cuenta",
     "logoAlt": "QuickIn",
     "emailLabel": "Correo electrónico",
     "passwordLabel": "Contraseña",
+    "forgotPassword": "¿Olvidaste tu contraseña?",
     "signIn": "Iniciar sesión",
     "signingIn": "Iniciando sesión…",
     "or": "o",
@@ -1593,11 +1602,28 @@
       "newCodeSent": "Un nuevo código está en camino.",
       "codeSentTo": "Enviamos un código de 6 dígitos a {email}."
     },
+    "forgot": {
+      "title": "Restablece tu contraseña",
+      "enterCodeTitle": "Revisa tu correo",
+      "intro": "Introduce tu correo y te enviaremos un código de 6 dígitos.",
+      "sendCode": "Enviar código",
+      "sending": "Enviando…",
+      "codeSent": "Si ese correo tiene una cuenta, un código de 6 dígitos va en camino a {email}.",
+      "devCode": "El envío de correo está desactivado: tu código es {code}.",
+      "codeLabel": "Código de recuperación",
+      "newPasswordLabel": "Nueva contraseña",
+      "submit": "Restablecer e iniciar sesión",
+      "submitting": "Restableciendo…",
+      "resendCode": "Enviar un código nuevo",
+      "backToSignIn": "Volver a iniciar sesión"
+    },
     "errors": {
       "googleFailed": "Error al iniciar sesión con Google. Inténtalo de nuevo.",
       "unableToSignIn": "No se pudo iniciar sesión. Inténtalo de nuevo.",
       "invalidCode": "Ese código no funcionó. Inténtalo de nuevo.",
-      "network": "Error de red. Inténtalo de nuevo."
+      "network": "Error de red. Inténtalo de nuevo.",
+      "resetRequestFailed": "No se pudo enviar el código. Inténtalo de nuevo.",
+      "resetFailed": "No se pudo restablecer tu contraseña. Inténtalo de nuevo."
     },
     "notices": {
       "appleSetup": "El inicio de sesión con Apple requiere HTTPS y un ID de Apple Developer Services (consulta OAUTH-SETUP.md)."
@@ -1612,11 +1638,16 @@
   },
   "signupLocal": {
     "subtitle": "Crea tu cuenta para empezar a explorar",
+    "exitToBrowsing": "Seguir explorando sin cuenta",
     "errors": {
       "invalidCode": "Ese código no es válido o ha caducado.",
       "network": "Error de red. Inténtalo de nuevo.",
       "googleFailed": "No se pudo iniciar sesión con Google. Inténtalo de nuevo.",
-      "createFailed": "No se pudo crear la cuenta. Inténtalo de nuevo."
+      "createFailed": "No se pudo crear la cuenta. Inténtalo de nuevo.",
+      "emailInvalid": "Introduce una dirección de correo válida.",
+      "emailBadTld": "«.{tld}» no es una extensión de dominio válida.",
+      "emailDidYouMean": "¿Querías decir {suggestion}?",
+      "emailDisposable": "No se admiten direcciones de correo temporales o desechables. Usa un correo personal o de trabajo permanente."
     },
     "otp": {
       "label": "Código de verificación",
@@ -1627,13 +1658,14 @@
       "resendIn": "Reenviar en {seconds} s",
       "resendCode": "Reenviar código",
       "newCodeSent": "Un nuevo código está en camino.",
-      "codeSentTo": "Enviamos un código de 6 dígitos a {email}."
+      "codeSentTo": "Enviamos un código de 6 dígitos a {email}.",
+      "back": "Volver al registro"
     },
     "fields": {
       "fullName": "Nombre completo",
       "email": "Correo electrónico",
       "password": "Contraseña",
-      "passwordPlaceholder": "Al menos 6 caracteres"
+      "passwordPlaceholder": "Al menos 8 caracteres"
     },
     "submit": {
       "creating": "Creando cuenta…",
@@ -1683,6 +1715,7 @@
       "ogDescription": "Consulta y gestiona tus próximas estancias en QuickIn."
     },
     "backToExplore": "Volver a Explorar",
+    "backToAccount": "Volver a la cuenta",
     "signedOut": {
       "title": "Inicia sesión para ver tus reservas",
       "subtitle": "Tus próximas estancias aparecerán aquí cuando inicies sesión.",
@@ -1730,7 +1763,8 @@
       "description": "Sube tu documento nacional de identidad para verificar tu cuenta de QuickIn."
     },
     "heading": "Verifica tu identidad",
-    "subtitle": "Las estancias boutique necesitan un huésped verificado: solo te llevará un minuto."
+    "subtitle": "Las estancias boutique necesitan un huésped verificado: solo te llevará un minuto.",
+    "backToAccount": "Volver a la cuenta"
   },
   "planPage": {
     "meta": {
@@ -1866,6 +1900,29 @@
       "unverified": "Sin verificar"
     },
     "verifyIdCta": "Verifica tu identidad",
+    "photo": {
+      "add": "Añadir una foto",
+      "change": "Cambiar foto",
+      "remove": "Quitar",
+      "saving": "Subiendo…",
+      "removing": "Quitando…",
+      "saved": "Foto actualizada.",
+      "hint": "JPEG, PNG o WebP. Los anfitriones la ven al reservar.",
+      "error": "No se pudo guardar tu foto. Inténtalo de nuevo.",
+      "unreadable": "No se pudo leer ese archivo como imagen.",
+      "problem": {
+        "notAnImage": "Elige un archivo de imagen.",
+        "unsupportedType": "Las fotos de perfil deben ser JPEG, PNG o WebP.",
+        "tooLarge": "Esa foto es demasiado grande — elige una más pequeña."
+      }
+    },
+    "preferences": {
+      "title": "Preferencias",
+      "subtitle": "Cómo te muestra QuickIn los precios y los textos.",
+      "currencyLabel": "Moneda",
+      "currencyHelp": "Los precios en QuickIn se muestran en esta moneda. Las reservas se siguen cobrando en la moneda del alojamiento.",
+      "languageLabel": "Idioma"
+    },
     "links": {
       "reservations": "Mis viajes",
       "saved": "Mis favoritos",
@@ -1877,6 +1934,25 @@
       "title": "Perfil",
       "fullName": "Nombre completo",
       "fullNamePlaceholder": "Tu nombre",
+      "age": "Edad",
+      "agePlaceholder": "34",
+      "ageHelp": "Solo se muestra en tu perfil. Entre {min} y {max}.",
+      "phone": "Número de teléfono",
+      "phonePlaceholder": "010 1234 5678",
+      "phoneHelp": "Solo lo vemos tú y nuestro equipo. Los anfitriones y los huéspedes nunca lo ven.",
+      "bio": "Sobre ti",
+      "bioPlaceholder": "Una o dos líneas sobre ti: de dónde eres y qué te gusta de viajar.",
+      "bioCount": "{count} / {max} caracteres",
+      "optional": "(opcional)",
+      "errors": {
+        "age": {
+          "notANumber": "Escribe tu edad en números, por ejemplo 34.",
+          "tooYoung": "Escribe una edad de al menos {min}.",
+          "tooOld": "Escribe una edad de como máximo {max}."
+        },
+        "phoneInvalid": "Esto no parece un número de teléfono. Prueba 010 1234 5678 o +20 10 1234 5678.",
+        "bioTooLong": "Limita este texto a {max} caracteres o menos."
+      },
       "avatarUrl": "URL del avatar",
       "save": "Guardar perfil",
       "saving": "Guardando…",
@@ -1891,7 +1967,6 @@
       "update": "Actualizar contraseña",
       "updating": "Actualizando…",
       "updated": "Contraseña actualizada.",
-      "tooShort": "La nueva contraseña debe tener al menos 8 caracteres.",
       "mismatch": "Las nuevas contraseñas no coinciden.",
       "error": "No se pudo cambiar tu contraseña."
     },
@@ -1915,6 +1990,7 @@
       "description": "Tus estancias boutique guardadas en QuickIn."
     },
     "backToExplore": "Volver a explorar",
+    "backToAccount": "Volver a la cuenta",
     "title": "Mis favoritos",
     "noneYet": "Aún no has guardado ninguna estancia.",
     "countSaved": "{count, plural, one {# estancia guardada.} other {# estancias guardadas.}}",
@@ -2069,6 +2145,7 @@
       "errors": {
         "titleRequired": "Dale un título a tu anuncio.",
         "priceInvalid": "Introduce un precio por noche válido.",
+        "weekendPriceInvalid": "El precio de fin de semana debe ser mayor que cero. Deja el campo vacío si no aplicas una tarifa diferente los fines de semana.",
         "invalidImageUrl": "Este enlace de foto no parece una URL válida: {url}",
         "createFailed": "No se pudo crear el anuncio",
         "tooManyPhotos": "Puedes subir hasta {max} fotos.",
@@ -2226,6 +2303,7 @@
     "errors": {
       "nationalIdRequired": "Introduce tu documento de identidad.",
       "phoneRequired": "Introduce tu número de teléfono.",
+      "phoneInvalid": "Eso no parece un número de teléfono. Prueba 010 1234 5678 o +20 10 1234 5678.",
       "addressRequired": "Introduce tu dirección.",
       "submitFailed": "No se pudo enviar tu solicitud. Inténtalo de nuevo.",
       "idRequired": "Añade el anverso y el reverso de tu documento.",
@@ -2418,5 +2496,90 @@
     "comingSoon": "Próximamente",
     "followUs": "Síguenos",
     "rights": "Todos los derechos reservados."
+  },
+  "payoutMethod": {
+    "title": "Información de pago",
+    "subtitleEmpty": "Añade un método de cobro para que QuickIn pueda enviarte tus ganancias.",
+    "subtitleSet": "Aquí es donde QuickIn envía tus ganancias.",
+    "chooseMethod": "Cómo quieres recibir tus pagos",
+    "badgeAdded": "Añadido",
+    "methods": {
+      "bank_account": "Cuenta bancaria",
+      "instapay": "InstaPay",
+      "wallet": "Monedero"
+    },
+    "walletProviders": {
+      "vodafone_cash": "Vodafone Cash",
+      "etisalat_cash": "Etisalat Cash",
+      "orange_money": "Orange Money",
+      "we_pay": "WE Pay",
+      "other": "Otro monedero"
+    },
+    "fields": {
+      "accountName": "Nombre del titular",
+      "bank": "Banco",
+      "iban": "IBAN",
+      "accountNumber": "Número de cuenta",
+      "swift": "SWIFT / BIC",
+      "swiftOptional": "SWIFT / BIC (opcional)",
+      "branch": "Sucursal",
+      "branchOptional": "Sucursal (opcional)",
+      "instapayAddress": "Dirección de InstaPay",
+      "walletProvider": "Monedero",
+      "walletNumber": "Número del monedero",
+      "updated": "Última actualización"
+    },
+    "placeholders": {
+      "accountName": "Tal como aparece en la cuenta",
+      "bank": "p. ej. Banque Misr",
+      "iban": "EG38 0019 0005 0000 0000 2631 8000 2",
+      "accountNumber": "Tu número de cuenta bancaria",
+      "swift": "p. ej. NBEGEGCX",
+      "branch": "p. ej. Zamalek",
+      "instapayAddress": "nombre@instapay",
+      "walletNumber": "01XXXXXXXXX"
+    },
+    "bankHint": "Introduce tu IBAN o tu número de cuenta: con uno basta, y con ambos mejor.",
+    "instapayHint": "Tu dirección de InstaPay, por ejemplo nombre@instapay o nombre@banquemisr.",
+    "save": "Guardar método de cobro",
+    "update": "Guardar cambios",
+    "saving": "Guardando…",
+    "saved": "Se ha guardado tu método de cobro.",
+    "change": "Cambiar",
+    "cancel": "Cancelar",
+    "remove": "Eliminar",
+    "removing": "Eliminando…",
+    "removed": "Se ha eliminado tu método de cobro.",
+    "removeConfirm": "¿Eliminar este método de cobro? QuickIn no tendrá dónde enviar tus ganancias hasta que añadas otro.",
+    "error": "No se ha podido guardar tu método de cobro. Inténtalo de nuevo."
+  },
+  "passwordPolicy": {
+    "rules": {
+      "length": "Al menos 8 caracteres",
+      "uppercase": "Una letra mayúscula (A–Z)",
+      "lowercase": "Una letra minúscula (a–z)",
+      "digit": "Un número (0–9)",
+      "symbol": "Un símbolo (! ? @ # …)"
+    },
+    "errors": {
+      "required": "Elige una contraseña.",
+      "tooLong": "Esa contraseña es demasiado larga (máximo 128 caracteres).",
+      "whitespace": "Tu contraseña no puede ser solo espacios.",
+      "length": "Tu contraseña debe tener al menos 8 caracteres.",
+      "uppercase": "Tu contraseña debe incluir una letra mayúscula.",
+      "lowercase": "Tu contraseña debe incluir una letra minúscula.",
+      "digit": "Tu contraseña debe incluir un número.",
+      "symbol": "Tu contraseña debe incluir un símbolo, por ejemplo ! ? @ #.",
+      "email": "Tu contraseña no puede ser tu correo electrónico.",
+      "common": "Esa contraseña es demasiado común. Elige una menos fácil de adivinar."
+    }
+  },
+  "namePolicy": {
+    "errors": {
+      "required": "Introduce tu nombre.",
+      "letters": "Introduce tu nombre — un nombre contiene letras, no solo números.",
+      "tooShort": "Introduce tu nombre completo (al menos 2 letras).",
+      "tooLong": "Ese nombre es demasiado largo (60 caracteres como máximo)."
+    }
   }
 }

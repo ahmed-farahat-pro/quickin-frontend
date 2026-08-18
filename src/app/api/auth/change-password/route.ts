@@ -5,6 +5,7 @@ import {
   verifyPassword,
   updatePassword,
 } from '@/lib/local/auth'
+import { checkPassword, passwordProblemMessage } from '@/lib/local/password-policy'
 
 // Change the signed-in user's password (no Supabase).
 //   POST /api/auth/change-password { currentPassword, newPassword } → { ok: true }
@@ -22,8 +23,14 @@ export async function POST(req: Request) {
     if (!currentPassword || !newPassword) {
       return NextResponse.json({ error: 'currentPassword and newPassword are required' }, { status: 400, headers: CORS })
     }
-    if (newPassword.length < 8) {
-      return NextResponse.json({ error: 'New password must be at least 8 characters' }, { status: 400, headers: CORS })
+    // Same policy as signup and reset — the three paths that set a password
+    // share one floor, or the weakest of them is the real one.
+    const weak = checkPassword(newPassword, user.email)
+    if (weak) {
+      return NextResponse.json(
+        { error: passwordProblemMessage(weak), passwordProblem: weak },
+        { status: 400, headers: CORS }
+      )
     }
     const row = await getUserRowByEmail(user.email)
     if (!row || !verifyPassword(currentPassword, row.password_hash)) {

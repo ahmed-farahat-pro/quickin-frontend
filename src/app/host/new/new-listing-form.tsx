@@ -15,6 +15,7 @@ import { PROPERTY_TYPES, MAX_WEB_LISTING_PHOTOS } from '@/lib/property-types'
 import { REGIONS, AMENITIES } from '@/lib/listing-options'
 import { fileToCompressedDataUrl } from '@/lib/image'
 import { DEFAULT_WEEKEND_DAYS } from '@/lib/geo'
+import { checkWeekendPrice } from '@/lib/local/listing-pricing-core'
 import { OwnershipDocField } from '../ownership-doc'
 
 const C = {
@@ -307,8 +308,15 @@ export function NewListingForm({
       const n = Math.floor(Number(v))
       return Number.isFinite(n) && n >= 0 ? n : d
     }
-    const wkNum = Number(weekendPrice)
-    const weekend_price = weekendPrice.trim() && Number.isFinite(wkNum) && wkNum > 0 ? wkNum : undefined
+    // Weekend pricing is optional, but a rate the host typed has to be a rate:
+    // 0 used to be dropped here and the listing saved without weekend pricing at
+    // all, with the day pills still lit. Same rule the API runs.
+    const weekend = checkWeekendPrice(weekendPrice)
+    if (!weekend.ok) {
+      setError(t('errors.weekendPriceInvalid'))
+      return
+    }
+    const weekend_price = weekend.value ?? undefined
 
     setBusy(true)
     try {
@@ -561,7 +569,7 @@ export function NewListingForm({
           id="weekendPrice"
           style={input}
           type="number"
-          min="0"
+          min="1"
           step="1"
           value={weekendPrice}
           onChange={(e) => setWeekendPrice(e.target.value)}

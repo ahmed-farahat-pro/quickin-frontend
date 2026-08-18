@@ -9,7 +9,8 @@ import dynamic from 'next/dynamic'
 import { useTranslations } from 'next-intl'
 import { MapPin, Users, Search as SearchIcon, Sparkles, Star } from 'lucide-react'
 import type { Listing } from '@/lib/local/db'
-import { formatPrice } from '@/lib/utils'
+import { formatDisplayPrice } from '@/lib/currency/display'
+import { useDisplayCurrency } from '@/components/providers/display-currency-provider'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { PROPERTY_TYPES, iconForPropertyType } from '@/lib/property-types'
 import WishlistButton from './wishlist-button'
@@ -822,6 +823,7 @@ function ListingCard({
 }) {
   const cover = listing.listing_images[0]?.url || FALLBACK_IMG
   const TypeIcon = iconForPropertyType(listing.property_type)
+  const { currency: displayCurrency } = useDisplayCurrency()
   return (
     <a
       href={`/explore/${listing.id}`}
@@ -908,7 +910,7 @@ function ListingCard({
         )}
         <p style={{ margin: '12px 0 0', fontSize: 15, color: COLORS.ink }}>
           <span style={{ fontWeight: 700, color: COLORS.burgundy, fontSize: 17 }}>
-            {formatPrice(listing.price_per_night, listing.currency)}
+            {formatDisplayPrice(listing.price_per_night, listing.currency, displayCurrency)}
           </span>{' '}
           <span style={{ color: COLORS.muted }}>{t('card.perNight')}</span>
         </p>

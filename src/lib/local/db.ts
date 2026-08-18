@@ -4,8 +4,11 @@ import { resolveResortSelection } from './resorts'
 import { isContactBlockedError } from './contentguard'
 import { guardContent, guardSplitContent, countFlaggedUsers, oldestFlaggedAt } from './moderation'
 import { countOpenDisputes, oldestOpenDisputeAt } from './disputes'
+import { countPendingIdChanges, oldestPendingIdChangeAt } from './id-changes'
 import { INSTAPAY_KEYS, rowsToPaymentConfig } from './payment-config-core'
 import type { PaymentConfig } from './payment-config-core'
+import { rowToPayoutMethod } from './payout-method-core'
+import type { PayoutMethodRecord, PayoutMethodView } from './payout-method-core'
 import {
   COMMISSION_RATE_KEY,
   COMMISSION_RATE_SQL,
@@ -16,10 +19,14 @@ import {
   roundUpToStep,
   sqlWithCommission,
 } from './commission-core'
+import { sqlRankingOrderBy } from './ranking-core'
 import { buildUserListWhere, hidesListings, normalizeStatus, orderBySql } from './user-admin-core'
 import type { AccountStatus, UserListFilter } from './user-admin-core'
-import { idColumnFor, statusForAction } from './document-core'
+import { idChangeColumnFor, idColumnFor, statusForAction } from './document-core'
 import { normalizeDocType, normalizeVerificationStatus, revokesListingPrivileges } from './host-verification-core'
+import { checkWeekendPrice, weekendPriceMessage } from './listing-pricing-core'
+import { normalizePhone } from './phone-core'
+import { normalizeName, validateName } from './name-policy'
 import { assertProofImage, canPay, outcomeFor, PaymentProofError } from './payment-flow-core'
 import type { PaymentReviewAction } from './payment-flow-core'
 import { branchLimit, wantsKind } from './activity-core'
@@ -271,8 +278,16 @@ export async function getListings(filters: SearchFilters = {}): Promise<Listing[
   }
 
   // Whitelisted sort orders → safe to interpolate (never accept raw sort text).
+  //
+  // `recommended` — the default, so this is what most guests actually see — is
+  // the performance ranking: guest ratings (shrunk, so one 5★ can't top a body
+  // of them) plus COMPLETED stays (never a cancellation), both recency-weighted.
+  // See ranking-core.ts, byte-identical in the backend repo so the web and the
+  // apps can't order the same catalogue differently. It replaced
+  // `is_guest_favorite DESC, created_at DESC`, which is now folded in as a small
+  // bonus and the tie-break.
   const ORDER_BY: Record<string, string> = {
-    recommended: 'l.is_guest_favorite DESC, l.created_at DESC',
+    recommended: sqlRankingOrderBy('l'),
     price_asc: 'l.price_per_night ASC, l.created_at DESC',
     price_desc: 'l.price_per_night DESC, l.created_at DESC',
     newest: 'l.created_at DESC',
@@ -1351,15 +1366,25 @@ export async function submitHostApplication(
   if (!isUuid(userId)) throw new HostApplicationError('Invalid user', 400)
 
   // Everything except company + notes is required.
-  const full_name = String(f.full_name ?? '').trim()
+  // The name collapses whitespace and drops invisibles as well as trimming, so
+  // what we validate is exactly what we store.
+  const full_name = normalizeName(f.full_name)
   const national_id = String(f.national_id ?? '').trim()
-  const phone = String(f.phone ?? '').trim()
+  const rawPhone = String(f.phone ?? '').trim()
+  // Stored in the canonical form, so the same mobile typed as +20, 0020 or 01…
+  // is one applicant in /ops rather than three. Null = not a phone number.
+  const phone = normalizePhone(rawPhone)
   const address = String(f.address ?? '').trim()
   const host_type = String(f.host_type ?? '').trim()
   const fields: Record<string, string> = {}
-  if (!full_name) fields.full_name = 'Full name is required'
+  // Presence is not the test — "12345" is non-empty, so the old emptiness check
+  // filed it for review as a host's legal name. Same policy as signup: an
+  // operator reads this name against the ID photos.
+  const nameError = validateName(full_name)
+  if (nameError) fields.full_name = nameError
   if (!national_id) fields.national_id = 'National ID is required'
-  if (!phone) fields.phone = 'Phone is required'
+  if (!rawPhone) fields.phone = 'Phone is required'
+  else if (!phone) fields.phone = 'Enter a valid phone number, like 010 1234 5678'
   if (!address) fields.address = 'Address is required'
   if (!(HOST_TYPES as readonly string[]).includes(host_type)) fields.host_type = 'Choose individual, company or brokerage'
 
@@ -1571,6 +1596,18 @@ export async function adminReadDocument(
     if (!row?.value) return null
     // The listing is the subject for audit purposes, so its own id is the target.
     return { value: row.value, subjectId: id }
+  }
+  const changeColumn = idChangeColumnFor(kind)
+  if (changeColumn) {
+    const { rows } = await pool.query(
+      `SELECT ${changeColumn} AS value, user_id AS subject_id FROM id_change_requests WHERE id = $1`,
+      [id],
+    )
+    const row = rows[0] as { value: string | null; subject_id: string } | undefined
+    if (!row?.value) return null
+    // The user is the subject, same as a verification — so "everything ever opened
+    // about this person" stays one lookup whichever queue the document came from.
+    return { value: row.value, subjectId: row.subject_id }
   }
   const column = idColumnFor(kind)
   if (!column) return null
@@ -1841,21 +1878,123 @@ export async function toggleWishlist(userId: string, listingId: string): Promise
 
 // ---- User profile -----------------------------------------------------------
 
-/** Update mutable profile fields (full_name / avatar_url). No-op if nothing provided. */
+/** The signed-in user's own editable profile fields, as `/account` shows them.
+ *  `phone` is in here because this is only ever read for the user themselves —
+ *  the public projection (`getUserById`) does not carry it. */
+export interface OwnProfileFields {
+  age: number | null
+  phone: string | null
+  bio: string | null
+}
+
+/**
+ * The age / phone / bio on the signed-in user's own row.
+ *
+ * These are the columns the mobile apps have always written through the
+ * backend's `/api/local/profile`; the web had no way to see or set them, so a
+ * bio typed on the phone was invisible on the site and a name saved on the site
+ * was the only thing the site could save. Read separately from
+ * `getUserRowByEmail` rather than widening it, because every session restore
+ * goes through that one and none of them need a bio.
+ *
+ * Degrades to nulls if a column is missing (the same tolerance
+ * `getUserRowByEmail` applies) so a dev database that predates the columns
+ * renders an empty form instead of a 500.
+ */
+export async function getOwnProfileFields(userId: string): Promise<OwnProfileFields> {
+  const empty: OwnProfileFields = { age: null, phone: null, bio: null }
+  if (!isUuid(userId)) return empty
+  try {
+    const { rows } = await pool.query(
+      `SELECT age, phone, bio FROM users WHERE id = $1`,
+      [userId]
+    )
+    const r = rows[0]
+    if (!r) return empty
+    return {
+      age: r.age === null || r.age === undefined ? null : Number(r.age),
+      phone: r.phone ?? null,
+      bio: r.bio ?? null,
+    }
+  } catch {
+    console.warn('getOwnProfileFields fell back: a users column (age/phone/bio) is missing.')
+    return empty
+  }
+}
+
+/** Update mutable profile fields (full_name / avatar_url / age / phone / bio).
+ *  No-op if nothing provided.
+ *
+ *  A field explicitly set to `null` is CLEARED, which is the whole difference
+ *  from the backend's COALESCE-based twin: emptying a bio has to mean the bio is
+ *  gone, not that the update was ignored. `undefined` means "not sent" and
+ *  leaves the column alone. */
 export async function updateUserProfile(
   userId: string,
-  fields: { full_name?: string; avatar_url?: string }
+  fields: {
+    full_name?: string
+    /** null removes the photo — `avatar_url` is nullable and every reader treats
+     *  NULL as "show initials", so a removed photo must not become `''`. */
+    avatar_url?: string | null
+    age?: number | null
+    phone?: string | null
+    bio?: string | null
+  }
 ): Promise<void> {
   if (!isUuid(userId)) throw new Error('Invalid id')
   // A display name is shown to the other party in every thread, so it's a way to
   // publish a number without ever typing it into chat.
   if (fields.full_name !== undefined) await guardContent(userId, fields.full_name ?? '', 'profile')
+  // A bio is the same door held open wider: it is free text shown next to the
+  // name, so it takes the same guard the name and every chat message take.
+  // `phone` deliberately does not — it is the user's own number, only ever read
+  // back to themselves, and guarding it would block the field for its purpose.
+  if (fields.bio) await guardContent(userId, fields.bio, 'profile')
   const sets: string[] = []
   const params: unknown[] = [userId]
   if (fields.full_name !== undefined) { params.push(fields.full_name); sets.push(`full_name = $${params.length}`) }
   if (fields.avatar_url !== undefined) { params.push(fields.avatar_url); sets.push(`avatar_url = $${params.length}`) }
+  if (fields.age !== undefined) { params.push(fields.age); sets.push(`age = $${params.length}`) }
+  if (fields.phone !== undefined) { params.push(fields.phone); sets.push(`phone = $${params.length}`) }
+  if (fields.bio !== undefined) { params.push(fields.bio); sets.push(`bio = $${params.length}`) }
   if (!sets.length) return
   await pool.query(`UPDATE users SET ${sets.join(', ')} WHERE id = $1`, params)
+}
+
+/**
+ * Take a profile photo down (/ops → user → Remove photo).
+ *
+ * A photo goes live the moment it is picked, on the web and in both apps — there
+ * is no review queue in front of it, and there shouldn't be: nobody would wait an
+ * hour to have a face on their profile. What a photo needs instead is a way DOWN,
+ * because it is the one field on a profile that no filter can read. `contentguard`
+ * catches a phone number typed into a name or a bio; a phone number written on a
+ * piece of paper and photographed is invisible to it, and so is everything else a
+ * photo can be. So the answer to a reported photo is a moderator with one button,
+ * and this is that button.
+ *
+ * Returns null for an unknown id — the route 404s on it — and `removed: false`
+ * when the account exists but had no photo, so the console can say so rather than
+ * claim to have taken down nothing.
+ */
+export async function adminRemoveUserAvatar(
+  userId: string,
+): Promise<{ removed: boolean; email: string } | null> {
+  if (!isUuid(userId)) return null
+  // The self-join reads the row as it was BEFORE this statement, which is how one
+  // query can both clear the photo and report whether there was one to clear — a
+  // read followed by a write would race a second moderator clicking the same
+  // button, and report "removed" twice for one photo.
+  const { rows } = await pool.query(
+    `UPDATE users u SET avatar_url = NULL
+       FROM users prev
+      WHERE u.id = $1 AND prev.id = u.id
+      RETURNING u.email, (prev.avatar_url IS NOT NULL) AS had_photo`,
+    [userId],
+  )
+  const row = rows[0] as { email: string; had_photo: boolean } | undefined
+  if (!row) return null
+  return { removed: !!row.had_photo, email: row.email }
 }
 
 // ---- Host: listings & incoming reservations ---------------------------------
@@ -2042,7 +2181,9 @@ export async function createListing(hostId: string, data: CreateListingInput): P
     const n = Number(v)
     return Number.isFinite(n) ? n : null
   }
-  const weekendPrice = fin(data.weekend_price)
+  // A typed weekend rate has to be money — 0 is refused here rather than written
+  // away as NULL. See listing-pricing-core.ts.
+  const weekendPrice = assertWeekendPrice(data.weekend_price)
   const weekendDays = Array.isArray(data.weekend_days)
     ? data.weekend_days.map((d) => Math.floor(Number(d))).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
     : []
@@ -2079,8 +2220,8 @@ export async function createListing(hostId: string, data: CreateListingInput): P
     [
       hostId, title, data.description ?? null, data.location ?? null, data.country ?? null,
       fin(data.lat), fin(data.lng), price,
-      weekendPrice && weekendPrice > 0 ? weekendPrice : null,
-      weekendPrice && weekendPrice > 0 && weekendDays.length ? weekendDays : null,
+      weekendPrice,
+      weekendPrice && weekendDays.length ? weekendDays : null,
       data.currency || 'EGP',
       nn(data.bedrooms, 1), nn(data.beds, 1), nn(data.bathrooms, 1), nn(data.max_guests, 2),
       data.property_type ?? null, resort.region, amenities, ownershipDoc,
@@ -2189,6 +2330,19 @@ function assertListingInt(v: unknown, label: string, min: number): number {
     throw new ListingInputError(`${label} must be a whole number of at least ${min}`)
   }
   return n
+}
+
+/**
+ * The optional weekend rate. Empty (`undefined`/`null`/`''`) clears it — that is
+ * how a host turns weekend pricing off, and what iOS and Android send as null.
+ * A value the host actually typed has to be a price: 0 and negatives are refused
+ * rather than written away as NULL, which is what used to leave a listing with
+ * weekend days lit up and no weekend rate behind them.
+ */
+function assertWeekendPrice(v: unknown): number | null {
+  const checked = checkWeekendPrice(v)
+  if (!checked.ok) throw new ListingInputError(weekendPriceMessage(checked.problem))
+  return checked.value
 }
 
 /** A coordinate inside its valid range, or null to clear the pin. */
@@ -2353,10 +2507,9 @@ export async function updateListing(
     if (!Number.isFinite(price) || price <= 0) throw new ListingInputError('Price must be greater than 0')
     put('price_per_night', price)
   }
-  if (data.weekend_price !== undefined) {
-    const wp = Number(data.weekend_price)
-    put('weekend_price', Number.isFinite(wp) && wp > 0 ? wp : null)
-  }
+  // null clears the weekend rate (that is how all three clients turn it off);
+  // a number that is not a price is refused instead of silently clearing it.
+  if (data.weekend_price !== undefined) put('weekend_price', assertWeekendPrice(data.weekend_price))
   if (data.currency !== undefined) put('currency', String(data.currency ?? '').trim() || 'USD')
   if (data.weekend_days !== undefined) {
     const days = Array.isArray(data.weekend_days)
@@ -2469,6 +2622,8 @@ export interface AdminStats {
   paid_bookings: number
   pending_applications: number
   pending_verifications: number
+  /** Requests to change an account's ID number, awaiting a decision. */
+  pending_id_changes: number
   gross_paid: number
   /** The platform's cut — guest price minus the host's raw price — summed over
    *  bookings that were actually collected. Refunded rows drop out with PAID_SQL. */
@@ -2490,6 +2645,7 @@ export interface AdminStats {
   open_disputes: number
   /** When the oldest item in each queue arrived, so an alert can show how long it has waited. */
   oldest_verification: string | null
+  oldest_id_change: string | null
   oldest_application: string | null
   oldest_listing: string | null
   oldest_report: string | null
@@ -2568,13 +2724,24 @@ export async function adminStats(): Promise<AdminStats> {
   // centre down on any database where migrate-policy-violations / migrate-disputes
   // hasn't run. Each helper answers 0 in that case, so the console degrades to
   // "nothing in this queue" instead of breaking.
-  const [flagged_users, open_disputes, oldest_flag, oldest_dispute] = await Promise.all([
-    countFlaggedUsers(),
-    countOpenDisputes(),
-    oldestFlaggedAt(),
-    oldestOpenDisputeAt(),
-  ])
-  return { ...(rows[0] as AdminStats), flagged_users, open_disputes, oldest_flag, oldest_dispute }
+  const [flagged_users, open_disputes, pending_id_changes, oldest_flag, oldest_dispute, oldest_id_change] =
+    await Promise.all([
+      countFlaggedUsers(),
+      countOpenDisputes(),
+      countPendingIdChanges(),
+      oldestFlaggedAt(),
+      oldestOpenDisputeAt(),
+      oldestPendingIdChangeAt(),
+    ])
+  return {
+    ...(rows[0] as AdminStats),
+    flagged_users,
+    open_disputes,
+    pending_id_changes,
+    oldest_flag,
+    oldest_dispute,
+    oldest_id_change,
+  }
 }
 
 /**
@@ -4570,4 +4737,75 @@ export async function recordLogin(
   } catch {
     /* never block a sign-in over telemetry */
   }
+}
+
+// ---- Host payout method (host_payout_methods) --------------------------------
+
+/**
+ * Where a host wants their earnings sent. One row per host, so this reads at
+ * most one; `null` means they have not completed that part of their profile.
+ *
+ * Returns the view shape (labels + the masked `display` line) rather than the
+ * raw row, so web, iOS and Android all render the same wording.
+ */
+export async function getPayoutMethod(userId: string): Promise<PayoutMethodView | null> {
+  if (!isUuid(userId)) return null
+  try {
+    const { rows } = await pool.query(
+      `SELECT method, account_name, account_ref, bank_name, iban, account_number,
+              swift_bic, branch, provider, updated_at
+         FROM host_payout_methods WHERE user_id = $1`,
+      [userId]
+    )
+    return rowToPayoutMethod(rows[0] ?? null)
+  } catch (e) {
+    // The table is absent until migrate-payout-methods.mjs runs. Read as "none
+    // set" rather than 500ing the whole profile over a feature the host has not
+    // used yet.
+    console.error('getPayoutMethod fell back to null:', e)
+    return null
+  }
+}
+
+/**
+ * Save the host's chosen destination, replacing whatever was there.
+ *
+ * `record` must come from validatePayout — that is what guarantees the fields of
+ * the other two methods are cleared rather than carried over. Upsert on user_id:
+ * a host has one payout method, and switching from a bank account to a wallet
+ * rewrites the row rather than adding one.
+ */
+export async function savePayoutMethod(
+  userId: string,
+  record: PayoutMethodRecord
+): Promise<PayoutMethodView | null> {
+  if (!isUuid(userId)) throw new Error('Invalid user')
+  const { rows } = await pool.query(
+    `INSERT INTO host_payout_methods
+       (user_id, method, account_name, account_ref, bank_name, iban, account_number, swift_bic, branch, provider)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     ON CONFLICT (user_id) DO UPDATE
+        SET method         = EXCLUDED.method,
+            account_name   = EXCLUDED.account_name,
+            account_ref    = EXCLUDED.account_ref,
+            bank_name      = EXCLUDED.bank_name,
+            iban           = EXCLUDED.iban,
+            account_number = EXCLUDED.account_number,
+            swift_bic      = EXCLUDED.swift_bic,
+            branch         = EXCLUDED.branch,
+            provider       = EXCLUDED.provider,
+            updated_at     = now()
+     RETURNING method, account_name, account_ref, bank_name, iban, account_number,
+               swift_bic, branch, provider, updated_at`,
+    [userId, record.method, record.account_name, record.account_ref, record.bank_name,
+     record.iban, record.account_number, record.swift_bic, record.branch, record.provider]
+  )
+  return rowToPayoutMethod(rows[0] ?? null)
+}
+
+/** Remove the host's payout method. Idempotent — returns false if none existed. */
+export async function deletePayoutMethod(userId: string): Promise<boolean> {
+  if (!isUuid(userId)) return false
+  const { rowCount } = await pool.query(`DELETE FROM host_payout_methods WHERE user_id = $1`, [userId])
+  return (rowCount ?? 0) > 0
 }
