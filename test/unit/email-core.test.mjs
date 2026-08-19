@@ -23,6 +23,9 @@ import {
   normalizeEmail,
   emailDomain,
   checkEmail,
+  isTrustedEmail,
+  isTrustedEmailDomain,
+  TRUSTED_DOMAIN_COUNT,
   isValidEmail,
   isDisposableEmail,
   emailProblemMessage,
@@ -212,6 +215,110 @@ describe('the copy the API returns', () => {
   test('every problem code produces a sentence', () => {
     for (const code of ['required', 'format', 'tooLong', 'unknownTld', 'disposable']) {
       assert.ok(emailProblemMessage({ code }).length > 10, code)
+    }
+  })
+})
+
+// The allowlist added 2026-08-19. Two failure modes to guard, pulling opposite
+// ways: a temp-mail domain slipping through, and a real guest being locked out.
+// The second is the expensive one — a host who cannot sign up never complains,
+// they just leave — so most of these tests are about who must still get IN.
+describe('the trusted-provider allowlist', () => {
+  test('the providers guests actually use are recognised', () => {
+    for (const domain of [
+      'gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com',
+      'icloud.com', 'me.com', 'live.com', 'msn.com',
+    ]) {
+      assert.ok(isTrustedEmailDomain(domain), domain)
+      assert.equal(checkEmail(`layla@${domain}`), null, domain)
+    }
+  })
+
+  test('the regional and legacy variants of those four count too', () => {
+    for (const domain of [
+      'googlemail.com', 'hotmail.co.uk', 'outlook.sa', 'live.co.uk',
+      'yahoo.co.uk', 'ymail.com', 'rocketmail.com', 'yahoo.com.au',
+    ]) {
+      assert.ok(isTrustedEmailDomain(domain), domain)
+    }
+  })
+
+  test('Sign in with Apple\'s private relay is trusted', () => {
+    // Apple hands us this domain when the user hides their real address. If it
+    // is ever refused, our own Apple sign-in cannot create an account.
+    assert.ok(isTrustedEmail('a1b2c3@privaterelay.appleid.com'))
+    assert.equal(checkEmail('a1b2c3@privaterelay.appleid.com'), null)
+  })
+
+  test('Egyptian and Gulf ISP mailboxes are trusted', () => {
+    for (const domain of ['link.net', 'tedata.net.eg', 'vodafone.com.eg', 'emirates.net.ae']) {
+      assert.ok(isTrustedEmailDomain(domain), domain)
+    }
+  })
+
+  test('matching is case- and whitespace-insensitive', () => {
+    assert.ok(isTrustedEmailDomain('  GMAIL.COM '))
+    assert.ok(isTrustedEmail('Layla@GMail.Com'))
+    assert.equal(checkEmail(' Layla@GMAIL.COM '), null)
+  })
+
+  test('a trailing root dot does not defeat the lookup', () => {
+    assert.ok(isTrustedEmailDomain('gmail.com.'))
+  })
+
+  test('the list is a fast path, not the policy — company mail still passes', () => {
+    // The whole point of allowlist-PLUS-blocklist over allowlist-only: a host
+    // signing up with their work address, or a guest with a university one,
+    // is not on any provider list and must still get through.
+    for (const email of [
+      'ahmed@orascom.com',
+      'nour@aucegypt.edu',
+      'sara@cu.edu.eg',
+      'omar@some-tiny-egyptian-isp.com.eg',
+    ]) {
+      assert.ok(!isTrustedEmail(email), `${email} should not be on the allowlist`)
+      assert.equal(checkEmail(email), null, `${email} should still be accepted`)
+    }
+  })
+
+  test('being off the allowlist does not excuse a fake extension', () => {
+    const problem = checkEmail('ahmed@orascom.con')
+    assert.equal(problem?.code, 'unknownTld')
+  })
+
+  test('temp-mail is still refused, allowlist or not', () => {
+    for (const email of [
+      'x@mailinator.com',
+      'x@sub.mailinator.com',
+      'x@yopmail.com',
+      'x@10minutemail.com',
+      'x@guerrillamail.com',
+      'x@trashmail.com',
+      'x@minuteinbox.com',
+      'x@generator.email',
+    ]) {
+      assert.equal(checkEmail(email)?.code, 'disposable', email)
+    }
+  })
+
+  test('a lookalike of a trusted domain is not itself trusted', () => {
+    // `gmail.co` is a real, deliverable domain and a classic phish/typo. It is
+    // not on the allowlist, so it takes the ordinary path — and because the
+    // extension is real, it is accepted rather than refused. The did-you-mean
+    // is what catches it at the form, not the validator.
+    assert.ok(!isTrustedEmailDomain('gmail.co'))
+    assert.equal(suggestDomain('gmail.co'), 'gmail.com')
+  })
+
+  test('the allowlist is big enough to be worth having', () => {
+    assert.ok(TRUSTED_DOMAIN_COUNT > 150, `only ${TRUSTED_DOMAIN_COUNT} domains`)
+  })
+
+  test('no domain is on both the allowlist and the blocklist', () => {
+    // A domain in both lists would be silently accepted, because the allowlist
+    // short-circuits first. That is a real footgun when the blocklist grows.
+    for (const email of ['x@mail.com', 'x@proton.me', 'x@tuta.io', 'x@fastmail.com']) {
+      assert.equal(checkEmail(email), null, email)
     }
   })
 })

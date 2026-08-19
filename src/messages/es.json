@@ -1624,7 +1624,10 @@
       "invalidCode": "Ese código no funcionó. Inténtalo de nuevo.",
       "network": "Error de red. Inténtalo de nuevo.",
       "resetRequestFailed": "No se pudo enviar el código. Inténtalo de nuevo.",
-      "resetFailed": "No se pudo restablecer tu contraseña. Inténtalo de nuevo."
+      "resetFailed": "No se pudo restablecer tu contraseña. Inténtalo de nuevo.",
+      "emailInvalid": "Introduce una dirección de correo válida.",
+      "emailBadTld": "«.{tld}» no es una extensión de dominio válida.",
+      "emailDidYouMean": "¿Querías decir {suggestion}?"
     },
     "notices": {
       "appleSetup": "El inicio de sesión con Apple requiere HTTPS y un ID de Apple Developer Services (consulta OAUTH-SETUP.md)."

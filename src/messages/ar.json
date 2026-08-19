@@ -1624,7 +1624,10 @@
       "invalidCode": "هذا الرمز غير صحيح. من فضلك حاول مرة أخرى.",
       "network": "خطأ في الشبكة. من فضلك حاول مرة أخرى.",
       "resetRequestFailed": "تعذر إرسال رمز الاستعادة. يرجى المحاولة مرة أخرى.",
-      "resetFailed": "تعذر إعادة تعيين كلمة المرور. يرجى المحاولة مرة أخرى."
+      "resetFailed": "تعذر إعادة تعيين كلمة المرور. يرجى المحاولة مرة أخرى.",
+      "emailInvalid": "يُرجى إدخال بريد إلكتروني صالح.",
+      "emailBadTld": "«‏.{tld}‏» ليست امتداد نطاق صالحًا.",
+      "emailDidYouMean": "هل تقصد {suggestion}؟"
     },
     "notices": {
       "appleSetup": "يتطلب تسجيل الدخول عبر Apple اتصال HTTPS ومُعرّف Apple Developer Services (راجع OAUTH-SETUP.md)."

@@ -1624,7 +1624,10 @@
       "invalidCode": "Ce code n'a pas fonctionné. Veuillez réessayer.",
       "network": "Erreur réseau. Veuillez réessayer.",
       "resetRequestFailed": "Impossible d'envoyer le code. Veuillez réessayer.",
-      "resetFailed": "Impossible de réinitialiser votre mot de passe. Veuillez réessayer."
+      "resetFailed": "Impossible de réinitialiser votre mot de passe. Veuillez réessayer.",
+      "emailInvalid": "Veuillez saisir une adresse e-mail valide.",
+      "emailBadTld": "« .{tld} » n'est pas une extension de domaine valide.",
+      "emailDidYouMean": "Vouliez-vous dire {suggestion} ?"
     },
     "notices": {
       "appleSetup": "La connexion Apple nécessite HTTPS et un identifiant Apple Developer Services (voir OAUTH-SETUP.md)."

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Script from 'next/script'
 import { useTranslations } from 'next-intl'
 import { checkPassword, isStrongPassword, MIN_PASSWORD_LENGTH, type PasswordProblem } from '@/lib/local/password-policy'
+import { checkEmail, type EmailProblem } from '@/lib/local/email-core'
 import PasswordChecklist from '@/components/features/auth/password-checklist'
 import AuthExitLink, { useAuthReturnHref } from '@/components/features/auth/auth-exit-link'
 
@@ -110,6 +111,7 @@ export default function LoginPage() {
 
   // Password reset.
   const [resetEmail, setResetEmail] = useState('')
+  const [resetEmailError, setResetEmailError] = useState<string | null>(null)
   const [resetCode, setResetCode] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [showNewPassword, setShowNewPassword] = useState(false)
@@ -172,6 +174,7 @@ export default function LoginPage() {
     // Carry over whatever they already typed — retyping the address they just
     // failed to sign in with is pure friction.
     setResetEmail(email)
+    setResetEmailError(null)
     setResetCode('')
     setNewPassword('')
     setView('forgot')
@@ -180,6 +183,7 @@ export default function LoginPage() {
   function backToSignIn() {
     setError(null)
     setNotice(null)
+    setResetEmailError(null)
     setView('signin')
   }
 
@@ -193,6 +197,36 @@ export default function LoginPage() {
     setPendingEmail(null)
     setResendCooldown(0)
     backToSignIn()
+  }
+
+  /**
+   * Localized copy for a refused address — the same problem codes /signup shows,
+   * so a typo reads identically whether you are creating an account or getting
+   * back into one.
+   */
+  function resetEmailMessage(problem: EmailProblem): string {
+    if (problem.code !== 'unknownTld') return t('errors.emailInvalid')
+    const bad = t('errors.emailBadTld', { tld: problem.tld ?? '' })
+    if (!problem.suggestion) return bad
+    const local = resetEmail.slice(0, resetEmail.lastIndexOf('@'))
+    return `${bad} ${t('errors.emailDidYouMean', { suggestion: `${local}@${problem.suggestion}` })}`
+  }
+
+  /**
+   * The address gate on the reset form. Until now this field had nothing but
+   * `type="email"`, so `layla@email.con` sailed through and the guest waited for
+   * a code that could never be delivered.
+   *
+   * Disposable addresses are deliberately let through, matching what
+   * /api/auth/forgot-password accepts: this flow only ever mails an account that
+   * already exists, so refusing here would strand anyone who signed up before
+   * the blocklist without stopping a single new signup.
+   */
+  function validateResetEmail(): boolean {
+    const problem = resetEmail.trim() ? checkEmail(resetEmail) : null
+    const bad = problem && problem.code !== 'disposable' ? problem : null
+    setResetEmailError(bad ? resetEmailMessage(bad) : null)
+    return !bad
   }
 
   /**
@@ -232,6 +266,7 @@ export default function LoginPage() {
 
   async function submitResetRequest(e: React.FormEvent) {
     e.preventDefault()
+    if (!validateResetEmail()) return
     await requestResetCode(true)
   }
 
@@ -540,10 +575,33 @@ export default function LoginPage() {
                 autoComplete="email"
                 autoFocus
                 value={resetEmail}
-                onChange={(e) => setResetEmail(e.target.value)}
+                onChange={(e) => {
+                  setResetEmail(e.target.value)
+                  if (resetEmailError) setResetEmailError(null)
+                }}
+                onBlur={validateResetEmail}
+                aria-invalid={resetEmailError ? true : undefined}
+                aria-describedby={resetEmailError ? 'reset-email-error' : undefined}
                 placeholder="layla@email.com"
-                style={inputStyle}
+                // The whole `border` shorthand, not just borderColor — React warns
+                // when a shorthand and its longhand are mixed across renders.
+                style={resetEmailError ? { ...inputStyle, border: `1px solid ${COLORS.burgundy}` } : inputStyle}
               />
+              {resetEmailError && (
+                <span
+                  id="reset-email-error"
+                  role="alert"
+                  style={{
+                    display: 'block',
+                    marginTop: 6,
+                    fontSize: 13,
+                    lineHeight: 1.4,
+                    color: COLORS.burgundy,
+                  }}
+                >
+                  {resetEmailError}
+                </span>
+              )}
             </label>
             <button type="submit" disabled={loading} style={primaryButtonStyle(loading)}>
               {loading ? t('forgot.sending') : t('forgot.sendCode')}

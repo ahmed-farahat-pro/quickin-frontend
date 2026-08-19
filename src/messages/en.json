@@ -1624,7 +1624,10 @@
       "invalidCode": "That code didn't work. Please try again.",
       "network": "Network error. Please try again.",
       "resetRequestFailed": "Couldn't send the reset code. Please try again.",
-      "resetFailed": "Couldn't reset your password. Please try again."
+      "resetFailed": "Couldn't reset your password. Please try again.",
+      "emailInvalid": "Please enter a valid email address.",
+      "emailBadTld": "“.{tld}” isn't a valid domain extension.",
+      "emailDidYouMean": "Did you mean {suggestion}?"
     },
     "notices": {
       "appleSetup": "Apple sign-in requires HTTPS + an Apple Developer Services ID (see OAUTH-SETUP.md)."

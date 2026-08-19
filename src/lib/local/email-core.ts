@@ -188,7 +188,133 @@ const DISPOSABLE_DOMAINS = new Set([
   'getairmail.com', 'maileater.com', 'spambox.us', 'spamgourmet.com', 'mytemp.email',
   'tempemail.co', 'tempemails.io', 'mailtemp.net', 'inboxkitten.com', 'emailfake.com',
   'mailsac.com', 'mail.tm', 'mail7.io', 'wegwerfmail.de', 'wegwerfemail.de',
+  // Added 2026-08-19 alongside the trusted-provider allowlist below. The
+  // allowlist is only a fast path, so this list is the real gate for every
+  // domain that isn't a known provider — it has to stay current. New temp-mail
+  // services appear weekly; a signup from an unknown domain whose OTP is never
+  // verified is the signal that one is missing.
+  'yopmail.it', 'jetable.org', 'jetable.net', 'spamdecoy.net', 'trbvm.com',
+  'incognitomail.com', 'incognitomail.org', 'deadaddress.com',
+  'objectmail.com', 'proxymail.eu', 'rcpt.at', 'safetymail.info',
+  'sofimail.com', 'spamavert.com', 'spambog.com', 'spamfree24.org',
+  'spamherelots.com', 'spamhole.com', 'spamify.com', 'superrito.com',
+  'teleworm.us', 'trash2009.com', 'trashdevil.com', 'trashymail.com',
+  'tyldd.com', 'uggsrock.com', 'wilemail.com', 'willselfdestruct.com',
+  'zetmail.com', 'armyspy.com', 'cuvox.de', 'dayrep.com', 'fleckens.hu',
+  'gustr.com', 'jourrapide.com', 'rhyta.com', 'mailinator.org',
+  'mailinator.us', 'binkmail.com', 'bobmail.info', 'devnullmail.com',
+  'letthemeatspam.com', 'mailin8r.com', 'notmailinator.com', 'sogetthis.com',
+  'suremail.info', 'thisisnotmyrealemail.com', 'tradermail.info',
+  'veryrealemail.com', 'zippymail.info', 'mailexpire.com', 'meltmail.com',
+  'mytrashmail.com', 'nospam4.us', 'nowmymail.com', 'shieldedmail.com',
+  'sneakemail.com', 'spamex.com', 'spamslicer.com', 'tempalias.com',
+  'tempmailer.com', 'tempsky.com', 'trashinbox.com', 'linshiyouxiang.net',
+  'lroid.com', 'mailhazard.com', 'mailhz.me', 'mailmoat.com',
+  'minuteinbox.com', 'mail-temporaire.fr', 'mailtothis.com', 'kurzepost.de',
+  'onemoremail.net', 'crazymailing.com', 'emailtemporanea.net', 'emltmp.com',
+  'etempmail.net', 'fakemailgenerator.com', 'generator.email',
+  'gettempmail.com', 'inbox.si', 'inboxalias.com', 'instantemailaddress.com',
+  'mail-easy.fr', 'mailbucket.org', 'mailforspam.com', 'mailguard.me',
+  'mailimate.com', 'mailismagic.com', 'mailquack.com', 'mailseal.de',
+  'mailtemporaire.fr', 'mytempemail.com', 'mytempmail.com',
+  'sharklasers.net', 'spambox.info', 'tempail.com', 'tempemail.net',
+  'tempimbox.com', 'tempmail2.com', 'tempsmail.com', 'tmails.net',
+  'vomoto.com', 'zoemail.net',
 ])
+
+// ---- The trusted-provider allowlist --------------------------------------
+// The mailbox providers real guests and hosts actually use. A domain on this
+// list is accepted immediately — no root-zone lookup, no blocklist walk —
+// because we already know it is a real, permanent mailbox.
+//
+// This is a FAST PATH, not the whole policy. A domain missing from here is NOT
+// refused: it falls through to the root-zone check and the disposable blocklist
+// above, which is what keeps company addresses (`ahmed@orascom.com`),
+// universities (`@aucegypt.edu`) and small providers working. An omission
+// therefore costs nothing — never "tighten" this by deleting entries.
+//
+// `privaterelay.appleid.com` is load-bearing: Sign in with Apple hands us an
+// address on that domain whenever the user chooses to hide their real one.
+// Drop it and our own Apple sign-in stops being able to create accounts.
+
+const TRUSTED_DOMAINS = new Set([
+  // Google
+  'gmail.com', 'googlemail.com',
+  // Microsoft — the global four plus the regional suffixes Egyptians carry
+  // over from old Hotmail and MSN accounts.
+  'outlook.com', 'hotmail.com', 'live.com', 'msn.com', 'windowslive.com',
+  'outlook.sa', 'outlook.fr', 'outlook.de', 'outlook.es', 'outlook.it',
+  'outlook.ie', 'outlook.in', 'outlook.pt', 'outlook.be', 'outlook.at',
+  'outlook.dk', 'outlook.com.au', 'outlook.com.br', 'outlook.com.tr',
+  'hotmail.co.uk', 'hotmail.fr', 'hotmail.de', 'hotmail.it', 'hotmail.es',
+  'hotmail.be', 'hotmail.nl', 'hotmail.se', 'hotmail.no', 'hotmail.dk',
+  'hotmail.fi', 'hotmail.gr', 'hotmail.ch', 'hotmail.ca', 'hotmail.com.au',
+  'hotmail.com.br', 'hotmail.com.ar', 'hotmail.com.mx', 'hotmail.com.tr',
+  'hotmail.co.jp', 'hotmail.co.th', 'hotmail.co.nz',
+  'live.co.uk', 'live.fr', 'live.de', 'live.it', 'live.nl', 'live.se',
+  'live.no', 'live.dk', 'live.ca', 'live.ie', 'live.at', 'live.be',
+  'live.in', 'live.cn', 'live.jp', 'live.com.au', 'live.com.mx',
+  'live.com.pt', 'live.com.sg',
+  // Yahoo
+  'yahoo.com', 'ymail.com', 'rocketmail.com',
+  'yahoo.co.uk', 'yahoo.co.jp', 'yahoo.co.in', 'yahoo.co.id', 'yahoo.co.nz',
+  'yahoo.co.th', 'yahoo.ca', 'yahoo.de', 'yahoo.fr', 'yahoo.es', 'yahoo.it',
+  'yahoo.se', 'yahoo.dk', 'yahoo.no', 'yahoo.fi', 'yahoo.nl', 'yahoo.be',
+  'yahoo.at', 'yahoo.ch', 'yahoo.gr', 'yahoo.pl', 'yahoo.cz', 'yahoo.hu',
+  'yahoo.ro', 'yahoo.pt', 'yahoo.ie', 'yahoo.in', 'yahoo.com.au',
+  'yahoo.com.br', 'yahoo.com.mx', 'yahoo.com.ar', 'yahoo.com.co',
+  'yahoo.com.ph', 'yahoo.com.sg', 'yahoo.com.hk', 'yahoo.com.tw',
+  'yahoo.com.tr', 'yahoo.com.vn', 'yahoo.com.my',
+  // Apple — including the Sign in with Apple relay. See the note above.
+  'icloud.com', 'me.com', 'mac.com', 'privaterelay.appleid.com',
+  // AOL
+  'aol.com', 'aol.co.uk', 'aim.com',
+  // Proton
+  'proton.me', 'protonmail.com', 'protonmail.ch', 'pm.me',
+  // Zoho
+  'zoho.com', 'zohomail.com', 'zoho.eu',
+  // GMX / United Internet / Mail.com
+  'gmx.com', 'gmx.net', 'gmx.de', 'gmx.at', 'gmx.ch', 'gmx.co.uk',
+  'gmx.fr', 'gmx.es', 'web.de', 'mail.com', 'email.com',
+  // Yandex and Mail.ru
+  'yandex.com', 'yandex.ru', 'yandex.by', 'yandex.kz', 'ya.ru',
+  'mail.ru', 'bk.ru', 'inbox.ru', 'list.ru', 'internet.ru',
+  // Privacy-first providers with PERMANENT mailboxes — not temp-mail, and a
+  // guest who reaches for one still gets a real inbox the OTP lands in.
+  'tutanota.com', 'tuta.io', 'tuta.com', 'fastmail.com', 'fastmail.fm',
+  'hushmail.com', 'posteo.de', 'mailbox.org', 'runbox.com',
+  // Egyptian ISPs
+  'link.net', 'tedata.net.eg', 'orange.eg', 'vodafone.com.eg', 'etisalat.eg',
+  // Gulf ISPs — a large share of our Egyptian guests live and work there
+  'emirates.net.ae', 'eim.ae', 'stc.com.sa', 'qatar.net.qa',
+  'batelco.com.bh', 'omantel.net.om',
+  // Large non-Western providers seen on inbound international bookings
+  'qq.com', '163.com', '126.com', 'sina.com', 'foxmail.com',
+  'naver.com', 'daum.net', 'rediffmail.com',
+  // Western ISPs still in daily use
+  'orange.fr', 'wanadoo.fr', 'free.fr', 'sfr.fr', 'laposte.net',
+  't-online.de', 'freenet.de', 'libero.it', 'virgilio.it', 'tiscali.it',
+  'seznam.cz', 'wp.pl', 'onet.pl', 'interia.pl', 'o2.pl',
+  'sapo.pt', 'terra.com.br', 'uol.com.br', 'bol.com.br',
+  'telenet.be', 'skynet.be', 'ziggo.nl', 'xs4all.nl', 'telia.com',
+  'comcast.net', 'verizon.net', 'att.net', 'sbcglobal.net', 'bellsouth.net',
+  'cox.net', 'charter.net', 'btinternet.com', 'sky.com', 'virginmedia.com',
+  'talktalk.net', 'shaw.ca', 'rogers.com', 'bigpond.com', 'optusnet.com.au',
+])
+
+/** How many providers the allowlist fast-paths. Exposed for the drift test. */
+export const TRUSTED_DOMAIN_COUNT = TRUSTED_DOMAINS.size
+
+/** True when [domain] is a mailbox provider we accept without further checks. */
+export function isTrustedEmailDomain(domain: unknown): boolean {
+  const d = String(domain ?? '').trim().toLowerCase().replace(/\.$/, '')
+  return TRUSTED_DOMAINS.has(d)
+}
+
+/** True when the domain of [email] is on the trusted-provider allowlist. */
+export function isTrustedEmail(email: unknown): boolean {
+  return isTrustedEmailDomain(emailDomain(email))
+}
 
 // ---- Did-you-mean --------------------------------------------------------
 // Suggestions only ever come from these two lists. Searching the whole root zone
@@ -330,6 +456,13 @@ export function checkEmail(email: unknown): EmailProblem | null {
 
   const tld = labels[labels.length - 1]
   if (!TLD_SHAPE_RE.test(tld)) return { code: 'format' }
+
+  // The allowlist fast path: a known mailbox provider is real by definition, so
+  // it skips the root-zone lookup and the blocklist walk. Every other domain
+  // still has to clear both — that is what lets a company or university address
+  // through while temp-mail stays out.
+  if (TRUSTED_DOMAINS.has(domain)) return null
+
   if (!VALID_TLDS.has(tld)) {
     const problem: EmailProblem = { code: 'unknownTld', tld }
     const suggestion = suggestDomain(domain)
