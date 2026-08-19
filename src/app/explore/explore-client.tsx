@@ -382,7 +382,17 @@ export default function ExploreClient({ initialListings, initialFilters, savedId
         }
 
         /* Card hover life. */
-        .qk-card { transition: transform .22s ease, box-shadow .22s ease; will-change: transform; }
+        .qk-card { transition: transform .22s ease, box-shadow .22s ease; will-change: transform; min-width: 0; }
+        /* Same reason as the host dashboard's card title: a 200-character title
+           with no spaces is one word, and a grid item sized by min-content lets
+           it widen its track and break the row. Break inside it and clamp. */
+        .qk-card-title, .qk-card-loc {
+          overflow-wrap: anywhere;
+          display: -webkit-box;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 2;
+          overflow: hidden;
+        }
         .qk-card:hover { transform: translateY(-6px); box-shadow: 0 18px 40px rgba(42,34,32,0.16); }
         .qk-card:hover .qk-card-img { transform: scale(1.07); }
         .qk-card-img { transition: transform .5s cubic-bezier(.2,.7,.2,1); }
@@ -871,12 +881,12 @@ function ListingCard({
       </div>
 
       <div style={{ padding: '16px 18px 20px' }}>
-        <h2 style={{ margin: 0, fontSize: 17.5, fontWeight: 600, lineHeight: 1.3, color: COLORS.ink }}>
+        <h2 className="qk-card-title" title={listing.title} style={{ margin: 0, fontSize: 17.5, fontWeight: 600, lineHeight: 1.3, color: COLORS.ink }}>
           {listing.title}
         </h2>
         {listing.location && (
-          <p style={{ margin: '6px 0 0', fontSize: 13.5, color: COLORS.muted, display: 'flex', alignItems: 'center', gap: 5 }}>
-            <MapPin size={13} /> {listing.location}
+          <p style={{ margin: '6px 0 0', fontSize: 13.5, color: COLORS.muted, display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+            <MapPin size={13} style={{ flex: '0 0 auto' }} /> <span className="qk-card-loc">{listing.location}</span>
           </p>
         )}
         {listing.property_type && (

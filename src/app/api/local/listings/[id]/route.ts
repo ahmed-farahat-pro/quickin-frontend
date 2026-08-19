@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getListingById, updateListing, setListingOwnershipDoc, isListingInputError } from '@/lib/local/db'
 import { getUserFromRequest } from '@/lib/local/auth'
+import { checkListingPin, listingPinProblemMessage } from '@/lib/local/listing-geo-policy'
 
 // GET   /api/local/listings/:id → a single listing (no Supabase).
 // PATCH /api/local/listings/:id → the OWNER host edits ANY aspect of the listing
@@ -11,7 +12,10 @@ import { getUserFromRequest } from '@/lib/local/auth'
 //        review (approval_status='pending', is_published=false) — see
 //        REVIEW_TRIGGERING_FIELDS in lib/local/db.ts — and the response carries
 //        the fresh approval_status so the client can show "Under review" without
-//        a refetch.
+//        a refetch. It also carries `pin_warning` — null, or the reason the
+//        map pin disagrees with the country/region, since a pin can be dragged
+//        into the wrong country from the editor too. It is a warning: the edit
+//        saves either way.
 //        ... { ownership_doc } → host (re)submits the ownership doc → re-queues
 //        the listing for review (same contract as quickin-backend's PATCH).
 export const dynamic = 'force-dynamic'
@@ -42,6 +46,22 @@ export async function GET(
   }
 }
 
+/**
+ * The saved listing plus the verdict on its pin — null when the pin agrees with
+ * the country and region, or the reason it doesn't. A warning, never a refusal:
+ * the edit is already written by the time this runs, and /ops badges an ignored
+ * one for the operator who re-approves. See lib/local/listing-geo-policy.ts.
+ */
+function withPinWarning<T extends { lat?: unknown; lng?: unknown; country?: unknown; region?: unknown }>(listing: T) {
+  const problem = checkListingPin(listing)
+  return {
+    ...listing,
+    pin_warning: problem
+      ? { code: problem.code, scope: problem.scope, message: listingPinProblemMessage(problem) }
+      : null,
+  }
+}
+
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -69,9 +89,9 @@ export async function PATCH(
       if (!requeued) {
         return NextResponse.json({ error: 'Listing not found or not yours' }, { status: 404, headers: CORS })
       }
-      return NextResponse.json(requeued, { headers: CORS })
+      return NextResponse.json(withPinWarning(requeued), { headers: CORS })
     }
-    return NextResponse.json(updated, { headers: CORS })
+    return NextResponse.json(withPinWarning(updated), { headers: CORS })
   } catch (err) {
     // Anything the host can fix in the form is a 400 carrying the reason; a real
     // failure stays opaque. isListingInputError covers the edit validators, the

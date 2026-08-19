@@ -2056,7 +2056,11 @@
       "reservationsHint": "Booking requests from guests for your places.",
       "emptyTitle": "You haven't listed a space yet",
       "emptyFilteredTitle": "No listings in this status",
-      "showAll": "Show all listings"
+      "showAll": "Show all listings",
+      "rejected": {
+        "heading": "Why it wasn't approved",
+        "noReason": "Our team didn't leave a reason. Check your details, then edit and resubmit."
+      }
     },
     "reservations": {
       "heading": "Incoming reservations",
@@ -2156,8 +2160,23 @@
           "tooFew": "{field} must be at least {min}."
         },
         "priceInvalid": "Please enter a valid price per night.",
-        "resortNameRequired": "Please type the resort or compound name, or pick a different option.",
+        "completeness": {
+          "required": "Please fill in {field}.",
+          "letters": "Please write {field} in words — it can’t be only symbols or numbers.",
+          "tooShort": "Please give a fuller {field} — it needs at least {min} letters.",
+          "tooFew": "Please add at least {min} photo of your place — a listing with no photos is one guests scroll past."
+        },
+        "pinRequired": "Place the pin on the map so guests can see where your place is.",
+        "resortName": {
+          "required": "Please type the resort or compound name, or pick a different option.",
+          "letters": "Please write the resort or compound name in words — it can’t be only symbols or numbers.",
+          "tooShort": "Please give the full resort or compound name — it needs at least {min} letters."
+        },
         "weekendPriceInvalid": "Weekend price must be more than zero. Leave it empty if you don't charge a different rate on weekends.",
+        "weekendDays": {
+          "wholeWeek": "Weekend pricing can’t cover all seven days. Leave at least one day on the normal price per night — that’s what it’s for.",
+          "noDaysChosen": "Pick at least one weekend day, or clear the weekend price — a weekend rate with no days never applies to a single night."
+        },
         "invalidImageUrl": "This photo link doesn’t look like a valid URL: {url}",
         "createFailed": "Could not create the listing",
         "tooManyPhotos": "You can upload up to {max} photos.",
@@ -2166,6 +2185,11 @@
       "pinHint": "Tap the map to drop a pin. Guests see an approximate area, not the exact address.",
       "searchHint": "Search a city, area or address and pick a result to pin it on the map — then drag the pin to fine-tune.",
       "pinSet": "Pinned at {lat}, {lng}. Tap again to move it.",
+      "pinMismatch": {
+        "outOfRange": "That isn't a valid spot on the map. Tap the map again to set the pin.",
+        "outsideCountry": "This pin is outside {place} — guests will see your place there on the map. Move the pin, or change the country.",
+        "outsideRegion": "This pin is outside {place} — guests browsing that area will see your place here. Move the pin, or change the area."
+      },
       "weekdays": {
         "sun": "Sun",
         "mon": "Mon",
@@ -2183,6 +2207,7 @@
       "locating": "Finding on map…",
       "geocodeFail": "Couldn't find that place — tap the map to set it.",
       "regionNone": "No area selected",
+      "requiredLegend": "Fields marked with an asterisk are required.",
       "regionHint": "Curated areas guests browse by. Optional — pick the one your place belongs to.",
       "regions": {
         "northCoast": "North Coast",
@@ -2252,11 +2277,16 @@
       },
       "errors": {
         "saveFailed": "Could not save your changes"
+      },
+      "rejected": {
+        "title": "This listing wasn't approved",
+        "noReason": "Our team didn't leave a reason this time.",
+        "hint": "Make the changes described, then save to send it back for review."
       }
     },
     "ownershipDoc": {
       "label": "Ownership document",
-      "intro": "Upload a document that proves you own or are authorised to list this place (e.g. a title deed or utility bill). Our team reviews it before your listing goes live.",
+      "intro": "Upload a document that proves you own or are authorised to list this place (e.g. a title deed or utility bill). A photo or a PDF both work. Our team reviews it before your listing goes live.",
       "upload": "Upload ownership document",
       "change": "Change",
       "processing": "Processing…",
@@ -2269,8 +2299,8 @@
       "uploading": "Uploading…",
       "resubmitted": "Sent for review",
       "errors": {
-        "tooLarge": "That image is too large",
-        "failed": "Couldn't process that document. Try another.",
+        "tooLarge": "That file is too large (max 2.5 MB)",
+        "failed": "Couldn't process that document. Upload a photo or a PDF.",
         "uploadFailed": "Couldn't send that document. Please try again."
       }
     }
@@ -2357,6 +2387,17 @@
       "national_id": "National ID",
       "passport": "Passport",
       "residence_permit": "Residence permit"
+    },
+    "identity": {
+      "verifiedTitle": "Identity verified",
+      "verifiedBody": "We already have your approved ID on file, so there is nothing to upload here. Our team will review this application against it.",
+      "pendingTitle": "Identity under review",
+      "pendingBody": "Your ID is already with our team. You don't need to send it again — we'll review it together with this application.",
+      "rejectedTitle": "Your last ID submission wasn't approved",
+      "rejectedBody": "Please upload clear photos of your ID again so our team can review it with this application.",
+      "reason": "Reason",
+      "view": "View my identity verification",
+      "nationalIdLocked": "Taken from the ID we already verified."
     }
   },
   "contact": {
@@ -2584,6 +2625,10 @@
       "symbol": "Your password must contain a symbol, for example ! ? @ #.",
       "email": "Your password cannot be your email address.",
       "common": "That password is too common. Please choose a less guessable one."
+    },
+    "toggle": {
+      "show": "Show password",
+      "hide": "Hide password"
     }
   },
   "namePolicy": {

@@ -23,14 +23,32 @@ import { sqlRankingOrderBy } from './ranking-core'
 import { buildUserListWhere, hidesListings, normalizeStatus, orderBySql } from './user-admin-core'
 import type { AccountStatus, UserListFilter } from './user-admin-core'
 import { idChangeColumnFor, idColumnFor, statusForAction } from './document-core'
-import { normalizeDocType, normalizeVerificationStatus, revokesListingPrivileges } from './host-verification-core'
-import { checkWeekendPrice, weekendPriceMessage } from './listing-pricing-core'
+import {
+  checkOwnershipDoc,
+  OWNERSHIP_DOC_MAX_CHARS,
+  ownershipDocProblemMessage,
+} from './ownership-doc-core'
+import { needsIdentityDocuments, normalizeDocType, normalizeVerificationStatus, revokesListingPrivileges } from './host-verification-core'
+import {
+  checkWeekendPrice,
+  resolveWeekendSchedule,
+  weekendDaysMessage,
+  weekendPriceMessage,
+} from './listing-pricing-core'
 import { normalizeListingTitle, validateListingTitle } from './listing-title-policy'
+import { listingRejectionMessage, normalizeListingReviewNote } from './listing-review-note-core'
+import { normalizeResortName, validateResortName } from './resort-core'
 import {
   checkListingCapacity,
   listingCapacityProblemMessage,
   parseCapacity,
 } from './listing-capacity-policy'
+import {
+  checkListingCompleteness,
+  checkListingEdit,
+  listingCompletenessProblemMessage,
+} from './listing-completeness-policy'
+import type { ListingCurrentState } from './listing-completeness-policy'
 import { normalizePhone } from './phone-core'
 import { normalizeName, validateName } from './name-policy'
 import { assertProofImage, canPay, outcomeFor, PaymentProofError } from './payment-flow-core'
@@ -75,20 +93,18 @@ const isImageSrc = (value: unknown): value is string => {
   }
 }
 
-/** Cap on an inline proof-of-ownership document (~3.5M chars of base64). */
-const OWNERSHIP_DOC_MAX_CHARS = 3_500_000
-
 /**
  * Validate the proof-of-ownership document a host attaches to a listing: an
- * inline image data URL (how the web/mobile uploaders encode a photo) or an
- * http(s) link, capped at OWNERSHIP_DOC_MAX_CHARS. Rules and messages are
- * mirrored verbatim from quickin-backend's setListingOwnershipDoc so a document
- * accepted by the mobile apps is accepted here too. Throws on bad input.
+ * inline image or PDF data URL (how the web/mobile uploaders encode what the
+ * host picked) or an http(s) link, capped at OWNERSHIP_DOC_MAX_CHARS. The rules
+ * live in ownership-doc-core.ts, which quickin-backend holds a verbatim copy of,
+ * so a document accepted by the mobile apps is accepted here too. Throws on bad
+ * input — the routes match the message to answer 400 rather than 500.
  */
 function normalizeOwnershipDoc(value: unknown): string {
   const doc = String(value ?? '').trim()
-  if (!/^(data:image\/|https?:\/\/)/i.test(doc)) throw new Error('Please attach a photo of the document')
-  if (doc.length > OWNERSHIP_DOC_MAX_CHARS) throw new Error('That image is too large')
+  const problem = checkOwnershipDoc(doc)
+  if (problem) throw new Error(ownershipDocProblemMessage(problem))
   return doc
 }
 
@@ -135,6 +151,12 @@ export interface Listing {
   lng: number | null
   listing_images: ListingImage[]
   approval_status?: string | null
+  /** The operator's reason for rejecting this listing, or null when they gave
+   *  none (the note is optional). HOST PROJECTION ONLY — it is staff-authored
+   *  text about the host, so it must never reach a guest read. Cleared when the
+   *  listing goes back into the queue, so it always describes the CURRENT
+   *  'rejected' state rather than a decision the host has already answered. */
+  review_note?: string | null
   created_at?: string | null
   host_id?: string | null
   host_name?: string | null
@@ -245,7 +267,11 @@ const LISTING_COLS = `
 const LISTING_COLS_HOST = `
   l.id, l.title, l.description, l.location, l.country,
   ${HOST_PRICE_COLS}
-  ${LISTING_COMMON_COLS}
+  ${LISTING_COMMON_COLS},
+  -- Deliberately NOT in LISTING_COMMON_COLS: the rejection note is staff-authored
+  -- text about this host's listing and belongs to the host alone. Adding it to the
+  -- shared block would publish it on every guest read of a listing.
+  l.review_note
 `
 
 export async function getListings(filters: SearchFilters = {}): Promise<Listing[]> {
@@ -1397,7 +1423,10 @@ export async function submitHostApplication(
   // Identity documents. An applicant who already has a verified or pending
   // submission (e.g. they verified as a guest first) doesn't upload again.
   const priorVerification = await getVerification(userId)
-  const alreadySubmitted = priorVerification?.status === 'verified' || priorVerification?.status === 'pending'
+  // One identity, verified once from the profile. `needsIdentityDocuments` is the
+  // same rule the application form renders from, so the form never asks for a
+  // document this code would ignore, and never omits one it would demand.
+  const alreadySubmitted = !needsIdentityDocuments(priorVerification?.status)
   const idFront = String(f.id_front ?? '').trim()
   let docType: string | null = null
   if (!alreadySubmitted) {
@@ -2148,7 +2177,10 @@ export interface CreateListingInput {
   lng?: number
   price_per_night: number
   weekend_price?: number
-  weekend_days?: number[]
+  /** Raw, and deliberately `unknown`: absent and `[]` are different answers
+   *  (see resolveWeekendSchedule), so the route forwards what the client sent
+   *  rather than normalizing the difference away. */
+  weekend_days?: unknown
   currency?: string
   // Strings too: the clients post whatever their number field held, and folding
   // that to a number here would throw away exactly what listing-capacity-policy
@@ -2182,6 +2214,28 @@ export async function createListing(hostId: string, data: CreateListingInput): P
   if (titleProblem) throw new ListingInputError(titleProblem)
   const price = Number(data.price_per_night)
   if (!Number.isFinite(price) || price <= 0) throw new Error('A valid price per night is required')
+  // The photos, decided once. The filter used to live down at the INSERT, which
+  // meant the count the rule below judges and the count actually written could
+  // disagree — a payload of one junk `images` entry would have "had a photo"
+  // and stored none.
+  const images = Array.isArray(data.images) ? data.images.filter(isImageSrc) : []
+  // Title and price were the WHOLE bar: a listing was created with no
+  // description, no address, no area, no map pin and no photos, and the create
+  // form marked none of them required. See listing-completeness-policy.ts.
+  // Deliberately the CREATE door only — `updateListingDetails` does not run this,
+  // so the rows that predate the rule stay editable by the hosts who own them.
+  const incomplete = checkListingCompleteness({
+    description: data.description,
+    location: data.location,
+    region: data.region,
+    resort_id: data.resort_id,
+    resort_name: data.resort_name,
+    lat: data.lat,
+    lng: data.lng,
+    property_type: data.property_type,
+    images,
+  })
+  if (incomplete) throw new ListingInputError(listingCompletenessProblemMessage(incomplete))
   // A number in the listing copy reaches every guest at once, so the same guard
   // the chat runs applies to the fields a host writes freely.
   await guardContent(hostId, title, 'listing')
@@ -2198,16 +2252,21 @@ export async function createListing(hostId: string, data: CreateListingInput): P
     if (problem) throw new ListingInputError(listingCapacityProblemMessage(problem))
     return parseCapacity(v) as number
   }
-  const fin = (v: unknown): number | null => {
-    const n = Number(v)
-    return Number.isFinite(n) ? n : null
-  }
+  // The map pin. `Number.isFinite` used to be the whole check here, so create
+  // accepted a latitude of 999 that the edit path (assertCoord) had always
+  // refused — the two doors now agree. Whether the pin matches the country and
+  // region the host chose is a separate, non-blocking question: see
+  // listing-geo-policy.ts and the warning the host forms show under the map.
+  const lat = assertCoord(data.lat, 'Latitude', 90)
+  const lng = assertCoord(data.lng, 'Longitude', 180)
   // A typed weekend rate has to be money — 0 is refused here rather than written
   // away as NULL. See listing-pricing-core.ts.
   const weekendPrice = assertWeekendPrice(data.weekend_price)
-  const weekendDays = Array.isArray(data.weekend_days)
-    ? data.weekend_days.map((d) => Math.floor(Number(d))).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
-    : []
+  // …and the days it applies to have to leave a day that isn't the weekend, and
+  // — once there is a rate — leave at least one day that IS. Both mobile apps
+  // send no day set at all, which is how they get the Fri+Sat their own pricing
+  // screens promise instead of the NULL they used to be given.
+  const weekendDays = assertWeekendSchedule(weekendPrice, data.weekend_days)
   // The ownership doc is optional at creation (hosts can also attach it later
   // from the editor or the dashboard) but is validated when it is supplied.
   const ownershipDoc = String(data.ownership_doc ?? '').trim()
@@ -2221,6 +2280,7 @@ export async function createListing(hostId: string, data: CreateListingInput): P
   const amenities = data.amenities === undefined ? [] : normalizeAmenities(data.amenities)
   // The resort decides the region — that is the point of a resort belonging to one.
   // An unknown typed name is kept as free text AND queued for /ops.
+  assertResortName(data.resort_id, data.resort_name)
   const resort = await resolveResortSelection({
     resortId: data.resort_id,
     resortName: data.resort_name,
@@ -2240,9 +2300,9 @@ export async function createListing(hostId: string, data: CreateListingInput): P
      RETURNING id`,
     [
       hostId, title, data.description ?? null, data.location ?? null, data.country ?? null,
-      fin(data.lat), fin(data.lng), price,
+      lat, lng, price,
       weekendPrice,
-      weekendPrice && weekendDays.length ? weekendDays : null,
+      weekendDays,
       data.currency || 'EGP',
       cap(data.bedrooms, 'bedrooms', 1), cap(data.beds, 'beds', 1),
       cap(data.bathrooms, 'bathrooms', 1), cap(data.max_guests, 'guests', 2),
@@ -2251,7 +2311,6 @@ export async function createListing(hostId: string, data: CreateListingInput): P
     ]
   )
   const newId = rows[0].id as string
-  const images = Array.isArray(data.images) ? data.images.filter(isImageSrc) : []
   for (let i = 0; i < images.length; i++) {
     await pool.query(
       `INSERT INTO listing_images (listing_id, url, "order") VALUES ($1, $2, $3)`,
@@ -2312,7 +2371,7 @@ export function requeuesForReview(fields: readonly string[]): boolean {
 }
 
 /** The SET fragment every re-queueing edit appends — identical to the ownership-doc flow. */
-const REQUEUE_SET = `approval_status = 'pending', is_published = false`
+const REQUEUE_SET = `approval_status = 'pending', is_published = false, review_note = NULL`
 
 /** Max photos on a listing — the cap the web uploader (MAX_WEB_LISTING_PHOTOS)
  *  and quickin-backend's MAX_LISTING_PHOTOS both enforce. */
@@ -2348,6 +2407,23 @@ function assertListingTitle(v: unknown): string {
   return s
 }
 
+/**
+ * A typed "Other — not listed" compound name that reads as a name, else the same
+ * sentence the host forms show. Shares its rule with both forms through
+ * resort-core.ts.
+ *
+ * Two cases pass straight through, and both are real answers rather than
+ * oversights: a resort PICKED from the dropdown (the typed text is ignored when
+ * an id is present), and nothing typed at all (a chalet outside any compound, or
+ * an edit clearing the resort).
+ */
+function assertResortName(resortId: unknown, resortName: unknown): void {
+  if (typeof resortId === 'string' && resortId.trim()) return
+  if (normalizeResortName(resortName) === null) return
+  const problem = validateResortName(resortName)
+  if (problem) throw new ListingInputError(problem)
+}
+
 /** A capacity count that clears the shared floor, else a per-field error in the
  *  same words the create door and the host forms use. Shares its rule with
  *  `createListing` through listing-capacity-policy. */
@@ -2368,6 +2444,25 @@ function assertWeekendPrice(v: unknown): number | null {
   const checked = checkWeekendPrice(v)
   if (!checked.ok) throw new ListingInputError(weekendPriceMessage(checked.problem))
   return checked.value
+}
+
+/**
+ * The rate and its days judged together — what actually goes in `weekend_days`.
+ *
+ * The two columns were being written from one expression (`price && days.length
+ * ? days : null`) that quietly resolved every disagreement between them in
+ * favour of NULL. A host who typed a rate and lit no day, and a mobile app that
+ * sent a rate and no day set at all, both stored a weekend price that the quote
+ * — which only reaches for it `WHEN weekend_days IS NOT NULL` — could never
+ * charge on any night. One refuses now, the other gets the Fri+Sat it promised.
+ *
+ * It carries the shape rule too — junk days dropped, all seven refused — so this
+ * is the single door every weekend-day set goes through. See listing-pricing-core.ts.
+ */
+function assertWeekendSchedule(price: number | null | undefined, days: unknown): number[] | null {
+  const resolved = resolveWeekendSchedule(price, days)
+  if (!resolved.ok) throw new ListingInputError(weekendDaysMessage(resolved.problem))
+  return resolved.days
 }
 
 /** A coordinate inside its valid range, or null to clear the pin. */
@@ -2473,6 +2568,37 @@ export async function updateListing(
 ): Promise<Listing | null> {
   if (!isUuid(id) || !isUuid(hostId)) return null
 
+  // The same bar the create door holds, applied to the fields THIS patch touches
+  // — see listing-completeness-policy.ts. A listing that cleared the bar when it
+  // was created must not be editable back below it, and clearing a field is
+  // touching it. Fields the patch leaves alone are not judged: a patch is
+  // partial by design, and refusing a price change over a description the
+  // listing never had would punish the host for a rule that postdates their row.
+  //
+  // Two of the rules span more than one column — the pin is a lat/lng pair, the
+  // area can be answered by a region OR by a resort — so when the patch touches
+  // either, the half already stored is read and merged before judging. That read
+  // doubles as the ownership check, which is why a miss returns the same `null`
+  // (404) the UPDATE would have.
+  const touchesMergedField =
+    data.region !== undefined ||
+    data.resort_id !== undefined ||
+    data.resort_name !== undefined ||
+    data.lat !== undefined ||
+    data.lng !== undefined
+  let current: ListingCurrentState = {}
+  if (touchesMergedField) {
+    const { rows: cur } = await pool.query(
+      `SELECT region, resort_id, resort_name, lat::float8 AS lat, lng::float8 AS lng
+         FROM listings WHERE id = $1 AND host_id = $2`,
+      [id, hostId]
+    )
+    if (!cur.length) return null
+    current = cur[0] as ListingCurrentState
+  }
+  const editProblem = checkListingEdit(data, current)
+  if (editProblem) throw new ListingInputError(listingCompletenessProblemMessage(editProblem))
+
   const sets: string[] = []
   const vals: unknown[] = [id, hostId]
   const touched: ListingEditField[] = []
@@ -2506,6 +2632,9 @@ export async function updateListing(
   const resortEdited = data.resort_id !== undefined || data.resort_name !== undefined
   if (data.region !== undefined && !resortEdited) put('region', normalizeRegion(data.region))
   if (resortEdited) {
+    // A listing that was created with a real compound name must not be editable
+    // down to `!!!!!` afterwards — same rule the create door runs.
+    assertResortName(data.resort_id, data.resort_name)
     const sel = await resolveResortSelection({
       resortId: data.resort_id === undefined ? null : String(data.resort_id ?? '') || null,
       resortName: data.resort_name === undefined ? null : (data.resort_name as string | null),
@@ -2536,18 +2665,22 @@ export async function updateListing(
     if (!Number.isFinite(price) || price <= 0) throw new ListingInputError('Price must be greater than 0')
     put('price_per_night', price)
   }
-  // null clears the weekend rate (that is how all three clients turn it off);
-  // a number that is not a price is refused instead of silently clearing it.
-  if (data.weekend_price !== undefined) put('weekend_price', assertWeekendPrice(data.weekend_price))
+  // Weekend pricing is a pair, and a PATCH can carry either half of it on its
+  // own: the web editor sends only the fields the host changed, and both mobile
+  // apps only ever send the rate. So the rate is checked here (null clears it —
+  // that is how all three clients turn weekend pricing off — and a number that
+  // is not a price is refused rather than silently clearing it), but what the
+  // two halves MEAN together can't be settled until the half that isn't in the
+  // patch has been read off the row. That happens inside the transaction below,
+  // against a locked read, so nothing can move between the judging and the write.
+  const weekendPriceSent = data.weekend_price !== undefined
+  const weekendDaysSent = data.weekend_days !== undefined
+  const sentWeekendPrice = weekendPriceSent ? assertWeekendPrice(data.weekend_price) : undefined
+  // Recorded as touched now, because that is what decides the early return and
+  // the re-review flip — only the values wait for the transaction.
+  if (weekendPriceSent) touched.push('weekend_price')
+  if (weekendDaysSent) touched.push('weekend_days')
   if (data.currency !== undefined) put('currency', String(data.currency ?? '').trim() || 'USD')
-  if (data.weekend_days !== undefined) {
-    const days = Array.isArray(data.weekend_days)
-      ? data.weekend_days
-          .map((d) => Math.floor(Number(d)))
-          .filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
-      : []
-    put('weekend_days', days.length ? days : null)
-  }
 
   // --- Photos (listing_images rows, replaced wholesale when supplied) ---
   // null = not sent (leave photos alone); [] = sent empty (clear them).
@@ -2565,6 +2698,43 @@ export async function updateListing(
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    // The (rate, days) pair, resolved against the row it is about to be written
+    // onto. Locked, because the half the patch left out is read here and written
+    // in the same statement a few lines down.
+    if (weekendPriceSent || weekendDaysSent) {
+      const { rows: cur } = await client.query(
+        `SELECT weekend_price::float8 AS weekend_price, weekend_days
+           FROM listings WHERE id = $1 AND host_id = $2 FOR UPDATE`,
+        [id, hostId]
+      )
+      if (!cur.length) {
+        await client.query('ROLLBACK')
+        return null // not found or not owned by this host
+      }
+      const price = weekendPriceSent ? sentWeekendPrice ?? null : (cur[0].weekend_price as number | null)
+      // Days the patch didn't mention are the days already on the row — but a
+      // row with none is indistinguishable from a client that never asked the
+      // host, so it takes the default rather than the empty set. Passing []
+      // here would refuse the mobile apps' rate-only PATCH, which is the one
+      // shape that has never carried days at all.
+      const stored = cur[0].weekend_days as number[] | null
+      const supplied = weekendDaysSent
+        ? data.weekend_days
+        : stored && stored.length
+          ? stored
+          : undefined
+      const resolved = resolveWeekendSchedule(price, supplied)
+      if (!resolved.ok) throw new ListingInputError(weekendDaysMessage(resolved.problem))
+      if (weekendPriceSent) {
+        vals.push(price)
+        sets.push(`weekend_price = $${vals.length}`)
+      }
+      // Always written, even on a rate-only patch: clearing the rate has to take
+      // the days with it, and setting one on a listing that has none has to put
+      // days underneath it, or the rate goes back to being unchargeable.
+      vals.push(resolved.days)
+      sets.push(`weekend_days = $${vals.length}`)
+    }
     // Ownership + the re-review flip in ONE statement — nothing can bypass it.
     // `sets` is empty on a photos-only edit, which still re-queues today; if the
     // switch above ever stops covering photos there is nothing to SET, so fall
@@ -2616,7 +2786,8 @@ export async function setListingOwnershipDoc(
   if (!isUuid(id) || !isUuid(hostId)) return null
   const value = normalizeOwnershipDoc(doc)
   const { rowCount } = await pool.query(
-    `UPDATE listings SET ownership_doc = $3, approval_status = 'pending', is_published = false
+    `UPDATE listings SET ownership_doc = $3, approval_status = 'pending', is_published = false,
+            review_note = NULL
       WHERE id = $1 AND host_id = $2`,
     [id, hostId, value]
   )
@@ -2965,6 +3136,12 @@ export interface AdminListingRow {
   title: string
   location: string | null
   region: string | null
+  /** The three fields the pin badge is derived from — see listing-geo-policy.ts.
+   *  Nothing about the mismatch is stored: the console recomputes it per row, so
+   *  a host who fixes their pin clears the badge on the next load. */
+  country: string | null
+  lat: number | null
+  lng: number | null
   /** Set when the host picked from the catalog. */
   resort_id: string | null
   /** Set when the host typed their own via "Other" — this is what needs review
@@ -3003,6 +3180,8 @@ export async function adminListListings(): Promise<AdminListingRow[]> {
             COALESCE(l.approval_status, 'approved') AS approval_status,
             (l.ownership_doc IS NOT NULL AND l.ownership_doc <> '') AS has_ownership_doc,
             l.host_id, u.full_name AS host_name, l.region,
+            -- Location fields the console cross-checks against the map pin.
+            l.country, l.lat::float8 AS lat, l.lng::float8 AS lng,
             -- The approval flow needs to know whether the resort is a catalog entry
             -- or free text the host typed via "Other" (which needs review).
             l.resort_id, l.resort_name,
@@ -3069,10 +3248,16 @@ export async function adminSetListingApproval(
     }
   }
   const status = action === 'approve' ? 'approved' : 'rejected'
+  // The note is stored, not just announced. It used to exist only inside the
+  // notification body below, so a host who missed that one notification saw a
+  // "Rejected" badge and had no way to learn what to fix — /host and the listing
+  // editor now read `review_note` back. Approving clears it: the note describes a
+  // rejection, and a stale one under a live listing reads as a fresh complaint.
+  const reviewNote = action === 'reject' ? normalizeListingReviewNote(note) : null
   const { rows } = await pool.query(
-    `UPDATE listings SET approval_status = $2, is_published = $3 WHERE id = $1
+    `UPDATE listings SET approval_status = $2, is_published = $3, review_note = $4 WHERE id = $1
      RETURNING host_id, title`,
-    [id, status, action === 'approve'],
+    [id, status, action === 'approve', reviewNote],
   )
   const row = rows[0] as { host_id: string | null; title: string | null } | undefined
   if (!row) throw new Error('Listing not found')
@@ -3086,7 +3271,9 @@ export async function adminSetListingApproval(
   } else {
     await createNotification(
       row.host_id, 'listing', 'Listing needs changes',
-      note ? `"${title}" wasn't approved: ${note}` : `"${title}" wasn't approved this time. Please review it and resubmit.`,
+      // Composed from the SAME normalized note that was just stored, so the
+      // notification and the reason on /host can never word it differently.
+      listingRejectionMessage(title, reviewNote),
       '/host',
     )
   }

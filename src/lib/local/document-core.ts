@@ -89,6 +89,20 @@ export function auditTargetTypeFor(kind: DocumentKind): 'user' | 'listing' {
  *  browser. Same reasoning as normalizeQrImage in payment-config-core.ts. */
 export const ALLOWED_DOCUMENT_MIME = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'] as const
 
+/** What an `ownership` document may additionally be: a PDF. A title deed is
+ *  issued as a document, not photographed as one, and the browser renders it in
+ *  its own sandboxed viewer — so unlike SVG it never runs as script against the
+ *  /ops origin. The ID kinds stay image-only: those are photographs of a card
+ *  and a selfie, and a PDF where a photo belongs is a sign of a forwarded scan
+ *  rather than a fresh capture.
+ *  KEEP IN SYNC with OWNERSHIP_DOC_ACCEPT in ownership-doc-core.ts. */
+export const ALLOWED_OWNERSHIP_MIME = [...ALLOWED_DOCUMENT_MIME, 'application/pdf'] as const
+
+/** The mime allowlist for one kind — `ownership` gets PDF, the rest do not. */
+export function allowedMimeFor(kind: DocumentKind): readonly string[] {
+  return kind === 'ownership' ? ALLOWED_OWNERSHIP_MIME : ALLOWED_DOCUMENT_MIME
+}
+
 /** Bad or unsafe stored document — the route maps this to 415/500 rather than
  *  streaming whatever happened to be in the column. */
 export class DocumentFormatError extends Error {
@@ -112,14 +126,20 @@ export function asDocumentUrl(value: unknown): string | null {
 
 /**
  * Split a stored `data:<mime>;base64,<payload>` into its parts, rejecting anything
- * that isn't an allowlisted image.
+ * the given kind does not allow — images for every kind, plus PDF for `ownership`.
  *
  * Deliberately strict: these values were uploaded by users years ago under looser
  * validation, so the read path cannot assume they are well-formed. Throwing beats
  * returning empty bytes, which would render as a silently broken image and look
  * like "no document on file".
+ *
+ * `kind` is optional and defaults to images only, so a caller that forgets it
+ * gets the narrower rule rather than the wider one.
  */
-export function parseDocumentDataUrl(value: unknown): { mime: string; base64: string } {
+export function parseDocumentDataUrl(
+  value: unknown,
+  kind?: DocumentKind
+): { mime: string; base64: string } {
   const raw = String(value ?? '').trim()
   if (!raw) throw new DocumentFormatError('Document is empty')
   const m = DATA_URL_RE.exec(raw)
@@ -127,7 +147,8 @@ export function parseDocumentDataUrl(value: unknown): { mime: string; base64: st
   const mime = m[1].toLowerCase()
   // Normalise the one common alias so a legitimately-stored jpg isn't refused.
   const canonical = mime === 'image/jpg' ? 'image/jpeg' : mime
-  if (!(ALLOWED_DOCUMENT_MIME as readonly string[]).includes(canonical)) {
+  const allowed = kind ? allowedMimeFor(kind) : ALLOWED_DOCUMENT_MIME
+  if (!(allowed as readonly string[]).includes(canonical)) {
     throw new DocumentFormatError(`Unsupported document type: ${mime}`)
   }
   // Strip the whitespace a wrapped/pretty-printed column may carry.
@@ -135,6 +156,20 @@ export function parseDocumentDataUrl(value: unknown): { mime: string; base64: st
   if (!base64) throw new DocumentFormatError('Document has no data')
   if (!BASE64_RE.test(base64)) throw new DocumentFormatError('Document data is not valid base64')
   return { mime: canonical, base64 }
+}
+
+/** Filename extension for an allowlisted document mime, so an operator who saves
+ *  the file gets one their machine can open. Every mime the parser lets through
+ *  has an entry; anything else falls back to `.bin` rather than guessing. */
+export function documentFileExtension(mime: string): string {
+  const map: Record<string, string> = {
+    'image/png': 'png',
+    'image/jpeg': 'jpg',
+    'image/gif': 'gif',
+    'image/webp': 'webp',
+    'application/pdf': 'pdf',
+  }
+  return map[mime.toLowerCase()] ?? 'bin'
 }
 
 /** Byte length of a base64 payload, without decoding it. */

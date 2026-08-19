@@ -10,9 +10,6 @@ import { purgeStaffExpired } from '@/lib/local/db'
 //
 //   GET /api/cron/staff-cleanup     header: Authorization: Bearer <CRON_SECRET>
 //
-// Deliberately separate from /api/cron/booking-timeouts, which is a Supabase
-// (World 2) route — this feature is Neon-only and shouldn't depend on it.
-//
 // Scheduled daily at 03:00 UTC in vercel.json. Safe to run by hand, and safe to run
 // repeatedly.
 export const dynamic = 'force-dynamic'

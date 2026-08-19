@@ -6,6 +6,7 @@ import {
   auditTargetTypeFor,
   base64ByteLength,
   DocumentFormatError,
+  documentFileExtension,
   isDocumentKind,
   owningModuleFor,
   parseDocumentDataUrl,
@@ -26,6 +27,11 @@ import {
 //      CORS const from a neighbouring route.
 //   2. The audit write is awaited and allowed to THROW (see recordDocumentView).
 //      An unlogged view is the exact thing E4 exists to prevent, so it fails closed.
+//
+// A PDF (ownership documents only) is served the same way as an image. The
+// operator's browser opens it in its own sandboxed viewer, so script inside a
+// hostile PDF never runs against the /ops origin — which is why SVG stays
+// refused and PDF does not. See ALLOWED_OWNERSHIP_MIME.
 export const dynamic = 'force-dynamic'
 
 /** Not shared with the other admin routes on purpose — see note 1 above. */
@@ -72,7 +78,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ kind: string; i
       return NextResponse.json({ url }, { headers: HEADERS })
     }
 
-    const { mime, base64 } = parseDocumentDataUrl(doc.value)
+    // The kind decides the allowlist: an ownership document may also be a PDF
+    // (a deed is issued as one), while the ID kinds stay image-only.
+    const { mime, base64 } = parseDocumentDataUrl(doc.value, kind)
 
     // Logged BEFORE the bytes are handed over — the row means "this was about to
     // leave", the same ordering analytics/export uses.
@@ -85,7 +93,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ kind: string; i
     })
 
     return new Response(new Uint8Array(Buffer.from(base64, 'base64')), {
-      headers: { ...HEADERS, 'Content-Type': mime, 'Content-Disposition': `inline; filename="${kind}-${id.slice(0, 8)}"` },
+      headers: { ...HEADERS, 'Content-Type': mime, 'Content-Disposition': `inline; filename="${kind}-${id.slice(0, 8)}.${documentFileExtension(mime)}"` },
     })
   } catch (err) {
     // A document stored in a shape we refuse to render (an SVG, junk base64) is a

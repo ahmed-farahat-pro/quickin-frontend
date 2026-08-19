@@ -13,10 +13,20 @@ import { useTranslations } from 'next-intl'
 import { GuestPriceHint } from '@/components/features/host/guest-price-hint'
 import { PROPERTY_TYPES, MAX_WEB_LISTING_PHOTOS } from '@/lib/property-types'
 import { REGIONS, AMENITIES } from '@/lib/listing-options'
+import { checkListingPin } from '@/lib/local/listing-geo-policy'
+import {
+  checkListingAddress,
+  checkListingArea,
+  checkListingDescription,
+  checkListingPhotos,
+  checkListingPinPresence,
+  checkListingPropertyType,
+} from '@/lib/local/listing-completeness-policy'
 import { OTHER_RESORT, isResortNameMissing } from '@/lib/resort-choice'
+import { checkResortName, MIN_RESORT_NAME_LETTERS } from '@/lib/local/resort-core'
 import { fileToCompressedDataUrl } from '@/lib/image'
 import { DEFAULT_WEEKEND_DAYS } from '@/lib/geo'
-import { checkWeekendPrice } from '@/lib/local/listing-pricing-core'
+import { DAYS_IN_WEEK, checkWeekendPrice, resolveWeekendSchedule } from '@/lib/local/listing-pricing-core'
 import {
   checkListingTitle,
   normalizeListingTitle,
@@ -66,6 +76,20 @@ const input: React.CSSProperties = {
 }
 
 const fieldWrap: React.CSSProperties = { marginBottom: 18 }
+
+// The mark next to every label the host cannot skip. The bug this answers was
+// half "the form accepted an empty listing" and half "nothing said it wouldn't"
+// — a rule enforced at submit and nowhere on the page is a rule the host meets
+// as a rejection. `aria-hidden` because the accessible name comes from the
+// input's own `required`/`aria-required`, and a screen reader announcing
+// "asterisk" after every label is noise.
+function Req() {
+  return (
+    <span aria-hidden="true" style={{ color: C.burgundy, marginInlineStart: 3, fontWeight: 800 }}>
+      *
+    </span>
+  )
+}
 
 const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
 
@@ -172,8 +196,24 @@ export function NewListingForm({
   // Proof of ownership — one compressed data URL, admin-only (never public).
   const [ownershipDoc, setOwnershipDoc] = useState('')
 
+  // A weekend is part of a week. Lighting up all seven prices every night at the
+  // weekend rate and leaves the price-per-night field above applying to nothing,
+  // so the last unlit day stays unlit — the host is told why under the pills.
+  // Same rule the API runs — see lib/local/listing-pricing-core.ts.
+  const weekendDaysFull = weekendDays.length >= DAYS_IN_WEEK - 1
+  // …and the other end of the same pair. A rate with every pill off is a rate no
+  // night can ever be charged at, so it is said under the pills as the host
+  // types rather than held back until they press Create.
+  const typedWeekendRate = checkWeekendPrice(weekendPrice)
+  const weekendDaysMissing =
+    weekendDays.length === 0 && typedWeekendRate.ok && typedWeekendRate.value !== null
+
   function toggleWeekendDay(day: number) {
-    setWeekendDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()))
+    setWeekendDays((prev) => {
+      if (prev.includes(day)) return prev.filter((d) => d !== day)
+      if (prev.length >= DAYS_IN_WEEK - 1) return prev
+      return [...prev, day].sort()
+    })
   }
 
   function toggleAmenity(value: string) {
@@ -298,6 +338,25 @@ export function NewListingForm({
     setPhotos((prev) => prev.filter((_, idx) => idx !== i))
   }
 
+  // The policy answers with a `{code, field}` problem rather than a sentence, so
+  // the reason can be said in the host's own language here instead of English
+  // being echoed from the API. Same shape the capacity errors use, and the field
+  // labels are the ones already rendered above each input, so the message and
+  // the label a host is looking at always name the field the same way.
+  function completenessMessage(problem: {
+    code: 'required' | 'letters' | 'tooShort' | 'tooFew'
+    field: 'description' | 'location' | 'region' | 'pin' | 'propertyType' | 'photos'
+    min?: number
+  }): string {
+    // The pin already had a sentence written for it in all four locales, and
+    // "Please fill in Map location" is not what you do to a map. Use it.
+    if (problem.field === 'pin') return t('errors.pinRequired')
+    return t(`errors.completeness.${problem.code}`, {
+      field: t(`fields.${problem.field}`),
+      min: problem.min ?? 0,
+    })
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
@@ -311,14 +370,52 @@ export function NewListingForm({
       setError(t(`errors.title.${titleProblem.code}`, { min: MIN_TITLE_LETTERS, max: MAX_TITLE_LENGTH }))
       return
     }
+    // Everything between the title and the price. A listing used to need only a
+    // title and a price — no description, no address, no area, no pin, no photo
+    // — so a host could publish something no guest could read, find, see or
+    // place. Same rule the API runs; the checks are ordered the way the fields
+    // are laid out below, so a host who skipped several is sent to the topmost
+    // one rather than to whichever the code looked at first. See
+    // lib/local/listing-completeness-policy.ts.
+    const missingAbovePrice =
+      checkListingDescription(description) ??
+      checkListingAddress(location) ??
+      checkListingArea({
+        region,
+        resort_id: resortId && resortId !== OTHER_RESORT ? resortId : '',
+        resort_name: resortId === OTHER_RESORT ? resortOther : '',
+      }) ??
+      checkListingPinPresence(lat, lng)
+    if (missingAbovePrice) {
+      setError(completenessMessage(missingAbovePrice))
+      return
+    }
     const priceNum = Number(price)
     if (!Number.isFinite(priceNum) || priceNum <= 0) {
       setError(t('errors.priceInvalid'))
       return
     }
+    // The pin was optional here while both apps gate their location step on one,
+    // so the web was the only door a listing could come through with no
+    // coordinates at all — and with no pin, the check under the map has nothing
+    // to judge, which is how a listing could carry a North Coast address under a
+    // Cairo area chip unchallenged. The pin is what the policy trusts, so it is
+    // required before any of it means anything.
+    if (lat == null || lng == null) {
+      setError(t('errors.pinRequired'))
+      return
+    }
     // "Other" without a name is not "no resort" — see isResortNameMissing().
     if (isResortNameMissing(resortId, resortOther)) {
-      setError(t('errors.resortNameRequired'))
+      setError(t('errors.resortName.required'))
+      return
+    }
+    // …and a box holding `@@@@@` is not a name. It used to submit, and a name with
+    // no letters is stored as no resort at all. Same rule the API runs — see
+    // lib/local/resort-core.ts.
+    const resortProblem = resortId === OTHER_RESORT ? checkResortName(resortOther) : null
+    if (resortProblem) {
+      setError(t(`errors.resortName.${resortProblem.code}`, { min: MIN_RESORT_NAME_LETTERS }))
       return
     }
 
@@ -346,6 +443,26 @@ export function NewListingForm({
       return
     }
     const weekend_price = weekend.value ?? undefined
+    // The days that rate applies to, judged against the rate itself. The pills
+    // can't reach all seven, but the value they hold is what gets sent, so the
+    // rule is checked here rather than assumed — and it also catches the pills
+    // being turned ALL the way off under a rate the host typed, which used to
+    // submit happily and store a weekend price no night could be charged at.
+    // Same rule the API runs — see lib/local/listing-pricing-core.ts.
+    const weekendSchedule = resolveWeekendSchedule(weekend.value, weekendDays)
+    if (!weekendSchedule.ok) {
+      setError(t(`errors.weekendDays.${weekendSchedule.problem}`))
+      return
+    }
+
+    // …and the two required fields that sit below the capacity row: the property
+    // type (always prefilled here, but the API accepts a payload without one)
+    // and the photos. A listing with no photo is the one a guest scrolls past.
+    const missingBelow = checkListingPropertyType(propertyType) ?? checkListingPhotos(photos)
+    if (missingBelow) {
+      setError(completenessMessage(missingBelow))
+      return
+    }
 
     setBusy(true)
     try {
@@ -362,7 +479,7 @@ export function NewListingForm({
           lng: lng ?? undefined,
           price_per_night: priceNum,
           weekend_price,
-          weekend_days: weekend_price ? weekendDays : undefined,
+          weekend_days: weekendSchedule.days ?? undefined,
           currency: currency.trim() || 'EGP',
           bedrooms,
           beds,
@@ -393,6 +510,22 @@ export function NewListingForm({
     }
   }
 
+  // Does the pin agree with the country + curated area chosen above? Derived on
+  // every render (it is three comparisons — see listing-geo-policy.ts), so the
+  // warning appears and clears as the host moves the pin or changes either field.
+  // The region is named in the host's own language; a country name is not
+  // translated anywhere in this form, so it is passed through as chosen.
+  const pinProblem = checkListingPin({ lat, lng, country, region })
+  const pinProblemPlace = pinProblem
+    ? (() => {
+        const known = REGIONS.find((r) => r.value === pinProblem.scope)
+        return known ? t(`regions.${known.key}`) : pinProblem.scope
+      })()
+    : ''
+  const pinProblemText = pinProblem
+    ? t(`pinMismatch.${pinProblem.code}`, { place: pinProblemPlace })
+    : ''
+
   return (
     <form
       onSubmit={submit}
@@ -410,32 +543,44 @@ export function NewListingForm({
         }
       `}</style>
 
+      {/* Says the rule once, at the top, instead of leaving the host to infer it
+          from the marks. Half the reported bug was that nothing on this page
+          indicated which fields were required. */}
+      <p style={{ margin: '0 0 18px', fontSize: 12.5, color: C.muted }}>
+        <Req />
+        <span style={{ marginInlineStart: 6 }}>{t('requiredLegend')}</span>
+      </p>
+
       <div style={fieldWrap}>
-        <label style={label} htmlFor="title">{t('fields.title')}</label>
+        <label style={label} htmlFor="title">{t('fields.title')}<Req /></label>
         <input
           id="title"
           style={input}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder={t('placeholders.title')}
+          // The policy already refuses a longer title on submit; capping the
+          // field means the host is stopped as they type instead of after.
+          maxLength={MAX_TITLE_LENGTH}
           required
         />
       </div>
 
       <div style={fieldWrap}>
-        <label style={label} htmlFor="description">{t('fields.description')}</label>
+        <label style={label} htmlFor="description">{t('fields.description')}<Req /></label>
         <textarea
           id="description"
           style={{ ...input, minHeight: 96, resize: 'vertical' }}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder={t('placeholders.description')}
+          required
         />
       </div>
 
       <div className="qk-new-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, ...fieldWrap }}>
         <div style={{ position: 'relative' }}>
-          <label style={label} htmlFor="location">{t('fields.location')}</label>
+          <label style={label} htmlFor="location">{t('fields.location')}<Req /></label>
           <input
             id="location"
             style={input}
@@ -459,6 +604,7 @@ export function NewListingForm({
             autoComplete="off"
             role="combobox"
             aria-expanded={placeOpen}
+            required
           />
           {placeOpen && placeResults.length > 0 && (
             <ul style={dropdownStyle}>
@@ -498,12 +644,13 @@ export function NewListingForm({
 
       {/* Curated browse area — the chips guests filter by (same four on mobile). */}
       <div style={fieldWrap}>
-        <label style={label} htmlFor="region">{t('fields.region')}</label>
+        <label style={label} htmlFor="region">{t('fields.region')}<Req /></label>
         <select
           id="region"
           style={input}
           value={region}
           onChange={(e) => setRegion(e.target.value)}
+          required
         >
           <option value="">{t('regionNone')}</option>
           {REGIONS.map((r) => (
@@ -548,7 +695,7 @@ export function NewListingForm({
 
       {/* Map pin — sets lat/lng; guests see an approximate area, not the exact pin. */}
       <div style={fieldWrap}>
-        <label style={label}>{t('fields.pinLocation')}</label>
+        <label style={label}>{t('fields.pinLocation')}<Req /></label>
         <LocationPickerMap lat={lat} lng={lng} onChange={(la, ln) => { setLat(la); setLng(ln) }} />
         <p style={{ margin: '6px 0 0', fontSize: 12.5, color: geo === 'fail' ? C.burgundy : C.muted }}>
           {geo === 'locating'
@@ -559,11 +706,33 @@ export function NewListingForm({
             ? t('pinSet', { lat: lat.toFixed(4), lng: lng.toFixed(4) })
             : t('pinHint')}
         </p>
+        {/* The pin used to be free of the words above it: a host could choose Egypt →
+            North Coast and drop the pin in Germany, and it saved silently. This says
+            so — it does not block, because a bounding box must never be the reason a
+            real property can't be listed. An ignored warning is badged in /ops. */}
+        {pinProblemText ? (
+          <p
+            role="status"
+            style={{
+              margin: '8px 0 0',
+              padding: '10px 12px',
+              borderRadius: 12,
+              background: '#FBEEEF',
+              border: `1px solid ${C.burgundy}33`,
+              fontSize: 12.5,
+              lineHeight: 1.5,
+              color: C.burgundy,
+              fontWeight: 600,
+            }}
+          >
+            {pinProblemText}
+          </p>
+        ) : null}
       </div>
 
       <div className="qk-new-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, ...fieldWrap }}>
         <div>
-          <label style={label} htmlFor="price">{t('fields.price')}</label>
+          <label style={label} htmlFor="price">{t('fields.price')}<Req /></label>
           <input
             id="price"
             style={input}
@@ -610,19 +779,23 @@ export function NewListingForm({
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {WEEKDAY_KEYS.map((k, day) => {
             const on = weekendDays.includes(day)
+            const locked = !on && weekendDaysFull
             return (
               <button
                 key={k}
                 type="button"
                 onClick={() => toggleWeekendDay(day)}
                 aria-pressed={on}
+                disabled={locked}
+                title={locked ? t('errors.weekendDays.wholeWeek') : undefined}
                 style={{
                   padding: '7px 12px',
                   borderRadius: 999,
                   fontSize: 13,
                   fontWeight: 600,
                   fontFamily: 'inherit',
-                  cursor: 'pointer',
+                  cursor: locked ? 'not-allowed' : 'pointer',
+                  opacity: locked ? 0.45 : 1,
                   border: `1px solid ${on ? C.burgundy : 'rgba(42,34,32,0.16)'}`,
                   background: on ? C.burgundy : '#fff',
                   color: on ? '#fff' : C.ink,
@@ -633,30 +806,40 @@ export function NewListingForm({
             )
           })}
         </div>
+        {weekendDaysFull && (
+          <p style={{ margin: '8px 0 0', fontSize: 12.5, color: C.muted }}>
+            {t('errors.weekendDays.wholeWeek')}
+          </p>
+        )}
+        {weekendDaysMissing && (
+          <p style={{ margin: '8px 0 0', fontSize: 12.5, color: C.burgundy }}>
+            {t('errors.weekendDays.noDaysChosen')}
+          </p>
+        )}
       </div>
 
       <div className="qk-new-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, ...fieldWrap }}>
         <div>
-          <label style={label} htmlFor="bedrooms">{t('fields.bedrooms')}</label>
-          <input id="bedrooms" style={input} type="number" min="1" step="1" value={bedrooms} onChange={(e) => setBedrooms(e.target.value)} />
+          <label style={label} htmlFor="bedrooms">{t('fields.bedrooms')}<Req /></label>
+          <input id="bedrooms" style={input} type="number" min="1" step="1" value={bedrooms} onChange={(e) => setBedrooms(e.target.value)} required />
         </div>
         <div>
-          <label style={label} htmlFor="beds">{t('fields.beds')}</label>
-          <input id="beds" style={input} type="number" min="1" step="1" value={beds} onChange={(e) => setBeds(e.target.value)} />
+          <label style={label} htmlFor="beds">{t('fields.beds')}<Req /></label>
+          <input id="beds" style={input} type="number" min="1" step="1" value={beds} onChange={(e) => setBeds(e.target.value)} required />
         </div>
         <div>
-          <label style={label} htmlFor="bathrooms">{t('fields.bathrooms')}</label>
-          <input id="bathrooms" style={input} type="number" min="1" step="1" value={bathrooms} onChange={(e) => setBathrooms(e.target.value)} />
+          <label style={label} htmlFor="bathrooms">{t('fields.bathrooms')}<Req /></label>
+          <input id="bathrooms" style={input} type="number" min="1" step="1" value={bathrooms} onChange={(e) => setBathrooms(e.target.value)} required />
         </div>
         <div>
-          <label style={label} htmlFor="maxGuests">{t('fields.maxGuests')}</label>
-          <input id="maxGuests" style={input} type="number" min="1" step="1" value={maxGuests} onChange={(e) => setMaxGuests(e.target.value)} />
+          <label style={label} htmlFor="maxGuests">{t('fields.maxGuests')}<Req /></label>
+          <input id="maxGuests" style={input} type="number" min="1" step="1" value={maxGuests} onChange={(e) => setMaxGuests(e.target.value)} required />
         </div>
       </div>
 
       {/* Property type — icon grid */}
       <div style={fieldWrap}>
-        <label style={label}>{t('fields.propertyType')}</label>
+        <label style={label}>{t('fields.propertyType')}<Req /></label>
         <div
           style={{
             display: 'grid',
@@ -736,7 +919,7 @@ export function NewListingForm({
 
       {/* Photos — camera or library, compressed to base64, up to MAX_WEB_LISTING_PHOTOS */}
       <div style={fieldWrap}>
-        <label style={label}>{t('fields.photos')}</label>
+        <label style={label}>{t('fields.photos')}<Req /></label>
         <input
           ref={fileRef}
           type="file"

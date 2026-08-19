@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { updateSession } from '@/lib/supabase/middleware'
 import {
   defaultLocale,
   detectLocaleFromAcceptLanguage,
@@ -97,9 +96,7 @@ export async function proxy(request: NextRequest) {
   const isSystemPath =
     pathname.startsWith('/api') ||
     pathname.startsWith('/_next') ||
-    pathname === '/favicon.ico' ||
-    pathname.startsWith('/auth/callback') ||
-    pathname.startsWith('/auth/invite')
+    pathname === '/favicon.ico'
 
   if (!isSystemPath && isLocalizablePath(pathname)) {
     const redirectUrl = request.nextUrl.clone()
@@ -116,7 +113,7 @@ export async function proxy(request: NextRequest) {
     pathname,
   )
 
-  return await updateSession(request, requestHeaders)
+  return NextResponse.next({ request: { headers: requestHeaders } })
 }
 
 export const config = {

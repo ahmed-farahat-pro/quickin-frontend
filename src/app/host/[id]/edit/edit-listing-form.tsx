@@ -24,10 +24,13 @@ import { GuestPriceHint } from '@/components/features/host/guest-price-hint'
 import dynamic from 'next/dynamic'
 import { PROPERTY_TYPES, MAX_WEB_LISTING_PHOTOS, iconForPropertyType } from '@/lib/property-types'
 import { REGIONS, AMENITIES } from '@/lib/listing-options'
+import { checkListingPin } from '@/lib/local/listing-geo-policy'
+import { checkListingEdit } from '@/lib/local/listing-completeness-policy'
 import { OTHER_RESORT, isResortNameMissing } from '@/lib/resort-choice'
+import { checkResortName, MIN_RESORT_NAME_LETTERS } from '@/lib/local/resort-core'
 import { fileToCompressedDataUrl } from '@/lib/image'
 import { DEFAULT_WEEKEND_DAYS } from '@/lib/geo'
-import { checkWeekendPrice } from '@/lib/local/listing-pricing-core'
+import { DAYS_IN_WEEK, checkWeekendPrice, resolveWeekendSchedule } from '@/lib/local/listing-pricing-core'
 import {
   checkListingTitle,
   normalizeListingTitle,
@@ -67,6 +70,17 @@ const label: React.CSSProperties = {
   fontWeight: 700,
   color: C.ink,
   marginBottom: 6,
+}
+
+// The mark next to every label the host cannot clear. Same component, same
+// reason as the create form: a rule enforced on save and shown nowhere on the
+// page is a rule the host meets as a rejection.
+function Req() {
+  return (
+    <span aria-hidden="true" style={{ color: C.burgundy, marginInlineStart: 3, fontWeight: 800 }}>
+      *
+    </span>
+  )
 }
 
 const input: React.CSSProperties = {
@@ -266,8 +280,25 @@ export function EditListingForm({
       .map((a) => ({ value: a, key: '', Icon: null })),
   ]
 
+  // A weekend is part of a week — the last unlit day stays unlit, same as on the
+  // create form. A listing saved with all seven before this rule existed still
+  // loads with all seven lit: nothing here turns pills off for the host, but the
+  // note under them says what has to change before the form will save.
+  // See lib/local/listing-pricing-core.ts.
+  const weekendDaysFull = weekendDays.length >= DAYS_IN_WEEK - 1
+  // …and the opposite end: every pill off under a rate the host typed. Unlike
+  // the whole-week case the pills can reach this one freely, so the note under
+  // them is the only warning before Save refuses.
+  const typedWeekendRate = checkWeekendPrice(weekendPrice)
+  const weekendDaysMissing =
+    weekendDays.length === 0 && typedWeekendRate.ok && typedWeekendRate.value !== null
+
   function toggleWeekendDay(day: number) {
-    setWeekendDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()))
+    setWeekendDays((prev) => {
+      if (prev.includes(day)) return prev.filter((d) => d !== day)
+      if (prev.length >= DAYS_IN_WEEK - 1) return prev
+      return [...prev, day].sort()
+    })
   }
 
   function toggleAmenity(value: string) {
@@ -483,8 +514,34 @@ export function EditListingForm({
   // is already stored, and the form would sit there saying "No changes yet"
   // while the host waits for the 0 they typed to save. Counting it as dirty is
   // what lets them press Save and be told why it can't.
-  const weekendPriceOk = checkWeekendPrice(weekendPrice).ok
-  const dirty = patch !== null || !weekendPriceOk
+  const weekendCheck = checkWeekendPrice(weekendPrice)
+  const weekendPriceOk = weekendCheck.ok
+  // The same trick for the day set, which has two ways to be wrong: it can cover
+  // the whole week (what a listing saved before that rule existed still holds)
+  // or it can cover no day at all under a rate the host typed — a rate that
+  // would store fine and then never be charged on a single night. Both are only
+  // problems while there IS a rate: if the host is clearing it, the days are
+  // being cleared with it, and refusing that save would trap them on a form they
+  // are in the middle of fixing.
+  const weekendSchedule = resolveWeekendSchedule(
+    weekendCheck.ok ? weekendCheck.value : null,
+    weekendDays
+  )
+  const dirty = patch !== null || !weekendPriceOk || !weekendSchedule.ok
+
+  // Same helper, same keys and same field labels as the create form — the two
+  // doors must not describe the same rule in two different ways.
+  function completenessMessage(problem: {
+    code: 'required' | 'letters' | 'tooShort' | 'tooFew'
+    field: 'description' | 'location' | 'region' | 'pin' | 'propertyType' | 'photos'
+    min?: number
+  }): string {
+    if (problem.field === 'pin') return t('errors.pinRequired')
+    return t(`errors.completeness.${problem.code}`, {
+      field: t(`fields.${problem.field}`),
+      min: problem.min ?? 0,
+    })
+  }
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -500,14 +557,48 @@ export function EditListingForm({
       setError(t(`errors.title.${titleProblem.code}`, { min: MIN_TITLE_LETTERS, max: MAX_TITLE_LENGTH }))
       return
     }
+    // The rules the create door holds, applied to the fields THIS save changes —
+    // see lib/local/listing-completeness-policy.ts. A listing that cleared the
+    // bar when it was created must not be editable back below it, and clearing a
+    // field is changing it. Fields the host hasn't touched are left alone, so a
+    // listing made before the rule existed can still have its price fixed
+    // without being held hostage to a description it never had. Same check the
+    // API runs, against the same stored values.
+    const editProblem = checkListingEdit(patch ?? {}, {
+      region: listing.region,
+      resort_id: listing.resort_id,
+      resort_name: listing.resort,
+      lat: listing.lat,
+      lng: listing.lng,
+    })
+    if (editProblem) {
+      setError(completenessMessage(editProblem))
+      return
+    }
     const priceNum = Number(price)
     if (!Number.isFinite(priceNum) || priceNum <= 0) {
       setError(t('errors.priceInvalid'))
       return
     }
+    // Same rule as the create form: without a pin there is nothing for the check
+    // under the map to judge, so the words can drift from the place unchallenged.
+    // Listings from before the pin was required can reach this form without one —
+    // the host places it once, here, and every later save is unaffected.
+    if (lat == null || lng == null) {
+      setError(t('errors.pinRequired'))
+      return
+    }
     // "Other" without a name is not "no resort" — see isResortNameMissing().
     if (isResortNameMissing(resortId, resortOther)) {
-      setError(t('errors.resortNameRequired'))
+      setError(t('errors.resortName.required'))
+      return
+    }
+    // …and a box holding `@@@@@` is not a name. It used to submit, and a name with
+    // no letters is stored as no resort at all. Same rule the API runs — see
+    // lib/local/resort-core.ts.
+    const resortProblem = resortId === OTHER_RESORT ? checkResortName(resortOther) : null
+    if (resortProblem) {
+      setError(t(`errors.resortName.${resortProblem.code}`, { min: MIN_RESORT_NAME_LETTERS }))
       return
     }
     // The same floor the create form and the API apply: a listing edited down to
@@ -528,6 +619,13 @@ export function EditListingForm({
     // is how you say that. Without this the patch would quietly save null.
     if (!weekendPriceOk) {
       setError(t('errors.weekendPriceInvalid'))
+      return
+    }
+    // …and the days behind that rate have to leave a day that isn't the weekend,
+    // or price_per_night is a number no night is ever charged — and to leave a
+    // day that IS one, or the weekend rate is.
+    if (!weekendSchedule.ok) {
+      setError(t(`errors.weekendDays.${weekendSchedule.problem}`))
       return
     }
     if (!dirty) return
@@ -575,6 +673,20 @@ export function EditListingForm({
     }
   }
 
+  // Same check the create form runs, for the same reason — a pin can also be
+  // dragged into the wrong country here, on a listing that was already approved.
+  // See listing-geo-policy.ts; it warns, it never blocks the save.
+  const pinProblem = checkListingPin({ lat, lng, country, region })
+  const pinProblemPlace = pinProblem
+    ? (() => {
+        const known = REGIONS.find((r) => r.value === pinProblem.scope)
+        return known ? t(`regions.${known.key}`) : pinProblem.scope
+      })()
+    : ''
+  const pinProblemText = pinProblem
+    ? t(`pinMismatch.${pinProblem.code}`, { place: pinProblemPlace })
+    : ''
+
   return (
     <form
       onSubmit={onSubmit}
@@ -595,19 +707,22 @@ export function EditListingForm({
       `}</style>
 
       <div style={fieldWrap}>
-        <label style={label} htmlFor="edit-title">{t('fields.title')}</label>
+        <label style={label} htmlFor="edit-title">{t('fields.title')}<Req /></label>
         <input
           id="edit-title"
           style={input}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder={t('placeholders.title')}
+          // The policy already refuses a longer title on submit; capping the
+          // field means the host is stopped as they type instead of after.
+          maxLength={MAX_TITLE_LENGTH}
           required
         />
       </div>
 
       <div style={fieldWrap}>
-        <label style={label} htmlFor="edit-desc">{t('fields.description')}</label>
+        <label style={label} htmlFor="edit-desc">{t('fields.description')}<Req /></label>
         <textarea
           id="edit-desc"
           style={{ ...input, minHeight: 96, resize: 'vertical' }}
@@ -619,7 +734,7 @@ export function EditListingForm({
 
       <div className="qk-edit-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, ...fieldWrap }}>
         <div style={{ position: 'relative' }}>
-          <label style={label} htmlFor="edit-location">{t('fields.location')}</label>
+          <label style={label} htmlFor="edit-location">{t('fields.location')}<Req /></label>
           <input
             id="edit-location"
             style={input}
@@ -682,7 +797,7 @@ export function EditListingForm({
 
       {/* Curated browse area — the chips guests filter by (same four on mobile). */}
       <div style={fieldWrap}>
-        <label style={label} htmlFor="edit-region">{t('fields.region')}</label>
+        <label style={label} htmlFor="edit-region">{t('fields.region')}<Req /></label>
         <select
           id="edit-region"
           style={input}
@@ -731,7 +846,7 @@ export function EditListingForm({
 
       {/* Map pin — sets lat/lng; guests see an approximate area, not the exact pin. */}
       <div style={fieldWrap}>
-        <label style={label}>{t('fields.pinLocation')}</label>
+        <label style={label}>{t('fields.pinLocation')}<Req /></label>
         <LocationPickerMap lat={lat} lng={lng} onChange={(la, ln) => { setLat(la); setLng(ln) }} />
         <p style={{ margin: '6px 0 0', fontSize: 12.5, color: geo === 'fail' ? C.burgundy : C.muted }}>
           {geo === 'locating'
@@ -742,11 +857,29 @@ export function EditListingForm({
             ? t('pinSet', { lat: lat.toFixed(4), lng: lng.toFixed(4) })
             : t('pinHint')}
         </p>
+        {pinProblemText ? (
+          <p
+            role="status"
+            style={{
+              margin: '8px 0 0',
+              padding: '10px 12px',
+              borderRadius: 12,
+              background: '#FBEEEF',
+              border: `1px solid ${C.burgundy}33`,
+              fontSize: 12.5,
+              lineHeight: 1.5,
+              color: C.burgundy,
+              fontWeight: 600,
+            }}
+          >
+            {pinProblemText}
+          </p>
+        ) : null}
       </div>
 
       <div className="qk-edit-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, ...fieldWrap }}>
         <div>
-          <label style={label} htmlFor="edit-price">{t('fields.price')}</label>
+          <label style={label} htmlFor="edit-price">{t('fields.price')}<Req /></label>
           <input
             id="edit-price"
             style={input}
@@ -793,19 +926,23 @@ export function EditListingForm({
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {WEEKDAY_KEYS.map((k, day) => {
             const on = weekendDays.includes(day)
+            const locked = !on && weekendDaysFull
             return (
               <button
                 key={k}
                 type="button"
                 onClick={() => toggleWeekendDay(day)}
                 aria-pressed={on}
+                disabled={locked}
+                title={locked ? t('errors.weekendDays.wholeWeek') : undefined}
                 style={{
                   padding: '7px 12px',
                   borderRadius: 999,
                   fontSize: 13,
                   fontWeight: 600,
                   fontFamily: 'inherit',
-                  cursor: 'pointer',
+                  cursor: locked ? 'not-allowed' : 'pointer',
+                  opacity: locked ? 0.45 : 1,
                   border: `1px solid ${on ? C.burgundy : 'rgba(42,34,32,0.16)'}`,
                   background: on ? C.burgundy : '#fff',
                   color: on ? '#fff' : C.ink,
@@ -816,30 +953,40 @@ export function EditListingForm({
             )
           })}
         </div>
+        {weekendDaysFull && (
+          <p style={{ margin: '8px 0 0', fontSize: 12.5, color: C.muted }}>
+            {t('errors.weekendDays.wholeWeek')}
+          </p>
+        )}
+        {weekendDaysMissing && (
+          <p style={{ margin: '8px 0 0', fontSize: 12.5, color: C.burgundy }}>
+            {t('errors.weekendDays.noDaysChosen')}
+          </p>
+        )}
       </div>
 
       <div className="qk-edit-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, ...fieldWrap }}>
         <div>
-          <label style={label} htmlFor="edit-bedrooms">{t('fields.bedrooms')}</label>
+          <label style={label} htmlFor="edit-bedrooms">{t('fields.bedrooms')}<Req /></label>
           <input id="edit-bedrooms" style={input} type="number" min="1" step="1" value={bedrooms} onChange={(e) => setBedrooms(e.target.value)} />
         </div>
         <div>
-          <label style={label} htmlFor="edit-beds">{t('fields.beds')}</label>
+          <label style={label} htmlFor="edit-beds">{t('fields.beds')}<Req /></label>
           <input id="edit-beds" style={input} type="number" min="1" step="1" value={beds} onChange={(e) => setBeds(e.target.value)} />
         </div>
         <div>
-          <label style={label} htmlFor="edit-baths">{t('fields.bathrooms')}</label>
+          <label style={label} htmlFor="edit-baths">{t('fields.bathrooms')}<Req /></label>
           <input id="edit-baths" style={input} type="number" min="1" step="1" value={bathrooms} onChange={(e) => setBathrooms(e.target.value)} />
         </div>
         <div>
-          <label style={label} htmlFor="edit-guests">{t('fields.maxGuests')}</label>
+          <label style={label} htmlFor="edit-guests">{t('fields.maxGuests')}<Req /></label>
           <input id="edit-guests" style={input} type="number" min="1" step="1" value={maxGuests} onChange={(e) => setMaxGuests(e.target.value)} />
         </div>
       </div>
 
       {/* Property type — icon grid */}
       <div style={fieldWrap}>
-        <label style={label}>{t('fields.propertyType')}</label>
+        <label style={label}>{t('fields.propertyType')}<Req /></label>
         <div
           style={{
             display: 'grid',
@@ -919,7 +1066,7 @@ export function EditListingForm({
 
       {/* Photos — add, remove, reorder and pick the cover, up to MAX_WEB_LISTING_PHOTOS */}
       <div style={fieldWrap}>
-        <label style={label}>{t('fields.photos')}</label>
+        <label style={label}>{t('fields.photos')}<Req /></label>
         <input
           ref={fileRef}
           type="file"

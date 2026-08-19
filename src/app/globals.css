@@ -128,6 +128,19 @@
   --sidebar-ring: #5B0F16;
 }
 
+/* Floating buttons (the WhatsApp FAB on the inline-start edge, a page's own FAB
+   on the inline-end edge — e.g. "Create a listing" on the host dashboard) all
+   sit on this one bottom shelf, so opposite corners stay level with each other.
+   Phones raise it so the buttons clear the browser chrome + home indicator. */
+:root {
+  --qk-fab-bottom: 22px;
+}
+@media (max-width: 640px) {
+  :root {
+    --qk-fab-bottom: calc(80px + env(safe-area-inset-bottom));
+  }
+}
+
 /* Dark mode kept for compatibility */
 .dark {
   --background: #1A1512;

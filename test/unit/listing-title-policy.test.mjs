@@ -1,7 +1,9 @@
 // Unit tests for src/lib/local/listing-title-policy.ts — the rule every path
-// that sets a listing title clears (`createListing`, the title branch of the
-// edit patch, the /host create + edit forms, and the dashboard wizard's zod
-// schema).
+// that sets a listing title clears, in BOTH repos: `createListing` and the title
+// branch of the edit patch (web and backend alike), the /host create + edit forms
+// and the dashboard wizard's zod schema on the web, and through the backend every
+// title the iOS and Android apps send. The file is byte-identical across the two
+// repos; check-listing-title-policy-parity.mjs is what keeps it that way.
 //
 // Offline: no database, no network, no server. Run with `npm test`.
 // Note the explicit `.ts` extension — Node 22 strips types, but its ESM resolver

@@ -12,6 +12,7 @@ import { HostReservations } from './host-reservations'
 import { HostTabs, HostListingsFilter, type HostListingStatus } from './host-tabs'
 import { ListingStatusChip } from './listing-status-chip'
 import { OwnershipDocReupload } from './ownership-doc'
+import { CARD_ACTION_STYLE } from './card-action-style'
 import { BecomeHostButton } from '../account/account-forms'
 
 export const dynamic = 'force-dynamic'
@@ -153,10 +154,28 @@ export default async function HostPage() {
       <style>{`
         @media (max-width: 640px) {
           .qk-host-grid { grid-template-columns: 1fr !important; }
-          .qk-host-listing-card { grid-template-columns: 1fr !important; }
+          .qk-host-listing-card { grid-template-columns: minmax(0, 1fr) !important; }
           .qk-host-listing-card .qk-host-listing-img {
             width: 100% !important; height: 170px !important;
           }
+        }
+        /* A listing title is host input: 200 repeated characters with no space
+           is one unbreakable word, and a grid item's min-width:auto lets that
+           word widen its track until the card overflows the row. Break inside
+           the word and clamp to two lines so any title fits the same box. */
+        .qk-host-card-title {
+          overflow-wrap: anywhere;
+          display: -webkit-box;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 2;
+          overflow: hidden;
+        }
+        .qk-host-card-loc {
+          overflow-wrap: anywhere;
+          display: -webkit-box;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 2;
+          overflow: hidden;
         }
         /* The whole photo/title area of a host card is a link to its editor —
            give it clear hover affordance so it reads as clickable. */
@@ -379,6 +398,8 @@ async function HostDashboard({ userId, firstName, t }: { userId: string; firstNa
     edit: t('dashboard.edit'),
     badgePending: t('dashboard.badge.pending'),
     badgeRejected: t('dashboard.badge.rejected'),
+    rejectedHeading: t('dashboard.rejected.heading'),
+    rejectedNoReason: t('dashboard.rejected.noReason'),
   }
 
   const emptyState = (
@@ -477,24 +498,27 @@ async function HostDashboard({ userId, firstName, t }: { userId: string; firstNa
         reservations={<HostReservations />}
       />
 
-      {/* Floating "Create listing" shortcut — offset above the WhatsApp FAB (bottom:22). */}
+      {/* Floating "Create listing" shortcut. It shares the --qk-fab-bottom shelf
+          (globals.css) and the 56px height of the WhatsApp FAB in the opposite
+          corner, so the two sit level on every breakpoint. */}
       <a
         href="/host/new"
         aria-label={t('dashboard.createListing')}
         style={{
           position: 'fixed',
-          bottom: 90,
+          bottom: 'var(--qk-fab-bottom, 22px)',
           insetInlineEnd: 22,
           zIndex: 900,
           display: 'inline-flex',
           alignItems: 'center',
           gap: 8,
+          height: 56,
           background: COLORS.burgundy,
           color: '#fff',
           textDecoration: 'none',
           fontWeight: 700,
           fontSize: 14.5,
-          padding: '13px 20px',
+          padding: '0 22px',
           borderRadius: 999,
           boxShadow: '0 8px 24px rgba(91,15,22,0.34)',
           whiteSpace: 'nowrap',
@@ -513,6 +537,10 @@ type CardLabels = {
   edit: string
   badgePending: string
   badgeRejected: string
+  /** Heading over the operator's reason on a rejected card. */
+  rejectedHeading: string
+  /** Shown in place of the reason when the operator rejected without writing one. */
+  rejectedNoReason: string
 }
 
 function ListingCard({
@@ -545,7 +573,10 @@ function ListingCard({
         boxShadow: '0 6px 24px rgba(42,34,32,0.07)',
         overflow: 'hidden',
         display: 'grid',
-        gridTemplateColumns: '1fr',
+        // minmax(0, …) rather than 1fr: without it the track floors at the
+        // content's min-width and a long title pushes the card wider.
+        gridTemplateColumns: 'minmax(0, 1fr)',
+        minWidth: 0,
       }}
     >
       {/* Tapping the photo / title / price opens this listing's editor. Kept as a
@@ -572,11 +603,15 @@ function ListingCard({
           )}
         </div>
         <div style={{ padding: '14px 16px 2px' }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: COLORS.ink, transition: 'color .16s ease' }}>
+          <h3
+            className="qk-host-card-title"
+            title={listing.title}
+            style={{ margin: 0, fontSize: 16, fontWeight: 700, lineHeight: 1.3, color: COLORS.ink, transition: 'color .16s ease' }}
+          >
             {listing.title}
           </h3>
           {listing.location && (
-            <p style={{ margin: '3px 0 0', fontSize: 13.5, color: COLORS.muted }}>
+            <p className="qk-host-card-loc" style={{ margin: '3px 0 0', fontSize: 13.5, lineHeight: 1.35, color: COLORS.muted }}>
               {listing.location}
             </p>
           )}
@@ -591,20 +626,50 @@ function ListingCard({
           )}
         </div>
       </a>
+      {/* Why it was rejected. A red badge alone tells a host they're blocked without
+          telling them what to change, which is the one thing the badge exists to
+          prompt. `review_note` is null when the operator rejected without writing a
+          reason (it is optional) and on every listing rejected before the column
+          existed — both fall back to generic guidance rather than an empty box.
+          Outside the <a> above: the reason is text to read, not part of the link. */}
+      {status === 'rejected' && (
+        <div
+          style={{
+            margin: '12px 16px 0',
+            padding: '10px 12px',
+            background: '#fdecea',
+            border: '1px solid rgba(179,38,30,0.16)',
+            borderRadius: 12,
+          }}
+        >
+          <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#b3261e' }}>
+            {labels.rejectedHeading}
+          </p>
+          {/* Host-visible staff text: keep the line breaks an operator typed, and
+              break inside a long unspaced run so it cannot widen the card. */}
+          <p
+            style={{
+              margin: '4px 0 0',
+              fontSize: 13,
+              lineHeight: 1.45,
+              color: COLORS.ink,
+              whiteSpace: 'pre-line',
+              overflowWrap: 'anywhere',
+            }}
+          >
+            {listing.review_note || labels.rejectedNoReason}
+          </p>
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 10, padding: '12px 16px 16px' }}>
         <a
           href={`/explore/${listing.id}`}
           style={{
+            ...CARD_ACTION_STYLE,
             flex: 1,
-            textAlign: 'center',
-            textDecoration: 'none',
             color: COLORS.burgundy,
             background: COLORS.cream,
-            border: `1px solid ${COLORS.tan}`,
-            borderRadius: 999,
-            padding: '9px 12px',
-            fontSize: 13.5,
-            fontWeight: 700,
+            borderColor: COLORS.tan,
           }}
         >
           {labels.view}
@@ -612,15 +677,10 @@ function ListingCard({
         <a
           href={editHref}
           style={{
+            ...CARD_ACTION_STYLE,
             flex: 1,
-            textAlign: 'center',
-            textDecoration: 'none',
             color: '#fff',
             background: COLORS.burgundy,
-            borderRadius: 999,
-            padding: '9px 12px',
-            fontSize: 13.5,
-            fontWeight: 700,
           }}
         >
           {labels.edit}

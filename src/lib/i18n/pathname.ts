@@ -4,7 +4,9 @@ import { defaultLocale, isLocale, type Locale } from '@/i18n/config'
 // /ops/login. Locale-prefixing it would turn every one of those redirects into two
 // (/ops/login → /en/ops/login), doubling history entries on sign-out.
 const UNLOCALIZED_PREFIXES = ['/api', '/_next', '/ops']
-const UNLOCALIZED_EXACT = ['/favicon.ico']
+// Crawler-facing files. A locale redirect on these hands Googlebot a URL that
+// isn't a route, so the sitemap and robots.txt must stay at the bare path.
+const UNLOCALIZED_EXACT = ['/favicon.ico', '/sitemap.xml', '/robots.txt']
 
 function isAbsoluteUrl(value: string): boolean {
   return /^https?:\/\//i.test(value)
@@ -28,8 +30,6 @@ export function stripLocaleFromPath(pathname: string): {
 export function isLocalizablePath(pathname: string): boolean {
   if (!pathname.startsWith('/')) return false
   if (UNLOCALIZED_EXACT.includes(pathname)) return false
-  if (pathname.startsWith('/auth/callback')) return false
-  if (pathname.startsWith('/auth/invite')) return false
 
   return !UNLOCALIZED_PREFIXES.some((prefix) => pathname.startsWith(prefix))
 }

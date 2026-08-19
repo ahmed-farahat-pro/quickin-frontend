@@ -121,6 +121,44 @@ export default async function EditListingPage({ params }: { params: Promise<{ id
         <p style={{ margin: '0 0 24px', fontSize: 15, color: COLORS.muted, lineHeight: 1.55 }}>
           {t('subtitle')}
         </p>
+        {/* The reason this listing was rejected, above the form that fixes it. The
+            host dashboard shows it too, but this is where the host actually acts on
+            it — a reason they have to navigate back to isn't much better than none.
+            `review_note` is null when the operator rejected without writing one, and
+            on listings rejected before the note was stored at all; both fall back to
+            generic copy. Cleared on save, since saving re-queues the listing. */}
+        {status === 'rejected' && (
+          <div
+            style={{
+              margin: '0 0 24px',
+              padding: '14px 16px',
+              background: '#fdecea',
+              border: '1px solid rgba(179,38,30,0.18)',
+              borderRadius: 14,
+            }}
+          >
+            <p style={{ margin: 0, fontSize: 14.5, fontWeight: 700, color: '#b3261e' }}>
+              {t('rejected.title')}
+            </p>
+            {/* Staff-authored text shown to the host: keep the operator's line
+                breaks, and break inside a long unspaced run so it can't overflow. */}
+            <p
+              style={{
+                margin: '6px 0 0',
+                fontSize: 14.5,
+                lineHeight: 1.55,
+                color: COLORS.ink,
+                whiteSpace: 'pre-line',
+                overflowWrap: 'anywhere',
+              }}
+            >
+              {listing.review_note || t('rejected.noReason')}
+            </p>
+            <p style={{ margin: '8px 0 0', fontSize: 13.5, lineHeight: 1.5, color: COLORS.muted }}>
+              {t('rejected.hint')}
+            </p>
+          </div>
+        )}
         <EditListingForm
           listing={listing}
           hasOwnershipDoc={hasOwnershipDoc}

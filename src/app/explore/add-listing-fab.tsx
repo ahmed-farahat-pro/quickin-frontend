@@ -8,9 +8,9 @@
 // Logical inset properties keep them on opposite corners in RTL too (they simply
 // mirror with the rest of the layout), so the two can never collide.
 //
-// Wide screens get the extended pill (+ icon + label); ≤640px collapses to a 56px
-// circle and raises `bottom` clear of the phone-only "download the app" bar
-// (fixed, ~64px + safe-area, zIndex 950 — see ./app-download-bar.tsx).
+// Both corners read their `bottom` from the shared --qk-fab-bottom shelf in
+// globals.css, so they stay level at every breakpoint. Wide screens get the
+// extended pill (+ icon + label); ≤640px collapses to a 56px circle.
 import { Plus } from 'lucide-react'
 
 export default function AddListingFab({ href, label }: { href: string; label: string }) {
@@ -19,7 +19,7 @@ export default function AddListingFab({ href, label }: { href: string; label: st
       <style>{`
         .qk-fab-add {
           position: fixed;
-          bottom: 22px;
+          bottom: var(--qk-fab-bottom, 22px);
           inset-inline-end: 22px;
           z-index: 900;
           display: inline-flex;
@@ -41,7 +41,6 @@ export default function AddListingFab({ href, label }: { href: string; label: st
         }
         @media (max-width: 640px) {
           .qk-fab-add {
-            bottom: calc(80px + env(safe-area-inset-bottom));
             width: 56px;
             padding: 0;
             gap: 0;

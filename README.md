@@ -169,6 +169,34 @@ host filed twice, and no operator reading `/ops` can tell that from two people.
 `national_id` next to it is deliberately **not** validated this way — a foreign
 applicant's passport number has letters in it.
 
+### `/host/apply` — identity is verified once, not once per role
+
+Identity belongs to the **person**, not to the role they are using: a guest verifies
+from `/account` → `/verify-id` for the trust badge, and that is the same document a host
+is approved on. The application form nevertheless asked every applicant for the front and
+back of their ID and refused to submit without them, so anyone who had already verified
+as a guest photographed the same card a second time to become a host.
+
+`needsIdentityDocuments(status)` in `src/lib/local/host-verification-core.ts` is the rule,
+and **both ends run it**: the form renders the upload step only when it returns true, and
+`submitHostApplication` in `db.ts` requires the images only when it returns true. Running
+one rule in both places is the point — the server has always accepted an application with
+no images from a verified applicant, and the form asking for them anyway was the whole bug.
+
+| Verification on file | The applicant sees |
+| --- | --- |
+| `verified` | A green "Identity verified" panel and a link to `/verify-id`. No upload. Their application is linked to the existing `id_verifications` row |
+| `pending` | An amber "under review" panel. No upload — it is already in the reviewer's queue and gets decided together with the application |
+| `rejected` | The reviewer's reason, then the upload step again. Re-filing refused photos would put the same document back in front of them |
+| none | The upload step, as before |
+
+The **National ID field is read-only** once the ID is verified, seeded from
+`id_verifications.id_number`. An admin approved a document bearing that number; letting the
+application carry a different one leaves the reviewer holding two answers with nothing to
+say which is the person's. It stays editable while a submission is only `pending` — nothing
+has been approved yet — and is still sent with the request either way (`readOnly`, not
+`disabled`, so the value is submitted and screen readers still announce the field).
+
 ### `/account` — Profile photo
 
 `users.avatar_url` had been **read** everywhere since the beginning — the identity card
@@ -263,10 +291,10 @@ The single URL to put in the Instagram / TikTok / Facebook bios. It lists the we
 both mobile apps, the three social accounts, the WhatsApp line and the support inbox as
 tappable rows.
 
-It sits **outside** the `(main)` route group on purpose, so it renders on the root layout
-alone — no navbar, no site footer. The global "Get the app" bar and the floating WhatsApp
-button both hide themselves here (each is already a row on the page), so the route is
-listed in `HIDDEN_PREFIXES` in `app-store-bar.tsx` and `whatsapp-fab.tsx`.
+It renders on the root layout alone — no navbar, no site footer. The global "Get the
+app" bar and the floating WhatsApp button both hide themselves here (each is already a
+row on the page), so the route is listed in `HIDDEN_PREFIXES` in `app-store-bar.tsx`
+and `whatsapp-fab.tsx`.
 
 Where each row comes from — all existing sources, nothing duplicated:
 
@@ -373,6 +401,27 @@ row, so a six-character rule there was a way to weaken a web account from the ap
 Existing weak passwords keep working — nothing rehashes or expires them; the rules
 apply the next time one is set.
 
+### Show/hide on every password box
+
+A rule you can't proofread against is a rule you fail twice. `/login` and `/signup`
+already put an eye inside the field; **`/account` → Change password did not**, so the
+one form that asks for three passwords at once — current, new, confirm — was the one
+form where a typo could only be discovered from *"New passwords do not match."*, or
+from a login that stopped working.
+
+**`components/features/auth/password-eye-toggle.tsx`** is that control, pulled out so
+any form can use it: drop it in a `position: relative` wrapper and leave the input
+`paddingInlineEnd: 46`. It is `insetInlineEnd`, not `right`, so it stays inside the
+field in Arabic; it carries `aria-pressed` and `aria-controls` so a screen reader says
+which field it belongs to; and its label is a real translation
+(`passwordPolicy.toggle.show` / `.hide`) in all four locales rather than the hardcoded
+English `/login` still uses.
+
+**Each field gets its own eye, and all three go back to dots after a successful
+change.** One shared toggle would mean revealing the new password to check it also
+puts the current one on screen — three boxes, three different secrets — and leaving
+them revealed would show the next thing typed into an emptied box.
+
 ## A name has to be a name
 
 Signup asked that the name field be non-empty, so `12345` created an account whose
@@ -421,7 +470,6 @@ has no imports, so the same code runs everywhere:
 | `updateListingDetails` (`lib/local/db.ts`) | The same rule on the edit door — otherwise a listing publishes with a real title and is edited down to `!!!!!` afterwards. It replaces `assertListingText`, which truncated at 200 rather than refusing |
 | `app/host/new/new-listing-form.tsx` | Checks before the request and localizes the problem code (`hostPage.create.errors.title.*`) |
 | `app/host/[id]/edit/edit-listing-form.tsx` | Same check on the edit form |
-| `components/features/host/listing-wizard.tsx` | A `.refine` on both `title` and `title_ar`; the schema's `.min(5)` counts characters, so `!!!!!` was a five-character title |
 
 The rule that does the work: a title must contain **letters** (`\p{L}`, so Arabic and
 Han count), at least three of them, in at most 200 characters. Deliberately **not** "no
@@ -432,6 +480,49 @@ before `tooShort` so `@@` hears the thing that is actually wrong with it.
 Not yet ported to `quickin-backend`, so a listing created from the mobile apps still
 clears only the non-empty check — the copy-and-parity treatment `name-policy.ts` gets
 is the follow-up.
+
+## A compound name has to be a name
+
+The resort dropdown's **Other — not listed** option swaps in a free-text box, and the
+box asked only to be non-blank — so a host could type `@@@@@`, `!!!!!` or `12345` and
+publish. Worse than an ugly catalog entry: a name with no alphanumerics slugs to `''`
+(see `resortSlug`), and the write path reads a slug-less name as *no resort chosen*.
+The host's answer was thrown away on save, the listing missed every resort filter, and
+nothing queued for the /ops catalog — the same silent discard `isResortNameMissing`
+was written to stop, one step further along.
+
+**`checkResortName` in `src/lib/local/resort-core.ts`** decides now, next to the
+normalizer and the slug it protects:
+
+| Caller | What it does |
+| --- | --- |
+| `createListing` (`lib/local/db.ts`) | `assertResortName` on the create door. Throws `ListingInputError`, so `POST /api/local/listings` answers 400 with the reason |
+| `updateListingDetails` (`lib/local/db.ts`) | The same rule on the edit door — otherwise a listing publishes under a real compound and is edited down to `!!!!!` afterwards |
+| `resolveResortSelection` (`lib/local/resorts.ts`) | The storage backstop: text that isn't a name is treated as no answer rather than written to the column, so a caller that forgets can't dirty the catalog |
+| `app/host/new/new-listing-form.tsx` | Checks before the request and localizes the problem code (`hostPage.create.errors.resortName.*`) |
+| `app/host/[id]/edit/edit-listing-form.tsx` | Same check on the edit form |
+
+The rule that does the work is the same one `listing-title-policy.ts` uses: the name
+must contain **letters** (`\p{L}`, so Arabic counts), at least two of them. Deliberately
+**not** "no punctuation" and **not** "Latin only" — `Marassi (North)`, `Sa7el Chalet`,
+`90 Avenue` and `هاسيندا باي` are all names a host really types, and a rule that turns
+one of those away leaves the resort blank, which is the failure it was meant to
+prevent. `letters` is reported before `tooShort`, so `@@@@@` hears "write it in words"
+rather than "add another `@`".
+
+Two things pass straight through, because both are real answers: a resort **picked**
+from the dropdown (the typed text is ignored when an id is present), and nothing typed
+at all (a chalet outside any compound, or an edit clearing the resort).
+
+Same fix in `quickin-backend` — `resort-core.ts` is parity-checked, and its
+`createListing`/`updateListingDetails` call the same `assertResortName`, so a listing
+created from iOS or Android meets the rule too.
+
+While fixing it: a name with letters but **no** slug — anything written in a
+non-Latin script, `هاسيندا باي` being the common case — is now **kept** as free text
+instead of being dropped. It has no match key, so it can't auto-link to a catalog row
+and can't queue (`resort_submissions` is keyed on the slug), but it is stored, shown
+to guests as typed, and visible to an admin in the unassigned-names sweep.
 
 ## A listing has to have somewhere to sleep
 
@@ -451,8 +542,6 @@ listing nobody can book at all, since every booking checks `guests <= max_guests
 | `updateListingDetails` (`lib/local/db.ts`) | The same floor on the edit door — otherwise a listing publishes with a real capacity and is edited down to zero bedrooms afterwards. It replaces `assertListingInt`, whose floor for these three fields was 0 |
 | `app/host/new/new-listing-form.tsx` | Checks before the request and localizes the problem code (`hostPage.create.errors.capacity.*`); the inputs now say `min="1"`, so the browser refuses first |
 | `app/host/[id]/edit/edit-listing-form.tsx` | Same check on the edit form. `buildPatch` runs on every render, so a half-typed count falls back to what the listing already holds rather than patching a 0 |
-| `components/features/host/listing-wizard.tsx` | `.min(MIN_CAPACITY)` in the zod schema, where the three fields were `.min(0)` |
-| `dashboard/listings/[id]/manage/actions.ts` | The server action behind the manage screen validates `beds` and `max_guests` before writing — the input's `min` is a hint, this is the rule |
 
 The rule that does the work: each count is a **whole number of at least one**.
 Deliberately **no** upper bound — a 40-bedroom villa is not an error, and a cap
@@ -470,6 +559,175 @@ it, `MIN_CAPACITY` is the one constant to change.
 Not yet ported to `quickin-backend`, so a listing created from the mobile apps still
 clears only the old `>= 0` check — the same follow-up the title policy is waiting on.
 
+## A listing has to say enough to be a listing
+
+Create-listing required a **title and a price. That was all.** A host could open
+`/host/new`, type a name and a number, press Create, and the row landed in `listings`
+with a NULL description, no address, no curated area, no map pin and not one photo —
+and nothing on the form said any of it mattered, because only the title carried a
+`required`. The result is a listing a guest cannot **read** (no description), cannot
+**find** (no region to filter by), cannot **see** (no photos) and cannot **place** (no
+pin, so it is missing from the `/explore` map the whole browse experience is built on).
+Both mobile wizards had already reached half of this conclusion on their own — each
+required the area and the pin, neither required a description or a photo — so the three
+clients nearly agreed, which is the worst number of clients to nearly agree.
+
+**`src/lib/local/listing-completeness-policy.ts`** decides now, and like
+`listing-capacity-policy.ts` it has no imports, so the same code runs everywhere:
+
+| Caller | What it does |
+| --- | --- |
+| `createListing` (`lib/local/db.ts`) | The decision on the create door. Throws `ListingInputError`, so `POST /api/local/listings` answers 400 with the reason. Runs against the **filtered** photo set, so the count it judges is the count that gets written |
+| `app/host/new/new-listing-form.tsx` | Checks before the request and localizes the problem code (`hostPage.create.errors.completeness.*`), in the order the fields are laid out on the page. Every required label now carries a `*` with a legend at the top of the form, and the fields that can hold a native `required` do |
+| `mobile/ios` `AddListingView.swift` | The per-step gates on the create wizard: description on Basics, address on Location, a photo on Details. The **edit** wizard in the same file is deliberately untouched |
+| `mobile/android` `ui/HostScreen.kt` | The same three gates in `canAdvance`. Photos are gated on Details, where the picker is — not on the read-only Review step |
+
+The rule: a **description** (at least 20 letters), an **address**, an **area**, a **map
+pin**, a **property type** and **at least one photo**. Two of those are worth spelling
+out. The 20 is the floor the old listing wizard already asked for, so it is the
+platform's existing answer rather than a new number; and it counts **letters**, not
+characters, for the reason `listing-title-policy.ts` counts them — `....................`
+is twenty characters and no description at all. `letters` is reported before `tooShort`
+so a box of symbols hears the real problem instead of being told to add a twenty-first
+one.
+
+The **resort is deliberately not required**, and a resort **satisfies the area
+requirement on its own**. A standalone villa belongs to no compound, so making the field
+mandatory would push those hosts through the "Other" free-text box and fill the
+moderation queue with names that are not resorts; and `resolveResortSelection` already
+derives the region from a chosen resort, so demanding the region separately would refuse
+a listing that names its compound and then have the server fill the region in a line
+later.
+
+**Both doors, judged differently.** `createListing` judges the whole listing:
+everything must be answered. The edit door (`checkListingEdit`) judges only the fields
+the patch actually *touches*, and that difference is deliberate on both sides.
+
+It has to be, because a patch is partial by design: the iOS app re-submits a proof of
+ownership with `PATCH { ownership_doc }` and nothing else, and its edit screen never
+sends `images` at all, since photos travel through the `/images` routes. Re-running the
+create check on the merged row would refuse both.
+
+It is still enough to close the hole that matters, because **clearing a field is
+touching it**. A listing cannot be created complete and then emptied out: every one of
+the six fields is refused when a patch blanks it, on the web form and through the API.
+What the edit door deliberately does *not* do is hold a host's price change hostage to a
+description their listing never had — the rows that predate this rule stay editable in
+the parts the host is actually editing, and complete themselves the moment someone edits
+those fields. The two-column rules are merged before judging, so patching `lat` alone is
+still judged as a pin against the stored `lng`, and swapping the region on a listing that
+names a resort is still judged as an area.
+
+One route could still empty a listing out from the side: `deleteListingImage` in
+**`quickin-backend`**, which the mobile apps call to remove one photo at a time. It now
+refuses to remove the last one — the count is taken after the delete, inside the
+transaction, so the `ROLLBACK` puts the photo back.
+
+This is a completeness rule, not a quality one. Whether the description is any *good* is
+what the `/ops` review is for — every new listing still lands there as `pending`.
+
+**Ported to `quickin-backend`**, where the mobile apps' create and edit doors run it, and
+the file is byte-identical in both repos — `check-listing-completeness-policy-parity.mjs`
+is what keeps it that way, and `npm run check` in the backend runs it. This is the first
+of the listing policies to reach both repos; the title policy is already shared, capacity
+is still web-only.
+
+## The map pin has to be where the listing says it is
+
+A listing states its place twice on the create form: in words — **Location**,
+**Country**, the curated **Region** chip, the **Resort** — and as a **pin** the host
+drops on the map. Nothing compared the two. A host could choose Egypt → North Coast →
+Porto, click the map in **Germany**, and the listing saved without a murmur; the pin
+is what `/explore`'s map, the search map and the listing page all draw from, so that
+Egyptian chalet appeared in Bavaria. `createListing` wrote lat/lng through a bare
+`Number.isFinite` check, so it did not even bound them to ±90/±180 the way the edit
+path (`assertCoord`) had always done — a latitude of `999` was stored.
+
+**`src/lib/local/listing-geo-policy.ts`** decides now, and like
+`listing-capacity-policy.ts` it has no imports, so the same code runs everywhere:
+
+| Caller | What it does |
+| --- | --- |
+| `app/host/new/new-listing-form.tsx` | Runs on every render and shows the problem under the map, in the host's own language (`hostPage.create.pinMismatch.*`, with the curated area named through `regions.*`). It **does not block the submit** |
+| `app/host/[id]/edit/edit-listing-form.tsx` | The same warning on the edit door — a pin can be dragged into the wrong country from the editor too, on a listing that was already approved |
+| `app/ops/(console)/ops-dashboard.tsx` | Badges the listing card an operator approves from (`Pin outside Egypt`), with the coordinates in the tooltip. This is where an ignored warning lands |
+| `createListing` (`lib/local/db.ts`) | Runs `assertCoord` on both doors now, so an impossible coordinate answers **400** on create as it already did on edit. The country/region mismatch itself is **not** refused here |
+| `POST /api/local/listings` · `PATCH /api/local/listings/[id]` | Answer the same verdict as a `pin_warning` field — `null`, or `{code, scope, message}`. Nothing on the web reads it (the forms run the module themselves), but `quickin-backend`'s copies of these routes answer with it for the mobile apps, and a caller pointed at either door should get the same answer |
+
+The verdict comes from **bounding boxes** — one per country the form offers, one per
+curated area (North Coast, Ain Sokhna, El Gouna, Cairo). Not a polygon and not a
+reverse-geocode: a reverse-geocode is a rate-limited Nominatim call on every pin drag,
+offline on mobile and fuzzy to compare against free text, while a box is explainable
+to the operator who has to act on it. The boxes are padded outward and the regions are
+drawn wide — "Cairo" is Greater Cairo including Giza, Sheikh Zayed, 6th of October and
+New Cairo — because a warning on a genuine listing is the expensive failure here.
+
+It **warns, it never refuses**, which is why the boxes can afford to be coarse: a
+rectangle written in a source file must not be the reason a real property can't be
+listed. The host sees the mismatch next to the map they just used and can fix the pin,
+the country or the area; if they submit anyway, `/ops` sees the badge before approving.
+Nothing about the mismatch is stored — it is derived from `lat`/`lng`/`country`/`region`
+at read time, so there is no column to migrate and no flag that goes stale the moment a
+host moves their pin.
+
+The module stays quiet whenever it cannot honestly judge: no pin at all, a country it
+has no box for, a region it has no box for. A warning a host cannot act on is worse
+than no warning.
+
+Which is why **both host forms now require a pin before they submit**
+(`hostPage.create.errors.pinRequired`). The pin was optional on the web while both
+mobile apps gate their location step on one, so the web was the only door a listing
+could come through with no coordinates — and with no pin there is nothing to judge, so
+the words could drift from the place unchallenged: a North Coast address under a Cairo
+area chip raised nothing at all. The pin is what the policy trusts, so it has to exist
+before any of it means anything. Older listings can reach the edit form without one;
+the host places it once, there. The API stays permissive — the requirement is a form
+rule, the same way iOS and Android gate their step rather than their request.
+
+`listing-geo-policy.ts` is byte-identical to `quickin-backend`'s copy — that project's
+`POST`/`PATCH` answer the same verdict as a non-blocking `pin_warning` for the mobile
+apps, and `scripts/check-listing-geo-policy-parity.mjs` (in the backend repo) fails on
+drift. `mobile/ios/Sources/ListingGeoPolicy.swift` and
+`mobile/android/…/com/quickin/app/ListingGeoPolicy.kt` carry the same boxes in Swift and
+Kotlin. Those two are kept in step **by hand** — no script guards them — so the boxes
+are the contract between all four files.
+
+## A rejected listing has to say why
+
+Rejecting a listing asked the operator for a reason and then threw it away. `/ops`
+prompted (`Optional note for the host (why rejected)`), `POST /api/local/admin/listings`
+passed the note down, and `adminSetListingApproval` interpolated it into a **notification
+body** — the only copy that ever existed. No column held it. A host who missed, cleared
+or never opened that notification was left with a red **Rejected** badge, no reason, and
+nothing to act on, which is the whole difference between rejecting a listing and deleting
+it.
+
+The note is now stored on the listing and read back by every host surface.
+
+| Piece | What it does |
+| --- | --- |
+| `listings.review_note` (`text`, nullable) | Where the reason lives. NULL means "no reason recorded" — the operator wrote none (the note is optional, by design) or the listing was rejected before the column existed. **Apply it to Neon BEFORE shipping** — `ALTER TABLE listings ADD COLUMN IF NOT EXISTS review_note text` (or `quickin-backend/scripts/migrate-listing-review-note.mjs`), because the host projection selects the column and a database without it fails every host read. The key-gated `GET /api/local/xmig9?key=…` is the same statement for a database with no shell pointed at it — it ships *with* the code that needs the column, so it cannot be the pre-deploy step |
+| `lib/local/listing-review-note-core.ts` | `normalizeListingReviewNote` — blank, whitespace and non-string all become the same `null`, so no host surface can render an empty reason box and the column never fills with `''` rows that read as a reason. Over-long notes are truncated at `MAX_LISTING_REVIEW_NOTE_CHARS`, never rejected: a slip of the finger must not leave a listing stuck in the queue. `listingRejectionMessage` composes the notification body from that same normalized note, so the notification and `/host` can't word it differently. No imports, so `node --test` loads it — see **Testing** |
+| `adminSetListingApproval` (`lib/local/db.ts`) | Writes the note on reject and **NULLs it on approve** — the note describes a rejection, and a stale one under a live listing reads as a fresh complaint |
+| `REQUEUE_SET` + `setListingOwnershipDoc` (`lib/local/db.ts`) | Clear the note whenever an edit or a re-uploaded document sends the listing back to `pending`, so a reason on screen always describes the *current* rejection rather than one the host has already answered |
+| `LISTING_COLS_HOST` (`lib/local/db.ts`) | Carries `review_note`. Deliberately **not** in `LISTING_COMMON_COLS`: it is staff-authored text about this host's listing, and the shared block would publish it on every guest read |
+| `app/host/page.tsx` | The reason under a rejected card, in its own panel outside the card's link — text to read, not part of the tap target |
+| `app/host/[id]/edit/page.tsx` | The same reason as a banner above the form that fixes it. A reason the host has to navigate back to isn't much better than none |
+
+Both surfaces fall back to generic guidance (`hostPage.dashboard.rejected.noReason`,
+`hostPage.edit.rejected.noReason`) when the note is NULL, and render the operator's line
+breaks with `white-space: pre-line` — a note is often a short list of fixes. Long
+unspaced runs break with `overflow-wrap: anywhere` so staff text can't widen a card.
+
+Mirrored in `quickin-backend` (`setListingApproval` takes the same optional note, and its
+host projection returns the column) so the mobile apps read the same reason — iOS shows it
+in `HostListingRow`, Android in the host listing card, both replacing the generic
+"rejected" line they showed before.
+
+**The note stays optional.** Someone clearing a queue of obvious spam should not have to
+type, and forcing a reason there would only produce `.` — the fallback copy is the honest
+answer for those.
+
 ## Loading states
 
 Every route that awaits data on the server needs its own `loading.tsx`. Without one,
@@ -485,7 +743,7 @@ boundary beside the layout you want to survive, not above it.
 | `<QuickInMark />` | `src/components/ui/quickin-mark.tsx` | The Q that draws itself. Cold boot and sign-in screens only — never in place of a populated screen. |
 | `SkeletonBlock`, `SkeletonCard`, `SkeletonRow`, `ShimmerStyles` | `src/components/ui/skeleton-block.tsx` | Boutique-palette shimmer for the guest site. One `<ShimmerStyles />` per loading tree. |
 | `OpsSkeletonPage`, `…Header`, `…Stats`, `…Table`, `…Filters`, `…Form`, `…Chart`, `…Panel` | `src/app/ops/(console)/ops-skeleton.tsx` | The console's shapes, in its inline-style idiom. |
-| `<Skeleton />` | `src/components/ui/skeleton.tsx` | The shadcn kit, for the Tailwind-styled pages (`/dashboard`, `/links`). |
+| `<Skeleton />` | `src/components/ui/skeleton.tsx` | The shadcn kit, for the Tailwind-styled pages (`/links`). |
 
 A `loading.tsx` must stay server-renderable — no `'use client'`, no hooks. Shipping
 JavaScript to draw a placeholder defeats the point.
@@ -583,6 +841,18 @@ Identity documents (`id_verifications.image_data` / `back_image_data` /
 `selfie_image_data`) and proof-of-ownership (`listings.ownership_doc`) are stored
 base64-inline like every other World-1 image. Three rules govern them.
 
+**An ownership document may be a PDF; an ID photo may not.** A title deed, a
+utility bill or a syndicate letter is *issued* as a PDF, and the field used to
+accept `image/*` only — so a host holding one had to photograph it off a screen,
+which is the document operators kept rejecting as illegible. `ownership-doc-core.ts`
+holds the rule (image data URL, `application/pdf` data URL with a real `%PDF-`
+magic number, or an http(s) link, capped at 3.5M chars ≈ 2.5 MB); the ID kinds
+stay image-only because those are a photograph of a card and a selfie. SVG is
+refused on both sides now — `/ops` never rendered it, so accepting it only ever
+stored a document nobody could open. A PDF is stored exactly as uploaded: there
+is nothing to downscale, so the cap is a limit hosts actually meet, and `/ops`
+opens it in the browser's own sandboxed PDF viewer.
+
 **1. `users.verification_status` is the source of truth.** `id_verifications` is the
 submission log; the user row is what every badge reads — the mobile apps'
 `getUserBadges`, `host_verified` on every listing payload, the web host profile,
@@ -603,7 +873,7 @@ the Listings tab handed you every pending ownership document, with no record eit
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| GET | `/api/local/admin/documents/:kind/:id` | `kind` ∈ `id_front\|id_back\|id_selfie\|ownership\|id_change_front\|id_change_back`. Returns image **bytes**; `415` if the stored value isn't an allowlisted image, `404` if there's nothing there. Requires **both** `documents` and the owning module (`verifications` for IDs, `listings` for ownership, `id_changes` for the change-request pair — whose `:id` is the `id_change_requests` row, not a verification) |
+| GET | `/api/local/admin/documents/:kind/:id` | `kind` ∈ `id_front\|id_back\|id_selfie\|ownership\|id_change_front\|id_change_back`. Returns the document **bytes**; `415` if the stored value isn't allowlisted for that kind (images for every kind, **plus `application/pdf` for `ownership`** — see `allowedMimeFor`), `404` if there's nothing there. Requires **both** `documents` and the owning module (`verifications` for IDs, `listings` for ownership, `id_changes` for the change-request pair — whose `:id` is the `id_change_requests` row, not a verification) |
 | GET | `/api/local/admin/verifications?status=` | `pending` (default) `\|verified\|rejected\|all` — a decided case stays reachable so it can be reopened |
 | POST | `/api/local/admin/verifications` | `{ id, action:'verify'\|'reject'\|'pending', note? }`. Writes both tables in one transaction and records the deciding staff member |
 | GET | `/api/local/admin/id-changes?status=` | `pending` (default) `\|approved\|rejected` — requests to change an account's ID number, with the before/after values and the declared document type |
@@ -887,12 +1157,13 @@ npm run check     # same; the pre-deploy gate
 | --- | --- |
 | `analytics-core.ts` | Filter parsing and validation, the `buildReportWhere` SQL builder (placeholder numbering, the date-column injection guard), refund math, CSV escaping and formula-injection defusing. It holds **no** commission math on purpose — see `commission-core.ts` |
 | `commission-core.ts` | The markup and its round-up to 10 EGP, rate parsing and the blank-row trap (`Number('')` is 0, which would read as a 0% commission), and the SQL builders — including that `bookingCommissionSql()` is guest minus raw, never a percentage |
-| `resort-core.ts` | Resort name normalization, slug collision (`Amouage` = `amouage` = `AMOUAGE.`), typo distance |
+| `resort-core.ts` | Resort name normalization, slug collision (`Amouage` = `amouage` = `AMOUAGE.`), typo distance — and `checkResortName`: that `@@@@@`, `!!!!!`, `-----`, `12345` and `٠١٢٣` are refused for a compound name, that invisible pasted characters don't make one non-empty, that `letters` is reported before `tooShort`, and the half that matters more, that `Marassi (North)`, `Sa7el Chalet`, `90 Avenue` and `هاسيندا باي` still get in |
 | `resort-choice.ts` | The resort dropdown's form rule: that **Other** with an empty or whitespace-only name is refused — it used to submit as `resort_name: undefined`, which the server cannot tell from "no resort chosen", so the host's answer was silently dropped — and the half that matters more, that the rule never fires for the no-resort choice or a catalog pick, including when stale text is left in the hidden box |
 | `user-admin-core.ts` | Users-list query parsing and clamping, the full block/remove transition matrix, the `ORDER BY` injection guard, blocked-login copy |
 | `activity-core.ts` | Activity/audit filter parsing, the UNION branch limits, the audit-action label map, and `alertsFor` — including that an operator never receives an alert for a module they don't hold |
 | `payment-flow-core.ts` | Which stage a booking is at (`paymentStageFor`), the shared `canPay` predicate, what an admin decision writes, and the proof-image validator — including that a submitted screenshot is never "awaiting payment" |
 | `document-core.ts` | Document-kind validation, the data-URL parser and its mime allowlist (SVG and HTML are rejected — these bytes render in an admin's browser), the verification state machine, and which module owns which document |
+| `ownership-doc-core.ts` | What a host may attach as proof of ownership: an image, a real PDF (checked by magic number, not by the mime the uploader typed) or an http(s) link, under the 3.5M-char cap. Shared verbatim with quickin-backend — `scripts/check-ownership-doc-core-parity.mjs` there fails on drift |
 | `xlsx.ts` | Cell typing (numbers stay numeric so Excel can sum them), sheet-name sanitizing, filename safety |
 | `moderation-core.ts` | The flag threshold (one attempt, and why not three), the three moderator actions and the fact that permanent removal is not one of them, the warning fallback copy, and the 409 `policyWarning` contract all three clients branch on — including that `error` repeats the warning so an old app build still shows it |
 | `disputes-core.ts` | Which bookings can be disputed (and why pending and cancelled can't), that `closed` is terminal while `resolved` can reopen, that a no-op transition is refused, and the validators — including that one bad attachment out of four doesn't lose the whole filing |
@@ -908,7 +1179,9 @@ npm run check     # same; the pre-deploy gate
 | `currency-core.ts` | The display currency: that an unrecognised cookie falls back to EGP instead of leaving prices in a currency with no rate; that one typo'd code in the rate override drops alone rather than taking the other five down with it, and that a zero rate is refused (it would divide every price into Infinity); and the property the money depends on — a missing rate returns the **stored** price in the **stored** currency, unmarked, never a number invented from a rate we do not have |
 | `avatar-core.ts` | The profile photo: that a base64 `data:` JPEG/PNG/WebP gets in and an `https://` link does **not** (the reason is in `/account` → Profile photo above), that HTML, PDF and SVG data URLs are refused, that a mangled base64 payload is not a photo, the size ceiling and the decoded-bytes math behind it, that `null`/`''`/blank all mean "remove" while the literal string `null` does not — and that the 256px / q0.8 constants still match the iOS picker, since a drift there is a photo that weighs one thing on the phone and another on the site |
 | `listing-capacity-policy.ts` | The four capacity counts: that `0`, `'0'` and `٠` are refused for bedrooms, beds, bathrooms **and** guests (the bug the module was written for), that a fraction is refused rather than floored into that same zero, that the JSON shapes `Number()` would coerce into a count (`true`, `['2']`) are not counts — and the half that matters as much, that an omitted field still falls back to the create defaults so the mobile apps' partial payloads are never answered with a 400, that a 40-bedroom villa is not an error, and that `required` is reported before `notWhole` so a blank field hears the real problem |
-| `listing-pricing-core.ts` | The host's weekend rate: that `0`, `'0'`, `'0.0'` and `-50` are refused rather than silently stored as "no weekend rate" (the bug the module was written for), and the half that matters as much — that `null`, `undefined` and a blank field still mean "no weekend rate" so a host can turn the feature off and the apps' `null` is never answered with a 400; plus the JSON shapes `Number()` would happily coerce into a price (`true`, `[]`, `['1500']`) |
+| `listing-completeness-policy.ts` | The bar a NEW listing clears: that a title and a price alone are refused (the reported bug), that each of the six required fields is caught when it alone is missing, that the first problem is reported in **form order** so a host is sent to the topmost empty field, that twenty symbols are `letters` rather than a long-enough description, that half a pin is no pin while `0,0` is a real coordinate, and that a non-array or junk `images` value is zero photos rather than an exemption — plus the halves that matter as much, that a complete listing passes untouched and that a chosen **resort** answers the area question on its own, since the region is derived from it. For the edit door: that every required field is refused when a patch clears it, that a field the patch does not mention is left alone (the empty ownership-doc-only patch the iOS app sends still goes through), that half a pin patch is judged against the half already stored, and that a resort on the listing answers a cleared region |
+| `listing-geo-policy.ts` | The map pin against the words around it: the reported bug (Egypt + North Coast, pin in Berlin) and that the country is named before the region, since it is the bigger mistake; every curated area against every other, so a Cairo pin on a North Coast listing is caught too; that Greater Cairo and the whole Alexandria → Marsa Matrouh strip are **not** flagged, because a box that refuses real listings is the worse failure; Morocco's negative longitudes; and the silence the module keeps where it cannot judge — no pin, an unknown country, an unknown region, an unparseable coordinate |
+| `listing-pricing-core.ts` | The host's weekend rate: that `0`, `'0'`, `'0.0'` and `-50` are refused rather than silently stored as "no weekend rate" (the bug the module was written for), and the half that matters as much — that `null`, `undefined` and a blank field still mean "no weekend rate" so a host can turn the feature off and the apps' `null` is never answered with a 400; plus the JSON shapes `Number()` would happily coerce into a price (`true`, `[]`, `['1500']`); and the day set that rate applies to — that all seven days is refused however it is padded (repeats, junk, reverse order), that six of seven and a lone day are not, that an empty set still means "nothing is a weekend", and that `3.7` is dropped rather than floored into Wednesday; and the two halves judged as a pair — that a rate with no day is refused, that a *missing* day set is not an empty one (it takes `DEFAULT_WEEKEND_DAYS`, which is what the mobile apps rely on) and that no rate means no days without a word of complaint, whatever the pills were showing |
 | `contentguard.ts` | Every de-obfuscation the contact guard undoes (Arabic-Indic/fullwidth/enclosed digits, zero-width and soft hyphens, Cyrillic lookalikes, spelled-out EN/AR numbers, `at`/`dot` spelling, letters used as separators — `A0101 S416 M3280`), the four categories it blocks, the split-across-messages check — and an equally large **false-positive** half, because a guard that rejects "we are 2 adults arriving on the 12th" is worse than one that misses |
 
 Those modules deliberately have **no runtime imports** — Node's ESM resolver
@@ -961,12 +1234,96 @@ values that must still get in (`null` from the apps, a blank field, `1500`,
 One thing the rule deliberately does **not** do is require a rate when weekend
 days are selected. `DEFAULT_WEEKEND_DAYS` is pre-selected on both forms, so
 "days chosen, no rate" is the normal resting state of a listing without weekend
-pricing, not a mistake to report.
+pricing, not a mistake to report. The reverse — a rate with no days — is not a
+resting state and is refused; see "a rate is not a rate without a day" below.
 
 On the edit form the refusal also has to make the form *dirty*. An invalid rate
 patches to null, which usually equals what is already stored, so without that the
 Save button would stay greyed out under "No changes yet" — the host would press
 nothing and hear nothing, which is the original bug wearing a different hat.
+
+### …and a weekend is not the whole week
+
+The other half of the same screen is the day pills, and they had the mirror-image
+hole: a host could light up all seven. That saves, and it prices every night at
+`weekend_price` — which leaves `price_per_night`, the field directly above it and
+the number the listing is advertised and sorted on, applying to no night at all.
+A host who wants one rate for every night has a field for exactly that.
+
+So the set has a ceiling: **at most six of seven**. Six is odd but honest — one
+day is still on the nightly price. Zero days stays fine and still means nothing
+is a weekend, for the same reason a rate-less listing is not an error.
+
+`checkWeekendDays` in `listing-pricing-core.ts` holds it, and cleaning happens
+*before* counting — days outside `0..6` are dropped, repeats are dropped, and a
+fraction is dropped rather than floored (the old inline filter turned `3.7` into
+Wednesday). Without that, `[0,1,2,3,4,5,6,6,'sat']` reads as nine entries and
+walks straight past a check aimed at seven.
+
+Both ends run it again. On `/host/new` and `/host/:id/edit` the sixth selection
+locks the last unlit pill, with the reason spelled out under the row
+(`hostPage.create.errors.weekendDays.wholeWeek`, in all four locales), and
+`createListing` / `updateListing` answer 400 `Weekend pricing cannot apply to all
+seven days` to anything that arrives another way — the mobile apps included,
+since they PATCH the same column.
+
+Listings saved with all seven days *before* this rule existed still load with all
+seven pills lit; nothing switches them off behind the host's back. What changes
+is that the edit form counts that state as dirty — the same trick the invalid
+rate uses — so Save is pressable and says what has to change, instead of sitting
+greyed out under "No changes yet". If the host is clearing the weekend rate
+entirely, the days go with it and the rule steps aside: refusing that save would
+trap them on a form they are in the middle of fixing.
+
+### …and a rate is not a rate without a day
+
+The pills had one more hole, at the opposite end from the whole week: a host
+could type a weekend rate and turn **every** day off. That saved too. The rate
+went into `weekend_price`, `weekend_days` went in as NULL — the write was a
+single expression, `weekendPrice && weekendDays.length ? weekendDays : null`,
+which resolved the disagreement between the two columns in favour of NULL — and
+the quote only reaches for the rate `WHEN weekend_days IS NOT NULL`. So the
+number the host entered was never charged on a single night, and nothing said
+so. That is the `0` bug exactly, arriving through the other half of the field.
+
+`resolveWeekendSchedule` in `listing-pricing-core.ts` now decides what the pair
+means, and it is the only thing that writes `weekend_days`. Two inputs that used
+to be the same thing are no longer:
+
+| what the client sent | what it means | what is stored |
+| --- | --- | --- |
+| no `weekend_days` key at all | the host was never asked | `DEFAULT_WEEKEND_DAYS` |
+| `weekend_days: []` | the host was asked and chose none | **400**, if there is a rate |
+| no rate, any days | weekend pricing is off | `NULL` |
+
+The first row is both mobile apps. Neither has ever sent a day set — their
+pricing screens say "Applied on Fri + Sat nights" and PATCH `weekend_price`
+alone — so under the old expression *every* weekend rate set from a phone stored
+NULL days and applied to nothing. They now get the Fri+Sat their own UI promised.
+The second row is the web forms, where the pills are directly under the rate
+field: a host who cleared them all said something, and quietly putting two back
+would be answering for them.
+
+Both ends run it. `/host/new` and `/host/:id/edit` refuse to submit and name the
+half to fix (`hostPage.create.errors.weekendDays.noDaysChosen`, in all four
+locales) with the same note shown live under the pills as the host types, and
+`createListing` / `updateListing` answer 400 `Pick at least one weekend day, or
+clear the weekend price`.
+
+`updateListing` is the awkward one, because a PATCH can carry either half alone —
+the editor sends only what changed, the apps only ever send the rate — so the
+half that isn't in the patch has to come off the row before the pair can be
+judged. That read happens **inside** the transaction, `FOR UPDATE`, and the days
+are written on every weekend patch even when only the rate moved: clearing a rate
+has to take its days with it, and setting one on a listing that has none has to
+put days underneath it, or the rate goes straight back to being unchargeable.
+
+The rate is consulted before the days, and that order is load-bearing rather than
+incidental — it is what keeps the whole-week rule above from trapping anyone. A
+listing saved with all seven days before that rule existed loads with all seven
+lit, and clearing the rate is how its host turns the feature off; judging the day
+set first would refuse the very save that fixes the listing, over a day set that
+was about to be dropped anyway.
 
 ## Display currency — what a guest reads, not what they pay
 
@@ -976,10 +1333,8 @@ display: the guest picks a currency to *read* prices in, and nothing about the
 money changes.
 
 **Where the switcher is.** Beside the language switcher, everywhere that has one:
-the `/explore` header and its mobile menu, both footers, the `/` navbar — and a
-**Preferences** card on `/account`, which is where people look for a setting
-rather than a control. Before this it was nowhere: the dashboard footer had an
-`EGP` button that was a `<button>` with no handler.
+the `/explore` header and its mobile menu, the footer — and a **Preferences** card
+on `/account`, which is where people look for a setting rather than a control.
 
 **How it is stored.** A `qk_currency` cookie, one year, exactly like `NEXT_LOCALE`
 — no column, no migration, and it works signed-out. Server components read it

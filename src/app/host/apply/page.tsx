@@ -6,12 +6,16 @@
 //   - pending        → calm "under review" state (read-only)
 //   - rejected       → the reason + the form again, as a reapply
 //   - none           → the application form (client component)
+// The signed-in user's identity verification is resolved here too and handed to
+// the form, which drops its ID-upload step for anyone already verified or under
+// review. See needsIdentityDocuments in host-verification-core.
 import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
-import { getHostApplication } from '@/lib/local/db'
+import { getHostApplication, getVerification } from '@/lib/local/db'
 import { verifyToken, getUserRowByEmail, getHostState, type HostStatus } from '@/lib/local/auth'
+import { normalizeVerificationStatus } from '@/lib/local/host-verification-core'
 import { ApplyForm } from './apply-form'
 
 export const dynamic = 'force-dynamic'
@@ -120,7 +124,15 @@ export default async function HostApplyPage() {
   if (user.host_status === 'approved') redirect('/host')
 
   const t = await getTranslations('hostApply')
-  const application = await getHostApplication(user.id)
+  // Identity is verified ONCE, from the profile, and serves guest and host alike.
+  // Read from the same place submitHostApplication reads (the id_verifications
+  // row, not users.verification_status) so the form asks for exactly what the
+  // server will require — an already-verified applicant is never sent back to
+  // photograph the same ID a second time.
+  const [application, verification] = await Promise.all([
+    getHostApplication(user.id),
+    getVerification(user.id),
+  ])
   const pending = user.host_status === 'pending'
   const rejected = user.host_status === 'rejected'
 
@@ -257,6 +269,12 @@ export default async function HostApplyPage() {
           <ApplyForm
             initialName={application?.full_name || user.full_name || ''}
             reapply={rejected}
+            identity={{
+              status: normalizeVerificationStatus(verification.status),
+              idNumber: verification.id_number,
+              docType: verification.doc_type,
+              notes: verification.notes,
+            }}
             previous={
               rejected && application
                 ? {

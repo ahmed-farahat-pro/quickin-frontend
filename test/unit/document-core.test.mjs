@@ -14,6 +14,9 @@ import assert from 'node:assert/strict'
 import {
   DOCUMENT_KINDS,
   ALLOWED_DOCUMENT_MIME,
+  ALLOWED_OWNERSHIP_MIME,
+  allowedMimeFor,
+  documentFileExtension,
   VERIFICATION_STATUSES,
   VERIFICATION_ACTIONS,
   VERIFICATION_FILTERS,
@@ -96,6 +99,59 @@ describe('parseDocumentDataUrl — accepts valid documents', () => {
   test('is case-insensitive on the mime and tolerates stray whitespace', () => {
     assert.equal(parseDocumentDataUrl('data:IMAGE/PNG;base64,QUJD').mime, 'image/png')
     assert.equal(parseDocumentDataUrl('  data:image/png;base64, QU JD  ').base64, 'QUJD')
+  })
+})
+
+describe('parseDocumentDataUrl — PDF, for ownership documents only', () => {
+  const PDF = 'data:application/pdf;base64,JVBERi0xLjcK'
+
+  test('an ownership document may be a PDF — a deed is issued as one', () => {
+    assert.deepEqual(parseDocumentDataUrl(PDF, 'ownership'), {
+      mime: 'application/pdf',
+      base64: 'JVBERi0xLjcK',
+    })
+  })
+
+  test('the ID kinds stay image-only', () => {
+    for (const kind of ['id_front', 'id_back', 'id_selfie', 'id_change_front', 'id_change_back']) {
+      assert.throws(() => parseDocumentDataUrl(PDF, kind), DocumentFormatError, `${kind} must refuse PDF`)
+    }
+  })
+
+  test('omitting the kind falls back to the narrower rule, not the wider one', () => {
+    assert.throws(() => parseDocumentDataUrl(PDF), DocumentFormatError)
+  })
+
+  test('allowedMimeFor hands ownership one extra type and the rest none', () => {
+    assert.deepEqual([...allowedMimeFor('ownership')], [...ALLOWED_OWNERSHIP_MIME])
+    assert.deepEqual([...allowedMimeFor('id_front')], [...ALLOWED_DOCUMENT_MIME])
+    assert.equal(ALLOWED_OWNERSHIP_MIME.length, ALLOWED_DOCUMENT_MIME.length + 1)
+  })
+
+  test('an ownership PDF still has to be a real PDF at write time, not read time', () => {
+    // parseDocumentDataUrl serves what is stored; ownership-doc-core.ts is what
+    // refuses HTML wearing a PDF label before it ever reaches the column.
+    assert.equal(parseDocumentDataUrl('data:application/pdf;base64,PGh0bWw+', 'ownership').mime, 'application/pdf')
+  })
+})
+
+describe('documentFileExtension', () => {
+  test('names every allowlisted type so a saved file opens', () => {
+    assert.equal(documentFileExtension('image/png'), 'png')
+    assert.equal(documentFileExtension('image/jpeg'), 'jpg')
+    assert.equal(documentFileExtension('image/gif'), 'gif')
+    assert.equal(documentFileExtension('image/webp'), 'webp')
+    assert.equal(documentFileExtension('application/pdf'), 'pdf')
+  })
+
+  test('every mime the parser can return has an extension', () => {
+    for (const mime of ALLOWED_OWNERSHIP_MIME) {
+      assert.notEqual(documentFileExtension(mime), 'bin', `${mime} needs an extension`)
+    }
+  })
+
+  test('falls back rather than guessing', () => {
+    assert.equal(documentFileExtension('application/zip'), 'bin')
   })
 })
 

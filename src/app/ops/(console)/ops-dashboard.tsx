@@ -33,6 +33,7 @@ import type { TrendPayload } from '@/lib/local/overview-trends-core'
 import { OpsSectionSkeleton } from './ops-skeleton'
 import { alertsFor, alertTotal, waitingLabel } from '@/lib/local/activity-core'
 import { docTypeLabel } from '@/lib/local/host-verification-core'
+import { checkListingPin, listingPinBadgeLabel, listingPinProblemMessage } from '@/lib/local/listing-geo-policy'
 import type { StaffModule } from '@/lib/local/staff'
 
 // Boutique palette.
@@ -97,6 +98,11 @@ type AdminListing = {
   title: string
   location: string | null
   region: string | null
+  /** The pin and the words it is checked against — see listing-geo-policy.ts.
+   *  Derived per render, never stored, so fixing the pin clears the badge. */
+  country: string | null
+  lat: number | null
+  lng: number | null
   approval_status: string
   /** Set when the host typed their own resort via "Other" — needs review before
    *  this listing can be approved. */
@@ -1139,6 +1145,15 @@ export function OpsDashboard({
                             : badge('Hidden', TAN, MUTED)}
                       {/* Free text needs a decision before this listing can go live. */}
                       {l.resort_name ? badge('Resort: review needed', '#F6E0E2', BURGUNDY) : null}
+                      {/* The host was warned about this pin and chose to submit anyway
+                          (the check never blocks) — so the decision lands here. */}
+                      {listingPinBadgeLabel(l) ? (
+                        <span
+                          title={`${listingPinProblemMessage(checkListingPin(l))} (pin ${l.lat}, ${l.lng})`}
+                        >
+                          {badge(listingPinBadgeLabel(l), '#F6E0E2', BURGUNDY)}
+                        </span>
+                      ) : null}
                     </div>
                     <div style={{ fontSize: 13, color: MUTED, marginTop: 4 }}>
                       {l.host_name ? `Host: ${l.host_name}` : 'Host: —'}

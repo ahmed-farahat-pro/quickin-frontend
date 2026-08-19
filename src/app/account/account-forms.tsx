@@ -13,7 +13,9 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { checkPassword } from '@/lib/local/password-policy'
+import { checkName } from '@/lib/local/name-policy'
 import PasswordChecklist from '@/components/features/auth/password-checklist'
+import PasswordEyeToggle from '@/components/features/auth/password-eye-toggle'
 import { MAX_PHONE_CHARS, filterPhoneInput, isValidPhone } from '@/lib/local/phone-core'
 import {
   MAX_AGE,
@@ -177,6 +179,9 @@ export function AccountForms({
   const router = useRouter()
   const t = useTranslations('accountPage')
   const tp = useTranslations('passwordPolicy')
+  // The same namespace /signup reads, because it is the same rule and the same
+  // four sentences — a name refused here should not read differently there.
+  const tn = useTranslations('namePolicy')
 
   // ---- Profile form -----------------------------------------------------
   const [fullName, setFullName] = useState(initialName)
@@ -192,6 +197,15 @@ export function AccountForms({
    *  (or promises to save what it would refuse). */
   function validateProfile(): Partial<Record<ProfileField, string>> {
     const invalid: Partial<Record<ProfileField, string>> = {}
+    // The name is the one field here that is NOT optional, and the one this form
+    // used to let through: `12345` is non-empty, so nothing stopped it before the
+    // request, and the 400 that came back landed in the form-wide notice rather
+    // than under the input. Same `checkName` the route runs, so the sentence a
+    // guest reads here is the sentence the API would have sent.
+    const nameProblem = checkName(fullName)
+    if (nameProblem) {
+      invalid.full_name = tn(`errors.${nameProblem.code}`)
+    }
     const ageProblem = checkAge(age)
     // The bounds are passed for every code, not only the two that print one:
     // next-intl renders the key itself when a placeholder has no value, so a
@@ -261,6 +275,12 @@ export function AccountForms({
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [savingPassword, setSavingPassword] = useState(false)
+  // One eye per field: the three boxes hold three different secrets, and
+  // revealing the new one to proofread it should not also put the current one
+  // on screen.
+  const [showCurrent, setShowCurrent] = useState(false)
+  const [showNew, setShowNew] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
   const [passwordMsg, setPasswordMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
 
   async function changePassword(e: React.FormEvent) {
@@ -299,6 +319,10 @@ export function AccountForms({
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
+      // Back to dots, so the next thing typed into an emptied box isn't on show.
+      setShowCurrent(false)
+      setShowNew(false)
+      setShowConfirm(false)
     } catch (err) {
       setPasswordMsg({
         kind: 'error',
@@ -428,31 +452,45 @@ export function AccountForms({
           <label htmlFor="acct-current" style={labelStyle}>
             {t('password.current')}
           </label>
-          <input
-            id="acct-current"
-            type="password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            autoComplete="current-password"
-            style={inputStyle}
-            required
-          />
+          <div style={{ position: 'relative' }}>
+            <input
+              id="acct-current"
+              type={showCurrent ? 'text' : 'password'}
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              autoComplete="current-password"
+              style={{ ...inputStyle, paddingInlineEnd: 46 }}
+              required
+            />
+            <PasswordEyeToggle
+              shown={showCurrent}
+              onToggle={() => setShowCurrent((s) => !s)}
+              controls="acct-current"
+            />
+          </div>
         </div>
 
         <div style={{ marginBottom: 16 }}>
           <label htmlFor="acct-new" style={labelStyle}>
             {t('password.new')}
           </label>
-          <input
-            id="acct-new"
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            autoComplete="new-password"
-            aria-describedby="acct-new-rules"
-            style={inputStyle}
-            required
-          />
+          <div style={{ position: 'relative' }}>
+            <input
+              id="acct-new"
+              type={showNew ? 'text' : 'password'}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              autoComplete="new-password"
+              aria-describedby="acct-new-rules"
+              style={{ ...inputStyle, paddingInlineEnd: 46 }}
+              required
+            />
+            <PasswordEyeToggle
+              shown={showNew}
+              onToggle={() => setShowNew((s) => !s)}
+              controls="acct-new"
+            />
+          </div>
           <PasswordChecklist id="acct-new-rules" password={newPassword} />
         </div>
 
@@ -460,15 +498,22 @@ export function AccountForms({
           <label htmlFor="acct-confirm" style={labelStyle}>
             {t('password.confirm')}
           </label>
-          <input
-            id="acct-confirm"
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            autoComplete="new-password"
-            style={inputStyle}
-            required
-          />
+          <div style={{ position: 'relative' }}>
+            <input
+              id="acct-confirm"
+              type={showConfirm ? 'text' : 'password'}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              autoComplete="new-password"
+              style={{ ...inputStyle, paddingInlineEnd: 46 }}
+              required
+            />
+            <PasswordEyeToggle
+              shown={showConfirm}
+              onToggle={() => setShowConfirm((s) => !s)}
+              controls="acct-confirm"
+            />
+          </div>
         </div>
 
         <div style={{ marginTop: 18 }}>

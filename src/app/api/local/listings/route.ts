@@ -1,14 +1,17 @@
 import { NextResponse } from 'next/server'
 import { getListings, createListing, isListingInputError, getListingGateState } from '@/lib/local/db'
 import { getUserFromRequest } from '@/lib/local/auth'
+import { checkListingPin, listingPinProblemMessage } from '@/lib/local/listing-geo-policy'
 import { canPublishListing } from '@/lib/local/host-verification-core'
 
 // Local-only API (no Supabase). GET /api/local/listings → JSON array.
 // Supports search: ?location=&guests=&checkIn=YYYY-MM-DD&checkOut=YYYY-MM-DD
 // Consumed by the /explore web page and the iOS + Android apps.
-//   POST /api/local/listings { ...listing fields, images?, ownership_doc? } → { listing }
-//        (auth; host_id = caller). The ownership doc is the proof-of-ownership
-//        image an admin reviews in /ops before the listing goes live.
+//   POST /api/local/listings { ...listing fields, images?, ownership_doc? }
+//        → { listing, pin_warning } (auth; host_id = caller). The ownership doc is
+//        the proof-of-ownership image an admin reviews in /ops before the listing
+//        goes live. `pin_warning` is null, or the reason the map pin disagrees
+//        with the country/region — a warning; the listing is created either way.
 export const dynamic = 'force-dynamic'
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' }
 
@@ -66,10 +69,6 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => null)
     if (!body) return NextResponse.json({ error: 'Invalid request body' }, { status: 400, headers: CORS })
     const num = (v: unknown) => (v === undefined || v === null || v === '' ? undefined : Number(v))
-    // Weekend days: keep only valid 0..6 integers.
-    const weekendDays = Array.isArray(body.weekend_days)
-      ? body.weekend_days.map((d: unknown) => Math.floor(Number(d))).filter((d: number) => Number.isInteger(d) && d >= 0 && d <= 6)
-      : undefined
     const listing = await createListing(user.id, {
       title: String(body.title ?? ''),
       description: body.description ?? undefined,
@@ -79,7 +78,9 @@ export async function POST(req: Request) {
       lng: num(body.lng),
       price_per_night: Number(body.price_per_night),
       weekend_price: num(body.weekend_price),
-      weekend_days: weekendDays && weekendDays.length ? weekendDays : undefined,
+      // Cleaned and judged in one place — createListing runs
+      // listing-pricing-core, which drops junk days and refuses all seven.
+      weekend_days: body.weekend_days,
       currency: body.currency ?? undefined,
       // Deliberately NOT run through num(): `Number('')` is 0, and 0 bedrooms is
       // the bug. createListing decides these through listing-capacity-policy.
@@ -99,7 +100,21 @@ export async function POST(req: Request) {
       // Same alias pair the mobile apps send (ownership_doc / ownershipDoc).
       ownership_doc: body.ownership_doc ?? body.ownershipDoc ?? undefined,
     })
-    return NextResponse.json({ listing }, { status: 201, headers: CORS })
+    // A pin that disagrees with the country/region the host chose is reported,
+    // never refused — see listing-geo-policy.ts. The host form already renders
+    // this verdict under its map from the same module, so nothing on the web
+    // needs the field; it is here because the mobile API answers with it on the
+    // same route, and a caller pointed at either door should get the same answer.
+    const pinProblem = checkListingPin(listing)
+    return NextResponse.json(
+      {
+        listing,
+        pin_warning: pinProblem
+          ? { code: pinProblem.code, scope: pinProblem.scope, message: listingPinProblemMessage(pinProblem) }
+          : null,
+      },
+      { status: 201, headers: CORS },
+    )
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error('POST /api/local/listings failed:', err)

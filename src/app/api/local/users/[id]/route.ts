@@ -89,8 +89,10 @@ export async function PATCH(
       const name = normalizeName(body.full_name)
       const nameProblem = checkName(name)
       if (nameProblem) {
+        // `field` so /account can put the reason under the name input the way it
+        // does for age, phone and bio, rather than only in the form-wide notice.
         return NextResponse.json(
-          { error: nameProblemMessage(nameProblem), nameProblem },
+          { error: nameProblemMessage(nameProblem), field: 'full_name', nameProblem },
           { status: 400, headers: CORS }
         )
       }

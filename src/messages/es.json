@@ -2056,7 +2056,11 @@
       "reservationsHint": "Solicitudes de reserva de huéspedes para tus alojamientos.",
       "emptyTitle": "Todavía no has publicado un alojamiento",
       "emptyFilteredTitle": "No hay alojamientos con este estado",
-      "showAll": "Mostrar todos los alojamientos"
+      "showAll": "Mostrar todos los alojamientos",
+      "rejected": {
+        "heading": "Por qué no se aprobó",
+        "noReason": "Nuestro equipo no dejó un motivo. Revisa los datos, edítalos y vuelve a enviarlo."
+      }
     },
     "reservations": {
       "heading": "Reservas entrantes",
@@ -2156,8 +2160,23 @@
           "tooFew": "El campo «{field}» debe ser como mínimo {min}."
         },
         "priceInvalid": "Introduce un precio por noche válido.",
-        "resortNameRequired": "Escribe el nombre del resort o complejo, o elige otra opción.",
+        "completeness": {
+          "required": "Completa {field}.",
+          "letters": "Escribe {field} con palabras: no puede contener solo símbolos o números.",
+          "tooShort": "Amplía {field}: necesita al menos {min} letras.",
+          "tooFew": "Añade al menos {min} foto de tu alojamiento: un anuncio sin fotos es uno que los huéspedes pasan de largo."
+        },
+        "pinRequired": "Coloca el pin en el mapa para que los huéspedes sepan dónde está tu alojamiento.",
+        "resortName": {
+          "required": "Escribe el nombre del resort o complejo, o elige otra opción.",
+          "letters": "Escribe el nombre del resort o complejo con letras: no puede contener solo símbolos o números.",
+          "tooShort": "Escribe el nombre completo del resort o complejo: debe tener al menos {min} letras."
+        },
         "weekendPriceInvalid": "El precio de fin de semana debe ser mayor que cero. Deja el campo vacío si no aplicas una tarifa diferente los fines de semana.",
+        "weekendDays": {
+          "wholeWeek": "El precio de fin de semana no puede cubrir los siete días. Deja al menos un día con el precio normal por noche — para eso está.",
+          "noDaysChosen": "Elige al menos un día de fin de semana, o borra el precio de fin de semana — una tarifa sin días no se aplica a ninguna noche."
+        },
         "invalidImageUrl": "Este enlace de foto no parece una URL válida: {url}",
         "createFailed": "No se pudo crear el anuncio",
         "tooManyPhotos": "Puedes subir hasta {max} fotos.",
@@ -2166,6 +2185,11 @@
       "pinHint": "Toca el mapa para colocar un pin. Los huéspedes ven una zona aproximada, no la dirección exacta.",
       "searchHint": "Busca una ciudad, zona o dirección y elige un resultado para fijarlo en el mapa; luego arrastra el pin para ajustarlo.",
       "pinSet": "Marcado en {lat}, {lng}. Toca de nuevo para moverlo.",
+      "pinMismatch": {
+        "outOfRange": "Ese no es un punto válido del mapa. Toca el mapa de nuevo para colocar el pin.",
+        "outsideCountry": "Este pin está fuera de {place}: los huéspedes verán tu alojamiento allí en el mapa. Mueve el pin o cambia el país.",
+        "outsideRegion": "Este pin está fuera de {place}: quienes exploren esa zona verán tu alojamiento aquí. Mueve el pin o cambia la zona."
+      },
       "weekdays": {
         "sun": "Dom",
         "mon": "Lun",
@@ -2183,6 +2207,7 @@
       "locating": "Buscando en el mapa…",
       "geocodeFail": "No se encontró el lugar — toca el mapa para ubicarlo.",
       "regionNone": "Ninguna zona seleccionada",
+      "requiredLegend": "Los campos marcados con un asterisco son obligatorios.",
       "regionHint": "Zonas destacadas que los huéspedes exploran. Opcional: elige la que corresponda a tu alojamiento.",
       "regions": {
         "northCoast": "Costa Norte",
@@ -2252,11 +2277,16 @@
       },
       "errors": {
         "saveFailed": "No se pudieron guardar los cambios"
+      },
+      "rejected": {
+        "title": "Este anuncio no fue aprobado",
+        "noReason": "Nuestro equipo no dejó un motivo esta vez.",
+        "hint": "Haz los cambios indicados y guarda para enviarlo de nuevo a revisión."
       }
     },
     "ownershipDoc": {
       "label": "Documento de propiedad",
-      "intro": "Sube un documento que acredite que eres propietario de este alojamiento o que estás autorizado a publicarlo (p. ej. una escritura o una factura de servicios). Nuestro equipo lo revisa antes de publicar tu anuncio.",
+      "intro": "Sube un documento que acredite que eres propietario de este alojamiento o que estás autorizado a publicarlo (p. ej. una escritura o una factura de servicios). Puedes subir una foto o un PDF. Nuestro equipo lo revisa antes de publicar tu anuncio.",
       "upload": "Subir documento de propiedad",
       "change": "Cambiar",
       "processing": "Procesando…",
@@ -2269,8 +2299,8 @@
       "uploading": "Subiendo…",
       "resubmitted": "Enviado para revisión",
       "errors": {
-        "tooLarge": "Esta imagen es demasiado grande",
-        "failed": "No se pudo procesar el documento. Prueba con otro.",
+        "tooLarge": "Este archivo es demasiado grande (máx. 2,5 MB)",
+        "failed": "No se pudo procesar el documento. Sube una foto o un PDF.",
         "uploadFailed": "No se pudo enviar el documento. Inténtalo de nuevo."
       }
     }
@@ -2357,6 +2387,17 @@
       "national_id": "Documento nacional de identidad",
       "passport": "Pasaporte",
       "residence_permit": "Permiso de residencia"
+    },
+    "identity": {
+      "verifiedTitle": "Identidad verificada",
+      "verifiedBody": "Ya tenemos tu identificación aprobada en nuestros archivos, así que aquí no hay nada que subir. Nuestro equipo revisará esta solicitud con ella.",
+      "pendingTitle": "Identidad en revisión",
+      "pendingBody": "Tu identificación ya está con nuestro equipo. No necesitas enviarla de nuevo: la revisaremos junto con esta solicitud.",
+      "rejectedTitle": "Tu última identificación no fue aprobada",
+      "rejectedBody": "Vuelve a subir fotos nítidas de tu identificación para que nuestro equipo pueda revisarla con esta solicitud.",
+      "reason": "Motivo",
+      "view": "Ver mi verificación de identidad",
+      "nationalIdLocked": "Tomado de la identificación que ya verificamos."
     }
   },
   "contact": {
@@ -2584,6 +2625,10 @@
       "symbol": "Tu contraseña debe incluir un símbolo, por ejemplo ! ? @ #.",
       "email": "Tu contraseña no puede ser tu correo electrónico.",
       "common": "Esa contraseña es demasiado común. Elige una menos fácil de adivinar."
+    },
+    "toggle": {
+      "show": "Mostrar contraseña",
+      "hide": "Ocultar contraseña"
     }
   },
   "namePolicy": {

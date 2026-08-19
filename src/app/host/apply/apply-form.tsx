@@ -8,7 +8,12 @@ import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { fileToCompressedDataUrl } from '@/lib/image'
-import { DOC_TYPES, type DocType } from '@/lib/local/host-verification-core'
+import {
+  DOC_TYPES,
+  needsIdentityDocuments,
+  type DocType,
+  type VerificationStatus,
+} from '@/lib/local/host-verification-core'
 import { MAX_PHONE_CHARS, filterPhoneInput, isValidPhone } from '@/lib/local/phone-core'
 import { checkName } from '@/lib/local/name-policy'
 
@@ -50,6 +55,19 @@ function FieldError({ text }: { text?: string }) {
   )
 }
 
+/** The applicant's existing identity verification, resolved on the server.
+ *  Identity is verified once from the profile and serves guest and host alike,
+ *  so an applicant who already has an approved (or under-review) submission is
+ *  never asked for the same documents again. */
+export interface ApplicantIdentity {
+  status: VerificationStatus
+  /** The number on the submission we hold, if any. */
+  idNumber: string | null
+  docType: string | null
+  /** The reviewer's reason, present when the last submission was rejected. */
+  notes: string | null
+}
+
 /** Previous answers, so a rejected applicant reapplies by editing, not retyping. */
 export interface PreviousApplication {
   national_id: string
@@ -76,10 +94,12 @@ export function ApplyForm({
   initialName,
   reapply = false,
   previous = null,
+  identity,
 }: {
   initialName: string
   reapply?: boolean
   previous?: PreviousApplication | null
+  identity: ApplicantIdentity
 }) {
   const router = useRouter()
   const t = useTranslations('hostApply')
@@ -90,12 +110,25 @@ export function ApplyForm({
   const [hostType, setHostType] = useState<'individual' | 'company' | 'brokerage'>(
     previous?.company ? 'company' : 'individual'
   )
-  const [nationalId, setNationalId] = useState(previous?.national_id ?? '')
+  // The number on a verified ID is the one an admin already approved, so it is
+  // shown rather than asked for, and locked: an application that contradicts the
+  // approved document would put the reviewer between two different numbers.
+  // A pending submission is only seeded — nothing has been approved yet.
+  const verifiedIdNumber = identity.status === 'verified' ? identity.idNumber?.trim() || '' : ''
+  const nationalIdLocked = verifiedIdNumber !== ''
+  const [nationalId, setNationalId] = useState(
+    verifiedIdNumber || previous?.national_id || identity.idNumber?.trim() || ''
+  )
   const [phone, setPhone] = useState(previous?.phone ?? '')
   const [address, setAddress] = useState(previous?.address ?? '')
   const [company, setCompany] = useState(previous?.company ?? '')
   const [notes, setNotes] = useState(previous?.notes ?? '')
   const isBusiness = hostType === 'company' || hostType === 'brokerage'
+
+  // Whether this applicant has to upload documents at all. Same rule the server
+  // applies in submitHostApplication, so the form can never ask for a photo the
+  // API would ignore — nor omit one it would demand.
+  const needsId = needsIdentityDocuments(identity.status)
 
   // ID photos (data URLs) — required so admins can verify the host, same as /verify-id.
   const [idFront, setIdFront] = useState<string | null>(null)
@@ -149,7 +182,7 @@ export function ApplyForm({
       setError(t('errors.checkFields'))
       return
     }
-    if (!idFront || !idBack) {
+    if (needsId && (!idFront || !idBack)) {
       setError(t('errors.idRequired'))
       return
     }
@@ -173,9 +206,11 @@ export function ApplyForm({
           // oversized photo, most often) left an application on file with no ID
           // attached and nothing linking the two. One admin decision now approves
           // both, and one failure fails the whole submission.
-          doc_type: docType,
-          id_front: idFront,
-          id_back: idBack,
+          //
+          // Omitted entirely when the applicant is already verified or under
+          // review: the server links their existing submission to this
+          // application instead of taking a second copy of the same ID.
+          ...(needsId ? { doc_type: docType, id_front: idFront, id_back: idBack } : {}),
         }),
       })
       if (res.status === 401) {
@@ -337,12 +372,21 @@ export function ApplyForm({
         </label>
         <input
           id="apply-national-id"
-          style={input}
+          style={nationalIdLocked ? { ...input, background: C.cream, color: C.muted } : input}
           value={nationalId}
           onChange={(e) => setNationalId(e.target.value)}
           placeholder={t('placeholders.nationalId')}
+          // readOnly, not disabled: the value still has to reach the request,
+          // and a disabled field is skipped by assistive technology.
+          readOnly={nationalIdLocked}
+          aria-readonly={nationalIdLocked || undefined}
           required
         />
+        {nationalIdLocked && (
+          <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>
+            {t('identity.nationalIdLocked')}
+          </p>
+        )}
         <FieldError text={fieldErrors.national_id} />
       </div>
 
@@ -384,115 +428,148 @@ export function ApplyForm({
         <FieldError text={fieldErrors.address} />
       </div>
 
-      <div style={fieldWrap}>
-        <label style={label} htmlFor="apply-doc-type">
-          {t('fields.docType')} <span style={{ color: C.burgundy }}>*</span>
-        </label>
-        <select
-          id="apply-doc-type"
-          style={input}
-          value={docType}
-          onChange={(e) => setDocType(e.target.value as DocType)}
-        >
-          {DOC_TYPES.map((d) => (
-            <option key={d.key} value={d.key}>{t(`docTypes.${d.key}`)}</option>
-          ))}
-        </select>
-        <FieldError text={fieldErrors.doc_type} />
-      </div>
+      {/* Identity. One verification serves guest and host alike, so the documents
+          are asked for only when nothing usable is on file. Someone who verified
+          from their profile — or whose submission is still under review — sees
+          what we already hold instead of a second upload of the same ID. */}
+      {needsId ? (
+        <>
+          {identity.status === 'rejected' && (
+            <div
+              style={{
+                ...fieldWrap,
+                background: '#fdecea',
+                border: '1px solid rgba(179,38,30,0.22)',
+                borderRadius: 16,
+                padding: '14px 16px',
+              }}
+            >
+              <p style={{ margin: 0, fontSize: 13.5, fontWeight: 700, color: '#b3261e' }}>
+                {t('identity.rejectedTitle')}
+              </p>
+              {identity.notes && (
+                <p style={{ margin: '6px 0 0', fontSize: 13, color: C.ink, lineHeight: 1.55 }}>
+                  <strong>{t('identity.reason')}:</strong> {identity.notes}
+                </p>
+              )}
+              <p style={{ margin: '6px 0 0', fontSize: 13, color: C.muted, lineHeight: 1.55 }}>
+                {t('identity.rejectedBody')}
+              </p>
+            </div>
+          )}
+        <div style={fieldWrap}>
+          <label style={label} htmlFor="apply-doc-type">
+            {t('fields.docType')} <span style={{ color: C.burgundy }}>*</span>
+          </label>
+          <select
+            id="apply-doc-type"
+            style={input}
+            value={docType}
+            onChange={(e) => setDocType(e.target.value as DocType)}
+          >
+            {DOC_TYPES.map((d) => (
+              <option key={d.key} value={d.key}>{t(`docTypes.${d.key}`)}</option>
+            ))}
+          </select>
+          <FieldError text={fieldErrors.doc_type} />
+        </div>
 
-      <div style={fieldWrap}>
-        <label style={label}>
-          {t('fields.idPhotos')} <span style={{ color: C.burgundy }}>*</span>
-        </label>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          {([
-            { side: 'front' as const, value: idFront, ref: frontInputRef, clear: () => setIdFront(null), text: t('fields.idFront') },
-            { side: 'back' as const, value: idBack, ref: backInputRef, clear: () => setIdBack(null), text: t('fields.idBack') },
-          ]).map(({ side, value, ref, clear, text }) => (
-            <div key={side}>
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: C.muted, marginBottom: 6 }}>{text}</div>
-              <input
-                ref={ref}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={(e) => onPickId(side, e)}
-                style={{ display: 'none' }}
-                aria-label={text}
-              />
-              {value ? (
-                <div style={{ position: 'relative', width: '100%' }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={value}
-                    alt={text}
+        <div style={fieldWrap}>
+          <label style={label}>
+            {t('fields.idPhotos')} <span style={{ color: C.burgundy }}>*</span>
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {([
+              { side: 'front' as const, value: idFront, ref: frontInputRef, clear: () => setIdFront(null), text: t('fields.idFront') },
+              { side: 'back' as const, value: idBack, ref: backInputRef, clear: () => setIdBack(null), text: t('fields.idBack') },
+            ]).map(({ side, value, ref, clear, text }) => (
+              <div key={side}>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: C.muted, marginBottom: 6 }}>{text}</div>
+                <input
+                  ref={ref}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={(e) => onPickId(side, e)}
+                  style={{ display: 'none' }}
+                  aria-label={text}
+                />
+                {value ? (
+                  <div style={{ position: 'relative', width: '100%' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={value}
+                      alt={text}
+                      style={{
+                        width: '100%',
+                        aspectRatio: '1 / 1',
+                        objectFit: 'cover',
+                        borderRadius: 14,
+                        border: `1px solid ${C.tan}`,
+                        display: 'block',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={clear}
+                      aria-label={t('idRemove')}
+                      title={t('idRemove')}
+                      style={{
+                        position: 'absolute',
+                        top: 8,
+                        insetInlineEnd: 8,
+                        width: 26,
+                        height: 26,
+                        borderRadius: 999,
+                        border: 'none',
+                        background: 'rgba(42,34,32,0.72)',
+                        color: '#fff',
+                        fontSize: 15,
+                        lineHeight: 1,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => ref.current?.click()}
                     style={{
                       width: '100%',
                       aspectRatio: '1 / 1',
-                      objectFit: 'cover',
                       borderRadius: 14,
-                      border: `1px solid ${C.tan}`,
-                      display: 'block',
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={clear}
-                    aria-label={t('idRemove')}
-                    title={t('idRemove')}
-                    style={{
-                      position: 'absolute',
-                      top: 8,
-                      insetInlineEnd: 8,
-                      width: 26,
-                      height: 26,
-                      borderRadius: 999,
-                      border: 'none',
-                      background: 'rgba(42,34,32,0.72)',
-                      color: '#fff',
-                      fontSize: 15,
-                      lineHeight: 1,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
+                      border: `1px dashed ${C.tan}`,
+                      background: C.cream,
+                      color: C.muted,
+                      fontSize: 12.5,
+                      fontWeight: 600,
                       fontFamily: 'inherit',
+                      cursor: 'pointer',
+                      padding: 10,
+                      textAlign: 'center',
+                      lineHeight: 1.4,
                     }}
                   >
-                    ×
+                    {t('idChoose')}
                   </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => ref.current?.click()}
-                  style={{
-                    width: '100%',
-                    aspectRatio: '1 / 1',
-                    borderRadius: 14,
-                    border: `1px dashed ${C.tan}`,
-                    background: C.cream,
-                    color: C.muted,
-                    fontSize: 12.5,
-                    fontWeight: 600,
-                    fontFamily: 'inherit',
-                    cursor: 'pointer',
-                    padding: 10,
-                    textAlign: 'center',
-                    lineHeight: 1.4,
-                  }}
-                >
-                  {t('idChoose')}
-                </button>
-              )}
-            </div>
-          ))}
+                )}
+              </div>
+            ))}
+          </div>
+          <p style={{ margin: '8px 0 0', fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>
+            {t('idHint')}
+          </p>
         </div>
-        <p style={{ margin: '8px 0 0', fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>
-          {t('idHint')}
-        </p>
-      </div>
+        </>
+      ) : (
+        <IdentityOnFile identity={identity} />
+      )}
 
       {isBusiness && (
         <div style={fieldWrap}>
@@ -559,5 +636,51 @@ export function ApplyForm({
         </a>
       </div>
     </form>
+  )
+}
+
+/** What we already hold, shown in place of the upload step. The applicant is
+ *  told their identity travels with the application, so the missing uploader
+ *  reads as "already done" rather than as a step that failed to render. */
+function IdentityOnFile({ identity }: { identity: ApplicantIdentity }) {
+  const t = useTranslations('hostApply')
+  const verified = identity.status === 'verified'
+  return (
+    <div
+      style={{
+        ...fieldWrap,
+        background: verified ? '#e7f5ec' : '#fff7e6',
+        border: `1px solid ${verified ? 'rgba(23,114,69,0.20)' : 'rgba(154,107,0,0.20)'}`,
+        borderRadius: 16,
+        padding: '16px 18px',
+      }}
+    >
+      <p
+        style={{
+          margin: 0,
+          fontSize: 13.5,
+          fontWeight: 700,
+          color: verified ? '#177245' : '#9a6b00',
+        }}
+      >
+        {verified ? `✓ ${t('identity.verifiedTitle')}` : t('identity.pendingTitle')}
+      </p>
+      <p style={{ margin: '6px 0 0', fontSize: 13.5, color: C.ink, lineHeight: 1.55 }}>
+        {verified ? t('identity.verifiedBody') : t('identity.pendingBody')}
+      </p>
+      <a
+        href="/verify-id"
+        style={{
+          display: 'inline-block',
+          marginTop: 10,
+          color: C.burgundy,
+          fontSize: 13,
+          fontWeight: 700,
+          textDecoration: 'underline',
+        }}
+      >
+        {t('identity.view')}
+      </a>
+    </div>
   )
 }

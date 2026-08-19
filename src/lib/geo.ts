@@ -15,8 +15,11 @@ export function approxLatLng(lat: number, lng: number): { lat: number; lng: numb
 /** Radius (metres) of the "approximate area" circle drawn around approxLatLng. */
 export const APPROX_RADIUS_M = 600
 
-/** Days-of-week that count as "weekend" by default (Egypt: Fri=5, Sat=6). */
-export const DEFAULT_WEEKEND_DAYS = [5, 6]
+// The weekend-day default lives with the rest of the weekend-pricing rules, so
+// the forms, the API and the quote below cannot disagree about which days a
+// listing falls back to. Re-exported here because this is where every caller
+// has always imported it from.
+export { DEFAULT_WEEKEND_DAYS } from './local/listing-pricing-core'
 
 /**
  * Total price for a stay, applying an optional per-listing weekend price on the

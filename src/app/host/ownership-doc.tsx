@@ -1,8 +1,10 @@
 'use client'
 
 // Ownership document (proof the host owns / may list the place) — the web half
-// of the flow the iOS + Android apps already have. Two widgets, both talking to
-// the same `ownership_doc` field:
+// of the flow the iOS + Android apps already have. A deed or a utility bill is
+// as often a PDF as a photo, so both are accepted here (the mobile pickers are
+// photos-only); ownership-doc-core.ts holds the rule the server enforces. Two
+// widgets, both talking to the same `ownership_doc` field:
 //  - OwnershipDocField: the labelled picker used by the create and edit forms.
 //    It only holds the compressed data URL; the parent form sends it.
 //  - OwnershipDocReupload: the "Re-upload ownership document" button on the host
@@ -12,7 +14,9 @@
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { fileToCompressedDataUrl, MAX_OWNERSHIP_DOC_CHARS } from '@/lib/image'
+import { fileToOwnershipDocDataUrl, MAX_OWNERSHIP_DOC_CHARS } from '@/lib/image'
+import { isPdfDataUrl, OWNERSHIP_DOC_ACCEPT } from '@/lib/local/ownership-doc-core'
+import { CARD_ACTION_STYLE } from './card-action-style'
 
 const C = {
   burgundy: '#5B0F16',
@@ -30,13 +34,15 @@ const label: React.CSSProperties = {
   marginBottom: 6,
 }
 
-/** Compress a picked file to a data URL, or a translated reason it failed. */
+/** Encode a picked file to a data URL, or a translated reason it failed. A photo
+ *  is compressed; a PDF is kept as-is, which is why the size cap bites here — a
+ *  scanned deed that misses it has to be re-exported smaller by the host. */
 async function encodeDoc(
   file: File,
   t: (key: string) => string
 ): Promise<{ doc: string } | { error: string }> {
   try {
-    const doc = await fileToCompressedDataUrl(file)
+    const doc = await fileToOwnershipDocDataUrl(file)
     // Same cap the server enforces — fail here rather than on a rejected request.
     if (doc.length > MAX_OWNERSHIP_DOC_CHARS) return { error: t('errors.tooLarge') }
     return { doc }
@@ -93,7 +99,7 @@ export function OwnershipDocField({
         ref={fileRef}
         id={`${idPrefix}-ownership-doc`}
         type="file"
-        accept="image/*"
+        accept={OWNERSHIP_DOC_ACCEPT}
         onChange={onPick}
         style={{ display: 'none' }}
       />
@@ -124,8 +130,24 @@ export function OwnershipDocField({
 
       {attached && (
         <div style={{ marginTop: 12, position: 'relative', width: 120, aspectRatio: '1 / 1', borderRadius: 12, overflow: 'hidden', background: C.tan }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={value} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          {/* A PDF has no thumbnail to show without a renderer, so the tile just
+              names the format — the host already knows which file they picked,
+              and the document itself is only ever read in /ops. */}
+          {isPdfDataUrl(value) ? (
+            <div
+              style={{
+                width: '100%', height: '100%', display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center', gap: 4,
+                color: C.burgundy, fontWeight: 800, fontSize: 18, letterSpacing: 0.5,
+              }}
+            >
+              PDF
+              <span style={{ fontSize: 11, fontWeight: 700, color: C.muted }}>{t('attached')}</span>
+            </div>
+          ) : (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={value} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          )}
           <button
             type="button"
             onClick={() => onChange('')}
@@ -194,21 +216,17 @@ export function OwnershipDocReupload({ listingId }: { listingId: string }) {
 
   return (
     <div style={{ padding: '0 16px 16px' }}>
-      <input ref={fileRef} type="file" accept="image/*" onChange={onPick} style={{ display: 'none' }} />
+      <input ref={fileRef} type="file" accept={OWNERSHIP_DOC_ACCEPT} onChange={onPick} style={{ display: 'none' }} />
       <button
         type="button"
         onClick={() => fileRef.current?.click()}
         disabled={busy}
         style={{
+          ...CARD_ACTION_STYLE,
           width: '100%',
-          padding: '9px 12px',
-          borderRadius: 999,
-          border: `1px solid rgba(91,15,22,0.18)`,
+          borderColor: 'rgba(91,15,22,0.18)',
           background: C.tan,
           color: C.burgundy,
-          fontFamily: 'inherit',
-          fontSize: 13.5,
-          fontWeight: 700,
           cursor: busy ? 'default' : 'pointer',
           opacity: busy ? 0.7 : 1,
         }}

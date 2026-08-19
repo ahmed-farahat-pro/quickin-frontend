@@ -2056,7 +2056,11 @@
       "reservationsHint": "Demandes de réservation des voyageurs pour vos logements.",
       "emptyTitle": "Vous n'avez pas encore publié de logement",
       "emptyFilteredTitle": "Aucun logement dans ce statut",
-      "showAll": "Afficher tous les logements"
+      "showAll": "Afficher tous les logements",
+      "rejected": {
+        "heading": "Pourquoi l'annonce n'a pas été approuvée",
+        "noReason": "Notre équipe n'a pas laissé de motif. Vérifiez vos informations, modifiez-les puis renvoyez l'annonce."
+      }
     },
     "reservations": {
       "heading": "Réservations entrantes",
@@ -2156,8 +2160,23 @@
           "tooFew": "Le champ « {field} » doit être d’au moins {min}."
         },
         "priceInvalid": "Veuillez saisir un prix par nuit valide.",
-        "resortNameRequired": "Veuillez saisir le nom du resort ou de la résidence, ou choisir une autre option.",
+        "completeness": {
+          "required": "Veuillez renseigner {field}.",
+          "letters": "Écrivez {field} en toutes lettres — cela ne peut pas être uniquement des symboles ou des chiffres.",
+          "tooShort": "Complétez {field} — il faut au moins {min} lettres.",
+          "tooFew": "Ajoutez au moins {min} photo de votre logement — une annonce sans photo, les voyageurs la dépassent."
+        },
+        "pinRequired": "Placez le repère sur la carte pour que les voyageurs sachent où se trouve votre logement.",
+        "resortName": {
+          "required": "Veuillez saisir le nom du resort ou de la résidence, ou choisir une autre option.",
+          "letters": "Veuillez écrire le nom du resort ou de la résidence en toutes lettres — il ne peut pas contenir uniquement des symboles ou des chiffres.",
+          "tooShort": "Veuillez indiquer le nom complet du resort ou de la résidence — il doit contenir au moins {min} lettres."
+        },
         "weekendPriceInvalid": "Le prix du week-end doit être supérieur à zéro. Laissez le champ vide si vous n'appliquez pas de tarif différent le week-end.",
+        "weekendDays": {
+          "wholeWeek": "Le tarif week-end ne peut pas couvrir les sept jours. Laissez au moins un jour au prix normal par nuit — c’est à cela qu’il sert.",
+          "noDaysChosen": "Choisissez au moins un jour de week-end, ou effacez le prix du week-end — un tarif sans jours ne s’applique à aucune nuit."
+        },
         "invalidImageUrl": "Ce lien de photo ne ressemble pas à une URL valide : {url}",
         "createFailed": "Impossible de créer l’annonce",
         "tooManyPhotos": "Vous pouvez téléverser jusqu'à {max} photos.",
@@ -2166,6 +2185,11 @@
       "pinHint": "Touchez la carte pour placer un repère. Les voyageurs voient une zone approximative, pas l'adresse exacte.",
       "searchHint": "Recherchez une ville, un quartier ou une adresse, puis choisissez un résultat pour le placer sur la carte — glissez ensuite le repère pour l’ajuster.",
       "pinSet": "Placé à {lat}, {lng}. Touchez à nouveau pour déplacer.",
+      "pinMismatch": {
+        "outOfRange": "Ce n'est pas un emplacement valide sur la carte. Touchez à nouveau la carte pour placer le repère.",
+        "outsideCountry": "Ce repère est en dehors de {place} — les voyageurs verront votre logement là-bas sur la carte. Déplacez le repère ou changez le pays.",
+        "outsideRegion": "Ce repère est en dehors de {place} — les voyageurs qui parcourent cette zone verront votre logement ici. Déplacez le repère ou changez la zone."
+      },
       "weekdays": {
         "sun": "Dim",
         "mon": "Lun",
@@ -2183,6 +2207,7 @@
       "locating": "Localisation sur la carte…",
       "geocodeFail": "Lieu introuvable — touchez la carte pour le définir.",
       "regionNone": "Aucune zone sélectionnée",
+      "requiredLegend": "Les champs marqués d’un astérisque sont obligatoires.",
       "regionHint": "Les zones que les voyageurs parcourent. Facultatif — choisissez celle de votre logement.",
       "regions": {
         "northCoast": "Côte Nord",
@@ -2252,11 +2277,16 @@
       },
       "errors": {
         "saveFailed": "Impossible d’enregistrer vos modifications"
+      },
+      "rejected": {
+        "title": "Cette annonce n'a pas été approuvée",
+        "noReason": "Notre équipe n'a pas laissé de motif cette fois.",
+        "hint": "Effectuez les modifications demandées, puis enregistrez pour la renvoyer en révision."
       }
     },
     "ownershipDoc": {
       "label": "Justificatif de propriété",
-      "intro": "Téléversez un document prouvant que vous êtes propriétaire de ce logement ou autorisé à le publier (p. ex. un titre de propriété ou une facture de services publics). Notre équipe l'examine avant la mise en ligne de votre annonce.",
+      "intro": "Téléversez un document prouvant que vous êtes propriétaire de ce logement ou autorisé à le publier (p. ex. un titre de propriété ou une facture de services publics). Une photo ou un PDF conviennent. Notre équipe l'examine avant la mise en ligne de votre annonce.",
       "upload": "Téléverser le justificatif de propriété",
       "change": "Modifier",
       "processing": "Traitement…",
@@ -2269,8 +2299,8 @@
       "uploading": "Envoi…",
       "resubmitted": "Envoyé pour examen",
       "errors": {
-        "tooLarge": "Cette image est trop volumineuse",
-        "failed": "Impossible de traiter ce document. Essayez-en un autre.",
+        "tooLarge": "Ce fichier est trop volumineux (max 2,5 Mo)",
+        "failed": "Impossible de traiter ce document. Téléversez une photo ou un PDF.",
         "uploadFailed": "Impossible d'envoyer ce document. Veuillez réessayer."
       }
     }
@@ -2357,6 +2387,17 @@
       "national_id": "Carte nationale d'identité",
       "passport": "Passeport",
       "residence_permit": "Titre de séjour"
+    },
+    "identity": {
+      "verifiedTitle": "Identité vérifiée",
+      "verifiedBody": "Votre pièce d'identité approuvée est déjà enregistrée : rien à téléverser ici. Notre équipe examinera cette demande à partir de celle-ci.",
+      "pendingTitle": "Identité en cours d'examen",
+      "pendingBody": "Votre pièce d'identité est déjà entre les mains de notre équipe. Inutile de l'envoyer à nouveau — nous l'examinerons avec cette demande.",
+      "rejectedTitle": "Votre dernière pièce d'identité n'a pas été approuvée",
+      "rejectedBody": "Merci de téléverser à nouveau des photos nettes de votre pièce d'identité pour que notre équipe puisse l'examiner avec cette demande.",
+      "reason": "Motif",
+      "view": "Voir ma vérification d'identité",
+      "nationalIdLocked": "Repris de la pièce d'identité déjà vérifiée."
     }
   },
   "contact": {
@@ -2584,6 +2625,10 @@
       "symbol": "Votre mot de passe doit contenir un symbole, par exemple ! ? @ #.",
       "email": "Votre mot de passe ne peut pas être votre adresse e-mail.",
       "common": "Ce mot de passe est trop courant. Choisissez-en un moins facile à deviner."
+    },
+    "toggle": {
+      "show": "Afficher le mot de passe",
+      "hide": "Masquer le mot de passe"
     }
   },
   "namePolicy": {
