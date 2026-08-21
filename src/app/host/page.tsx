@@ -396,6 +396,7 @@ async function HostDashboard({ userId, firstName, t }: { userId: string; firstNa
     perNight: t('perNight'),
     view: t('dashboard.view'),
     edit: t('dashboard.edit'),
+    calendar: t('dashboard.calendar'),
     badgePending: t('dashboard.badge.pending'),
     badgeRejected: t('dashboard.badge.rejected'),
     rejectedHeading: t('dashboard.rejected.heading'),
@@ -535,6 +536,7 @@ type CardLabels = {
   perNight: string
   view: string
   edit: string
+  calendar: string
   badgePending: string
   badgeRejected: string
   /** Heading over the operator's reason on a rejected card. */
@@ -661,12 +663,15 @@ function ListingCard({
           </p>
         </div>
       )}
-      <div style={{ display: 'flex', gap: 10, padding: '12px 16px 16px' }}>
+      {/* Three actions now, so they wrap rather than squeezing the labels: the
+          calendar is where a host manages day-to-day pricing and availability,
+          and it earns a place next to Edit rather than being buried inside it. */}
+      <div style={{ display: 'flex', gap: 10, padding: '12px 16px 16px', flexWrap: 'wrap' }}>
         <a
           href={`/explore/${listing.id}`}
           style={{
             ...CARD_ACTION_STYLE,
-            flex: 1,
+            flex: '1 1 30%',
             color: COLORS.burgundy,
             background: COLORS.cream,
             borderColor: COLORS.tan,
@@ -675,10 +680,22 @@ function ListingCard({
           {labels.view}
         </a>
         <a
+          href={`/host/${listing.id}/calendar`}
+          style={{
+            ...CARD_ACTION_STYLE,
+            flex: '1 1 30%',
+            color: COLORS.burgundy,
+            background: COLORS.cream,
+            borderColor: COLORS.tan,
+          }}
+        >
+          {labels.calendar}
+        </a>
+        <a
           href={editHref}
           style={{
             ...CARD_ACTION_STYLE,
-            flex: 1,
+            flex: '1 1 30%',
             color: '#fff',
             background: COLORS.burgundy,
           }}

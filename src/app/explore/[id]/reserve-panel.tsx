@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { formatPrice } from '@/lib/utils'
 import { formatDisplayPrice, isConverted } from '@/lib/currency/display'
 import { useDisplayCurrency } from '@/components/providers/display-currency-provider'
 import { stayQuote } from '@/lib/geo'
+import { nightsOfStay } from '@/lib/local/date-pricing-core'
+import type { PriceSource } from '@/lib/local/date-pricing-core'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 
 const COLORS = {
@@ -66,8 +68,76 @@ export default function ReservePanel({
   const guests = adults + children // total headcount (infants/pets don't count)
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
 
-  const { nights, total } = stayQuote(checkIn, checkOut, pricePerNight, weekendPrice, weekendDays)
+  // What each night of the chosen stay costs, straight from the host's calendar.
+  // These are GUEST prices — the calendar endpoint marks each night up and rounds
+  // it individually for a public reader, so the list here always adds up to the
+  // total, and nothing has to re-derive the markup on the client.
+  const [dayPrices, setDayPrices] = useState<Record<string, { price: number; source: PriceSource }>>({})
+
+  const stayNights = useMemo(() => nightsOfStay(checkIn, checkOut), [checkIn, checkOut])
+
+  // Windows already requested, so a window that comes back short is not asked for
+  // again. Without this the effect would re-run on every merge — setDayPrices
+  // always returns a fresh object — and a response missing even one night would
+  // never satisfy the guard below, turning a slow day into an endless refetch.
+  const fetched = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (stayNights.length === 0) return
+    // Only the nights being paid for: [checkIn, checkOut), so the checkout day
+    // is never fetched and never priced.
+    const start = stayNights[0]
+    const end = stayNights[stayNights.length - 1]
+    const window = `${listingId}:${start}:${end}`
+    if (fetched.current.has(window)) return
+    if (stayNights.every((d) => dayPrices[d])) return
+    fetched.current.add(window)
+    const ac = new AbortController()
+    ;(async () => {
+      try {
+        const res = await fetch(
+          `/api/local/listings/${listingId}/calendar?start=${start}&end=${end}`,
+          { signal: ac.signal, cache: 'no-store' }
+        )
+        if (!res.ok) {
+          // Let a transient failure be retried when the guest next changes dates.
+          fetched.current.delete(window)
+          return
+        }
+        const payload = await res.json()
+        setDayPrices((prev) => {
+          const next = { ...prev }
+          for (const d of payload.days ?? []) next[d.date] = { price: d.price, source: d.source }
+          return next
+        })
+      } catch {
+        // Offline or a slow network: the panel falls back to the local estimate
+        // below, which is what it always showed before the calendar existed.
+        fetched.current.delete(window)
+      }
+    })()
+    return () => ac.abort()
+  }, [listingId, stayNights, dayPrices])
+
+  /** Per-night prices, but only when we have every night — a partial list would
+   *  add up to less than the total and read as a discount. */
+  const breakdown = useMemo(() => {
+    if (stayNights.length === 0) return null
+    if (!stayNights.every((d) => dayPrices[d])) return null
+    return stayNights.map((date) => ({ date, ...dayPrices[date] }))
+  }, [stayNights, dayPrices])
+
+  // The local estimate is still the fallback for the moment before the calendar
+  // arrives (and if it never does). It knows the base and weekend rates, which
+  // covers every listing whose host has not touched their calendar.
+  const local = stayQuote(checkIn, checkOut, pricePerNight, weekendPrice, weekendDays)
+  const nights = stayNights.length
+  const total = breakdown ? breakdown.reduce((sum, n) => sum + n.price, 0) : local.total
+
   const weekendActive = typeof weekendPrice === 'number' && weekendPrice > 0 && !!weekendDays && weekendDays.length > 0
+  /** Itemise only when the nights actually differ. A stay at one flat rate reads
+   *  better as "3,000 × 3 nights" than as the same number written three times. */
+  const varies = !!breakdown && breakdown.some((n) => n.price !== breakdown[0].price)
 
   async function handleReserve() {
     setStatus({ kind: 'loading' })
@@ -184,12 +254,36 @@ export default function ReservePanel({
           }}
         >
           <span>
-            {weekendActive
+            {varies || weekendActive
               ? t('nightsCount', { nights })
-              : `${price(pricePerNight)} × ${t('nightsCount', { nights })}`}
+              : `${price(breakdown?.[0]?.price ?? pricePerNight)} × ${t('nightsCount', { nights })}`}
           </span>
           <span style={{ fontWeight: 700 }}>{price(total)}</span>
         </div>
+
+        {/* The nightly prices behind that number. Shown only when the nights
+            differ from each other — that is exactly when a guest would otherwise
+            have no way to tell where the total came from, and it is what a host
+            pricing a weekend or a holiday wants them to see. */}
+        {varies && breakdown && (
+          <ul style={{ listStyle: 'none', margin: '10px 0 0', padding: 0, display: 'grid', gap: 5 }}>
+            {breakdown.map((night) => (
+              <li
+                key={night.date}
+                style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: COLORS.muted }}
+              >
+                <span>
+                  {new Intl.DateTimeFormat(undefined, {
+                    weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC',
+                  }).format(new Date(`${night.date}T00:00:00Z`))}
+                </span>
+                <span style={{ fontWeight: night.source === 'custom' ? 700 : 500, color: COLORS.ink }}>
+                  {price(night.price)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
         <div
           style={{
             display: 'flex',

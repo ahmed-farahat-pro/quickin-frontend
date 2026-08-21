@@ -66,6 +66,8 @@ fails if one slips into the defaults.
 | ------ | ----------------------------------------------------------- | ------ |
 | GET    | `/api/local/listings?location=&guests=&checkIn=&checkOut=`  | —      |
 | GET    | `/api/local/listings/{id}`                                  | —      |
+| GET    | `/api/local/listings/{id}/calendar?start=&end=`              | — (host sees raw prices) |
+| PUT    | `/api/local/listings/{id}/calendar`                         | Cookie (the listing's host) |
 | POST   | `/api/local/bookings`                                       | Bearer |
 | GET    | `/api/local/bookings`                                       | Bearer |
 | POST   | `/api/auth/login` · `/signup` · `/social` · `/google` · `/apple` | — (returns `{ token, user }`) |
@@ -107,6 +109,8 @@ never-verified user would reset their password only to be bounced to the OTP scr
   email-verification step and the **password reset** — see above.
 - `/reservations` — the signed-in user's bookings.
 - `/account` — profile, identity, password, **Preferences** (display currency + language) and — for an approved host — **Payment information**. See below.
+- `/host/[id]/calendar` — the host's **pricing calendar** for one of their own listings:
+  a night's rate and its availability, day by day. See below.
 - `/host/apply` — the "become a host" application. See below.
 - `/links` — the bio linktree. See below.
 - `/plan` — static launch-plan page.
@@ -191,7 +195,11 @@ no images from a verified applicant, and the form asking for them anyway was the
 | none | The upload step, as before |
 
 The **National ID field is read-only** once the ID is verified, seeded from
-`id_verifications.id_number`. An admin approved a document bearing that number; letting the
+`id_verifications.id_number` by `nationalIdForApplication` in the same core module —
+the apps run that function too (`IdentityRules`, in `IdentityRules.kt` and
+`TrustService.swift`), reading the
+number from `GET /api/local/verification`, so no client asks for a number another client
+would have filled in. An admin approved a document bearing that number; letting the
 application carry a different one leaves the reviewer holding two answers with nothing to
 say which is the person's. It stays editable while a submission is only `pending` — nothing
 has been approved yet — and is still sent with the request either way (`readOnly`, not
@@ -1182,7 +1190,7 @@ npm run check     # same; the pre-deploy gate
 | `listing-completeness-policy.ts` | The bar a NEW listing clears: that a title and a price alone are refused (the reported bug), that each of the six required fields is caught when it alone is missing, that the first problem is reported in **form order** so a host is sent to the topmost empty field, that twenty symbols are `letters` rather than a long-enough description, that half a pin is no pin while `0,0` is a real coordinate, and that a non-array or junk `images` value is zero photos rather than an exemption — plus the halves that matter as much, that a complete listing passes untouched and that a chosen **resort** answers the area question on its own, since the region is derived from it. For the edit door: that every required field is refused when a patch clears it, that a field the patch does not mention is left alone (the empty ownership-doc-only patch the iOS app sends still goes through), that half a pin patch is judged against the half already stored, and that a resort on the listing answers a cleared region |
 | `listing-geo-policy.ts` | The map pin against the words around it: the reported bug (Egypt + North Coast, pin in Berlin) and that the country is named before the region, since it is the bigger mistake; every curated area against every other, so a Cairo pin on a North Coast listing is caught too; that Greater Cairo and the whole Alexandria → Marsa Matrouh strip are **not** flagged, because a box that refuses real listings is the worse failure; Morocco's negative longitudes; and the silence the module keeps where it cannot judge — no pin, an unknown country, an unknown region, an unparseable coordinate |
 | `listing-pricing-core.ts` | The host's weekend rate: that `0`, `'0'`, `'0.0'` and `-50` are refused rather than silently stored as "no weekend rate" (the bug the module was written for), and the half that matters as much — that `null`, `undefined` and a blank field still mean "no weekend rate" so a host can turn the feature off and the apps' `null` is never answered with a 400; plus the JSON shapes `Number()` would happily coerce into a price (`true`, `[]`, `['1500']`); and the day set that rate applies to — that all seven days is refused however it is padded (repeats, junk, reverse order), that six of seven and a lone day are not, that an empty set still means "nothing is a weekend", and that `3.7` is dropped rather than floored into Wednesday; and the two halves judged as a pair — that a rate with no day is refused, that a *missing* day set is not an empty one (it takes `DEFAULT_WEEKEND_DAYS`, which is what the mobile apps rely on) and that no rate means no days without a word of complaint, whatever the pills were showing |
-| `contentguard.ts` | Every de-obfuscation the contact guard undoes (Arabic-Indic/fullwidth/enclosed digits, zero-width and soft hyphens, Cyrillic lookalikes, spelled-out EN/AR numbers, `at`/`dot` spelling, letters used as separators — `A0101 S416 M3280`), the four categories it blocks, the split-across-messages check — and an equally large **false-positive** half, because a guard that rejects "we are 2 adults arriving on the 12th" is worse than one that misses |
+| `contentguard.ts` | Every de-obfuscation the contact guard undoes (Arabic-Indic/fullwidth/enclosed digits, zero-width and soft hyphens, Cyrillic lookalikes, spelled-out EN/AR numbers, `at`/`dot` spelling, letters used as separators — `A0101 S416 M3280`, and a number padded letter-by-letter — `0a1b0c1d2e3f4g5h6i7j8`, whatever plan it is written to), the four categories it blocks, the split-across-messages check — and an equally large **false-positive** half, because a guard that rejects "we are 2 adults arriving on the 12th" is worse than one that misses |
 
 Those modules deliberately have **no runtime imports** — Node's ESM resolver
 rejects the extension-less relative specifiers used elsewhere in `src/lib/local`, so a
@@ -1200,6 +1208,92 @@ the same two chalets in one order on the web and the other order in the apps. An
 `name-policy.ts` (`check-name-policy-parity.mjs`): both projects create accounts in the
 same `users` table, so a name rule that held on one door and not the other would not
 hold at all.
+
+## The host calendar — a night costs what the host said that night costs
+
+`/host/[id]/calendar` is where a host prices their listing day by day: the long weekend
+above the Tuesday after it, Eid above March, the week nobody books below both. It sits at
+the **top** of the pricing ladder:
+
+```
+listing_date_prices  →  weekend_price on weekend_days  →  price_per_night
+```
+
+A day the host pinned beats the weekend rule. **"Reset to default" deletes the pinned
+row** rather than writing the base price — a day pinned at whatever the base happened to
+be would look identical, right up until the host edited their listing's price and that
+day silently stopped following it. The absence of a row is the only honest way to say
+"this day has no opinion of its own".
+
+**A day's price is the price of the NIGHT that starts on it.** A stay `[check_in,
+check_out)` is charged for `check_in … check_out-1`, so the checkout day is never priced —
+Aug 15 → Aug 18 is three nights, not four.
+
+### Selecting days
+
+Airbnb-style and multi-day, because pricing a season one tap at a time is not a feature:
+
+- **tap** a day to add or remove it,
+- **press and drag** across days to sweep a range in or out,
+- **Select month** takes the whole month, and takes it back on a second press — a mis-tap
+  should not cost the host a month of manual deselection.
+
+The sweep is driven by hit-testing what is under the pointer (`elementFromPoint`), not by
+each cell's own enter event. On touch the pointer stays bound to the element that was
+pressed for the whole gesture, so the cells being dragged over never get an enter event
+at all and the drag would collapse into a single-day tap. The direction (adding or
+removing) is fixed when the press starts, so dragging back and forth over a day doesn't
+flip it repeatedly.
+
+The grid maths and the set operations live in `src/lib/local/date-pricing-core.ts`
+(`monthGrid`, `applySweep`, `toggleMonthSelection`, `isDayEditable`, `selectionStats`,
+`chunkWindows`) rather than in the component, so they are tested without a DOM —
+`test/unit/calendar-grid.test.mjs`. That file is byte-identical with the backend's copy
+and guarded by `check-date-pricing-core-parity.mjs` there.
+
+### What the host sees, and what the guest is charged
+
+The calendar shows the host's **raw** rates — the numbers they type and are paid — with
+the guest-inclusive figure under the price box ("Guests will see 4,680 EGP"). `GET
+/api/local/listings/:id/calendar` decides which of the two it returns from the session,
+exactly like the listing projections, so a host cannot be shown and then re-save the
+marked-up number.
+
+Every save takes the days back from the server's response rather than patching them
+locally: a day whose pin was just reset gets its new price from the weekend/base ladder,
+which only the server can evaluate.
+
+**A booked night is not editable.** `bookings.total_price` is snapshotted when the
+reservation is taken, so a later price change can never restate a stay a guest already
+agreed to — the guard is about not misleading the host, not about data safety. Days held
+by a reservation come back in `skipped` rather than failing the request, because a host
+dragging across a month will cross a booking routinely.
+
+### Availability, in the same calendar
+
+`listing_blocked_dates` stores half-open `[start, end)` **ranges** — what the mobile range
+picker writes — but the calendar edits single **days**, so "unblock the Wednesday in the
+middle of this week-long block" cannot be expressed as a DELETE. The spans overlapping
+what the host touched are exploded into days, changed, re-merged and rewritten; notes ride
+along per day, so splitting a *maintenance* block leaves two *maintenance* blocks rather
+than two unlabelled ones. `applyBlockChange()` and `blockRewriteWindow()`, both pure and
+both tested.
+
+### The booking summary
+
+The reserve panel on `/explore/[id]` fetches the same calendar for the chosen nights and
+**itemises them when they differ from each other** ("Sat 5 Sep · 4,680"). A stay at one
+flat rate keeps the single `price × nights` line — writing the same number three times is
+noise. The prices come straight from the endpoint, already marked up and rounded per
+night, so the list always adds up to the total shown beneath it.
+
+> **Known divergence (predates this feature).** This project's per-night ladder does not
+> consult `monthly_prices` and applies no length-of-stay discount; `quickin-backend`'s
+> does both, and reads Fri/Sat as the weekend rather than the listing's `weekend_days`.
+> The same listing and dates can therefore total differently depending on which client
+> took the booking. The **calendar rung is identical in both**, so a pinned day is charged
+> the same either way. Unifying the rest is a separate change and needs a decision about
+> which behaviour is correct before it is written.
 
 ## Weekend pricing — an empty field is optional, a `0` is not
 

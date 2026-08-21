@@ -10,6 +10,7 @@ import { useTranslations } from 'next-intl'
 import { fileToCompressedDataUrl } from '@/lib/image'
 import {
   DOC_TYPES,
+  nationalIdForApplication,
   needsIdentityDocuments,
   type DocType,
   type VerificationStatus,
@@ -113,12 +114,15 @@ export function ApplyForm({
   // The number on a verified ID is the one an admin already approved, so it is
   // shown rather than asked for, and locked: an application that contradicts the
   // approved document would put the reviewer between two different numbers.
-  // A pending submission is only seeded — nothing has been approved yet.
-  const verifiedIdNumber = identity.status === 'verified' ? identity.idNumber?.trim() || '' : ''
-  const nationalIdLocked = verifiedIdNumber !== ''
-  const [nationalId, setNationalId] = useState(
-    verifiedIdNumber || previous?.national_id || identity.idNumber?.trim() || ''
-  )
+  // A pending submission is only seeded — nothing has been approved yet. The
+  // rule lives in host-verification-core because iOS and Android render it too.
+  const idField = nationalIdForApplication({
+    status: identity.status,
+    submittedIdNumber: identity.idNumber,
+    previousNationalId: previous?.national_id,
+  })
+  const nationalIdLocked = idField.locked
+  const [nationalId, setNationalId] = useState(idField.value)
   const [phone, setPhone] = useState(previous?.phone ?? '')
   const [address, setAddress] = useState(previous?.address ?? '')
   const [company, setCompany] = useState(previous?.company ?? '')

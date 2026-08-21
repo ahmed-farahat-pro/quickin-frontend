@@ -15,6 +15,7 @@ import {
   isHostVerificationError,
   isListingAllowed,
   normalizeDocType,
+  nationalIdForApplication,
   needsIdentityDocuments,
   normalizeVerificationStatus,
   revokesListingPrivileges,
@@ -184,5 +185,75 @@ describe('needsIdentityDocuments', () => {
   test('status is read case- and whitespace-insensitively', () => {
     assert.equal(needsIdentityDocuments('  VERIFIED '), false)
     assert.equal(needsIdentityDocuments('Pending'), false)
+  })
+})
+
+describe('nationalIdForApplication', () => {
+  test('a verified number is shown, not asked for', () => {
+    // The number an admin already approved. Asking for it again invites an
+    // application that contradicts the document sitting next to it in /ops.
+    assert.deepEqual(
+      nationalIdForApplication({ status: 'verified', submittedIdNumber: '29801011234567' }),
+      { value: '29801011234567', locked: true }
+    )
+  })
+
+  test('a verified applicant whose submission carried no number still types one', () => {
+    // id_number is optional on a submission; locking an empty field would leave
+    // the applicant unable to fill in a required one.
+    assert.deepEqual(
+      nationalIdForApplication({ status: 'verified', submittedIdNumber: '   ' }),
+      { value: '', locked: false }
+    )
+  })
+
+  test('a pending or rejected submission seeds the field but never locks it', () => {
+    // Nothing is approved yet, so this is a convenience, not a decision.
+    assert.deepEqual(
+      nationalIdForApplication({ status: 'pending', submittedIdNumber: '123' }),
+      { value: '123', locked: false }
+    )
+    assert.deepEqual(
+      nationalIdForApplication({ status: 'rejected', submittedIdNumber: '123' }),
+      { value: '123', locked: false }
+    )
+  })
+
+  test('a reapply keeps what was typed last time', () => {
+    assert.deepEqual(
+      nationalIdForApplication({
+        status: 'pending',
+        submittedIdNumber: '111',
+        previousNationalId: '222',
+      }),
+      { value: '222', locked: false }
+    )
+  })
+
+  test('a verified number outranks the previous application', () => {
+    // The approved document wins over whatever a rejected application said.
+    assert.deepEqual(
+      nationalIdForApplication({
+        status: 'verified',
+        submittedIdNumber: '111',
+        previousNationalId: '222',
+      }),
+      { value: '111', locked: true }
+    )
+  })
+
+  test('nothing on file leaves an empty, editable field', () => {
+    assert.deepEqual(nationalIdForApplication({}), { value: '', locked: false })
+    assert.deepEqual(
+      nationalIdForApplication({ status: null, submittedIdNumber: null, previousNationalId: null }),
+      { value: '', locked: false }
+    )
+  })
+
+  test('values are trimmed and the status read case-insensitively', () => {
+    assert.deepEqual(
+      nationalIdForApplication({ status: ' VERIFIED ', submittedIdNumber: '  123  ' }),
+      { value: '123', locked: true }
+    )
   })
 })

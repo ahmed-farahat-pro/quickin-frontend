@@ -2038,6 +2038,7 @@
       "createListing": "Créer une annonce",
       "view": "Voir",
       "edit": "Modifier",
+      "calendar": "Calendrier",
       "emptyHint": "Publiez votre premier espace pour commencer à accueillir des voyageurs.",
       "tabs": {
         "listings": "Mes annonces",
@@ -2285,6 +2286,40 @@
         "title": "Cette annonce n'a pas été approuvée",
         "noReason": "Notre équipe n'a pas laissé de motif cette fois.",
         "hint": "Effectuez les modifications demandées, puis enregistrez pour la renvoyer en révision."
+      }
+    },
+    "calendar": {
+      "meta": {
+        "title": "Calendrier · QuickIn"
+      },
+      "backToHost": "Retour à l’hébergement",
+      "editListing": "Modifier l’annonce",
+      "title": "Calendrier des tarifs",
+      "subtitle": "Votre tarif de base est de {base} {currency} par nuit. Sélectionnez les jours à tarifer différemment — week-ends, jours fériés, semaines creuses.",
+      "selectMonth": "Sélectionner le mois",
+      "actionBar": "Jours sélectionnés",
+      "nightsSelected": "{count, plural, one {# nuit sélectionnée} other {# nuits sélectionnées}}",
+      "clear": "Effacer",
+      "priceLabel": "Tarif par nuit ({currency})",
+      "pricePlaceholder": "ex. 3500",
+      "guestsPay": "Les voyageurs verront {amount} {currency}",
+      "setPrice": "Définir le tarif",
+      "resetPrice": "Rétablir le tarif par défaut",
+      "block": "Bloquer",
+      "unblock": "Ouvrir",
+      "saving": "Enregistrement…",
+      "saved": "{count, plural, one {# jour mis à jour} other {# jours mis à jour}}.",
+      "savedWithSkips": "{count, plural, one {# jour mis à jour} other {# jours mis à jour}}. {skipped, plural, one {# jour réservé a été ignoré} other {# jours réservés ont été ignorés}}.",
+      "limits": "Jusqu’à {max} jours à la fois, {months} mois à l’avance. Les nuits réservées conservent le tarif auquel elles ont été réservées.",
+      "legend": {
+        "available": "Tarif par défaut",
+        "custom": "Tarif personnalisé",
+        "blocked": "Bloqué",
+        "booked": "Réservé"
+      },
+      "errors": {
+        "saveFailed": "Impossible d’enregistrer ces dates. Veuillez réessayer.",
+        "priceRequired": "Saisissez d’abord un tarif par nuit."
       }
     },
     "ownershipDoc": {

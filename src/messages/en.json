@@ -2038,6 +2038,7 @@
       "createListing": "Create a listing",
       "view": "View",
       "edit": "Edit",
+      "calendar": "Calendar",
       "emptyHint": "List your first space to start welcoming guests.",
       "tabs": {
         "listings": "My Listings",
@@ -2285,6 +2286,40 @@
         "title": "This listing wasn't approved",
         "noReason": "Our team didn't leave a reason this time.",
         "hint": "Make the changes described, then save to send it back for review."
+      }
+    },
+    "calendar": {
+      "meta": {
+        "title": "Calendar · QuickIn"
+      },
+      "backToHost": "Back to hosting",
+      "editListing": "Edit listing",
+      "title": "Pricing calendar",
+      "subtitle": "Your base rate is {base} {currency} a night. Select days to charge something different — weekends, holidays, a quiet week.",
+      "selectMonth": "Select month",
+      "actionBar": "Selected days",
+      "nightsSelected": "{count, plural, one {# night selected} other {# nights selected}}",
+      "clear": "Clear",
+      "priceLabel": "Nightly price ({currency})",
+      "pricePlaceholder": "e.g. 3500",
+      "guestsPay": "Guests will see {amount} {currency}",
+      "setPrice": "Set price",
+      "resetPrice": "Reset to default",
+      "block": "Block",
+      "unblock": "Open",
+      "saving": "Saving…",
+      "saved": "{count, plural, one {# day updated} other {# days updated}}.",
+      "savedWithSkips": "{count, plural, one {# day updated} other {# days updated}}. {skipped, plural, one {# booked day was skipped} other {# booked days were skipped}}.",
+      "limits": "Up to {max} days at a time, {months} months ahead. Booked nights keep the price they were reserved at.",
+      "legend": {
+        "available": "Default price",
+        "custom": "Custom price",
+        "blocked": "Blocked",
+        "booked": "Booked"
+      },
+      "errors": {
+        "saveFailed": "Could not save those dates. Please try again.",
+        "priceRequired": "Enter a nightly price first."
       }
     },
     "ownershipDoc": {
