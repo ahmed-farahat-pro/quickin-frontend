@@ -2,11 +2,11 @@
 // Server-resolves the user from the qk_token cookie (same pattern as
 // explore/page.tsx + reservations/page.tsx); redirects to /login when absent.
 import type { Metadata } from 'next'
+import type { HostStatus, Verification, ProfileFields } from '@/lib/types'
+import { viewer, backendFetchOr } from '@/lib/backend'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
-import { getVerification, getPayoutMethod, getOwnProfileFields } from '@/lib/local/db'
-import { verifyToken, getUserRowByEmail, getHostState, type HostStatus } from '@/lib/local/auth'
 import type { PayoutMethodView } from '@/lib/local/payout-method-core'
 import { AccountForms, BecomeHostButton } from './account-forms'
 import { AvatarPicker } from './avatar-picker'
@@ -43,31 +43,6 @@ interface AccountUser {
   is_host: boolean
   host_status: HostStatus
   host_review_note: string | null
-}
-
-// Resolve the signed-in user (full row) + their authoritative host state, or null
-// when the cookie is missing/invalid.
-async function getCurrentUser(): Promise<AccountUser | null> {
-  const token = (await cookies()).get('qk_token')?.value
-  if (!token) return null
-  const claims = verifyToken(token)
-  if (!claims?.email) return null
-  try {
-    const row = await getUserRowByEmail(claims.email)
-    if (!row) return null
-    const host = await getHostState(row.id, !!row.is_host)
-    return {
-      id: row.id,
-      email: row.email,
-      full_name: row.full_name,
-      avatar_url: row.avatar_url,
-      is_host: !!row.is_host,
-      host_status: host.host_status,
-      host_review_note: host.host_review_note,
-    }
-  } catch {
-    return null
-  }
 }
 
 const VERIFY_CHIP_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -128,20 +103,28 @@ function Header({ backLabel }: { backLabel: string }) {
 }
 
 export default async function AccountPage() {
-  const user = await getCurrentUser()
+  const user = await viewer()
   if (!user) redirect('/login')
 
   const t = await getTranslations('accountPage')
-  const verification = await getVerification(user.id)
+  // Defaults rather than null: the old getVerification() returned an UNVERIFIED row,
+  // so an unreachable backend renders "not verified yet" instead of blanking the card.
+  const verification = await backendFetchOr<Verification>('/api/local/verification', {
+    status: 'unverified', id_number: null, verified_at: null, doc_type: null, notes: null,
+  })
   // Only a host is paid by QuickIn, so only a host has a payout method to show.
   // Read it server-side so an already-added method renders with the page rather
   // than flashing the empty form first.
   const payoutMethod: PayoutMethodView | null =
-    user.host_status === 'approved' ? await getPayoutMethod(user.id) : null
+    user.host_status === 'approved'
+      ? (await backendFetchOr<{ payout_method: PayoutMethodView | null }>(
+          '/api/local/host/payout-method', { payout_method: null })).payout_method
+      : null
   // Age / phone / bio live on the same row the apps write, so a bio typed on the
   // phone is already filled in here. Read server-side with the rest of the page
   // so the form renders populated rather than empty-then-filled.
-  const profileFields = await getOwnProfileFields(user.id)
+  const profileFields = await backendFetchOr<ProfileFields | null>('/api/local/profile', null)
+  const profile = profileFields ?? ({} as ProfileFields)
   const chipColors = VERIFY_CHIP_COLORS[verification.status] ?? VERIFY_CHIP_COLORS.unverified
   const chipKey = VERIFY_CHIP_COLORS[verification.status]
     ? verification.status
@@ -379,9 +362,9 @@ export default async function AccountPage() {
         <AccountForms
           userId={user.id}
           initialName={user.full_name ?? ''}
-          initialAge={profileFields.age === null ? '' : String(profileFields.age)}
-          initialPhone={profileFields.phone ?? ''}
-          initialBio={profileFields.bio ?? ''}
+          initialAge={profile.age === null ? '' : String(profile.age)}
+          initialPhone={profile.phone ?? ''}
+          initialBio={profile.bio ?? ''}
         />
 
         {/* Display currency + language */}

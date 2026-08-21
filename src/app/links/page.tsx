@@ -15,6 +15,7 @@
 // silently drops the apps looks broken rather than early.
 // =============================================================================
 import type { Metadata } from 'next'
+import { backendFetchOr } from '@/lib/backend'
 import Image from 'next/image'
 import { getTranslations } from 'next-intl/server'
 import {
@@ -28,7 +29,6 @@ import {
   IconMail,
   IconChevronRight,
 } from '@tabler/icons-react'
-import { getAppLinks } from '@/lib/local/db'
 import { SOCIAL_LINKS, type SocialPlatform } from '@/lib/social'
 import { whatsappHref, CONTACT_EMAIL, CONTACT_EMAIL_HREF } from '@/lib/contact'
 import { getBaseUrl } from '@/lib/utils'
@@ -163,7 +163,8 @@ function ComingSoonRow({
 
 export default async function LinksPage() {
   const t = await getTranslations('linksPage')
-  const { ios, android } = await getAppLinks()
+  const { ios, android } = await backendFetchOr<{ ios: string | null; android: string | null }>(
+    '/api/local/app-links', { ios: null, android: null })
   const siteUrl = getBaseUrl()
 
   const iconProps = { className: 'h-[22px] w-[22px] shrink-0', stroke: 1.8 } as const

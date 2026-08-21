@@ -5,14 +5,13 @@
 // about that before the host commits, and this header carries the same
 // approval-status chip the host dashboard uses.
 import type { Metadata } from 'next'
+import type { Listing, ResortOption } from '@/lib/types'
+import { viewer, backendFetchOr, backendFetch } from '@/lib/backend'
 import { cookies } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
-import { getCommissionConfig, getListingById, hostListingHasOwnershipDoc } from '@/lib/local/db'
-import { verifyToken, getUserRowByEmail } from '@/lib/local/auth'
 import { ListingStatusChip } from '../../listing-status-chip'
 import type { HostListingStatus } from '../../host-tabs'
-import { listActiveResorts } from '@/lib/local/resorts'
 import { EditListingForm } from './edit-listing-form'
 
 export const dynamic = 'force-dynamic'
@@ -42,34 +41,32 @@ function listingStatus(approval: string | null | undefined): HostListingStatus {
 
 export default async function EditListingPage({ params }: { params: Promise<{ id: string }> }) {
   // Server-side, like the create page: no client fetch needed.
-  let resorts: Awaited<ReturnType<typeof listActiveResorts>> = []
+  let resorts: ResortOption[] = []
   try {
-    resorts = await listActiveResorts()
+    resorts = (await backendFetchOr<{ resorts: ResortOption[] }>('/api/local/resorts', { resorts: [] })).resorts
   } catch (err) {
     console.error('host/edit resorts:', err)
   }
   const { id } = await params
 
-  const token = (await cookies()).get('qk_token')?.value
-  if (!token) redirect('/login')
-  const claims = verifyToken(token)
-  if (!claims?.email) redirect('/login')
-  const me = await getUserRowByEmail(claims.email)
+  const me = await viewer()
   if (!me) redirect('/login')
 
   // asHost: the form loads price_per_night and saves it straight back, so it
   // must see the host's RAW price — not the commission-inclusive guest price,
   // which would inflate the listing a little more on every save.
-  const listing = await getListingById(id, { asHost: true })
+  const listing = await backendFetch<Listing | null>(`/api/local/listings/${id}?asHost=1`, { allow404: true })
   // Only the owner may edit — anyone else (or a missing listing) gets a 404.
   if (!listing || listing.host_id !== me.id) notFound()
   // Just a flag — the document itself is admin-only (reviewed in /ops).
-  const hasOwnershipDoc = await hostListingHasOwnershipDoc(listing.id, me.id)
+  const hasOwnershipDoc = Boolean(
+    (listing as unknown as { has_ownership_doc?: boolean }).has_ownership_doc,
+  )
   // Drives the "guests will see EGP X" hint under the price fields. A failure
   // degrades to 0, hiding the hint rather than showing a wrong number.
   let commissionRate = 0
   try {
-    commissionRate = (await getCommissionConfig()).rate
+    commissionRate = (await backendFetchOr<{ rate: number }>('/api/local/host/commission', { rate: 0 })).rate
   } catch (err) {
     console.error('host/edit commission:', err)
   }

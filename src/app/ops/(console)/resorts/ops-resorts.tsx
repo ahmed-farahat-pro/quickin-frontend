@@ -9,6 +9,7 @@
 // one go. The submitted spelling is kept as an alias, so the next host to type it
 // auto-links instead of queueing the same thing again.
 import { useCallback, useMemo, useState } from 'react'
+import type { Review } from '@/lib/types'
 import { COLORS, SERIF } from '../../ops-theme'
 import {
   Empty,

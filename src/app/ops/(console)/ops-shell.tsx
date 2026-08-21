@@ -28,7 +28,7 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { COLORS, FONT } from '../ops-theme'
 import { useOpsSession } from './ops-session'
-import type { StaffModule } from '@/lib/local/staff'
+import type { StaffModule, Booking } from '@/lib/types'
 
 /** Group headings, a shade darker than COLORS.muted: muted was tuned against white
  *  and sits at roughly 4.6:1 on tan — passing, but too faint to hold the groups

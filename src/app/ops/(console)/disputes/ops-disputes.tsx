@@ -7,6 +7,7 @@
 // outcome, and "who moved this to Resolved, when, and why" has to have an answer
 // months later.
 import { useCallback, useEffect, useState } from 'react'
+import type { Listing } from '@/lib/types'
 import { COLORS, SERIF } from '../../ops-theme'
 import { EmptyRow, adminGet, adminSend, btnBase, controlStyle, ghostBtn, pageStyle, panelStyle, solidBtn, td, th } from '../ops-ui'
 import { waitingLabel } from '@/lib/local/activity-core'

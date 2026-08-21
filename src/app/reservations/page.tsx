@@ -1,10 +1,9 @@
 // My reservations (no Supabase) — the signed-in user's bookings.
 import type { Metadata } from 'next'
+import type { Booking, Dispute } from '@/lib/types'
+import { viewer, backendFetchOr } from '@/lib/backend'
 import { cookies } from 'next/headers'
 import { getLocale, getTranslations } from 'next-intl/server'
-import { getUserBookings } from '@/lib/local/db'
-import { disputableBookingIds, listDisputesForGuest } from '@/lib/local/disputes'
-import { verifyToken, getUserRowByEmail } from '@/lib/local/auth'
 import { getRequestOrigin } from '@/lib/site-origin'
 import { localeToBcp47, type Locale } from '@/i18n/config'
 import { formatPrice } from '@/lib/utils'
@@ -46,28 +45,6 @@ const COLORS = {
 }
 
 const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
-
-// Resolve the viewer from the qk_token cookie. `isHost` mirrors the pattern used
-// on /explore — it drives the "your places' requests live over on /host"
-// cross-link, so hosts aren't left wondering why reservations show up twice.
-async function getCurrentUser(): Promise<{
-  id: string
-  firstName: string
-  isHost: boolean
-} | null> {
-  const token = (await cookies()).get('qk_token')?.value
-  if (!token) return null
-  const claims = verifyToken(token)
-  if (!claims?.email) return null
-  try {
-    const row = await getUserRowByEmail(claims.email)
-    if (!row) return null
-    const name = row.full_name?.trim() || row.email.split('@')[0]
-    return { id: row.id, firstName: name.split(' ')[0], isHost: !!row.is_host }
-  } catch {
-    return null
-  }
-}
 
 function fmtDate(d: string, bcp47: string): string {
   // d is YYYY-MM-DD — formatted in the active locale's BCP47 tag.
@@ -145,8 +122,14 @@ function Header({
   )
 }
 
+/** First name for a greeting, from whatever the account actually has. */
+function firstNameOf(u: { full_name: string | null; email: string }): string {
+  const name = u.full_name?.trim() || u.email.split('@')[0] || ''
+  return name.split(' ')[0] || ''
+}
+
 export default async function ReservationsPage() {
-  const user = await getCurrentUser()
+  const user = await viewer()
   const t = await getTranslations('reservationsLocal')
 
   return (
@@ -233,8 +216,8 @@ export default async function ReservationsPage() {
         ) : (
           <ReservationsList
             userId={user.id}
-            firstName={user.firstName}
-            isHost={user.isHost}
+            firstName={firstNameOf(user)}
+            isHost={user.is_host}
           />
         )}
       </section>
@@ -251,17 +234,17 @@ async function ReservationsList({
   firstName: string
   isHost: boolean
 }) {
-  const bookings = await getUserBookings(userId)
+  const bookings = await backendFetchOr<Booking[]>('/api/local/bookings', [])
   // Which of these can still be disputed, and which already have one — resolved
   // server-side in one query so the eligibility rule lives in exactly one place
   // (disputes-core) rather than being re-derived per client.
   // Tolerated rather than awaited bare: if migrate-disputes hasn't run on this
   // database, these throw — and a guest's reservations list must not 500 over a
   // feature that simply isn't available yet. It degrades to "no dispute UI".
-  const [disputeState, myDisputes] = await Promise.all([
-    disputableBookingIds(userId).catch(() => ({ eligible: [] as string[], existing: {} })),
-    listDisputesForGuest(userId).catch(() => [] as Awaited<ReturnType<typeof listDisputesForGuest>>),
-  ])
+  const { disputes: myDisputes, eligible, existing } = await backendFetchOr<{
+    disputes: Dispute[]; eligible: string[]; existing: Record<string, string>
+  }>('/api/local/disputes', { disputes: [], eligible: [], existing: {} })
+  const disputeState = { eligible, existing }
   const disputeByBooking = new Map(myDisputes.map((d) => [d.booking_id, d]))
   const t = await getTranslations('reservationsLocal')
   // Absolute origin for the stay-pass QR (see StayPassCard).

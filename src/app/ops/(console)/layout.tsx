@@ -14,7 +14,7 @@
 import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { resolveStaffSession, STAFF_COOKIE, STAFF_IDLE_MS } from '@/lib/local/staff'
+import { opsMe, STAFF_COOKIE } from '@/lib/backend'
 import { OpsSessionProvider } from './ops-session'
 import { OpsShell } from './ops-shell'
 
@@ -25,8 +25,10 @@ export const metadata: Metadata = {
 }
 
 export default async function OpsConsoleLayout({ children }: { children: React.ReactNode }) {
+  // The cookie is read only to tell "signed out" from "session rejected" — its value
+  // is opaque here; the backend owns the signing secret and verifies it.
   const token = (await cookies()).get(STAFF_COOKIE)?.value
-  const staff = await resolveStaffSession(token)
+  const { staff, idleMs } = await opsMe()
 
   if (!staff) {
     // `reason` lets the login page explain itself: a present-but-rejected cookie
@@ -37,14 +39,14 @@ export default async function OpsConsoleLayout({ children }: { children: React.R
   return (
     <OpsSessionProvider
       session={{
-        staffId: staff.staffId,
+        staffId: staff.id,
         email: staff.email,
-        fullName: staff.fullName,
-        role: staff.role,
-        modules: [...staff.modules],
+        fullName: staff.full_name ?? '',
+        role: staff.role as never,
+        modules: [...staff.modules] as never,
         legacy: Boolean(staff.legacy),
       }}
-      idleMs={STAFF_IDLE_MS}
+      idleMs={idleMs}
     >
       <OpsShell>{children}</OpsShell>
     </OpsSessionProvider>

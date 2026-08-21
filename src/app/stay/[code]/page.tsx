@@ -14,15 +14,10 @@
 // transition), so a pending request can never resolve here.
 import type { Metadata } from 'next'
 import { getLocale, getTranslations } from 'next-intl/server'
-import {
-  getStayByCode,
-  isLiveStayStatus,
-  normalizeReservationCode,
-  type StayGuideItem,
-  type StayPass,
-} from '@/lib/local/db'
+import { backendFetch } from '@/lib/backend'
+import { isLiveStayStatus, normalizeReservationCode, stayPassPath } from '@/lib/stay-code'
+import type { StayGuideItem, StayPass } from '@/lib/types'
 import { localeToBcp47, type Locale } from '@/i18n/config'
-import { stayPassPath } from '@/lib/stay-code'
 import { getRequestOrigin } from '@/lib/site-origin'
 import { StayQr } from '../stay-qr'
 import { StayNotice } from '../stay-notice'
@@ -155,7 +150,7 @@ export default async function StayPassPage({
     )
   }
 
-  const pass = await getStayByCode(code)
+  const pass = await backendFetch<StayPass | null>(`/api/local/stay/${code}`, { allow404: true })
   if (!pass) {
     return (
       <Shell>

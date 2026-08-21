@@ -7,17 +7,67 @@ fetched over HTTP from the separate **QuickIn backend API**.
 
 ## Architecture
 
+**This project is the UI. It has no API routes and no database.**
+
+`quickin-backend` owns the data. Everything here reaches it over HTTP:
+
+| | how |
+| --- | --- |
+| Server components | `src/lib/backend.ts` — `viewer()`, `opsSession()`, `backendFetch*()` |
+| Browser (`fetch('/api/...')`) | the `/api/:path*` rewrite in `next.config.ts` |
+| Public, cacheable reads | `backendFetchPublic()` — no cookies, so the route can stay static |
+
 ```
-┌──────────────────────┐      HTTP (fetch)      ┌──────────────────────┐
-│  quickin-frontend    │  ───────────────────▶  │   backend API        │
-│  (this repo, UI)     │   NEXT_PUBLIC_API_URL   │  /api/local/*        │
-│  Next.js · port 5000 │                         │  /api/auth/*         │
-└──────────────────────┘                         └──────────────────────┘
+┌────────────────────────┐                       ┌──────────────────────────┐
+│  quickin-frontend      │   server: fetch +     │   quickin-backend        │
+│  (this repo — the UI)  │   forwarded cookies   │   /api/auth/*            │
+│                        │ ────────────────────▶ │   /api/local/*           │
+│  browser: /api/*  ─────┼─ next.config rewrite ▶│   → Neon                 │
+└────────────────────────┘                       └──────────────────────────┘
 ```
 
-- Listings/detail pages **fetch** from the backend (server-side, `cache: 'no-store'`).
-- Auth uses a **bearer token stored in `localStorage`** (`qk_token` / `qk_user`) —
-  no cookies, so the frontend and backend can live on different domains.
+The single env var that matters is `NEXT_PUBLIC_API_URL`. **There is deliberately no
+`DATABASE_URL`**: a database client here is how the two projects drifted apart.
+
+Auth is **cookie-based** (`qk_token` for guests and hosts, `qk_staff` for /ops), not a
+bearer token in `localStorage` — the rewrite keeps every call same-origin, so the cookies
+are first-party and the backend verifies them.
+
+It did not start this way. Until 21 Aug 2026 this app had **86 API routes and its own
+`db.ts`**, a full second backend against the same Neon instance — the result of a sync
+commit in June that replaced a thin client with a self-contained app. The two copies
+answered the same questions differently, and users saw it: identical credentials that
+signed in here and failed on iOS, a listing that cost less booked from the app, a day a
+host had blocked that the browser would still take a booking for.
+
+### Why server components fetch instead of querying
+
+Querying the database directly from a server component is the idiomatic App Router
+pattern and is strictly faster — no HTTP hop, no serialisation. It was the right design
+for a standalone app, and that is what this once was. It is the wrong design next to a
+dedicated backend, because it puts a second data client in a second codebase. The extra
+hop is the price of one owner for the data; that trade was made deliberately.
+
+### Cookies and why the rewrite exists
+
+The browser only ever talks to this origin. `/api/*` is rewritten server-side to the
+backend, so `qk_token` and `qk_staff` stay first-party — no CORS, no SameSite problem.
+Server-side calls forward the incoming cookie header explicitly.
+
+### What still lives in `src/lib/local`
+
+Pure logic only: policies, validators and formatters with no database access
+(`password-policy`, `listing-geo-policy`, `activity-core`, `user-admin-core`, …). They
+are byte-identical to quickin-backend's copies and its `npm run check` fails if they
+drift. Shared UI shapes are in `src/lib/types.ts` — a deliberate copy, since types erase
+at build and importing across repos would add a runtime dependency for nothing.
+
+**Permissions are never re-derived here.** `GET /api/local/staff/me` returns `can`, the
+operator's effective module list, and `opsCan()` is a lookup against it. The real rule is
+not "is the key granted" — a super admin holds everything and some modules are
+super-admin-only regardless of grants. When this was checked live, the super admin had
+**zero explicit grants and nineteen effective permissions**; a local `modules.includes()`
+would have locked them out of the whole console.
 
 ## Environment
 
@@ -361,6 +411,92 @@ opposite of the bug: an over-tight list turns away a paying guest with no appeal
 `npm run check:tlds` diffs the snapshot against IANA and prints what to refresh. It
 needs the network, so it is **not** part of `npm run check`; run it by hand every few
 months, or the moment someone reports a valid address being refused.
+
+## One email, several rows — the credentials pick the account
+
+An address can own **more than one `users` row** on the shared Neon DB: quickin-backend's
+`migrate-split-accounts.mjs` dropped the unique constraint on `users.email` and keyed
+uniqueness on `(lower(email), role)` instead. That model was abandoned, but the index and
+the rows created under it remain, so "the user with this email" is ambiguous here too —
+including rows this project never created.
+
+**Sign-in verifies the password against every row for the address and lets the match
+decide the account.** Never pick a row first and check the password against only that one.
+
+That ordering caused a genuinely confusing production bug. This project picked an
+unordered `rows[0]`; quickin-backend picked `ORDER BY (role = 'user') DESC LIMIT 1`. When
+the password lived on a row the backend did not pick, **the same email and password signed
+in on the web and were refused with `401 Invalid email or password` on iOS and Android** —
+which reads like the apps are pointed at a different database. They are not.
+
+- `src/lib/local/login-row-core.ts` — `pickLoginRow`, `blockedRowAmong`,
+  `LOGIN_ROW_ORDER_SQL`. **Byte-identical to quickin-backend's copy**, enforced by that
+  repo's `scripts/check-login-row-core-parity.mjs` in its `npm run check`. If the copies
+  drift, the cross-client asymmetry comes back silently.
+- `getUserRowsByEmail(email)` in `src/lib/local/auth.ts` returns every row in a **total**
+  order (`role='user'`, then `created_at`, then `id`), so a tie never depends on physical
+  row order. It keeps the same pre-migration `catch` fallback as `getUserRowByEmail`.
+- `pickLoginRow` falls back to the canonical row when nothing matches, so the
+  wrong-password branch still answers 401 and never leaks which addresses are registered.
+- **A block is enforced across all rows** — `/ops` suspends one row by id, so
+  `blockedRowAmong(rows)` refuses the address if any row is blocked or removed.
+
+`getUserRowByEmail` (single row) is still fine for plain lookups, **not** for sign-in. The
+lasting fix is quickin-backend's `scripts/dedupe-user-emails.mjs`, which merges duplicates
+and restores `UNIQUE (lower(email))`.
+
+## What a guest gets back when they cancel
+
+Refund maths lives in `src/lib/local/cancellation-core.ts`, **byte-identical to
+quickin-backend's copy** and guarded by that repo's
+`scripts/check-cancellation-core-parity.mjs`. It exists because the two projects
+disagreed and both answers were live: for a stay 6 days out, this app refunded 50% of
+what the guest paid while the mobile API refunded 100% of the host's raw price.
+
+- **One flat ladder for now:** 7+ days out refunds 100%, 1–6 days refunds 50%, the day
+  of check-in or later refunds nothing. `listings.cancellation_policy` is still written
+  and still snapshotted onto every booking, but nothing reads it — the per-listing
+  ladder is a business decision that has not been made, and recording the data now means
+  turning it on later is a config change rather than a backfill.
+- **The refund is a share of what the guest PAID**, commission included — `loadCancelable`
+  selects `sqlWithCommission('b.total_price', BOOKING_RATE_SQL)`, never the raw price.
+- **Cancelling now notifies the host**, which this project did not do before.
+- `getCancellationQuote` and `cancelBooking` take **`(userId, bookingId)`** in both
+  projects. The order used to differ, and since both are strings a swapped call
+  type-checks and silently fails.
+
+## The nightly ladder is shared, not re-implemented
+
+`PER_NIGHT_SEASONAL_SQL` no longer hand-writes its own `CASE`. It delegates to
+`perNightSeasonalSql()` in `date-pricing-core.ts` — the SQL twin of `resolveNightPrice()`,
+which is what the client uses to preview a price.
+
+They had come apart. This project honoured `listings.weekend_days` but had **no monthly
+rung at all**, and skipped the weekend rate entirely when `weekend_days` was NULL;
+quickin-backend had the monthly rung but hardcoded Friday/Saturday. Both therefore
+charged something the guest had not been quoted, and differently from each other.
+`createBooking` here also applied **no length-of-stay discount**, so a 10-night stay on a
+listing with `weekly_discount = 10` cost 10% more booked from the browser than from the
+app. All three rungs now come from the guarded core.
+
+## Timestamps are serialised as real UTC
+
+Every `to_char(...)` rendering a timestamp goes through `col AT TIME ZONE 'UTC'` and ends
+in a literal `Z`. Appending `Z` alone — which this project did in all 38 places — is
+wrong: `to_char` on a `timestamptz` renders in the **session** zone, so a database in
+`Africa/Cairo` returned `2026-08-21T04:18:29Z` for an instant that was really
+`01:18:29Z`, confidently mislabelled by three hours. The explicit conversion makes the
+output independent of server configuration.
+
+## What makes a booking refusable
+
+`createBooking` enforced capacity, publish state and host status here but checked
+availability against `bookings` **only** — so a day the host had blocked on their
+calendar was still bookable from the browser, while the app correctly refused it.
+`listing_blocked_dates` is now part of the same clash query in both projects.
+
+The full list is documented in quickin-backend's README under the same heading; it is
+the authoritative copy, since that project is where this logic is consolidating.
 
 ## Password policy — one floor, all three doors
 

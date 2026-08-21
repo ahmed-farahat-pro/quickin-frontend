@@ -5,11 +5,9 @@
 // adds the super-admin check. The API routes re-check it independently — this
 // redirect only stops a moderator from loading a screen they can't use.
 import type { Metadata } from 'next'
-import { cookies } from 'next/headers'
+import { opsSession, backendFetchOr } from '@/lib/backend'
 import { redirect } from 'next/navigation'
-import { resolveStaffSession, STAFF_COOKIE, GRANTABLE_MODULES } from '@/lib/local/staff'
-import { listStaffAccounts } from '@/lib/local/db'
-import { StaffClient } from './staff-client'
+import { StaffClient, type Account } from './staff-client'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,24 +17,26 @@ export const metadata: Metadata = {
 }
 
 export default async function OpsStaffPage() {
-  const staff = await resolveStaffSession((await cookies()).get(STAFF_COOKIE)?.value)
+  const staff = await opsSession()
   if (!staff) redirect('/ops/login')
   if (staff.role !== 'super_admin') redirect('/ops')
 
-  // Server-render the first list so the screen is useful before any JS runs. A DB
+  // Server-render the first list so the screen is useful before any JS runs. A backend
   // hiccup shouldn't blank the page — the client refetches on mount anyway.
-  let initial: Awaited<ReturnType<typeof listStaffAccounts>> = []
-  try {
-    initial = await listStaffAccounts()
-  } catch (err) {
-    console.error('ops/staff initial load:', err)
-  }
+  // `grantable` excludes super-admin-only modules: a moderator can never be granted
+  // the ability to manage staff. The backend decides which those are.
+  const [{ accounts: initial }, { grantable }] = await Promise.all([
+    backendFetchOr<{ accounts: Account[] }>('/api/local/staff/accounts', { accounts: [] }),
+    backendFetchOr<{ grantable: { key: string; label: string; description: string }[] }>(
+      '/api/local/staff/modules', { grantable: [] }
+    ),
+  ])
 
   return (
     <StaffClient
       initialAccounts={initial}
-      grantable={GRANTABLE_MODULES.map((m) => ({ key: m.key, label: m.label, description: m.description }))}
-      currentStaffId={staff.legacy ? null : staff.staffId}
+      grantable={grantable}
+      currentStaffId={staff.legacy ? null : staff.id}
     />
   )
 }

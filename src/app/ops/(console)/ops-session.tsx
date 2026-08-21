@@ -9,7 +9,7 @@
 // session on the next request regardless (see resolveStaffSession). Without it the UI
 // would simply sit on a dead session until the operator clicked something.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react'
-import type { StaffModule, StaffRole } from '@/lib/local/staff'
+import type { StaffModule, StaffRole } from '@/lib/types'
 
 export type OpsSession = {
   staffId: string
@@ -22,7 +22,7 @@ export type OpsSession = {
 
 type Ctx = {
   session: OpsSession
-  /** Mirror of staffCan() on the server: super admin passes everything. */
+  /** Mirror of opsCan() on the server: super admin passes everything. */
   can: (module: StaffModule) => boolean
   signOut: () => void
 }

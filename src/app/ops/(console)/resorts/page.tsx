@@ -3,10 +3,8 @@
 // The (console) layout has already proven a valid staff session; this adds the
 // per-module check. The API routes re-check `resorts` independently.
 import type { Metadata } from 'next'
-import { cookies } from 'next/headers'
+import { opsSession, opsCan, backendFetchOr } from '@/lib/backend'
 import { redirect } from 'next/navigation'
-import { resolveStaffSession, staffCan, STAFF_COOKIE } from '@/lib/local/staff'
-import { listResorts, listResortSubmissions, listUnassignedResortNames } from '@/lib/local/resorts'
 import { REGION_VALUES } from '@/lib/local/resort-core'
 import { OpsResorts } from './ops-resorts'
 
@@ -18,27 +16,29 @@ export const metadata: Metadata = {
 }
 
 export default async function OpsResortsPage() {
-  const staff = await resolveStaffSession((await cookies()).get(STAFF_COOKIE)?.value)
+  const staff = await opsSession()
   if (!staff) redirect('/ops/login')
-  if (!staffCan(staff, 'resorts')) redirect('/ops')
+  if (!opsCan(staff, 'resorts')) redirect('/ops')
 
   // Server-render the first paint so the screen is useful immediately — the same
   // shape /ops/staff uses. The client refetches after every mutation.
-  let initial = { resorts: [], submissions: [], unassigned: [] } as {
-    resorts: Awaited<ReturnType<typeof listResorts>>
-    submissions: Awaited<ReturnType<typeof listResortSubmissions>>
-    unassigned: Awaited<ReturnType<typeof listUnassignedResortNames>>
-  }
-  try {
-    const [resorts, submissions, unassigned] = await Promise.all([
-      listResorts(),
-      listResortSubmissions(),
-      listUnassignedResortNames(),
-    ])
-    initial = { resorts, submissions, unassigned }
-  } catch (err) {
-    console.error('ops/resorts initial load:', err)
-  }
+  // Server-render the first paint so the screen is useful immediately. The client
+  // refetches after every mutation.
+  type Initial = React.ComponentProps<typeof OpsResorts>['initial']
+  // Two endpoints: the catalog, and the queue of names hosts typed themselves.
+  const [catalog, subs] = await Promise.all([
+    backendFetchOr<{ resorts: Initial['resorts']; unassigned: Initial['unassigned'] }>(
+      '/api/local/admin/resorts',
+      { resorts: [], unassigned: [] } as unknown as { resorts: Initial['resorts']; unassigned: Initial['unassigned'] },
+    ),
+    backendFetchOr<{ submissions: Initial['submissions'] }>(
+      '/api/local/admin/resorts/submissions',
+      { submissions: [] as unknown as Initial['submissions'] },
+    ),
+  ])
+  const initial: Initial = {
+    resorts: catalog.resorts, unassigned: catalog.unassigned, submissions: subs.submissions,
+  } as Initial
 
   return <OpsResorts initial={initial} regions={[...REGION_VALUES]} />
 }

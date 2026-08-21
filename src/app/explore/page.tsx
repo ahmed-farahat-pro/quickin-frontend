@@ -2,14 +2,14 @@
 // The header/footer + server-side auth are rendered here; the interactive
 // search/grid/map lives in the client component below.
 import type { Metadata } from 'next'
+import type { Listing } from '@/lib/types'
+import { viewer, viewerChrome, backendFetchOr } from '@/lib/backend'
 import { cookies } from 'next/headers'
 import { LocaleSwitcher } from '@/components/layout/locale-switcher'
 import { CurrencySwitcher } from '@/components/layout/currency-switcher'
 import { NotificationsBell } from './notifications-bell'
 import { MobileMenu } from './mobile-menu'
 import { getTranslations, getLocale } from 'next-intl/server'
-import { getListings, getWishlistIds } from '@/lib/local/db'
-import { verifyToken, getUserRowByEmail } from '@/lib/local/auth'
 import { Heart, MessageCircle } from 'lucide-react'
 import ExploreClient from './explore-client'
 import AddListingFab from './add-listing-fab'
@@ -61,31 +61,6 @@ interface Viewer {
 
 const SIGNED_OUT: Viewer = { firstName: null, initials: '?', avatarUrl: null, savedIds: [], isHost: false }
 
-// Read the qk_token cookie and resolve the signed-in user's first name, avatar
-// (photo url + initials) and saved listing ids (all null/empty when signed out).
-// One DB round-trip for the user row, then a second for the wishlist when signed in.
-async function getCurrentUser(): Promise<Viewer> {
-  const token = (await cookies()).get('qk_token')?.value
-  if (!token) return SIGNED_OUT
-  const claims = verifyToken(token)
-  if (!claims?.email) return SIGNED_OUT
-  try {
-    const row = await getUserRowByEmail(claims.email)
-    const name = row?.full_name?.trim() || claims.email.split('@')[0]
-    const firstName = name ? name.split(' ')[0] : null
-    const savedIds = row?.id ? await getWishlistIds(row.id).catch(() => []) : []
-    return {
-      firstName,
-      initials: initialsFrom(name || claims.email),
-      avatarUrl: row?.avatar_url?.trim() || null,
-      savedIds,
-      isHost: !!row?.is_host,
-    }
-  } catch {
-    return SIGNED_OUT
-  }
-}
-
 const COLORS = {
   burgundy: '#5B0F16',
   cream: '#F6F1E6',
@@ -120,15 +95,15 @@ export default async function ExplorePage({
   const type = sp.type?.trim() || ''
   const guests = guestsRaw ? Number(guestsRaw) : undefined
 
+  const query = new URLSearchParams()
+  if (location) query.set('location', location)
+  if (checkIn) query.set('checkIn', checkIn)
+  if (checkOut) query.set('checkOut', checkOut)
+  if (guests && Number.isFinite(guests)) query.set('guests', String(guests))
+  if (type) query.set('type', type)
   const [listings, currentUser] = await Promise.all([
-    getListings({
-      location: location || undefined,
-      checkIn: checkIn || undefined,
-      checkOut: checkOut || undefined,
-      guests: guests && Number.isFinite(guests) ? guests : undefined,
-      type: type || undefined,
-    }),
-    getCurrentUser(),
+    backendFetchOr<Listing[]>(`/api/local/listings?${query}`, []),
+    viewerChrome(),
   ])
   const { firstName, initials, avatarUrl, savedIds, isHost } = currentUser
   // The avatar carries the greeting ("Hi, {name}") as its label so the crowded

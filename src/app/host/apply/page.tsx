@@ -10,11 +10,11 @@
 // the form, which drops its ID-upload step for anyone already verified or under
 // review. See needsIdentityDocuments in host-verification-core.
 import type { Metadata } from 'next'
+import type { HostStatus, HostApplication, Verification } from '@/lib/types'
+import { viewer, backendFetchOr } from '@/lib/backend'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
-import { getHostApplication, getVerification } from '@/lib/local/db'
-import { verifyToken, getUserRowByEmail, getHostState, type HostStatus } from '@/lib/local/auth'
 import { normalizeVerificationStatus } from '@/lib/local/host-verification-core'
 import { ApplyForm } from './apply-form'
 
@@ -46,27 +46,6 @@ interface ApplyUser {
   full_name: string | null
   host_status: HostStatus
   host_review_note: string | null
-}
-
-async function getCurrentUser(): Promise<ApplyUser | null> {
-  const token = (await cookies()).get('qk_token')?.value
-  if (!token) return null
-  const claims = verifyToken(token)
-  if (!claims?.email) return null
-  try {
-    const row = await getUserRowByEmail(claims.email)
-    if (!row) return null
-    const host = await getHostState(row.id, !!row.is_host)
-    return {
-      id: row.id,
-      email: row.email,
-      full_name: row.full_name,
-      host_status: host.host_status,
-      host_review_note: host.host_review_note,
-    }
-  } catch {
-    return null
-  }
 }
 
 function Header({ backLabel }: { backLabel: string }) {
@@ -119,7 +98,7 @@ function formatDate(iso: string): string {
 }
 
 export default async function HostApplyPage() {
-  const user = await getCurrentUser()
+  const user = await viewer()
   if (!user) redirect('/login')
   if (user.host_status === 'approved') redirect('/host')
 
@@ -129,9 +108,9 @@ export default async function HostApplyPage() {
   // row, not users.verification_status) so the form asks for exactly what the
   // server will require — an already-verified applicant is never sent back to
   // photograph the same ID a second time.
-  const [application, verification] = await Promise.all([
-    getHostApplication(user.id),
-    getVerification(user.id),
+  const [{ application }, verification] = await Promise.all([
+    backendFetchOr<{ application: HostApplication | null }>('/api/local/host/application', { application: null }),
+    backendFetchOr<Verification | null>('/api/local/verification', null),
   ])
   const pending = user.host_status === 'pending'
   const rejected = user.host_status === 'rejected'
@@ -270,10 +249,10 @@ export default async function HostApplyPage() {
             initialName={application?.full_name || user.full_name || ''}
             reapply={rejected}
             identity={{
-              status: normalizeVerificationStatus(verification.status),
-              idNumber: verification.id_number,
-              docType: verification.doc_type,
-              notes: verification.notes,
+              status: normalizeVerificationStatus(verification?.status ?? null),
+              idNumber: verification?.id_number ?? null,
+              docType: verification?.doc_type ?? null,
+              notes: verification?.notes ?? null,
             }}
             previous={
               rejected && application

@@ -46,7 +46,7 @@ import {
 import { OwnershipDocField } from '../../ownership-doc'
 import { ListingStatusChip } from '../../listing-status-chip'
 import type { HostListingStatus } from '../../host-tabs'
-import type { Listing } from '@/lib/local/db'
+import type { Listing } from '@/lib/types'
 
 const C = {
   burgundy: '#5B0F16',

@@ -3,10 +3,10 @@
 // /explore and /reservations); the interactive Approve/Decline panel lives in
 // the 'use client' component below.
 import type { Metadata } from 'next'
+import type { HostStatus, Listing } from '@/lib/types'
+import { viewer, backendFetchOr } from '@/lib/backend'
 import { cookies } from 'next/headers'
 import { getLocale, getTranslations } from 'next-intl/server'
-import { getHostListings, type Listing } from '@/lib/local/db'
-import { verifyToken, getUserRowByEmail, getHostState, type HostStatus } from '@/lib/local/auth'
 import { formatPrice } from '@/lib/utils'
 import { HostReservations } from './host-reservations'
 import { HostTabs, HostListingsFilter, type HostListingStatus } from './host-tabs'
@@ -72,29 +72,6 @@ interface HostViewer {
   host_review_note: string | null
 }
 
-/** Resolved from the database on every request — never a cached client flag. */
-async function getCurrentUser(): Promise<HostViewer | null> {
-  const token = (await cookies()).get('qk_token')?.value
-  if (!token) return null
-  const claims = verifyToken(token)
-  if (!claims?.email) return null
-  try {
-    const row = await getUserRowByEmail(claims.email)
-    if (!row) return null
-    const name = row.full_name?.trim() || row.email.split('@')[0]
-    const host = await getHostState(row.id, !!row.is_host)
-    return {
-      id: row.id,
-      firstName: name.split(' ')[0],
-      is_host: !!row.is_host,
-      host_status: host.host_status,
-      host_review_note: host.host_review_note,
-    }
-  } catch {
-    return null
-  }
-}
-
 function Header({ backLabel }: { backLabel: string }) {
   return (
     <header
@@ -138,8 +115,14 @@ function Header({ backLabel }: { backLabel: string }) {
   )
 }
 
+/** First name for a greeting, from whatever the account actually has. */
+function firstNameOf(u: { full_name: string | null; email: string }): string {
+  const name = u.full_name?.trim() || u.email.split('@')[0] || ''
+  return name.split(' ')[0] || ''
+}
+
 export default async function HostPage() {
-  const user = await getCurrentUser()
+  const user = await viewer()
   const t = await getTranslations('hostPage')
 
   return (
@@ -199,9 +182,9 @@ export default async function HostPage() {
         {!user ? (
           <BecomeAHost t={t} signedIn={false} status="none" reviewNote={null} />
         ) : !user.is_host ? (
-          <BecomeAHost t={t} signedIn status={user.host_status} reviewNote={user.host_review_note} />
+          <BecomeAHost t={t} signedIn status={user.host_status as HostStatus} reviewNote={user.host_review_note} />
         ) : (
-          <HostDashboard userId={user.id} firstName={user.firstName} t={t} />
+          <HostDashboard userId={user.id} firstName={firstNameOf(user)} t={t} />
         )}
       </section>
     </main>
@@ -388,7 +371,7 @@ function BecomeAHost({
 
 /** Signed-in dashboard: listings grid + a "Create a listing" CTA + incoming reservations. */
 async function HostDashboard({ userId, firstName, t }: { userId: string; firstName: string; t: T }) {
-  const listings = await getHostListings(userId)
+  const listings = await backendFetchOr<Listing[]>('/api/local/host/listings', [])
   const locale = await getLocale()
   const dateFmt = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' })
 

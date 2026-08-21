@@ -1,10 +1,10 @@
 // Local listing detail (no Supabase, no auth) — boutique stay view.
 import type { Metadata } from 'next'
+import type { Listing, Review } from '@/lib/types'
+import { viewer, backendFetchOr, backendFetch } from '@/lib/backend'
 import { cookies } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
-import { getListingById, getListingReviews, getWishlistIds } from '@/lib/local/db'
-import { verifyToken, getUserRowByEmail } from '@/lib/local/auth'
 import ReservePanel from './reserve-panel'
 import MessageHostButton from './message-host-button'
 import ListingLocationMap from './listing-location-map-client'
@@ -20,7 +20,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params
   const t = await getTranslations('listingPage')
-  const listing = await getListingById(id).catch(() => null)
+  const listing = await backendFetchOr<Listing | null>(`/api/local/listings/${id}`, null)
 
   if (!listing) {
     return {
@@ -94,24 +94,23 @@ export default async function ListingDetailPage({
   const { id } = await params
   const t = await getTranslations('listingPage')
   const tHost = await getTranslations('hostProfile')
-  const listing = await getListingById(id)
+  const listing = await backendFetch<Listing | null>(`/api/local/listings/${id}`, { allow404: true })
   if (!listing) notFound()
 
   // Resolve the viewer: the owner gets an ownership view (no self-booking /
   // self-messaging) and the heart reflects their saved state.
-  const token = (await cookies()).get('qk_token')?.value
-  const claims = token ? verifyToken(token) : null
-  const me = claims?.email ? await getUserRowByEmail(claims.email).catch(() => null) : null
+  const me = await viewer()
   const isOwner = !!me && me.id === listing.host_id
   // A pending / rejected listing (under moderation) is not public — only its owner
   // can open it by direct link. Everyone else gets a 404, same as a hidden listing.
   if (listing.approval_status && listing.approval_status !== 'approved' && !isOwner) notFound()
   const isSaved = me
-    ? (await getWishlistIds(me.id).catch(() => [] as string[])).includes(listing.id)
+    ? (await backendFetchOr<{ listingIds: string[] }>('/api/local/wishlist', { listingIds: [] })).listingIds.includes(listing.id)
     : false
 
   // A reviews failure must never crash the stay page — fall back to none.
-  const reviews = await getListingReviews(listing.id).catch(() => [])
+  const { reviews } = await backendFetchOr<{ reviews: Review[] }>(
+    `/api/local/listings/${listing.id}/reviews`, { reviews: [] })
   const avgRating = reviews.length
     ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
     : null

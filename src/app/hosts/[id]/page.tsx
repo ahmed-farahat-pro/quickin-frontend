@@ -2,9 +2,10 @@
 // /explore and the listing detail. Shows the host's stays plus the reviews their
 // guests left, so a browsing guest can judge a host by their whole portfolio.
 import type { Metadata } from 'next'
+import type { PublicUser, HostProfile } from '@/lib/types'
+import { backendFetchOr } from '@/lib/backend'
 import { notFound } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
-import { getHostProfile, getUserById } from '@/lib/local/db'
 import { formatPrice } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
@@ -27,7 +28,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params
   const t = await getTranslations('hostProfile')
-  const user = await getUserById(id).catch(() => null)
+  const user = await backendFetchOr<PublicUser | null>(`/api/local/users/${id}`, null)
   return {
     title: user?.full_name ? t('meta.title', { name: user.full_name }) : t('meta.fallback'),
     robots: { index: false, follow: true },
@@ -55,7 +56,7 @@ export default async function HostProfilePage({
 }) {
   const { id } = await params
   const t = await getTranslations('hostProfile')
-  const data = await getHostProfile(id)
+  const data = await backendFetchOr<HostProfile | null>(`/api/local/users/${id}`, null)
   if (!data) notFound()
 
   const { profile, listings, reviews, avgRating, totalReviews } = data

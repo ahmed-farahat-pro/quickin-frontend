@@ -1,8 +1,9 @@
 import { MetadataRoute } from 'next'
-import { getListings } from '@/lib/local/db'
+import { backendFetchPublic } from '@/lib/backend'
+import type { Listing } from '@/lib/types'
 import { getBaseUrl } from '@/lib/utils'
 
-// The sitemap reads the SAME Neon source the browse page does — getListings()
+// The sitemap reads the SAME source the browse page does — /api/local/listings
 // already filters to is_published + approval_status='approved', so an unapproved
 // or unpublished listing can never leak into the sitemap. It used to read the
 // retired Supabase project and emit /listings/:id, which the proxy 308s to
@@ -43,7 +44,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // A sitemap that throws fails the whole route, so a database hiccup must
   // degrade to the static pages above rather than 500.
   try {
-    const listings = await getListings()
+    const listings = await backendFetchPublic<Listing[]>('/api/local/listings', [])
     for (const listing of listings) {
       sitemapEntries.push({
         url: `${baseUrl}/explore/${listing.id}`,

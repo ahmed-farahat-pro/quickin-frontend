@@ -4,10 +4,8 @@
 // The (console) layout has already proven a valid staff session; this adds the
 // per-module check. The API routes re-check `users` independently.
 import type { Metadata } from 'next'
-import { cookies } from 'next/headers'
+import { opsSession, opsCan, backendFetchOr } from '@/lib/backend'
 import { redirect } from 'next/navigation'
-import { resolveStaffSession, staffCan, STAFF_COOKIE } from '@/lib/local/staff'
-import { adminSearchUsers } from '@/lib/local/db'
 import { parseUserListFilter } from '@/lib/local/user-admin-core'
 import { OpsUsers } from './ops-users'
 
@@ -19,24 +17,19 @@ export const metadata: Metadata = {
 }
 
 export default async function OpsUsersPage() {
-  const staff = await resolveStaffSession((await cookies()).get(STAFF_COOKIE)?.value)
+  const staff = await opsSession()
   if (!staff) redirect('/ops/login')
-  if (!staffCan(staff, 'users')) redirect('/ops')
+  if (!opsCan(staff, 'users')) redirect('/ops')
 
   // Server-render the first page so the screen is useful immediately — the same
   // shape /ops/resorts and /ops/staff use. The client refetches whenever a filter
   // changes or a mutation lands.
-  const filter = parseUserListFilter(() => null)
-  let initial: { users: Awaited<ReturnType<typeof adminSearchUsers>>['users']; total: number } = {
-    users: [],
-    total: 0,
-  }
-  try {
-    initial = await adminSearchUsers(filter)
-  } catch (err) {
-    // A DB hiccup shouldn't blank the page — the client refetches on mount anyway.
-    console.error('ops/users initial load:', err)
-  }
+  // A backend hiccup shouldn't blank the page — the client refetches on mount anyway.
+  type Initial = React.ComponentProps<typeof OpsUsers>['initial']
+  const initial = await backendFetchOr<Initial>(
+    '/api/local/admin/users',
+    { users: [], total: 0 } as unknown as Initial,
+  )
 
   return <OpsUsers initial={initial} />
 }

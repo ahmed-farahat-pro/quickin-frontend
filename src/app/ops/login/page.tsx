@@ -4,9 +4,8 @@
 // Server component so `reason` is read without a Suspense boundary; the form itself
 // is the client component below.
 import type { Metadata } from 'next'
-import { cookies } from 'next/headers'
+import { opsSession } from '@/lib/backend'
 import { redirect } from 'next/navigation'
-import { resolveStaffSession, STAFF_COOKIE } from '@/lib/local/staff'
 import { StaffLoginForm } from './login-form'
 
 export const dynamic = 'force-dynamic'
@@ -28,7 +27,7 @@ export default async function OpsLoginPage({
   searchParams: Promise<{ reason?: string }>
 }) {
   // Already signed in — skip the form.
-  const staff = await resolveStaffSession((await cookies()).get(STAFF_COOKIE)?.value)
+  const staff = await opsSession()
   if (staff) redirect('/ops')
 
   const { reason } = await searchParams

@@ -11,6 +11,7 @@
 //     listings, keeps the booking and payment history, reversible by a super admin —
 //     because "permanently deactivate" reads like a delete and isn't one.
 import { useCallback, useState } from 'react'
+import type { Listing, Review } from '@/lib/types'
 import Link from 'next/link'
 import { COLORS, SERIF } from '../../../ops-theme'
 import { Empty, EmptyRow, adminGet, adminSend, ghostBtn, money, numTd, pageStyle, panelStyle, solidBtn, td, th, Stat, StatGrid } from '../../ops-ui'

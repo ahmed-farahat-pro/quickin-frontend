@@ -8,9 +8,7 @@
 // Strings are hardcoded English (this ops page
 // is intentionally not wired into next-intl to keep the change contained).
 import type { Metadata } from 'next'
-import { cookies } from 'next/headers'
-import { resolveStaffSession, staffCan, STAFF_COOKIE } from '@/lib/local/staff'
-import { adminListDisputes, adminListPendingProofs, getPaymentConfig } from '@/lib/local/db'
+import { opsSession, opsCan, backendFetchOr } from '@/lib/backend'
 import { OpsPayments } from './ops-payments'
 
 export const dynamic = 'force-dynamic'
@@ -31,8 +29,8 @@ const COLORS = {
 const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
 
 export default async function OpsPaymentsPage() {
-  const staff = await resolveStaffSession((await cookies()).get(STAFF_COOKIE)?.value)
-  const allowed = Boolean(staff && staffCan(staff, 'payments'))
+  const staff = await opsSession()
+  const allowed = Boolean(staff && opsCan(staff, 'payments'))
 
   // Load the three payloads here rather than letting the client fetch them after it
   // mounts. The screen used to arrive fully drawn and empty, then fill in — and the
@@ -42,23 +40,24 @@ export default async function OpsPaymentsPage() {
   // `null` means the load failed, and is not the same as "no rows": the client falls
   // back to fetching for itself, so a DB hiccup here costs a moment rather than the
   // whole screen. Same reasoning as /ops/users and /ops/staff.
-  let initial: {
-    config: Awaited<ReturnType<typeof getPaymentConfig>>
-    pending: Awaited<ReturnType<typeof adminListPendingProofs>>
-    disputes: Awaited<ReturnType<typeof adminListDisputes>>
-  } | null = null
+  type Initial = NonNullable<React.ComponentProps<typeof OpsPayments>['initial']>
+  let initial: Initial | null = null
 
   if (allowed) {
-    try {
-      const [config, pending, disputes] = await Promise.all([
-        getPaymentConfig(),
-        adminListPendingProofs(),
-        adminListDisputes(),
-      ])
-      initial = { config, pending, disputes }
-    } catch (err) {
-      console.error('ops/payments initial load:', err)
-    }
+    // One admin call returns BOTH queues, which is why this page exists in this shape:
+    // the two used to request the same endpoint separately and pull the same rows twice.
+    // The config comes from the staff-gated settings route — /api/local/payment-config
+    // is the GUEST view and rejects a staff cookie.
+    const [config, queues] = await Promise.all([
+      backendFetchOr<Initial['config'] | null>('/api/local/admin/settings/instapay', null),
+      backendFetchOr<{ pending: Initial['pending']; disputes: Initial['disputes'] }>(
+        '/api/local/admin/payments',
+        { pending: [] as unknown as Initial['pending'], disputes: [] as unknown as Initial['disputes'] },
+      ),
+    ])
+    // `null` means the load failed, which is not the same as "no rows" — the client
+    // then fetches for itself, so a hiccup costs a moment rather than the screen.
+    if (config) initial = { config, pending: queues.pending, disputes: queues.disputes }
   }
 
   return (

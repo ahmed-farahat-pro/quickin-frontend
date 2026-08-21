@@ -34,7 +34,7 @@ import { OpsSectionSkeleton } from './ops-skeleton'
 import { alertsFor, alertTotal, waitingLabel } from '@/lib/local/activity-core'
 import { docTypeLabel } from '@/lib/local/host-verification-core'
 import { checkListingPin, listingPinBadgeLabel, listingPinProblemMessage } from '@/lib/local/listing-geo-policy'
-import type { StaffModule } from '@/lib/local/staff'
+import type { StaffModule, Listing, Booking } from '@/lib/types'
 
 // Boutique palette.
 const BURGUNDY = '#5B0F16'

@@ -5,10 +5,10 @@
 // only "Pay now" button POSTed to a mock endpoint that marked the booking paid without
 // taking any money, and the screenshot upload existed on mobile alone.
 import type { Metadata } from 'next'
+import type { Booking } from '@/lib/types'
+import { viewer, backendFetch } from '@/lib/backend'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { getBookingById } from '@/lib/local/db'
-import { verifyToken, getUserRowByEmail } from '@/lib/local/auth'
 import { canPay, paymentStageFor } from '@/lib/local/payment-flow-core'
 import { PayClient } from './pay-client'
 
@@ -20,13 +20,11 @@ export const metadata: Metadata = {
 }
 
 export default async function PayPage(ctx: { params: Promise<{ id: string }> }) {
-  const token = (await cookies()).get('qk_token')?.value
-  const claims = token ? verifyToken(token) : null
-  const me = claims ? await getUserRowByEmail(claims.email) : null
+  const me = await viewer()
   if (!me) redirect('/login?next=/reservations')
 
   const { id } = await ctx.params
-  const booking = await getBookingById(me.id, id)
+  const booking = await backendFetch<Booking | null>(`/api/local/bookings/${id}`, { allow404: true }).catch(() => null)
   // Not theirs, or gone. Don't leak which — both send you back to your list.
   if (!booking) redirect('/reservations')
 

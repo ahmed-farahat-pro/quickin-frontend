@@ -8,7 +8,7 @@
 // its bounds to the markers and rebuilds them whenever the listings change.
 import { useEffect, useMemo, useRef } from 'react'
 import { useTranslations } from 'next-intl'
-import type { Listing } from '@/lib/local/db'
+import type { Listing } from '@/lib/types'
 import { approxLatLng } from '@/lib/geo'
 import { formatDisplayPrice } from '@/lib/currency/display'
 import { useDisplayCurrency } from '@/components/providers/display-currency-provider'

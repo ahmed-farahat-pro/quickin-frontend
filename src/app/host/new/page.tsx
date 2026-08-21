@@ -2,12 +2,12 @@
 // qk_token cookie (same pattern as /explore) and redirects signed-out visitors
 // to /login. The create form is the 'use client' component below.
 import type { Metadata } from 'next'
+import type { ResortOption } from '@/lib/types'
+import type { ListingGateResult } from '@/lib/local/host-verification-core'
+import { viewer, backendFetchOr } from '@/lib/backend'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
-import { verifyToken, getUserRowByEmail } from '@/lib/local/auth'
-import { listActiveResorts } from '@/lib/local/resorts'
-import { getCommissionConfig, getListingGateState, getVerification } from '@/lib/local/db'
 import { canPublishListing } from '@/lib/local/host-verification-core'
 import { VerificationGateNotice } from '../verification-gate-notice'
 import { NewListingForm } from './new-listing-form'
@@ -34,28 +34,13 @@ const COLORS = {
 
 const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
 
-/** The signed-in user's id, or null. Returns the id rather than a boolean so the
- *  listing gate below can be checked without a second lookup. */
-async function signedInUserId(): Promise<string | null> {
-  const token = (await cookies()).get('qk_token')?.value
-  if (!token) return null
-  const claims = verifyToken(token)
-  if (!claims?.email) return null
-  try {
-    const row = await getUserRowByEmail(claims.email)
-    return row?.id ?? null
-  } catch {
-    return null
-  }
-}
-
 export default async function NewListingPage() {
   // Server-side: the catalog is a small, cacheable read and the page already has
   // DB access, so there is no reason to make the browser fetch it. A failure here
   // degrades to the free-text "Other" path rather than breaking the form.
-  let resorts: Awaited<ReturnType<typeof listActiveResorts>> = []
+  let resorts: ResortOption[] = []
   try {
-    resorts = await listActiveResorts()
+    resorts = (await backendFetchOr<{ resorts: ResortOption[] }>('/api/local/resorts', { resorts: [] })).resorts
   } catch (err) {
     console.error('host/new resorts:', err)
   }
@@ -64,20 +49,26 @@ export default async function NewListingPage() {
   // wrong number — the server prices the listing either way.
   let commissionRate = 0
   try {
-    commissionRate = (await getCommissionConfig()).rate
+    commissionRate = (await backendFetchOr<{ rate: number }>('/api/local/host/commission', { rate: 0 })).rate
   } catch (err) {
     console.error('host/new commission:', err)
   }
-  const userId = await signedInUserId()
+  const userId = (await viewer())?.id ?? null
   if (!userId) redirect('/login')
 
   // Check the gate BEFORE rendering the form. The POST enforces it anyway, but
   // letting an unverified host fill in a whole listing only to be refused at the
   // end is a bad way to communicate a rule we already know.
-  const gate = canPublishListing(await getListingGateState(userId))
+  // The backend runs canPublishListing() and sends its result, so the gate the form
+  // renders is the same one POST /api/local/listings will enforce.
+  const gate = await backendFetchOr<ListingGateResult>('/api/local/host/listing-gate', {
+    allowed: false, code: 'not_host', message: 'Only hosts can add a listing.',
+  } as ListingGateResult)
   // The reviewer's reason, fetched only when it is going to be shown.
   const rejectionReason =
-    gate.code === 'verification_rejected' ? (await getVerification(userId)).notes : null
+    gate.code === 'verification_rejected'
+      ? (await backendFetchOr<{ notes: string | null }>('/api/local/verification', { notes: null })).notes
+      : null
 
   const t = await getTranslations('hostPage.create')
 

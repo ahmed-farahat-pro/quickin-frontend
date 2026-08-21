@@ -3,10 +3,8 @@
 // Derived counts, not stored notifications: an alert disappears exactly when the work
 // is done, and there is no read/unread state that could disagree with reality.
 import type { Metadata } from 'next'
-import { cookies } from 'next/headers'
+import { opsSession, opsCan, backendFetchOr } from '@/lib/backend'
 import { redirect } from 'next/navigation'
-import { resolveStaffSession, staffCan, STAFF_COOKIE } from '@/lib/local/staff'
-import { adminStats } from '@/lib/local/db'
 import { alertsFor } from '@/lib/local/activity-core'
 import { OpsAlerts } from './ops-alerts'
 
@@ -18,28 +16,16 @@ export const metadata: Metadata = {
 }
 
 export default async function OpsAlertsPage() {
-  const staff = await resolveStaffSession((await cookies()).get(STAFF_COOKIE)?.value)
+  const staff = await opsSession()
   if (!staff) redirect('/ops/login')
-  if (!staffCan(staff, 'overview')) redirect('/ops')
+  if (!opsCan(staff, 'overview')) redirect('/ops')
 
-  let alerts: ReturnType<typeof alertsFor> = []
-  let oldest: Record<string, string | null> = {}
-  try {
-    const stats = await adminStats()
-    alerts = alertsFor(stats as unknown as Record<string, number>, {
-      modules: staff.modules ?? [],
-      isSuperAdmin: staff.role === 'super_admin',
-    })
-    oldest = {
-      pending_verifications: stats.oldest_verification,
-      pending_applications: stats.oldest_application,
-      pending_listings: stats.oldest_listing,
-      pending_payments: stats.oldest_payment,
-      open_reports: stats.oldest_report,
-    }
-  } catch (err) {
-    console.error('ops/alerts initial load:', err)
-  }
+  // The backend already filters the alert list to what this operator may act on and
+  // resolves the "oldest waiting" timestamps, so the page just renders them.
+  const { alerts, oldest } = await backendFetchOr<{
+    alerts: ReturnType<typeof alertsFor>
+    oldest: Record<string, string | null>
+  }>('/api/local/admin/alerts', { alerts: [], oldest: {} })
 
   return <OpsAlerts initialAlerts={alerts} initialOldest={oldest} />
 }

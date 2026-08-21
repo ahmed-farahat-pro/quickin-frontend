@@ -3,11 +3,11 @@
 // to /login when signed out, then renders a boutique grid of saved stays each
 // with a WishlistButton (so the user can un-save inline).
 import type { Metadata } from 'next'
+import type { Listing } from '@/lib/types'
+import { viewer, backendFetchOr } from '@/lib/backend'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
-import { getWishlistListings } from '@/lib/local/db'
-import { verifyToken, getUserRowByEmail } from '@/lib/local/auth'
 import { formatDisplayPrice } from '@/lib/currency/display'
 import { getRequestCurrency } from '@/lib/currency/request-currency'
 import WishlistButton from '@/app/explore/wishlist-button'
@@ -44,19 +44,6 @@ const BACK_LINK_STYLE = {
   fontSize: 14,
 } as const
 
-async function getCurrentUserId(): Promise<string | null> {
-  const token = (await cookies()).get('qk_token')?.value
-  if (!token) return null
-  const claims = verifyToken(token)
-  if (!claims?.email) return null
-  try {
-    const row = await getUserRowByEmail(claims.email)
-    return row?.id ?? null
-  } catch {
-    return null
-  }
-}
-
 function imageOf(listing: {
   image_url?: string | null
   listing_images?: { url: string }[]
@@ -67,11 +54,12 @@ function imageOf(listing: {
 }
 
 export default async function SavedPage() {
-  const userId = await getCurrentUserId()
-  if (!userId) redirect('/login')
+  const me = await viewer()
+  if (!me) redirect('/login')
 
   const t = await getTranslations('savedPage')
-  const listings = await getWishlistListings(userId)
+  const { listings } = await backendFetchOr<{ listings: Listing[] }>(
+    '/api/local/wishlist', { listings: [] })
   const displayCurrency = await getRequestCurrency()
 
   return (

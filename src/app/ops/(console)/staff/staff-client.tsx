@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { COLORS, FONT, SERIF, cardStyle, inputStyle, labelStyle } from '../../ops-theme'
 import { EmptyRow } from '../ops-ui'
 
-type Account = {
+export type Account = {
   id: string
   email: string
   full_name: string

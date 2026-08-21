@@ -9,9 +9,7 @@
 // server-rendering the initial data (the /ops/staff pattern) is what works.
 // Strings are hardcoded English, like the rest of /ops.
 import type { Metadata } from 'next'
-import { cookies } from 'next/headers'
-import { resolveStaffSession, staffCan, STAFF_COOKIE } from '@/lib/local/staff'
-import { getCommissionConfig, getCommissionImpact } from '@/lib/local/db'
+import { opsSession, opsCan, backendFetchOr } from '@/lib/backend'
 import { OpsPricing } from './ops-pricing'
 
 export const dynamic = 'force-dynamic'
@@ -31,13 +29,17 @@ const COLORS = {
 const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
 
 export default async function OpsPricingPage() {
-  const staff = await resolveStaffSession((await cookies()).get(STAFF_COOKIE)?.value)
-  const allowed = Boolean(staff && staffCan(staff, 'pricing'))
+  const staff = await opsSession()
+  const allowed = Boolean(staff && opsCan(staff, 'pricing'))
   // Only read the setting once the gate has passed — an operator without the
   // module should not cause a query, let alone see its result.
-  const [config, impact] = allowed
-    ? await Promise.all([getCommissionConfig(), getCommissionImpact()])
-    : [null, null]
+  // One call returns the rate and the impact preview together. Only read it once the
+  // gate has passed — an operator without the module should not cause a query, let
+  // alone see its result.
+  type CommissionView = React.ComponentProps<typeof OpsPricing>['initial']
+  const settings = allowed
+    ? await backendFetchOr<CommissionView | null>('/api/local/admin/settings/commission', null)
+    : null
 
   return (
     <main style={{ minHeight: '100vh', background: COLORS.cream, color: COLORS.ink, fontFamily: FONT }}>
@@ -59,7 +61,7 @@ export default async function OpsPricingPage() {
           Set the commission QuickIn adds on top of every host&rsquo;s price.
         </p>
 
-        {!allowed || !config || !impact ? (
+        {!allowed || !settings ? (
           <div
             style={{
               background: '#fff',
@@ -81,7 +83,7 @@ export default async function OpsPricingPage() {
             </p>
           </div>
         ) : (
-          <OpsPricing initial={{ ...config, impact }} />
+          <OpsPricing initial={settings} />
         )}
       </section>
     </main>

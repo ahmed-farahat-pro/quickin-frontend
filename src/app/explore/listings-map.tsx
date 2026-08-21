@@ -14,7 +14,7 @@
 // imports it via next/dynamic with { ssr: false } because both map libraries
 // touch `window` at load time.
 import { useState } from 'react'
-import type { Listing } from '@/lib/local/db'
+import type { Listing } from '@/lib/types'
 import LeafletListingsMap from './leaflet-listings-map'
 import GoogleListingsMap from './google-listings-map'
 

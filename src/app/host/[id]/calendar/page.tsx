@@ -7,12 +7,11 @@
 // `asHost: true` throughout: these are the host's RAW rates, the numbers they
 // type and are paid, with the guest-inclusive figure shown alongside.
 import type { Metadata } from 'next'
+import type { ListingCalendar, Listing } from '@/lib/types'
+import { viewer, backendFetch } from '@/lib/backend'
 import { cookies } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
-import { getListingById, getListingCalendar } from '@/lib/local/db'
-import type { ListingCalendar } from '@/lib/local/db'
-import { verifyToken, getUserRowByEmail } from '@/lib/local/auth'
 import { addDays } from '@/lib/local/date-pricing-core'
 import { CalendarEditor } from './calendar-editor'
 
@@ -52,14 +51,10 @@ const PREFETCH_DAYS = 92
 export default async function HostCalendarPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
 
-  const token = (await cookies()).get('qk_token')?.value
-  if (!token) redirect('/login')
-  const claims = verifyToken(token)
-  if (!claims?.email) redirect('/login')
-  const me = await getUserRowByEmail(claims.email)
+  const me = await viewer()
   if (!me) redirect('/login')
 
-  const listing = await getListingById(id, { asHost: true })
+  const listing = await backendFetch<Listing | null>(`/api/local/listings/${id}?asHost=1`, { allow404: true })
   // Only the owner may see this — anyone else (or a missing listing) gets a 404.
   if (!listing || listing.host_id !== me.id) notFound()
 
@@ -68,7 +63,9 @@ export default async function HostCalendarPage({ params }: { params: Promise<{ i
   // windows, so the host sees an empty grid that fills in rather than an error.
   let initial: ListingCalendar | null = null
   try {
-    initial = await getListingCalendar(id, today, addDays(today, PREFETCH_DAYS), { asHost: true })
+    initial = await backendFetch<ListingCalendar>(
+      `/api/local/listings/${id}/calendar?from=${today}&to=${addDays(today, PREFETCH_DAYS)}&asHost=1`,
+    )
   } catch (err) {
     console.error('host/calendar prefetch:', err)
   }

@@ -3,10 +3,8 @@
 // The feed is derived from rows that already exist rather than a written log, so this
 // screen shows full history the day it ships. See getActivityFeed in db.ts.
 import type { Metadata } from 'next'
-import { cookies } from 'next/headers'
+import { opsSession, opsCan, backendFetchOr } from '@/lib/backend'
 import { redirect } from 'next/navigation'
-import { resolveStaffSession, staffCan, STAFF_COOKIE } from '@/lib/local/staff'
-import { getActivityFeed } from '@/lib/local/db'
 import { parseActivityFilter } from '@/lib/local/activity-core'
 import { OpsActivity } from './ops-activity'
 
@@ -18,17 +16,17 @@ export const metadata: Metadata = {
 }
 
 export default async function OpsActivityPage() {
-  const staff = await resolveStaffSession((await cookies()).get(STAFF_COOKIE)?.value)
+  const staff = await opsSession()
   if (!staff) redirect('/ops/login')
-  if (!staffCan(staff, 'overview')) redirect('/ops')
+  if (!opsCan(staff, 'overview')) redirect('/ops')
 
-  let initial: Awaited<ReturnType<typeof getActivityFeed>> = { events: [], hasMore: false }
-  try {
-    initial = await getActivityFeed(parseActivityFilter(() => null))
-  } catch (err) {
-    // A DB hiccup shouldn't blank the page — the client refetches on filter change.
-    console.error('ops/activity initial load:', err)
-  }
+  // The first page of the feed. A backend hiccup shows an empty console rather than
+  // a 500 — the client refetches on mount and whenever the filter changes.
+  type Initial = React.ComponentProps<typeof OpsActivity>['initial']
+  const initial = await backendFetchOr<Initial>(
+    '/api/local/admin/activity',
+    { events: [], hasMore: false } as unknown as Initial,
+  )
 
   return <OpsActivity initial={initial} />
 }
