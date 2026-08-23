@@ -105,7 +105,6 @@
     "signupSuccess": "Account created! Check your email to confirm.",
     "pleaseEnterEmail": "Please enter your email address",
     "continueGoogle": "Continue with Google",
-    "continueApple": "Continue with Apple",
     "or": "or",
     "acceptTermsPrefix": "I accept the ",
     "acceptTermsLink": "Terms and Conditions",
@@ -1586,7 +1585,6 @@
     "signIn": "Sign in",
     "signingIn": "Signing in…",
     "or": "or",
-    "continueWithApple": "Continue with Apple",
     "continueWithGoogle": "Continue with Google",
     "googleDisabledHint": "Add NEXT_PUBLIC_GOOGLE_CLIENT_ID to enable Google sign-in",
     "newHere": "New here?",
@@ -1628,9 +1626,6 @@
       "emailInvalid": "Please enter a valid email address.",
       "emailBadTld": "“.{tld}” isn't a valid domain extension.",
       "emailDidYouMean": "Did you mean {suggestion}?"
-    },
-    "notices": {
-      "appleSetup": "Apple sign-in requires HTTPS + an Apple Developer Services ID (see OAUTH-SETUP.md)."
     },
     "meta": {
       "title": "Log in",
@@ -1691,7 +1686,7 @@
       "googleCloud": "<b>Google Cloud</b> project + billing.",
       "mapsKey": "<b>Google Maps API key</b> (Maps JS · Android SDK · iOS SDK).",
       "oauthClients": "<b>Google OAuth client IDs</b> — Web, iOS, Android (+ SHA‑1).",
-      "appleDeveloper": "<b>Apple Developer</b> ($99/yr) → App ID + Sign in with Apple + Team.",
+      "appleDeveloper": "<b>Apple Developer</b> ($99/yr) → App ID + Team.",
       "vercelPostgres": "<b>Vercel Postgres</b> (DATABASE_URL) + <b>domain + HTTPS</b>."
     },
     "tracks": {
@@ -1708,14 +1703,14 @@
       "web": {
         "title": "B · Web",
         "flipMap": "Flip map to <b>Google Maps</b> (paste Maps key).",
-        "googleLogin": "Turn on <b>Google login</b> (+ Apple via Services ID + HTTPS).",
+        "googleLogin": "Turn on <b>Google login</b> (HTTPS).",
         "realListings": "Real listings via admin + listing <b>photo upload</b>.",
         "a11y": "A11y pass; deploy to the domain."
       },
       "ios": {
         "title": "C · iOS",
         "apiBaseUrl": "Point release <code>apiBaseURL</code> at the Vercel URL.",
-        "signing": "Xcode signing: set <b>Team</b> + add <b>Sign in with Apple</b>.",
+        "signing": "Xcode signing: set <b>Team</b>.",
         "maps": "(If Google Maps) add Maps iOS SDK + key; add Google iOS client id.",
         "device": "Test on a real device.",
         "testflight": "<b>TestFlight</b> → App Store review."
@@ -1738,7 +1733,7 @@
     },
     "ready": {
       "title": "🏁 Definition of ready to ship",
-      "web": "Web live on the domain (HTTPS), real data, Maps + Google/Apple login.",
+      "web": "Web live on the domain (HTTPS), real data, Maps + Google login.",
       "ios": "iOS on TestFlight (signed, real login + maps), passing on a device.",
       "android": "Android signed release on Play internal testing, passing on a device.",
       "db": "Production DB with backups; apps pointed at the prod API."
@@ -1849,10 +1844,6 @@
     },
     "divider": {
       "or": "or"
-    },
-    "apple": {
-      "continue": "Continue with Apple",
-      "requiresHttps": "Apple sign-in requires HTTPS + an Apple Developer Services ID (see OAUTH-SETUP.md)."
     },
     "google": {
       "continue": "Continue with Google",

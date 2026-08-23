@@ -120,7 +120,7 @@ fails if one slips into the defaults.
 | PUT    | `/api/local/listings/{id}/calendar`                         | Cookie (the listing's host) |
 | POST   | `/api/local/bookings`                                       | Bearer |
 | GET    | `/api/local/bookings`                                       | Bearer |
-| POST   | `/api/auth/login` · `/signup` · `/social` · `/google` · `/apple` | — (returns `{ token, user }`) |
+| POST   | `/api/auth/login` · `/signup` · `/social` · `/google` | — (returns `{ token, user }`) |
 | POST   | `/api/auth/forgot-password` `{ email }`                     | — (always `{ sent: true, cooldown }`) |
 | POST   | `/api/auth/reset-password` `{ email, code, password }`      | — (returns `{ token, user }`) |
 

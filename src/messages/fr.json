@@ -105,7 +105,6 @@
     "signupSuccess": "Compte créé ! Vérifiez votre e-mail pour confirmer.",
     "pleaseEnterEmail": "Veuillez saisir votre adresse e-mail",
     "continueGoogle": "Continuer avec Google",
-    "continueApple": "Continuer avec Apple",
     "or": "ou",
     "acceptTermsPrefix": "J'accepte les ",
     "acceptTermsLink": "Conditions générales",
@@ -1586,7 +1585,6 @@
     "signIn": "Se connecter",
     "signingIn": "Connexion en cours…",
     "or": "ou",
-    "continueWithApple": "Continuer avec Apple",
     "continueWithGoogle": "Continuer avec Google",
     "googleDisabledHint": "Ajoutez NEXT_PUBLIC_GOOGLE_CLIENT_ID pour activer la connexion Google",
     "newHere": "Nouveau ici ?",
@@ -1628,9 +1626,6 @@
       "emailInvalid": "Veuillez saisir une adresse e-mail valide.",
       "emailBadTld": "« .{tld} » n'est pas une extension de domaine valide.",
       "emailDidYouMean": "Vouliez-vous dire {suggestion} ?"
-    },
-    "notices": {
-      "appleSetup": "La connexion Apple nécessite HTTPS et un identifiant Apple Developer Services (voir OAUTH-SETUP.md)."
     },
     "meta": {
       "title": "Connexion",
@@ -1677,10 +1672,6 @@
     },
     "divider": {
       "or": "ou"
-    },
-    "apple": {
-      "continue": "Continuer avec Apple",
-      "requiresHttps": "La connexion avec Apple nécessite HTTPS et un identifiant Apple Developer Services (voir OAUTH-SETUP.md)."
     },
     "google": {
       "continue": "Continuer avec Google",
@@ -1821,7 +1812,7 @@
       "googleCloud": "Projet <b>Google Cloud</b> + facturation.",
       "mapsKey": "<b>Clé API Google Maps</b> (Maps JS · SDK Android · SDK iOS).",
       "oauthClients": "<b>Identifiants client Google OAuth</b> — Web, iOS, Android (+ SHA‑1).",
-      "appleDeveloper": "<b>Apple Developer</b> (99 $/an) → App ID + Sign in with Apple + Team.",
+      "appleDeveloper": "<b>Apple Developer</b> (99 $/an) → App ID + Team.",
       "vercelPostgres": "<b>Vercel Postgres</b> (DATABASE_URL) + <b>domaine + HTTPS</b>."
     },
     "tracks": {
@@ -1838,14 +1829,14 @@
       "web": {
         "title": "B · Web",
         "flipMap": "Basculer la carte vers <b>Google Maps</b> (coller la clé Maps).",
-        "googleLogin": "Activer la <b>connexion Google</b> (+ Apple via Services ID + HTTPS).",
+        "googleLogin": "Activer la <b>connexion Google</b> (HTTPS).",
         "realListings": "Vraies annonces via l'admin + <b>téléversement de photos</b> d'annonces.",
         "a11y": "Passe d'accessibilité ; déploiement sur le domaine."
       },
       "ios": {
         "title": "C · iOS",
         "apiBaseUrl": "Pointer l'<code>apiBaseURL</code> de release vers l'URL Vercel.",
-        "signing": "Signature Xcode : définir <b>Team</b> + ajouter <b>Sign in with Apple</b>.",
+        "signing": "Signature Xcode : définir <b>Team</b>.",
         "maps": "(Si Google Maps) ajouter le SDK Maps iOS + la clé ; ajouter l'ID client Google iOS.",
         "device": "Tester sur un appareil réel.",
         "testflight": "<b>TestFlight</b> → examen App Store."
@@ -1868,7 +1859,7 @@
     },
     "ready": {
       "title": "🏁 Définition de prêt à livrer",
-      "web": "Web en ligne sur le domaine (HTTPS), vraies données, Maps + connexion Google/Apple.",
+      "web": "Web en ligne sur le domaine (HTTPS), vraies données, Maps + connexion Google.",
       "ios": "iOS sur TestFlight (signé, vraie connexion + cartes), fonctionnel sur un appareil.",
       "android": "Release Android signée en test interne sur Play, fonctionnelle sur un appareil.",
       "db": "BD de production avec sauvegardes ; apps pointées vers l'API de prod."

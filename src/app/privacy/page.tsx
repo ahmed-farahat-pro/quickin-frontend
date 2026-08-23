@@ -61,7 +61,7 @@ export default function PrivacyPolicyPage() {
 
         <Section title="Information you give us">
           <ul style={ul}>
-            <li><strong>Account:</strong> your name, email address, phone number and password. Passwords are stored only as a salted hash — never in readable form. If you sign in with Google or Apple we receive your name, email and profile picture from them; we never receive your password.</li>
+            <li><strong>Account:</strong> your name, email address, phone number and password. Passwords are stored only as a salted hash — never in readable form. If you sign in with Google we receive your name, email and profile picture from Google; we never receive your password.</li>
             <li><strong>Email verification:</strong> a one-time code sent to your address, stored until it is used or expires.</li>
             <li><strong>Becoming a host:</strong> your full name, national ID number, phone, address and (optionally) company name, submitted with your host application for review by our team.</li>
             <li><strong>Identity verification:</strong> photographs of your identity document, where verification is required.</li>
@@ -114,7 +114,7 @@ export default function PrivacyPolicyPage() {
             <li><strong>Neon</strong> — the managed PostgreSQL database where your data is stored.</li>
             <li><strong>Google Firebase Cloud Messaging</strong> — delivering push notifications.</li>
             <li><strong>Google Maps</strong> — displaying maps and location pins.</li>
-            <li><strong>Google and Apple</strong> — only if you choose to sign in with them.</li>
+            <li><strong>Google</strong> — only if you choose to sign in with Google.</li>
             <li><strong>Our email provider</strong> — sending verification codes and booking notifications.</li>
           </ul>
           <p style={{ marginTop: 12, color: C.muted }}>

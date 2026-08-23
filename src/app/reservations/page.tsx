@@ -241,10 +241,25 @@ async function ReservationsList({
   // Tolerated rather than awaited bare: if migrate-disputes hasn't run on this
   // database, these throw — and a guest's reservations list must not 500 over a
   // feature that simply isn't available yet. It degrades to "no dispute UI".
-  const { disputes: myDisputes, eligible, existing } = await backendFetchOr<{
-    disputes: Dispute[]; eligible: string[]; existing: Record<string, string>
-  }>('/api/local/disputes', { disputes: [], eligible: [], existing: {} })
-  const disputeState = { eligible, existing }
+  //
+  // TWO calls, because the backend answers two different shapes on the same URL:
+  //   /api/local/disputes            -> { disputes, categories }
+  //   /api/local/disputes?eligible=1 -> { eligible, existing }
+  // Asking only the first and destructuring `eligible` off it is a silent 200,
+  // not an error, so backendFetchOr's fallback never fires — `eligible` came
+  // back undefined and `eligible.includes(b.id)` below took the whole page down
+  // for every guest who had at least one booking.
+  const [disputeList, disputeState] = await Promise.all([
+    backendFetchOr<{ disputes: Dispute[] }>('/api/local/disputes', { disputes: [] }),
+    backendFetchOr<{ eligible: string[]; existing: Record<string, string> }>(
+      '/api/local/disputes?eligible=1',
+      { eligible: [], existing: {} },
+    ),
+  ])
+  // Belt and braces: a 200 carrying a shape we didn't expect must degrade to
+  // "no dispute UI", never to a 500 on the guest's own reservations.
+  const myDisputes = Array.isArray(disputeList?.disputes) ? disputeList.disputes : []
+  const eligible = Array.isArray(disputeState?.eligible) ? disputeState.eligible : []
   const disputeByBooking = new Map(myDisputes.map((d) => [d.booking_id, d]))
   const t = await getTranslations('reservationsLocal')
   // Absolute origin for the stay-pass QR (see StayPassCard).
@@ -445,7 +460,7 @@ async function ReservationsList({
                     Renders nothing on a reservation that isn't eligible. */}
                 <DisputePanel
                   bookingId={b.id}
-                  eligible={disputeState.eligible.includes(b.id)}
+                  eligible={eligible.includes(b.id)}
                   existing={disputeByBooking.get(b.id) ?? null}
                 />
                 {/* QR + link to the public pass — rendered only once the host

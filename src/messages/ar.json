@@ -105,7 +105,6 @@
     "signupSuccess": "تم إنشاء الحساب! تحقق من بريدك الإلكتروني للتأكيد.",
     "pleaseEnterEmail": "يرجى إدخال بريدك الإلكتروني",
     "continueGoogle": "المتابعة عبر Google",
-    "continueApple": "المتابعة عبر Apple",
     "or": "أو",
     "acceptTermsPrefix": "أوافق على ",
     "acceptTermsLink": "الشروط والأحكام",
@@ -1586,7 +1585,6 @@
     "signIn": "تسجيل الدخول",
     "signingIn": "جارٍ تسجيل الدخول…",
     "or": "أو",
-    "continueWithApple": "المتابعة باستخدام Apple",
     "continueWithGoogle": "المتابعة باستخدام Google",
     "googleDisabledHint": "أضف NEXT_PUBLIC_GOOGLE_CLIENT_ID لتفعيل تسجيل الدخول عبر Google",
     "newHere": "جديد هنا؟",
@@ -1628,9 +1626,6 @@
       "emailInvalid": "يُرجى إدخال بريد إلكتروني صالح.",
       "emailBadTld": "«‏.{tld}‏» ليست امتداد نطاق صالحًا.",
       "emailDidYouMean": "هل تقصد {suggestion}؟"
-    },
-    "notices": {
-      "appleSetup": "يتطلب تسجيل الدخول عبر Apple اتصال HTTPS ومُعرّف Apple Developer Services (راجع OAUTH-SETUP.md)."
     },
     "meta": {
       "title": "تسجيل الدخول",
@@ -1677,10 +1672,6 @@
     },
     "divider": {
       "or": "أو"
-    },
-    "apple": {
-      "continue": "المتابعة باستخدام Apple",
-      "requiresHttps": "يتطلّب تسجيل الدخول عبر Apple بروتوكول HTTPS ومعرّف Apple Developer Services (راجع OAUTH-SETUP.md)."
     },
     "google": {
       "continue": "المتابعة باستخدام Google",
@@ -1821,7 +1812,7 @@
       "googleCloud": "مشروع <b>Google Cloud</b> + الفوترة.",
       "mapsKey": "<b>مفتاح Google Maps API</b> (Maps JS · Android SDK · iOS SDK).",
       "oauthClients": "<b>معرّفات عميل Google OAuth</b> — الويب و iOS و Android (+ SHA‑1).",
-      "appleDeveloper": "<b>Apple Developer</b> (99 دولارًا/سنة) → App ID + تسجيل الدخول بحساب Apple + Team.",
+      "appleDeveloper": "<b>Apple Developer</b> (99 دولارًا/سنة) → App ID + Team.",
       "vercelPostgres": "<b>Vercel Postgres</b> (DATABASE_URL) + <b>نطاق + HTTPS</b>."
     },
     "tracks": {
@@ -1838,14 +1829,14 @@
       "web": {
         "title": "ب · الويب",
         "flipMap": "تبديل الخريطة إلى <b>Google Maps</b> (الصق مفتاح Maps).",
-        "googleLogin": "تفعيل <b>تسجيل الدخول بحساب Google</b> (+ Apple عبر Services ID + HTTPS).",
+        "googleLogin": "تفعيل <b>تسجيل الدخول بحساب Google</b> (HTTPS).",
         "realListings": "قوائم حقيقية عبر لوحة الإدارة + <b>رفع صور</b> القوائم.",
         "a11y": "مراجعة إمكانية الوصول؛ النشر على النطاق."
       },
       "ios": {
         "title": "ج · iOS",
         "apiBaseUrl": "توجيه <code>apiBaseURL</code> الخاص بالإصدار إلى عنوان Vercel.",
-        "signing": "توقيع Xcode: ضبط <b>Team</b> + إضافة <b>تسجيل الدخول بحساب Apple</b>.",
+        "signing": "توقيع Xcode: ضبط <b>Team</b>.",
         "maps": "(في حال Google Maps) أضف Maps iOS SDK + المفتاح؛ أضف معرّف عميل Google لـ iOS.",
         "device": "الاختبار على جهاز حقيقي.",
         "testflight": "<b>TestFlight</b> → مراجعة App Store."
@@ -1868,7 +1859,7 @@
     },
     "ready": {
       "title": "🏁 تعريف الجاهزية للإطلاق",
-      "web": "الويب يعمل مباشرةً على النطاق (HTTPS)، بيانات حقيقية، Maps + تسجيل دخول Google/Apple.",
+      "web": "الويب يعمل مباشرةً على النطاق (HTTPS)، بيانات حقيقية، Maps + تسجيل دخول Google.",
       "ios": "iOS على TestFlight (موقّع، تسجيل دخول حقيقي + خرائط)، يعمل على جهاز.",
       "android": "إصدار Android موقّع على الاختبار الداخلي في Play، يعمل على جهاز.",
       "db": "قاعدة بيانات إنتاج مع نسخ احتياطي؛ التطبيقات موجّهة إلى API الإنتاج."

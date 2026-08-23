@@ -46,14 +46,6 @@ function GoogleG() {
   )
 }
 
-function AppleGlyph() {
-  return (
-    <svg width="17" height="20" viewBox="0 0 17 20" fill="#fff" aria-hidden="true">
-      <path d="M14.06 10.62c-.02-2.16 1.76-3.2 1.84-3.25-1-1.47-2.57-1.67-3.12-1.69-1.33-.13-2.59.78-3.26.78-.67 0-1.71-.76-2.81-.74-1.45.02-2.78.84-3.53 2.14-1.5 2.6-.38 6.45 1.08 8.56.71 1.03 1.56 2.19 2.67 2.15 1.07-.04 1.48-.69 2.78-.69 1.3 0 1.66.69 2.79.67 1.15-.02 1.88-1.05 2.59-2.09.81-1.2 1.15-2.36 1.16-2.42-.03-.01-2.23-.86-2.26-3.4zM11.9 4.3c.59-.72.99-1.71.88-2.71-.85.03-1.89.57-2.5 1.28-.55.63-1.03 1.65-.9 2.62.95.07 1.92-.48 2.52-1.19z" />
-    </svg>
-  )
-}
-
 function EyeIcon({ off }: { off: boolean }) {
   return (
     <svg
@@ -333,11 +325,6 @@ export default function SignupPage() {
     // The rendered GIS button handles the flow directly; this fallback prompts
     // One Tap in case the styled button is shown instead.
     ;(window as { google?: any }).google?.accounts?.id?.prompt()
-  }
-
-  function handleAppleClick() {
-    setError(null)
-    setNotice(t('apple.requiresHttps'))
   }
 
   return (
@@ -648,15 +635,6 @@ export default function SignupPage() {
           <span style={{ flex: 1, height: 1, background: 'rgba(42,34,32,0.12)' }} />
         </div>
 
-        <button
-          type="button"
-          onClick={handleAppleClick}
-          style={appleButtonStyle(false)}
-        >
-          <AppleGlyph />
-          {t('apple.continue')}
-        </button>
-
         {/* Real Google sign-in. When configured, GIS renders its own button into
             this div; we also keep a styled fallback that triggers One Tap. */}
         {googleEnabled ? (
@@ -774,27 +752,6 @@ function primaryButtonStyle(loading: boolean): React.CSSProperties {
     cursor: loading ? 'not-allowed' : 'pointer',
     opacity: loading ? 0.7 : 1,
     transition: 'opacity 0.15s ease',
-  }
-}
-
-function appleButtonStyle(loading: boolean): React.CSSProperties {
-  return {
-    width: '100%',
-    fontFamily: FONT,
-    fontSize: 15,
-    fontWeight: 600,
-    color: '#fff',
-    background: '#000',
-    border: 'none',
-    borderRadius: 20,
-    padding: '12px 16px',
-    cursor: loading ? 'not-allowed' : 'pointer',
-    opacity: loading ? 0.7 : 1,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    marginBottom: 12,
   }
 }
 
