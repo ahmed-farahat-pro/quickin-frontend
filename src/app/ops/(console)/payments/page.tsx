@@ -1,10 +1,11 @@
-// QuickIn — Instapay payments ops (World 1, no Supabase).
+// QuickIn — payments ops (World 1, no Supabase).
 // Server component: the (console) layout has already established the staff session;
 // this adds the per-module check, so only a super admin or a moderator holding the
 // 'payments' module sees the panels. The API routes behind them re-check the same
 // permission independently.
-// Two panels live in the 'use client' component below: the Instapay destination
-// settings form (number, link, QR, instructions) and the payment-disputes queue.
+// Four panels live in the 'use client' component below: the two destination forms
+// (Instapay, and the bank account), the payments-awaiting-confirmation queue and
+// the payment-disputes queue.
 // Strings are hardcoded English (this ops page
 // is intentionally not wired into next-intl to keep the change contained).
 import type { Metadata } from 'next'
@@ -14,7 +15,7 @@ import { OpsPayments } from './ops-payments'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Instapay payments — QuickIn Ops',
+  title: 'Payments — QuickIn Ops',
   robots: { index: false, follow: false },
 }
 
@@ -47,7 +48,8 @@ export default async function OpsPaymentsPage() {
     // One admin call returns BOTH queues, which is why this page exists in this shape:
     // the two used to request the same endpoint separately and pull the same rows twice.
     // The config comes from the staff-gated settings route — /api/local/payment-config
-    // is the GUEST view and rejects a staff cookie.
+    // is the GUEST view and rejects a staff cookie. One call covers BOTH destination
+    // panels: either settings route returns the whole config.
     const [config, queues] = await Promise.all([
       backendFetchOr<Initial['config'] | null>('/api/local/admin/settings/instapay', null),
       backendFetchOr<{ pending: Initial['pending']; disputes: Initial['disputes'] }>(
@@ -86,10 +88,10 @@ export default async function OpsPaymentsPage() {
             color: COLORS.burgundy,
           }}
         >
-          Instapay payments
+          Payments
         </h1>
         <p style={{ margin: '0 0 28px', fontSize: 15, color: COLORS.muted }}>
-          Set the Instapay destination guests transfer to, and resolve payment disputes.
+          Set the destinations guests transfer to, confirm transfers, and resolve disputes.
         </p>
 
         {!allowed ? (

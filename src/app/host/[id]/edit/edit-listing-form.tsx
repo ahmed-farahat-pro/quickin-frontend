@@ -31,6 +31,8 @@ import { checkResortName, MIN_RESORT_NAME_LETTERS } from '@/lib/local/resort-cor
 import { fileToCompressedDataUrl } from '@/lib/image'
 import { DEFAULT_WEEKEND_DAYS } from '@/lib/geo'
 import { DAYS_IN_WEEK, checkWeekendPrice, resolveWeekendSchedule } from '@/lib/local/listing-pricing-core'
+import { CANCELLATION_POLICIES, toPolicy } from '@/lib/cancellation-policies'
+import type { CancellationPolicy } from '@/lib/cancellation-policies'
 import {
   checkListingTitle,
   normalizeListingTitle,
@@ -212,6 +214,11 @@ export function EditListingForm({
   const placeBlurRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [price, setPrice] = useState(listing.price_per_night != null ? String(listing.price_per_night) : '')
   const [weekendPrice, setWeekendPrice] = useState(listing.weekend_price != null ? String(listing.weekend_price) : '')
+  // Seeded from the listing, falling back to moderate — the database default, so a
+  // listing written before the column existed shows what the backend would apply.
+  const [cancellationPolicy, setCancellationPolicy] = useState<CancellationPolicy>(
+    toPolicy(listing.cancellation_policy)
+  )
   const [weekendDays, setWeekendDays] = useState<number[]>(listing.weekend_days ?? DEFAULT_WEEKEND_DAYS)
   const [currency, setCurrency] = useState(listing.currency?.trim() || 'EGP')
   const [bedrooms, setBedrooms] = useState(String(listing.bedrooms ?? 1))
@@ -476,6 +483,9 @@ export function EditListingForm({
     const nextWeekendPrice = wk.ok ? wk.value : null
     const weekendPriceChanged = nextWeekendPrice !== (listing.weekend_price ?? null)
     if (weekendPriceChanged) patch.weekend_price = nextWeekendPrice
+    if (cancellationPolicy !== toPolicy(listing.cancellation_policy)) {
+      patch.cancellation_policy = cancellationPolicy
+    }
     // Weekend days are only meaningful alongside a weekend price — they are
     // saved together, and cleared together.
     const nextWeekendDays = nextWeekendPrice ? weekendDays : null
@@ -906,6 +916,29 @@ export function EditListingForm({
             ))}
           </select>
         </div>
+      </div>
+
+      {/* Cancellation policy. Refunds honour this per listing, so the copy states
+          the actual ladder rather than a vague label. Changing it applies to FUTURE
+          bookings only — every reservation carries the policy it was taken under. */}
+      <div style={fieldWrap}>
+        <label style={label} htmlFor="edit-cancellation">{t('fields.cancellationPolicy')}</label>
+        <select
+          id="edit-cancellation"
+          style={input}
+          value={cancellationPolicy}
+          onChange={(e) => setCancellationPolicy(toPolicy(e.target.value))}
+        >
+          {CANCELLATION_POLICIES.map((p) => (
+            <option key={p} value={p}>{t(`cancellationPolicies.${p}`)}</option>
+          ))}
+        </select>
+        <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.muted }}>
+          {t(`cancellationPolicyHints.${cancellationPolicy}`)}
+        </p>
+        <p style={{ margin: '4px 0 0', fontSize: 12, color: C.muted }}>
+          {t('cancellationPolicyExisting')}
+        </p>
       </div>
 
       {/* Weekend pricing (optional, configurable days) */}

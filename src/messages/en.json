@@ -1753,7 +1753,7 @@
     "hide": "Hide payment details",
     "loading": "Loading payment details…",
     "loadFailed": "Couldn't load the payment details. Please try again.",
-    "notConfigured": "Instapay payments aren't set up yet. Please check back soon.",
+    "notConfigured": "Payments aren't set up yet. Please check back soon.",
     "sendTo": "Send to",
     "copy": "Copy",
     "copied": "Copied",
@@ -2126,7 +2126,8 @@
         "weekendDays": "Which days count as the weekend?",
         "region": "Area",
         "amenities": "Amenities",
-        "resort": "Resort / compound"
+        "resort": "Resort / compound",
+        "cancellationPolicy": "Cancellation policy"
       },
       "placeholders": {
         "title": "Sunlit loft by the Nile",
@@ -2249,6 +2250,16 @@
       "commission": {
         "guestsSee": "Guests will see {price}",
         "note": "includes QuickIn's {percent}% commission — you receive the price you entered"
+      },
+      "cancellationPolicies": {
+        "flexible": "Flexible",
+        "moderate": "Moderate (recommended)",
+        "strict": "Strict"
+      },
+      "cancellationPolicyHints": {
+        "flexible": "Full refund up to the day before check-in. Nothing on the day itself.",
+        "moderate": "Full refund 5 or more days before check-in, 50% inside that. Nothing on the day itself.",
+        "strict": "50% refund 7 or more days before check-in. Nothing inside that."
       }
     },
     "edit": {
@@ -2286,7 +2297,21 @@
         "title": "This listing wasn't approved",
         "noReason": "Our team didn't leave a reason this time.",
         "hint": "Make the changes described, then save to send it back for review."
-      }
+      },
+      "fields": {
+        "cancellationPolicy": "Cancellation policy"
+      },
+      "cancellationPolicies": {
+        "flexible": "Flexible",
+        "moderate": "Moderate (recommended)",
+        "strict": "Strict"
+      },
+      "cancellationPolicyHints": {
+        "flexible": "Full refund up to the day before check-in. Nothing on the day itself.",
+        "moderate": "Full refund 5 or more days before check-in, 50% inside that. Nothing on the day itself.",
+        "strict": "50% refund 7 or more days before check-in. Nothing inside that."
+      },
+      "cancellationPolicyExisting": "Changing this affects future bookings only — every reservation keeps the policy it was booked under."
     },
     "calendar": {
       "meta": {
@@ -2672,9 +2697,19 @@
   "namePolicy": {
     "errors": {
       "required": "Please enter your name.",
-      "letters": "Please enter your name — a name contains letters, not only numbers.",
+      "invalidCharacters": "Please use letters only — a name has no numbers or symbols in it.",
+      "letters": "Please enter your name — a name contains letters.",
       "tooShort": "Please enter your name in full (at least 2 letters).",
       "tooLong": "That name is too long (60 characters max)."
     }
+  },
+  "payMethods": {
+    "choose": "Choose how to pay",
+    "instapay": "Instapay",
+    "bankTransfer": "Bank transfer",
+    "bankName": "Bank",
+    "accountName": "Account holder",
+    "accountNumber": "Account number",
+    "iban": "IBAN"
   }
 }

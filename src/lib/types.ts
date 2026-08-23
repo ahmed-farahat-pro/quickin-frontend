@@ -27,6 +27,9 @@ export interface Listing {
    *  price. See LISTING_COLS vs LISTING_COLS_HOST. */
   price_per_night: number
   weekend_price: number | null
+  /** 'flexible' | 'moderate' | 'strict'. The backend always sends one — it
+   *  COALESCEs a missing value to 'moderate', the database default. */
+  cancellation_policy?: string
   weekend_days: number[] | null
   /** The commission rate these prices were projected with (0.1 = 10%). */
   commission_rate?: number

@@ -1702,7 +1702,7 @@
     "hide": "Ocultar los datos de pago",
     "loading": "Cargando los datos de pago…",
     "loadFailed": "No se pudieron cargar los datos de pago. Inténtalo de nuevo.",
-    "notConfigured": "Los pagos con Instapay aún no están configurados. Vuelve a intentarlo pronto.",
+    "notConfigured": "Los pagos aún no están configurados. Vuelve pronto.",
     "sendTo": "Enviar a",
     "copy": "Copiar",
     "copied": "Copiado",
@@ -2126,7 +2126,8 @@
         "weekendDays": "¿Qué días son fin de semana?",
         "region": "Zona",
         "amenities": "Servicios",
-        "resort": "Resort / complejo"
+        "resort": "Resort / complejo",
+        "cancellationPolicy": "Política de cancelación"
       },
       "placeholders": {
         "title": "Loft soleado junto al Nilo",
@@ -2249,6 +2250,16 @@
       "commission": {
         "guestsSee": "Los huéspedes verán {price}",
         "note": "incluye la comisión del {percent}% de QuickIn: tú recibes el precio que introdujiste"
+      },
+      "cancellationPolicies": {
+        "flexible": "Flexible",
+        "moderate": "Moderada (recomendada)",
+        "strict": "Estricta"
+      },
+      "cancellationPolicyHints": {
+        "flexible": "Reembolso completo hasta el día anterior a la llegada. Nada el mismo día.",
+        "moderate": "Reembolso completo 5 días o más antes de la llegada, 50% después. Nada el mismo día.",
+        "strict": "Reembolso del 50% 7 días o más antes de la llegada. Nada después."
       }
     },
     "edit": {
@@ -2286,7 +2297,21 @@
         "title": "Este anuncio no fue aprobado",
         "noReason": "Nuestro equipo no dejó un motivo esta vez.",
         "hint": "Haz los cambios indicados y guarda para enviarlo de nuevo a revisión."
-      }
+      },
+      "fields": {
+        "cancellationPolicy": "Política de cancelación"
+      },
+      "cancellationPolicies": {
+        "flexible": "Flexible",
+        "moderate": "Moderada (recomendada)",
+        "strict": "Estricta"
+      },
+      "cancellationPolicyHints": {
+        "flexible": "Reembolso completo hasta el día anterior a la llegada. Nada el mismo día.",
+        "moderate": "Reembolso completo 5 días o más antes de la llegada, 50% después. Nada el mismo día.",
+        "strict": "Reembolso del 50% 7 días o más antes de la llegada. Nada después."
+      },
+      "cancellationPolicyExisting": "El cambio solo afecta a reservas futuras: cada reserva conserva la política con la que se hizo."
     },
     "calendar": {
       "meta": {
@@ -2672,9 +2697,19 @@
   "namePolicy": {
     "errors": {
       "required": "Introduce tu nombre.",
-      "letters": "Introduce tu nombre — un nombre contiene letras, no solo números.",
+      "invalidCharacters": "Usa solo letras — un nombre no lleva números ni símbolos.",
+      "letters": "Introduce tu nombre — un nombre contiene letras.",
       "tooShort": "Introduce tu nombre completo (al menos 2 letras).",
       "tooLong": "Ese nombre es demasiado largo (60 caracteres como máximo)."
     }
+  },
+  "payMethods": {
+    "choose": "Elige cómo pagar",
+    "instapay": "Instapay",
+    "bankTransfer": "Transferencia bancaria",
+    "bankName": "Banco",
+    "accountName": "Titular de la cuenta",
+    "accountNumber": "Número de cuenta",
+    "iban": "IBAN"
   }
 }

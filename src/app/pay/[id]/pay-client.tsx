@@ -12,9 +12,10 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { formatDisplayPrice, isConverted } from '@/lib/currency/display'
 import { useDisplayCurrency } from '@/components/providers/display-currency-provider'
-import { InstapayDetails } from '@/components/instapay-details'
+import { PaymentDestination } from '@/components/payment-destination'
 import { fileToCompressedDataUrl } from '@/lib/image'
 import { MAX_PROOF_CHARS } from '@/lib/local/payment-flow-core'
+import type { PaymentMethod } from '@/lib/local/payment-config-core'
 
 const C = {
   burgundy: '#5B0F16',
@@ -60,6 +61,10 @@ export function PayClient({
   const { currency: displayCurrency } = useDisplayCurrency()
   const converted = isConverted(currency, displayCurrency)
   const [image, setImage] = useState<string | null>(null)
+  // Which destination the guest picked on the left. Posted with the screenshot so
+  // the reviewer knows which account the money should have landed in; null until
+  // the config loads, or when the admin has switched every method off.
+  const [method, setMethod] = useState<PaymentMethod | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
@@ -92,7 +97,7 @@ export function PayClient({
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image, method: 'instapay' }),
+        body: JSON.stringify({ image, method: method ?? 'instapay' }),
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -180,9 +185,9 @@ export function PayClient({
           <div style={card}>
             <h2 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800, color: C.burgundy }}>1. Send the transfer</h2>
             <p style={{ margin: '0 0 14px', fontSize: 13, color: C.muted }}>
-              Scan the code or copy the number into your banking app.
+              Copy the details into your banking app.
             </p>
-            <InstapayDetails />
+            <PaymentDestination onMethodChange={setMethod} />
           </div>
 
           <div style={card}>

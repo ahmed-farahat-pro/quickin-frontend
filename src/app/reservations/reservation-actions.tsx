@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { InstapayDetails } from '@/components/instapay-details'
+import { PaymentDestination } from '@/components/payment-destination'
 import { paymentStageFor } from '@/lib/local/payment-flow-core'
 
 const C = { burgundy: '#5B0F16', tan: '#EFE6D8', ink: '#2A2220', muted: '#6B6055' }
@@ -47,7 +47,7 @@ export function ReservationActions(props: {
   const [reviewing, setReviewing] = useState(false)
   const [reviewed, setReviewed] = useState(false)
   // Collapsed by default: an admin-uploaded QR arrives inline as a base64 data
-  // URL, so InstapayDetails only fetches once the guest asks to see it.
+  // URL, so PaymentDestination only fetches once the guest asks to see it.
   const [showInstapay, setShowInstapay] = useState(false)
 
   const today = new Date().toISOString().slice(0, 10)
@@ -157,7 +157,9 @@ export function ReservationActions(props: {
 
     {awaitingPayment && showInstapay && (
       <div style={{ marginTop: 12 }}>
-        <InstapayDetails />
+        {/* Read-only here — this panel only shows a guest where to send money.
+            Which method they used is recorded when they upload the proof on /pay. */}
+        <PaymentDestination />
       </div>
     )}
     </>

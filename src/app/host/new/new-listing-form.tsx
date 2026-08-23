@@ -27,6 +27,8 @@ import { checkResortName, MIN_RESORT_NAME_LETTERS } from '@/lib/local/resort-cor
 import { fileToCompressedDataUrl } from '@/lib/image'
 import { DEFAULT_WEEKEND_DAYS } from '@/lib/geo'
 import { DAYS_IN_WEEK, checkWeekendPrice, resolveWeekendSchedule } from '@/lib/local/listing-pricing-core'
+import { CANCELLATION_POLICIES, toPolicy } from '@/lib/cancellation-policies'
+import type { CancellationPolicy } from '@/lib/cancellation-policies'
 import {
   checkListingTitle,
   normalizeListingTitle,
@@ -182,6 +184,9 @@ export function NewListingForm({
   const placeBlurRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [price, setPrice] = useState('')
   const [weekendPrice, setWeekendPrice] = useState('')
+  // Moderate is the middle ground and the database default — a host who never
+  // opens this field gets the same terms the backend would have given them.
+  const [cancellationPolicy, setCancellationPolicy] = useState<CancellationPolicy>('moderate')
   const [weekendDays, setWeekendDays] = useState<number[]>(DEFAULT_WEEKEND_DAYS)
   const [currency, setCurrency] = useState('EGP')
   const [bedrooms, setBedrooms] = useState('1')
@@ -490,6 +495,7 @@ export function NewListingForm({
           resort_id: resortId && resortId !== OTHER_RESORT ? resortId : undefined,
           resort_name: resortId === OTHER_RESORT ? resortOther.trim() || undefined : undefined,
           amenities,
+          cancellation_policy: cancellationPolicy,
           images: photos,
           ownership_doc: ownershipDoc || undefined,
         }),
@@ -759,6 +765,25 @@ export function NewListingForm({
             ))}
           </select>
         </div>
+      </div>
+
+      {/* Cancellation policy. Refunds honour this per listing, so the copy states
+          the actual ladder rather than a vague label. */}
+      <div style={fieldWrap}>
+        <label style={label} htmlFor="cancellationPolicy">{t('fields.cancellationPolicy')}</label>
+        <select
+          id="cancellationPolicy"
+          style={input}
+          value={cancellationPolicy}
+          onChange={(e) => setCancellationPolicy(toPolicy(e.target.value))}
+        >
+          {CANCELLATION_POLICIES.map((p) => (
+            <option key={p} value={p}>{t(`cancellationPolicies.${p}`)}</option>
+          ))}
+        </select>
+        <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.muted }}>
+          {t(`cancellationPolicyHints.${cancellationPolicy}`)}
+        </p>
       </div>
 
       {/* Weekend pricing (optional, configurable days) */}

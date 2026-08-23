@@ -1702,7 +1702,7 @@
     "hide": "Masquer les informations de paiement",
     "loading": "Chargement des informations de paiement…",
     "loadFailed": "Impossible de charger les informations de paiement. Veuillez réessayer.",
-    "notConfigured": "Les paiements Instapay ne sont pas encore configurés. Revenez bientôt.",
+    "notConfigured": "Les paiements ne sont pas encore configurés. Revenez bientôt.",
     "sendTo": "Envoyer à",
     "copy": "Copier",
     "copied": "Copié",
@@ -2126,7 +2126,8 @@
         "weekendDays": "Quels jours sont le week-end ?",
         "region": "Zone",
         "amenities": "Équipements",
-        "resort": "Resort / résidence"
+        "resort": "Resort / résidence",
+        "cancellationPolicy": "Politique d’annulation"
       },
       "placeholders": {
         "title": "Loft ensoleillé au bord du Nil",
@@ -2249,6 +2250,16 @@
       "commission": {
         "guestsSee": "Les voyageurs verront {price}",
         "note": "commission QuickIn de {percent}% incluse — vous recevez le prix que vous avez saisi"
+      },
+      "cancellationPolicies": {
+        "flexible": "Flexible",
+        "moderate": "Modérée (recommandée)",
+        "strict": "Stricte"
+      },
+      "cancellationPolicyHints": {
+        "flexible": "Remboursement intégral jusqu’à la veille de l’arrivée. Rien le jour même.",
+        "moderate": "Remboursement intégral 5 jours ou plus avant l’arrivée, 50% ensuite. Rien le jour même.",
+        "strict": "Remboursement de 50% 7 jours ou plus avant l’arrivée. Rien ensuite."
       }
     },
     "edit": {
@@ -2286,7 +2297,21 @@
         "title": "Cette annonce n'a pas été approuvée",
         "noReason": "Notre équipe n'a pas laissé de motif cette fois.",
         "hint": "Effectuez les modifications demandées, puis enregistrez pour la renvoyer en révision."
-      }
+      },
+      "fields": {
+        "cancellationPolicy": "Politique d’annulation"
+      },
+      "cancellationPolicies": {
+        "flexible": "Flexible",
+        "moderate": "Modérée (recommandée)",
+        "strict": "Stricte"
+      },
+      "cancellationPolicyHints": {
+        "flexible": "Remboursement intégral jusqu’à la veille de l’arrivée. Rien le jour même.",
+        "moderate": "Remboursement intégral 5 jours ou plus avant l’arrivée, 50% ensuite. Rien le jour même.",
+        "strict": "Remboursement de 50% 7 jours ou plus avant l’arrivée. Rien ensuite."
+      },
+      "cancellationPolicyExisting": "Ce changement ne s’applique qu’aux futures réservations — chaque réservation conserve la politique en vigueur lors de sa création."
     },
     "calendar": {
       "meta": {
@@ -2672,9 +2697,19 @@
   "namePolicy": {
     "errors": {
       "required": "Veuillez saisir votre nom.",
-      "letters": "Veuillez saisir votre nom — un nom contient des lettres, pas uniquement des chiffres.",
+      "invalidCharacters": "Veuillez utiliser uniquement des lettres — un nom ne contient ni chiffres ni symboles.",
+      "letters": "Veuillez saisir votre nom — un nom contient des lettres.",
       "tooShort": "Veuillez saisir votre nom complet (au moins 2 lettres).",
       "tooLong": "Ce nom est trop long (60 caractères maximum)."
     }
+  },
+  "payMethods": {
+    "choose": "Choisissez votre mode de paiement",
+    "instapay": "Instapay",
+    "bankTransfer": "Virement bancaire",
+    "bankName": "Banque",
+    "accountName": "Titulaire du compte",
+    "accountNumber": "Numéro de compte",
+    "iban": "IBAN"
   }
 }

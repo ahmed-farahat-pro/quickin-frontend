@@ -578,18 +578,30 @@ imports, so the same code runs everywhere:
 
 | Caller | What it does |
 | --- | --- |
-| `api/auth/signup` (here and in `quickin-backend`) | The decision. 400 with a plain-English `error` **and** a structured `nameProblem` (`{ code }`) |
+| `quickin-backend` `api/auth/signup` | The decision. 400 with a plain-English `error` **and** a structured `nameProblem` (`{ code }`) |
 | `app/signup/page.tsx` | Checks on blur and before the request, and localizes `nameProblem` into the four locales (`namePolicy.errors.*`) |
-| `lib/validations/schemas.ts` | `signUpSchema` — its `.min(6)` accepted `123456` while refusing `Ali M` |
-| `api/local/users/[id]` (PATCH) | The rename door. A gate only signup enforced would let a guest sign up as `Layla` and become `12345` a minute later |
-| `api/local/host/apply` + `app/host/apply/apply-form.tsx` | The name an operator reads against the ID photos |
-| iOS `Sources/NameRules.swift` | The Swift twin: same rule, same problem cases, so the app says it at the field instead of after a round trip |
+| `quickin-backend` `api/local/profile` (PATCH) + `app/account/account-forms.tsx` | The rename door. A gate only signup enforced would let a guest sign up as `Layla` and become `12345` a minute later |
+| `quickin-backend` `api/local/host/apply` + `app/host/apply/apply-form.tsx` | The name an operator reads against the ID photos |
+| iOS `Sources/NameRules.swift`, Android `NameRules.kt` | The mobile twins: same rule, same problem cases, so the app says it at the field instead of after a round trip |
 
-The rule that does the work: a name must contain **letters** (`\p{L}`, so Arabic and
-Han count), at least two of them, in at most 60 characters. Deliberately **not** "no
-digits" — Franco-Arabic writes real names with numerals (`Ma7moud`, `3omar`), and a
-digit ban would turn away exactly the guests this app is for. `letters` is reported
-before `tooShort` so `5` hears the thing that is actually wrong with it.
+The rule that does the work: **a name is letters and nothing else** — `\p{L}` in any
+script (Arabic and Han count), the combining marks that sit on those letters (`\p{M}`:
+harakat, the accent of a decomposed `José`), and the three characters that hold a real
+name together: the space between its parts, the hyphen of `Jean-Luc`, the apostrophe of
+`O'Brien` — the last two also in the typographic forms a phone sends (`’`, `‐`, `‑`),
+since smart punctuation substitutes them as the guest types and the guest cannot see
+it. At least two letters, at most 60 characters.
+
+Digits and symbols are refused, which is a **tightening**: the first version of this
+rule asked only that a name contain *some* letter, so `Ma7moud` and `3omar` were
+deliberately let in. They are refused now — the field is what an operator matches
+against an ID document, and `Ma7moud` is not what the document says. A name stored
+before the change keeps it until that account next saves a name.
+
+`invalidCharacters` is reported before `letters` and `tooShort`, so `5` and `A1` hear
+the thing that is actually wrong with them rather than being sent back to type another
+character. `letters` survives for the one input the character rule cannot catch:
+`-----`, every character legal and no name in it.
 
 A request with **no** name at all is still accepted, because social sign-in has none.
 It falls back to the local part of the address — and to `Guest` when that isn't a name
@@ -942,7 +954,7 @@ Reaching a section without its module gets a no-access card and a 403 from the A
 | `/ops/analytics` | `analytics` | Booking, payment and cancellation reports with a shared filter bar, plus CSV/Excel export |
 | `/ops/resorts` | `resorts` | Resort catalog and the pending-submission queue |
 | `/ops/staff` | `staff` | Moderator accounts and their permissions (super admin only) |
-| `/ops/payments` | `payments` | The Instapay destination guests pay to, plus the dispute queue |
+| `/ops/payments` | `payments` | The two destinations guests pay to (Instapay, bank transfer), plus the confirmation and dispute queues |
 
 ### Activity, audit and alerts
 
@@ -1085,10 +1097,15 @@ both be true.
 
 ### Paying for a stay
 
-**`/pay/<bookingId>`** — how to pay on the left (the QR, handle and deep link, via the
-shared `InstapayDetails`), the screenshot upload and an **"I have paid"** button on the
-right. It stacks on narrow screens. Reached from Pay now on `/reservations`, and gated
-on the booking being yours, confirmed, and not already paid.
+**`/pay/<bookingId>`** — how to pay on the left (the method picker and the chosen
+destination, via the shared `PaymentDestination`), the screenshot upload and an
+**"I have paid"** button on the right. It stacks on narrow screens. Reached from Pay
+now on `/reservations`, and gated on the booking being yours, confirmed, and not
+already paid.
+
+The method the guest picked is posted as `method` with the screenshot, so the reviewer
+in `/ops/payments` knows which account the money should have landed in — every queue
+row carries that as a chip.
 
 | Method | Path | Notes |
 | --- | --- | --- |
@@ -1120,26 +1137,41 @@ Rejecting a screenshot leaves the booking **confirmed** — the guest uploads a 
 one. The old host path flipped the whole reservation to `rejected`, cancelling a real
 booking over an unreadable photo.
 
-### Instapay destination
+### Payment destinations
 
-`/ops/payments` is where the number, QR code and link guests see are set. The four
-values live in `app_settings` (`instapay_handle`, `instapay_instructions`,
-`instapay_link`, `instapay_qr_image`) and are shared with the mobile API, which reads
-the same Neon rows.
+`/ops/payments` is where the accounts guests pay to are set. There are **two**, each
+with its own on/off switch, both stored as `app_settings` rows shared with the mobile
+API (it reads the same Neon rows):
+
+| Method | Rows | Offered when |
+| --- | --- | --- |
+| `instapay` | `instapay_enabled`, `instapay_handle`, `instapay_instructions`, `instapay_link`, `instapay_qr_image` | enabled, and a handle **or** link is set |
+| `bank_transfer` | `bank_transfer_enabled`, `bank_name`, `bank_account_name`, `bank_account_number`, `bank_iban`, `bank_instructions` | enabled, and the bank, the account holder **and** an account number or IBAN are all set |
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| GET | `/api/local/payment-config` | Signed-in guests — `{instapay_handle, instructions, instapay_link, instapay_qr_image, qr_payload}` |
-| GET | `/api/local/admin/settings/instapay` | The same config, for the ops form (`payments` module) |
-| PUT | `/api/local/admin/settings/instapay` | `{instapay_handle?, instapay_link?, instapay_qr_image?, instructions?}` — omit a field to leave it, send `""` to clear it. `400` on an invalid link or QR |
+| GET | `/api/local/payment-config` | Signed-in guests — both destinations plus the derived `available_methods` |
+| GET | `/api/local/admin/settings/instapay` | The whole config, for the ops form (`payments` module) |
+| PUT | `/api/local/admin/settings/instapay` | `{enabled?, instapay_handle?, instapay_link?, instapay_qr_image?, instructions?}` — omit a field to leave it, send `""` to clear it. `400` on an invalid link or QR |
+| GET | `/api/local/admin/settings/bank` | The same payload, for the bank panel |
+| PUT | `/api/local/admin/settings/bank` | `{enabled?, bank_name?, account_name?, account_number?, iban?, instructions?}`. `400` with the reason on a malformed account number or IBAN |
+
+`src/components/payment-destination.tsx` is the shared guest-facing panel. It renders
+its picker from `available_methods` rather than a hardcoded list — that is what keeps
+the ops toggles meaningful — and shows no picker at all when only one method is
+offered. Switching a method off hides it without discarding its details.
+
+The account number and IBAN are shown **whole**, never masked: they exist to be typed
+into a banking app. The IBAN is displayed in groups of four but copies unspaced.
 
 An uploaded QR is downscaled to a 640px PNG in the browser before it is sent, and
-stored base64-inline like every other World-1 image. When no QR is uploaded, both this
-app and iOS draw one from `qr_payload` (the link if set, else the handle) — here via
-`qrcode.react` in `src/components/instapay-details.tsx`, which is the shared
-guest-facing panel. Validation is `src/lib/local/payment-config-core.ts`, kept
+stored base64-inline like every other World-1 image. When no QR is uploaded, this app
+and both mobile clients draw one from `qr_payload` (the link if set, else the handle) —
+here via `qrcode.react`. Validation is `src/lib/local/payment-config-core.ts`, kept
 byte-identical with the backend copy by
-`quickin-backend/scripts/check-payment-config-core-parity.mjs`.
+`quickin-backend/scripts/check-payment-config-core-parity.mjs`. **No migration is
+needed** to add a destination: `app_settings` is key/value and a missing row reads as
+`''`, which is how the bank half shipped without touching the schema.
 
 ### Resorts API
 
@@ -1317,7 +1349,7 @@ npm run check     # same; the pre-deploy gate
 | `email-core.ts` | That `.con` (and `cim`, `cmo`, `ocm`, `ner`, `ogr`…) is refused, that the did-you-mean answers `com` and never `cn`, the structural rules (double dots, edge hyphens, the 64/254 limits) — and an equally large half asserting that ordinary addresses still get in (`.eg`, `.com.eg`, `.co.uk`, `.photography`, punycode), because a too-tight TLD list turns away paying guests and is the worse failure |
 | `phone-core.ts` | The host application's phone field: that a word is refused and that letters mixed into a real number are refused rather than quietly stripped (a wrong number on file is worse than a rejected form); that the nine ways of writing one Egyptian mobile all normalize to the same `01XXXXXXXXX`; that a mobile a digit short is caught while an Egyptian landline and a foreign E.164 number are not; that Arabic-Indic and Persian digits are digits; and that what survives typing still has to normalize — the filter is not the validator |
 | `profile-core.ts` | The age and "about you" fields on `/account`: that an empty field is accepted (all three are optional, and a form that demanded an age to save a name would be a new bug), that `3e2` and `0x22` are refused rather than coerced into 300 and 34, that `٣٤` is thirty-four, that a slipped number pad is caught at both ends — and for the bio, that line breaks survive while a paste's padding does not, that invisibles cannot fill it or its budget, and that the cap is measured on what gets stored, not on what was typed |
-| `name-policy.ts` | The signup name: that `12345`, `٠١٢٣٤`, `0100` and `-----` are refused, that `letters` is reported before `tooShort` so `5` hears the real problem, that invisible pasted characters don't make a name non-empty — and the half that matters more, that `Ma7moud`, `Bo`, `Ali M`, `محمد أحمد`, `李伟` and `O'Brien` still get in; plus the email fallback, which can never seed the numeric name the rule just refused |
+| `name-policy.ts` | The signup name: that `12345`, `٠١٢٣٤`, `0100`, `Layla2`, `j.doe`, an emoji and `-----` are refused, that `Ma7moud` joined them when the rule tightened to letters-only, that `invalidCharacters` is reported before `letters` and `tooShort` so `5` hears the real problem, that invisible pasted characters don't make a name non-empty — and the half that matters more, that `Bo`, `Ali M`, `محمد أحمد`, `مُحَمَّد` with its harakat, `李伟`, `Jean-Luc` and `O’Brien` with the apostrophe a phone actually sends still get in; plus the email fallback, which reads `layla.hassan@` as `layla hassan` and can never seed a name the rule just refused |
 | `listing-title-policy.ts` | The listing title: that `@@@@@`, `!!!!!`, `.....`, `12345` and `🏖️🏖️🏖️` are refused, that `letters` is reported before `tooShort` so `@@` hears the real problem, that invisible pasted characters don't make a title non-empty, and that the 200-character cap counts code points — plus the half that matters more, that `Nile-view flat (2BR)`, `★ Sahel chalet ★`, `Sa7el chalet` and `شقة بإطلالة على النيل` still get in, because a rule that bans punctuation would refuse most real titles |
 | `auth-exit-core.ts` | The way out of `/login` and `/signup`: that the referring page wins and keeps its query string (a guest who came from a filtered search gets those filters back), and the four cases that fall back to `/explore` instead — no referrer, an unparseable one, another origin (otherwise any site could choose where our sign-in page sends people), and the auth pages themselves, with locale prefixes stripped first so `/ar/signup` doesn't slip through |
 | `currency-core.ts` | The display currency: that an unrecognised cookie falls back to EGP instead of leaving prices in a currency with no rate; that one typo'd code in the rate override drops alone rather than taking the other five down with it, and that a zero rate is refused (it would divide every price into Infinity); and the property the money depends on — a missing rate returns the **stored** price in the **stored** currency, unmarked, never a number invented from a rate we do not have |

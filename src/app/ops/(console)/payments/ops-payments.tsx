@@ -1,17 +1,27 @@
 'use client'
 
-// Payments ops (World 1) — two panels:
+// Payments ops (World 1) — four panels:
 //  1. Instapay destination: GET/PUT /api/local/admin/settings/instapay — the
 //     handle/number, the deep link, the QR image and the instructions guests see.
-//  2. Disputes queue: GET /api/local/admin/payments (open disputes) with a per-row
-//     "view screenshot" (GET /api/local/bookings/:id/payment-proof) and Approve / Uphold
-//     (POST /api/local/admin/payments). All fetches are cookie-authed (same-origin) and
-//     admin-gated server-side. Strings are hardcoded English to keep the change contained.
+//  2. Bank transfer destination: GET/PUT /api/local/admin/settings/bank — the bank,
+//     the account holder, the account number and an optional IBAN.
+//  3. Payments awaiting confirmation, and 4. the disputes queue: GET
+//     /api/local/admin/payments with a per-row "view screenshot"
+//     (GET /api/local/bookings/:id/payment-proof) and Accept / Reject / Approve /
+//     Uphold (POST /api/local/admin/payments).
+//
+// Each destination has its own on/off switch, so one can be withdrawn without its
+// details being discarded — the guest-facing list comes from `available_methods`,
+// which the server derives from enabled AND configured.
+//
+// All fetches are cookie-authed (same-origin) and admin-gated server-side. Strings
+// are hardcoded English to keep the change contained.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { OpsSkeletonFields, OpsSkeletonQueueRows } from '../ops-skeleton'
 import { Empty } from '../ops-ui'
-import { MAX_QR_CHARS, qrPayload } from '@/lib/local/payment-config-core'
+import { MAX_QR_CHARS, bankConfigGap, qrPayload } from '@/lib/local/payment-config-core'
+import type { PaymentConfig } from '@/lib/local/payment-config-core'
 
 const C = {
   burgundy: '#5B0F16',
@@ -85,12 +95,8 @@ const inputStyle: React.CSSProperties = {
  * unconditionally — so a DB hiccup during the render costs a moment, not the screen.
  */
 export interface OpsPaymentsInitial {
-  config: {
-    instapay_handle?: string
-    instapay_link?: string
-    instapay_qr_image?: string
-    instructions?: string
-  }
+  /** The whole config — both destinations come back from either settings route. */
+  config: PaymentConfig
   pending: PendingProof[]
   disputes: Dispute[]
 }
@@ -99,9 +105,83 @@ export function OpsPayments({ initial }: { initial: OpsPaymentsInitial | null })
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
       <InstapaySettings initial={initial?.config ?? null} />
+      <BankSettings initial={initial?.config ?? null} />
       <PendingPaymentsQueue initial={initial?.pending ?? null} />
       <DisputesQueue initial={initial?.disputes ?? null} />
     </div>
+  )
+}
+
+// ---- Shared bits ------------------------------------------------------------
+
+/**
+ * The on/off switch on each destination panel.
+ *
+ * Deliberately a labelled control rather than a bare toggle: "guests can pay this
+ * way" states the consequence, and this is the switch that decides whether money
+ * can reach the business at all.
+ */
+function MethodToggle({
+  on,
+  onChange,
+  disabled,
+}: {
+  on: boolean
+  onChange: (next: boolean) => void
+  disabled?: boolean
+}) {
+  return (
+    <label
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 9,
+        cursor: disabled ? 'default' : 'pointer',
+        fontSize: 13,
+        fontWeight: 700,
+        color: on ? C.ink : C.muted,
+        opacity: disabled ? 0.6 : 1,
+      }}
+    >
+      <input
+        type="checkbox"
+        checked={on}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+        style={{ width: 16, height: 16, accentColor: C.burgundy, cursor: 'inherit', margin: 0 }}
+      />
+      {on ? 'Shown to guests' : 'Hidden from guests'}
+    </label>
+  )
+}
+
+const METHOD_LABELS: Record<string, string> = {
+  instapay: 'Instapay',
+  bank_transfer: 'Bank transfer',
+}
+
+/**
+ * Which destination the guest says they sent to. On every queue row because the
+ * reviewer's first question, looking at a screenshot, is which account to check.
+ */
+function MethodChip({ method }: { method: string | null }) {
+  const label = METHOD_LABELS[String(method ?? '')] ?? METHOD_LABELS.instapay
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        padding: '2px 9px',
+        borderRadius: 999,
+        border: `1px solid ${C.tan}`,
+        background: C.cream,
+        fontSize: 11.5,
+        fontWeight: 700,
+        color: C.muted,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {label}
+    </span>
   )
 }
 
@@ -114,6 +194,7 @@ interface PendingProof {
   guest_name: string | null
   guest_email: string | null
   amount: number
+  method: string | null
   submitted_at: string
   check_in: string
   check_out: string
@@ -223,8 +304,11 @@ function PendingPaymentsQueue({ initial }: { initial: PendingProof[] | null }) {
                   {r.guest_name || r.guest_email} · {r.check_in} → {r.check_out}
                   {r.reservation_code ? ` · ${r.reservation_code}` : ''}
                 </div>
-                <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
-                  Sent {new Date(r.submitted_at).toLocaleString()}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+                  <MethodChip method={r.method} />
+                  <span style={{ fontSize: 12, color: C.muted }}>
+                    Sent {new Date(r.submitted_at).toLocaleString()}
+                  </span>
                 </div>
               </div>
               <strong style={{ fontSize: 16, color: C.burgundy, whiteSpace: 'nowrap' }}>
@@ -300,6 +384,7 @@ async function fileToQrDataUrl(file: File): Promise<string> {
 }
 
 function InstapaySettings({ initial }: { initial: OpsPaymentsInitial['config'] | null }) {
+  const [enabled, setEnabled] = useState(initial?.instapay_enabled ?? true)
   const [handle, setHandle] = useState(initial?.instapay_handle ?? '')
   const [link, setLink] = useState(initial?.instapay_link ?? '')
   const [qrImage, setQrImage] = useState(initial?.instapay_qr_image ?? '')
@@ -313,12 +398,8 @@ function InstapaySettings({ initial }: { initial: OpsPaymentsInitial['config'] |
   // with the server by importing the same helper the API uses.
   const generated = qrPayload(handle, link)
 
-  function apply(data: {
-    instapay_handle?: string
-    instapay_link?: string
-    instapay_qr_image?: string
-    instructions?: string
-  }) {
+  function apply(data: Partial<PaymentConfig>) {
+    setEnabled(data.instapay_enabled ?? true)
     setHandle(data.instapay_handle ?? '')
     setLink(data.instapay_link ?? '')
     setQrImage(data.instapay_qr_image ?? '')
@@ -369,6 +450,7 @@ function InstapaySettings({ initial }: { initial: OpsPaymentsInitial['config'] |
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          enabled,
           instapay_handle: handle,
           instapay_link: link,
           instapay_qr_image: qrImage,
@@ -390,10 +472,15 @@ function InstapaySettings({ initial }: { initial: OpsPaymentsInitial['config'] |
 
   return (
     <section style={card}>
-      <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 700, color: C.ink }}>Instapay destination</h2>
-      <p style={{ margin: '0 0 16px', fontSize: 13.5, color: C.muted }}>
-        The number, QR code and link guests pay to. Shown at checkout in the app and on the web.
-      </p>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 700, color: C.ink }}>Instapay</h2>
+          <p style={{ margin: '0 0 16px', fontSize: 13.5, color: C.muted }}>
+            The number, QR code and link guests pay to. Shown at checkout in the app and on the web.
+          </p>
+        </div>
+        {!loading && <MethodToggle on={enabled} onChange={setEnabled} disabled={saving} />}
+      </div>
 
       {loading ? (
         <OpsSkeletonFields fields={4} />
@@ -495,6 +582,199 @@ function InstapaySettings({ initial }: { initial: OpsPaymentsInitial['config'] |
             />
           </label>
 
+          {!enabled && (
+            <p style={{ margin: 0, fontSize: 12.5, color: C.muted }}>
+              Guests won&apos;t see Instapay while this is off. Nothing above is deleted — switch it
+              back on and it returns as it was.
+            </p>
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button onClick={save} disabled={saving} style={{ ...primaryBtn, opacity: saving ? 0.7 : 1 }}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            {msg && (
+              <span style={{ fontSize: 13, color: msg.kind === 'ok' ? '#177245' : '#b3261e' }}>{msg.text}</span>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
+// ---- Bank transfer destination ----------------------------------------------
+
+/**
+ * The second destination: an ordinary bank account guests transfer to, alongside
+ * Instapay.
+ *
+ * The account number and IBAN are shown back WHOLE and never masked. That is
+ * deliberate and matches the host payout method: this value exists to be typed
+ * into a banking app, and a masked one is one the admin cannot even check.
+ */
+function BankSettings({ initial }: { initial: OpsPaymentsInitial['config'] | null }) {
+  const [enabled, setEnabled] = useState(initial?.bank?.enabled ?? true)
+  const [bankName, setBankName] = useState(initial?.bank?.bank_name ?? '')
+  const [accountName, setAccountName] = useState(initial?.bank?.account_name ?? '')
+  const [accountNumber, setAccountNumber] = useState(initial?.bank?.account_number ?? '')
+  const [iban, setIban] = useState(initial?.bank?.iban ?? '')
+  const [instructions, setInstructions] = useState(initial?.bank?.instructions ?? '')
+  const [loading, setLoading] = useState(initial === null)
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+
+  // The same rule the server applies, imported rather than restated — an admin
+  // must not be told they are live when the API would hide the method.
+  const gap = bankConfigGap({
+    bank_name: bankName,
+    account_name: accountName,
+    account_number: accountNumber,
+    iban,
+  })
+
+  function apply(data: Partial<PaymentConfig>) {
+    const b = data.bank
+    setEnabled(b?.enabled ?? true)
+    setBankName(b?.bank_name ?? '')
+    setAccountName(b?.account_name ?? '')
+    setAccountNumber(b?.account_number ?? '')
+    setIban(b?.iban ?? '')
+    setInstructions(b?.instructions ?? '')
+  }
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/local/admin/settings/bank', { credentials: 'same-origin' })
+      if (!res.ok) throw new Error('Failed to load settings')
+      apply(await res.json())
+    } catch (e) {
+      setMsg({ kind: 'err', text: e instanceof Error ? e.message : 'Failed to load settings' })
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  // See PendingPaymentsQueue — only fetch when the server render didn't supply it.
+  useEffect(() => {
+    if (initial === null) load()
+  }, [initial, load])
+
+  async function save() {
+    setSaving(true)
+    setMsg(null)
+    try {
+      const res = await fetch('/api/local/admin/settings/bank', {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled,
+          bank_name: bankName,
+          account_name: accountName,
+          account_number: accountNumber,
+          iban,
+          instructions,
+        }),
+      })
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}))
+        throw new Error(e.error || 'Failed to save')
+      }
+      apply(await res.json())
+      setMsg({ kind: 'ok', text: 'Saved' })
+    } catch (e) {
+      setMsg({ kind: 'err', text: e instanceof Error ? e.message : 'Failed to save' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <section style={card}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 700, color: C.ink }}>Bank transfer</h2>
+          <p style={{ margin: '0 0 16px', fontSize: 13.5, color: C.muted }}>
+            A bank account guests can transfer to instead of Instapay. Offered at checkout on the
+            web and in both apps.
+          </p>
+        </div>
+        {!loading && <MethodToggle on={enabled} onChange={setEnabled} disabled={saving} />}
+      </div>
+
+      {loading ? (
+        <OpsSkeletonFields fields={5} />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 560 }}>
+          <label style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>
+            Bank name
+            <input
+              value={bankName}
+              onChange={(e) => setBankName(e.target.value)}
+              placeholder="e.g. Banque Misr"
+              style={{ ...inputStyle, marginTop: 6 }}
+            />
+          </label>
+
+          <label style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>
+            Account holder name
+            <input
+              value={accountName}
+              onChange={(e) => setAccountName(e.target.value)}
+              placeholder="The name on the account"
+              style={{ ...inputStyle, marginTop: 6 }}
+            />
+            <span style={{ display: 'block', marginTop: 5, fontSize: 12.5, fontWeight: 400, color: C.muted }}>
+              Banking apps check this against the account and refuse a mismatch, so guests need it
+              exactly as the bank has it.
+            </span>
+          </label>
+
+          <label style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>
+            Account number
+            <input
+              value={accountNumber}
+              onChange={(e) => setAccountNumber(e.target.value)}
+              placeholder="e.g. 1234567890123"
+              style={{ ...inputStyle, marginTop: 6, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}
+            />
+          </label>
+
+          <label style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>
+            IBAN (optional)
+            <input
+              value={iban}
+              onChange={(e) => setIban(e.target.value)}
+              placeholder="EG38 0019 0005 0000 0000 2631 8000 2"
+              style={{ ...inputStyle, marginTop: 6, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}
+            />
+            <span style={{ display: 'block', marginTop: 5, fontSize: 12.5, fontWeight: 400, color: C.muted }}>
+              Checked against its country&apos;s length and checksum when you save. Leave it blank if
+              you only have the account number.
+            </span>
+          </label>
+
+          <label style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>
+            Instructions (optional)
+            <textarea
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              placeholder="e.g. Put your reservation code in the transfer reference."
+              rows={3}
+              style={{ ...inputStyle, marginTop: 6, resize: 'vertical' }}
+            />
+          </label>
+
+          {gap && <p style={{ margin: 0, fontSize: 12.5, color: '#8a6d1f' }}>{gap}</p>}
+          {!enabled && (
+            <p style={{ margin: 0, fontSize: 12.5, color: C.muted }}>
+              Guests won&apos;t see bank transfer while this is off. Nothing above is deleted —
+              switch it back on and it returns as it was.
+            </p>
+          )}
+
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <button onClick={save} disabled={saving} style={{ ...primaryBtn, opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Saving…' : 'Save'}
@@ -520,6 +800,7 @@ interface Dispute {
   guest_email: string | null
   host_id: string | null
   total_price: number
+  method: string | null
   reject_reason: string | null
   dispute_note: string | null
   submitted_at: string | null
@@ -667,6 +948,9 @@ function DisputesQueue({ initial }: { initial: Dispute[] | null }) {
                       {d.guest_email ? ` · ${d.guest_email}` : ''}
                       {d.reservation_code ? ` · ${d.reservation_code}` : ''}
                     </p>
+                    <div style={{ marginTop: 6 }}>
+                      <MethodChip method={d.method} />
+                    </div>
                   </div>
                   <div style={{ fontSize: 16, fontWeight: 800, color: C.burgundy, whiteSpace: 'nowrap' }}>
                     {d.total_price}
