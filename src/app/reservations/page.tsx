@@ -368,7 +368,15 @@ async function ReservationsList({
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          {bookings.map((b) => (
+          {bookings.map((b) => {
+            // The bookings API doesn't return a currency column (BOOKING_COLS in
+            // the backend's db.ts joins the listing but never selects
+            // l.currency), so `b.currency` arrives undefined — and formatPrice
+            // renders an empty code as "$". Every listing is priced in EGP, and
+            // the listings table itself defaults the column to 'EGP', so that is
+            // the right floor here. Same guard as /pay/[id]/page.tsx.
+            const currency = b.currency ?? 'EGP'
+            return (
             <article
               key={b.id}
               className="qk-res-card"
@@ -487,19 +495,20 @@ async function ReservationsList({
                     color: COLORS.burgundy,
                   }}
                 >
-                  {formatPrice(b.total_price, b.currency)}
+                  {formatPrice(b.total_price, currency)}
                 </div>
                 <div style={{ fontSize: 13, color: COLORS.muted }}>{t('total')}</div>
-                {isConverted(b.currency, displayCurrency) && (
+                {isConverted(currency, displayCurrency) && (
                   <div style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 2 }}>
-                    {formatDisplayPrice(b.total_price, b.currency, displayCurrency)}
+                    {formatDisplayPrice(b.total_price, currency, displayCurrency)}
                     {' · '}
-                    {tCurrency('chargedIn', { currency: b.currency })}
+                    {tCurrency('chargedIn', { currency })}
                   </div>
                 )}
               </div>
             </article>
-          ))}
+            )
+          })}
         </div>
       )}
     </>
