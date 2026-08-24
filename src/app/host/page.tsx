@@ -137,7 +137,6 @@ export default async function HostPage() {
       <style>{`
         @media (max-width: 640px) {
           .qk-host-grid { grid-template-columns: 1fr !important; }
-          .qk-host-listing-card { grid-template-columns: minmax(0, 1fr) !important; }
           .qk-host-listing-card .qk-host-listing-img {
             width: 100% !important; height: 170px !important;
           }
@@ -557,10 +556,17 @@ function ListingCard({
         border: `1px solid rgba(42,34,32,0.06)`,
         boxShadow: '0 6px 24px rgba(42,34,32,0.07)',
         overflow: 'hidden',
-        display: 'grid',
-        // minmax(0, …) rather than 1fr: without it the track floors at the
-        // content's min-width and a long title pushes the card wider.
-        gridTemplateColumns: 'minmax(0, 1fr)',
+        // A column flexbox, not a grid. Cards in a row are stretched to the
+        // tallest one, and an auto-row grid shares that slack out over every
+        // row: each card's actions then started at a different height, and the
+        // pills — flex children of a row that had itself grown — stretched
+        // taller than their neighbours'. A column parks all the slack in one
+        // place (the `marginTop: 'auto'` footer below), so the buttons keep
+        // their own height and land on the same line across the whole grid.
+        display: 'flex',
+        flexDirection: 'column',
+        // Without this the card floors at its content's min-width, and a long
+        // title pushes it wider than its track.
         minWidth: 0,
       }}
     >
@@ -649,7 +655,12 @@ function ListingCard({
       {/* Three actions now, so they wrap rather than squeezing the labels: the
           calendar is where a host manages day-to-day pricing and availability,
           and it earns a place next to Edit rather than being buried inside it. */}
-      <div style={{ display: 'flex', gap: 10, padding: '12px 16px 16px', flexWrap: 'wrap' }}>
+      {/* `marginTop: 'auto'` collects the card's spare height above this row, so
+          the footer sits on the card's floor instead of drifting with however
+          much text the listing above it happens to have. `alignItems: 'center'`
+          stops the pills stretching to the row: they keep the height
+          CARD_ACTION_STYLE gives them, wrapped or not. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px 16px', flexWrap: 'wrap', marginTop: 'auto' }}>
         <a
           href={`/explore/${listing.id}`}
           style={{
