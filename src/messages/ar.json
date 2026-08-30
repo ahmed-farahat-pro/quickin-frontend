@@ -2224,7 +2224,9 @@
         "capacity": {
           "required": "من فضلك أدخل قيمة في خانة «{field}».",
           "notWhole": "يجب أن تكون قيمة «{field}» رقمًا صحيحًا.",
-          "tooFew": "يجب ألا تقل قيمة «{field}» عن {min}."
+          "tooFew": "يجب ألا تقل قيمة «{field}» عن {min}.",
+          "tooMany": "يجب ألا تزيد قيمة «{field}» عن {max}.",
+          "tooManyForType": "«{field}»: الحد الأقصى في {propertyType} هو {max}."
         },
         "priceInvalid": "يرجى إدخال سعر صحيح لكل ليلة.",
         "completeness": {

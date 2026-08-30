@@ -22,7 +22,7 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { GuestPriceHint } from '@/components/features/host/guest-price-hint'
 import dynamic from 'next/dynamic'
-import { PROPERTY_TYPES, MAX_WEB_LISTING_PHOTOS, iconForPropertyType } from '@/lib/property-types'
+import { PROPERTY_TYPES, MAX_WEB_LISTING_PHOTOS, iconForPropertyType, propertyTypeKey } from '@/lib/property-types'
 import { REGIONS, AMENITIES } from '@/lib/listing-options'
 import { checkListingPin } from '@/lib/local/listing-geo-policy'
 import {
@@ -62,6 +62,7 @@ import {
   CAPACITY_FIELDS,
   MIN_CAPACITY,
   checkListingCapacity,
+  maxListingCapacity,
   parseCapacity,
 } from '@/lib/local/listing-capacity-policy'
 import { OwnershipDocField } from '../../ownership-doc'
@@ -743,17 +744,37 @@ export function EditListingForm({
       setError(t(`errors.resortName.${resortProblem.code}`, { min: MIN_RESORT_NAME_LETTERS }))
       return
     }
-    // The same floor the create form and the API apply: a listing edited down to
-    // 0 bedrooms would be the create bug arriving through the other door. See
-    // lib/local/listing-capacity-policy.ts.
+    // The same floor and ceiling the create form and the API apply: a listing
+    // edited down to 0 bedrooms — or up to 40 — would be the create bug arriving
+    // through the other door. See lib/local/listing-capacity-policy.ts.
+    //
+    // Judged against the property type this SAVE will store, not the stored one,
+    // because retyping a 6-bedroom Villa as a Cabin changes both halves of the
+    // rule in one edit. A row that already exceeds its type's ceiling (there are
+    // a handful, all created before this rule) is shown as it is and blocks Save
+    // until the host corrects it — the same treatment a stored 0 gets.
     const capacity: Record<string, string> = { bedrooms, beds, bathrooms, guests: maxGuests }
     for (const field of CAPACITY_FIELDS) {
-      const problem = checkListingCapacity(field, capacity[field])
+      const problem = checkListingCapacity(field, capacity[field], propertyType)
       if (problem) {
         // 'guests' is `fields.maxGuests` in the copy — the only field whose
         // policy name and label key differ.
         const labelKey = field === 'guests' ? 'maxGuests' : field
-        setError(t(`errors.capacity.${problem.code}`, { field: t(`fields.${labelKey}`), min: MIN_CAPACITY }))
+        // A ceiling that came from the property type says so by name, in the
+        // reader's language — "Cabin" is stored in English but never shown that
+        // way. The impersonal key covers beds/bathrooms/guests and any type
+        // product's table does not name.
+        const typeKey = propertyTypeKey(problem.propertyType)
+        const code =
+          problem.code === 'tooMany' && problem.propertyType ? 'tooManyForType' : problem.code
+        setError(
+          t(`errors.capacity.${code}`, {
+            field: t(`fields.${labelKey}`),
+            min: MIN_CAPACITY,
+            max: problem.max,
+            propertyType: typeKey ? t(`propertyTypes.${typeKey}`) : (problem.propertyType ?? ''),
+          })
+        )
         return
       }
     }
@@ -1191,19 +1212,22 @@ export function EditListingForm({
       <div className="qk-edit-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, ...fieldWrap }}>
         <div>
           <label style={label} htmlFor="edit-bedrooms">{t('fields.bedrooms')}<Req /></label>
-          <input id="edit-bedrooms" style={input} type="number" min="1" step="1" value={bedrooms} onChange={(e) => setBedrooms(e.target.value)} />
+          {/* `max` tracks the property type chosen below, so the spinner stops
+              where the rule does. A stored count already above it stays in the
+              field and is refused on Save rather than silently rewritten. */}
+          <input id="edit-bedrooms" style={input} type="number" min="1" max={maxListingCapacity('bedrooms', propertyType)} step="1" value={bedrooms} onChange={(e) => setBedrooms(e.target.value)} />
         </div>
         <div>
           <label style={label} htmlFor="edit-beds">{t('fields.beds')}<Req /></label>
-          <input id="edit-beds" style={input} type="number" min="1" step="1" value={beds} onChange={(e) => setBeds(e.target.value)} />
+          <input id="edit-beds" style={input} type="number" min="1" max={maxListingCapacity('beds')} step="1" value={beds} onChange={(e) => setBeds(e.target.value)} />
         </div>
         <div>
           <label style={label} htmlFor="edit-baths">{t('fields.bathrooms')}<Req /></label>
-          <input id="edit-baths" style={input} type="number" min="1" step="1" value={bathrooms} onChange={(e) => setBathrooms(e.target.value)} />
+          <input id="edit-baths" style={input} type="number" min="1" max={maxListingCapacity('bathrooms')} step="1" value={bathrooms} onChange={(e) => setBathrooms(e.target.value)} />
         </div>
         <div>
           <label style={label} htmlFor="edit-guests">{t('fields.maxGuests')}<Req /></label>
-          <input id="edit-guests" style={input} type="number" min="1" step="1" value={maxGuests} onChange={(e) => setMaxGuests(e.target.value)} />
+          <input id="edit-guests" style={input} type="number" min="1" max={maxListingCapacity('guests')} step="1" value={maxGuests} onChange={(e) => setMaxGuests(e.target.value)} />
         </div>
       </div>
 

@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { useTranslations } from 'next-intl'
 import { GuestPriceHint } from '@/components/features/host/guest-price-hint'
-import { PROPERTY_TYPES, MAX_WEB_LISTING_PHOTOS } from '@/lib/property-types'
+import { PROPERTY_TYPES, MAX_WEB_LISTING_PHOTOS, propertyTypeKey } from '@/lib/property-types'
 import { REGIONS, AMENITIES } from '@/lib/listing-options'
 import { checkListingPin } from '@/lib/local/listing-geo-policy'
 import {
@@ -57,6 +57,7 @@ import {
   CAPACITY_FIELDS,
   MIN_CAPACITY,
   checkListingCapacity,
+  maxListingCapacity,
 } from '@/lib/local/listing-capacity-policy'
 import { OwnershipDocField } from '../ownership-doc'
 
@@ -486,16 +487,33 @@ export function NewListingForm({
 
     // Capacity: a place with 0 bedrooms, 0 beds and 0 bathrooms was accepted here
     // and published — the old `num()` helper kept anything >= 0, and an empty
-    // field became 0 rather than the default it was handed. Same rule the API
-    // runs — see lib/local/listing-capacity-policy.ts.
+    // field became 0 rather than the default it was handed. Nothing refused a
+    // number from the TOP either, so a Cabin with 40 bedrooms submitted just as
+    // happily. Same rule the API runs — see lib/local/listing-capacity-policy.ts.
+    // Bedrooms are capped per property type, so the chosen type is handed over
+    // with the count; the grid sits below this row but always holds a value.
     const capacity: Record<string, string> = { bedrooms, beds, bathrooms, guests: maxGuests }
     for (const field of CAPACITY_FIELDS) {
-      const problem = checkListingCapacity(field, capacity[field])
+      const problem = checkListingCapacity(field, capacity[field], propertyType)
       if (problem) {
         // 'guests' is `fields.maxGuests` in the copy — the only field whose
         // policy name and label key differ.
         const labelKey = field === 'guests' ? 'maxGuests' : field
-        setError(t(`errors.capacity.${problem.code}`, { field: t(`fields.${labelKey}`), min: MIN_CAPACITY }))
+        // A ceiling that came from the property type says so by name, in the
+        // reader's language — "Cabin" is stored in English but never shown that
+        // way. The impersonal key covers beds/bathrooms/guests and any type
+        // product's table does not name.
+        const typeKey = propertyTypeKey(problem.propertyType)
+        const code =
+          problem.code === 'tooMany' && problem.propertyType ? 'tooManyForType' : problem.code
+        setError(
+          t(`errors.capacity.${code}`, {
+            field: t(`fields.${labelKey}`),
+            min: MIN_CAPACITY,
+            max: problem.max,
+            propertyType: typeKey ? t(`propertyTypes.${typeKey}`) : (problem.propertyType ?? ''),
+          })
+        )
         return
       }
     }
@@ -968,19 +986,22 @@ export function NewListingForm({
       <div className="qk-new-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, ...fieldWrap }}>
         <div>
           <label style={label} htmlFor="bedrooms">{t('fields.bedrooms')}<Req /></label>
-          <input id="bedrooms" style={input} type="number" min="1" step="1" value={bedrooms} onChange={(e) => setBedrooms(e.target.value)} required />
+          {/* `max` moves with the property type chosen below — the browser's own
+              spinner and validity bubble then agree with the rule onSubmit runs,
+              instead of letting a host type 40 and only hear about it on submit. */}
+          <input id="bedrooms" style={input} type="number" min="1" max={maxListingCapacity('bedrooms', propertyType)} step="1" value={bedrooms} onChange={(e) => setBedrooms(e.target.value)} required />
         </div>
         <div>
           <label style={label} htmlFor="beds">{t('fields.beds')}<Req /></label>
-          <input id="beds" style={input} type="number" min="1" step="1" value={beds} onChange={(e) => setBeds(e.target.value)} required />
+          <input id="beds" style={input} type="number" min="1" max={maxListingCapacity('beds')} step="1" value={beds} onChange={(e) => setBeds(e.target.value)} required />
         </div>
         <div>
           <label style={label} htmlFor="bathrooms">{t('fields.bathrooms')}<Req /></label>
-          <input id="bathrooms" style={input} type="number" min="1" step="1" value={bathrooms} onChange={(e) => setBathrooms(e.target.value)} required />
+          <input id="bathrooms" style={input} type="number" min="1" max={maxListingCapacity('bathrooms')} step="1" value={bathrooms} onChange={(e) => setBathrooms(e.target.value)} required />
         </div>
         <div>
           <label style={label} htmlFor="maxGuests">{t('fields.maxGuests')}<Req /></label>
-          <input id="maxGuests" style={input} type="number" min="1" step="1" value={maxGuests} onChange={(e) => setMaxGuests(e.target.value)} required />
+          <input id="maxGuests" style={input} type="number" min="1" max={maxListingCapacity('guests')} step="1" value={maxGuests} onChange={(e) => setMaxGuests(e.target.value)} required />
         </div>
       </div>
 

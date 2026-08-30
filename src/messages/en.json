@@ -2224,7 +2224,9 @@
         "capacity": {
           "required": "Please fill in {field}.",
           "notWhole": "{field} must be a whole number.",
-          "tooFew": "{field} must be at least {min}."
+          "tooFew": "{field} must be at least {min}.",
+          "tooMany": "{field} must be at most {max}.",
+          "tooManyForType": "{field}: a {propertyType} can have at most {max}."
         },
         "priceInvalid": "Please enter a valid price per night.",
         "completeness": {

@@ -680,7 +680,7 @@ instead of being dropped. It has no match key, so it can't auto-link to a catalo
 and can't queue (`resort_submissions` is keyed on the slug), but it is stored, shown
 to guests as typed, and visible to an admin in the unassigned-names sweep.
 
-## A listing has to have somewhere to sleep
+## A listing has to have somewhere to sleep — and not twenty of them
 
 Create-listing accepted **0 bedrooms, 0 beds and 0 bathrooms**. The form's `num()`
 helper kept anything `>= 0`, the number inputs carried `min="0"`, and `createListing`
@@ -695,22 +695,51 @@ listing nobody can book at all, since every booking checks `guests <= max_guests
 | Caller | What it does |
 | --- | --- |
 | `createListing` (`lib/local/db.ts`) | The decision on the create door. Throws `ListingInputError`, so `POST /api/local/listings` answers 400 with the reason. An **omitted** field still falls back to the old defaults (1/1/1/2) — the mobile clients don't all send them, and "absent" was never the bug |
-| `updateListingDetails` (`lib/local/db.ts`) | The same floor on the edit door — otherwise a listing publishes with a real capacity and is edited down to zero bedrooms afterwards. It replaces `assertListingInt`, whose floor for these three fields was 0 |
-| `app/host/new/new-listing-form.tsx` | Checks before the request and localizes the problem code (`hostPage.create.errors.capacity.*`); the inputs now say `min="1"`, so the browser refuses first |
+| `updateListingDetails` (`lib/local/db.ts`) | The same rule on the edit door — otherwise a listing publishes with a real capacity and is edited down to zero bedrooms afterwards, or up to forty. It replaces `assertListingInt`, whose floor for these three fields was 0 |
+| `app/host/new/new-listing-form.tsx` | Checks before the request and localizes the problem code (`hostPage.create.errors.capacity.*`); the inputs say `min="1"` and now a `max` too — the bedroom one **tracks the property type**, so the spinner stops where the rule does and the browser refuses first |
 | `app/host/[id]/edit/edit-listing-form.tsx` | Same check on the edit form. `buildPatch` runs on every render, so a half-typed count falls back to what the listing already holds rather than patching a 0 |
 
-The rule that does the work: each count is a **whole number of at least one**.
-Deliberately **no** upper bound — a 40-bedroom villa is not an error, and a cap
-invented here would start refusing edits to rows that already exist. `required` is
+The rule that does the work: each count is a **whole number of at least one**, and no
+more than a place of that kind can hold.
+
+### The ceiling, per property type
+
+There was no upper bound at all. The web inputs stopped at nothing, the mobile steppers
+stopped at 20 because that is as far as the control scrolled, and the API refused
+nothing — so Neon carries a **Studio with 27,373 bedrooms** and a **Chalet with 12**.
+Numbers like that mean nothing to a guest, sort to the top of a bedrooms filter, and
+read as a broken product rather than as a typo.
+
+`MAX_BEDROOMS_BY_PROPERTY_TYPE` is product's table, because "too many" only means
+something once you know what the place is — 8 bedrooms is an ordinary villa and an
+impossible guest suite:
+
+| Apartment | House | Villa | Cabin | Studio | Loft | Chalet | Cottage | Guest suite |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 5 | 6 | 8 | 3 | **1** | 3 | 6 | 4 | 2 |
+
+A type the table does not name gets `DEFAULT_MAX_BEDROOMS` (8) — the **most
+permissive** number in it, on purpose: a type product has not ruled on must never be
+judged harder than one they have. For the same reason the error names the type only
+when the table carries it (`errors.capacity.tooManyForType`); otherwise it uses the
+impersonal `tooMany`, because "a Guest House can have at most 8 bedrooms" would state a
+rule that does not exist. `beds`, `bathrooms` and `guests` have no per-type table but
+are capped anyway (`MAX_CAPACITY`: 30 / 20 / 32) — the same keypad types into them.
+
+A count already stored above its ceiling is shown as it is and blocks Save until the
+host corrects it, the same way a stored `0` does. `required` is
 reported before `notWhole` so a blank field hears "you skipped this" rather than
 "that is not a number" — `Number('')` is 0, which is how an empty field used to
 arrive as a zero nobody typed. Fractions are refused rather than floored (`Math.floor`
 turned `0.5` bathrooms into the zero the rule exists to prevent), and Arabic-Indic
 digits are folded like everywhere else, so `٣` is three.
 
-A **studio** is entered as 1 bedroom, not 0 — the property type already says `Studio`.
-If studios should instead be modelled with 0 bedrooms the way some other platforms do
-it, `MIN_CAPACITY` is the one constant to change.
+A **studio has exactly 1 bedroom** — floor and ceiling are the same number. Product's
+table says a studio "must be 0", meaning it has no separate bedroom; `MIN_CAPACITY` is
+1. The two are the same statement, because the single room IS the bedroom — so a studio
+may not claim a second, and may not claim none. If studios should instead be modelled
+with 0 bedrooms the way some other platforms do it, `MIN_CAPACITY` is the one constant
+to change.
 
 Not yet ported to `quickin-backend`, so a listing created from the mobile apps still
 clears only the old `>= 0` check — the same follow-up the title policy is waiting on.
@@ -1418,7 +1447,8 @@ npm run check     # same; the pre-deploy gate
 | `auth-exit-core.ts` | The way out of `/login` and `/signup`: that the referring page wins and keeps its query string (a guest who came from a filtered search gets those filters back), and the four cases that fall back to `/explore` instead — no referrer, an unparseable one, another origin (otherwise any site could choose where our sign-in page sends people), and the auth pages themselves, with locale prefixes stripped first so `/ar/signup` doesn't slip through |
 | `currency-core.ts` | The display currency: that an unrecognised cookie falls back to EGP instead of leaving prices in a currency with no rate; that one typo'd code in the rate override drops alone rather than taking the other five down with it, and that a zero rate is refused (it would divide every price into Infinity); and the property the money depends on — a missing rate returns the **stored** price in the **stored** currency, unmarked, never a number invented from a rate we do not have |
 | `avatar-core.ts` | The profile photo: that a base64 `data:` JPEG/PNG/WebP gets in and an `https://` link does **not** (the reason is in `/account` → Profile photo above), that HTML, PDF and SVG data URLs are refused, that a mangled base64 payload is not a photo, the size ceiling and the decoded-bytes math behind it, that `null`/`''`/blank all mean "remove" while the literal string `null` does not — and that the 256px / q0.8 constants still match the iOS picker, since a drift there is a photo that weighs one thing on the phone and another on the site |
-| `listing-capacity-policy.ts` | The four capacity counts: that `0`, `'0'` and `٠` are refused for bedrooms, beds, bathrooms **and** guests (the bug the module was written for), that a fraction is refused rather than floored into that same zero, that the JSON shapes `Number()` would coerce into a count (`true`, `['2']`) are not counts — and the half that matters as much, that an omitted field still falls back to the create defaults so the mobile apps' partial payloads are never answered with a 400, that a 40-bedroom villa is not an error, and that `required` is reported before `notWhole` so a blank field hears the real problem |
+| `listing-capacity-policy.ts` | The four capacity counts, floor and ceiling. The floor: that `0`, `'0'` and `٠` are refused for bedrooms, beds, bathrooms **and** guests, that a fraction is refused rather than floored into that same zero, that the JSON shapes `Number()` would coerce into a count (`true`, `['2']`) are not counts, and that `required` is reported before `notWhole` so a blank field hears the real problem. The ceiling: product's table transcribed into the suite, so a change to the module has to be a deliberate change to the test too — every type accepts its maximum and refuses one more, a Studio is exactly one room, an unruled type gets the most permissive number rather than the strictest, and the type is matched however a client cased or spaced it. And the halves that matter as much: that an omitted field still falls back to the create defaults so the mobile apps' partial payloads are never answered with a 400, and that ordinary listings (a 3-bedroom chalet, a 2-bedroom apartment) still save |
+| `src/messages/*.json` (`capacity-messages.test.mjs`) | The copy the rule renders, which nothing else covers: that all four locales carry every `errors.capacity.*` key (a missing one renders the key path to a host — no error, no build failure), that none carries a key the others do not, that every sentence only reaches for a placeholder the forms actually pass (next-intl throws on the rest), that the ceiling sentences name the number the host has to get under, that only the per-type sentence names a type, and that no locale was left holding the English string |
 | `listing-completeness-policy.ts` | The bar a NEW listing clears: that a title and a price alone are refused (the reported bug), that each of the six required fields is caught when it alone is missing, that the first problem is reported in **form order** so a host is sent to the topmost empty field, that twenty symbols are `letters` rather than a long-enough description, that half a pin is no pin while `0,0` is a real coordinate, and that a non-array or junk `images` value is zero photos rather than an exemption — plus the halves that matter as much, that a complete listing passes untouched and that a chosen **resort** answers the area question on its own, since the region is derived from it. For the edit door: that every required field is refused when a patch clears it, that a field the patch does not mention is left alone (the empty ownership-doc-only patch the iOS app sends still goes through), that half a pin patch is judged against the half already stored, and that a resort on the listing answers a cleared region |
 | `geo-label-core.ts` | The words that go with the pin: the reported bug's case (a pin dragged out of Porto into a named suburb reads as that suburb), that a named feature at the pin outranks the administrative words, that a village outranks the road running through it — `Sahl Hasheesh`, not `Sahl Hasheesh Road, Sahl Hasheesh` — while a desert highway with no settlement does use the road, and six **captured live responses** (Sidi Abdel Rahman, El Gouna, Ain Sokhna, downtown Cairo, the Western Desert, the open Mediterranean) that pin the road-vs-neighbourhood ordering to what the service really returns at `zoom=16`, that a city is never qualified by the governorate that shares its name, the coarse desert/sea fallbacks down to the country, that `''` (not a wrong label) comes back when there are no place words and when the fetch itself failed, and that the two directions agree — the same place picked from the dropdown and reached by dragging the pin produce identical text |
 | `listing-geo-policy.ts` | The map pin against the words around it: the reported bug (Egypt + North Coast, pin in Berlin) and that the country is named before the region, since it is the bigger mistake; every curated area against every other, so a Cairo pin on a North Coast listing is caught too; that Greater Cairo and the whole Alexandria → Marsa Matrouh strip are **not** flagged, because a box that refuses real listings is the worse failure; Morocco's negative longitudes; and the silence the module keeps where it cannot judge — no pin, an unknown country, an unknown region, an unparseable coordinate |

@@ -33,6 +33,20 @@ export const PROPERTY_TYPES: PropertyType[] = [
   { value: 'Guest suite', key: 'guestSuite', Icon: Hotel },
 ]
 
+/**
+ * The `propertyTypes.*` copy key for a stored property_type value, or null when
+ * the value is one this list does not carry (a legacy row, or 'Guest House',
+ * which the API accepts and only the Android picker offers).
+ *
+ * Case-insensitive for the same reason `iconForPropertyType` is: the value is
+ * stored in English and written by four different clients.
+ */
+export function propertyTypeKey(value: string | null | undefined): string | null {
+  if (!value) return null
+  const match = PROPERTY_TYPES.find((p) => p.value.toLowerCase() === value.toLowerCase())
+  return match?.key ?? null
+}
+
 /** Look up the icon for a stored property_type value (case-insensitive). */
 export function iconForPropertyType(value: string | null | undefined): LucideIcon {
   if (!value) return Home
