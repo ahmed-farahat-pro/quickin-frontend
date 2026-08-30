@@ -1957,7 +1957,13 @@
       "reservations": "Mes voyages",
       "saved": "Mes favoris",
       "verification": "Vérification d’identité",
-      "hosting": "Hébergement"
+      "hosting": "Hébergement",
+      "services": "Services",
+      "subscriptions": "Mes demandes de service",
+      "earnings": "Revenus et versements",
+      "analytics": "Statistiques",
+      "reviewGuests": "Évaluez vos voyageurs",
+      "hostServices": "Vos services"
     },
     "logout": "Se déconnecter",
     "profile": {
@@ -2102,6 +2108,25 @@
       "blocked": {
         "heading": "Masquée par notre équipe",
         "body": "Cette annonce n’est pas visible par les voyageurs pour le moment, et vous ne pouvez pas le changer ici. Contactez le support pour en connaître la raison."
+      },
+      "quickActions": {
+        "label": "Outils de l’hôte",
+        "reviews": {
+          "label": "Évaluez vos voyageurs",
+          "hint": "Notez les séjours terminés"
+        },
+        "analytics": {
+          "label": "Statistiques",
+          "hint": "Réservations, revenus et tendances"
+        },
+        "earnings": {
+          "label": "Revenus",
+          "hint": "Ce que vous avez gagné et ce qui est en attente"
+        },
+        "services": {
+          "label": "Services",
+          "hint": "Les expériences que vous proposez, et les demandes"
+        }
       }
     },
     "reservations": {
@@ -2813,5 +2838,263 @@
     "accountName": "Titulaire du compte",
     "accountNumber": "Numéro de compte",
     "iban": "IBAN"
+  },
+  "hostEarnings": {
+    "meta": {
+      "title": "Revenus et versements · QuickIn",
+      "description": "Ce que vous avez gagné en hébergeant sur QuickIn."
+    },
+    "title": "Revenus et versements",
+    "backToDashboard": "Retour au tableau de bord",
+    "backToAccount": "Retour au compte",
+    "noBookings": "Aucune réservation comptabilisée pour l’instant.",
+    "countBookings": "{count, plural, one {# réservation comptabilisée.} other {# réservations comptabilisées.}}",
+    "totalEarned": "Total gagné",
+    "paidOut": "Versé",
+    "pending": "En attente",
+    "commission": {
+      "title": "Les voyageurs paient {rate}% au-dessus de votre prix",
+      "body": "Les voyageurs ont payé {guestPaid} au total, dont {commission} de commission QuickIn. Rien de ce qui précède n’est déduit de vos revenus : la commission s’ajoute au prix que vous fixez."
+    },
+    "recent": {
+      "title": "Versements récents",
+      "emptyTitle": "Aucun versement pour l’instant",
+      "emptyHint": "Les versements apparaissent ici dès qu’un voyageur a payé un séjour."
+    },
+    "row": {
+      "paidOut": "Versé",
+      "upcoming": "À venir",
+      "refunded": "Remboursé",
+      "partiallyRefunded": "Partiellement remboursé",
+      "cancelledKept": "Annulé",
+      "refundedPercent": "{percent}% remboursés au voyageur"
+    },
+    "empty": {
+      "title": "Rien de gagné pour l’instant",
+      "hint": "Dès qu’un voyageur réserve et paie l’un de vos logements, vos revenus apparaîtront ici.",
+      "cta": "Aller au tableau de bord"
+    }
+  },
+  "hostAnalytics": {
+    "meta": {
+      "title": "Statistiques · QuickIn",
+      "description": "Les performances de vos logements sur QuickIn."
+    },
+    "title": "Statistiques",
+    "subtitle": "Réservations, revenus, note et tendances de vos logements.",
+    "backToDashboard": "Retour au tableau de bord",
+    "backToAccount": "Retour au compte",
+    "revenue": "Revenus",
+    "bookingsCount": "{count, plural, one {# réservation} other {# réservations}}",
+    "stat": {
+      "listings": "Annonces",
+      "bookings": "Réservations totales",
+      "paidBookings": "Réservations payées",
+      "avgRating": "Note moyenne",
+      "noReviews": "Pas encore d’avis",
+      "reviews": "{count, plural, one {sur # avis} other {sur # avis}}",
+      "conversion": "Conversion",
+      "cancelled": "Annulées"
+    },
+    "trend": {
+      "title": "Derniers mois",
+      "empty": "Pas encore assez d’historique pour le graphique."
+    },
+    "topListings": {
+      "title": "Meilleures annonces",
+      "empty": "Aucune annonce n’a encore été réservée."
+    },
+    "empty": {
+      "title": "Rien à afficher pour l’instant",
+      "hint": "Dès que les voyageurs réserveront vos logements, leurs performances apparaîtront ici.",
+      "cta": "Aller au tableau de bord"
+    }
+  },
+  "hostReviews": {
+    "meta": {
+      "title": "Évaluez vos voyageurs · QuickIn",
+      "description": "Évaluez les voyageurs qui ont séjourné chez vous."
+    },
+    "title": "Évaluez vos voyageurs",
+    "subtitle": "Évaluez les voyageurs dont le séjour est terminé. Votre avis apparaît sur leur profil.",
+    "backToDashboard": "Retour au tableau de bord",
+    "backToAccount": "Retour au compte",
+    "loadFailed": "Impossible de charger vos anciens voyageurs. Rechargez la page pour réessayer.",
+    "thanks": "{count, plural, one {Merci — # avis envoyé.} other {Merci — # avis envoyés.}}",
+    "allDone": {
+      "title": "Tout le monde y est passé",
+      "hint": "Vous avez évalué tous les voyageurs en attente."
+    },
+    "empty": {
+      "title": "Aucun voyageur à évaluer",
+      "hint": "Dès qu’un séjour se termine, le voyageur apparaît ici."
+    },
+    "deletedGuest": "Voyageur",
+    "stayedAt": "A séjourné à {title}",
+    "ratingLegend": "Votre note",
+    "starLabel": "{count, plural, one {# étoile} other {# étoiles}}",
+    "commentPlaceholder": "Comment était ce voyageur ? (facultatif)",
+    "optionalComment": "Le commentaire est facultatif.",
+    "submit": "Envoyer l’avis",
+    "submitting": "Envoi…",
+    "submitFailed": "Impossible d’envoyer cet avis. Réessayez."
+  },
+  "hostServices": {
+    "meta": {
+      "title": "Vos services · QuickIn",
+      "description": "Gérez les expériences que vous proposez avec vos logements."
+    },
+    "title": "Vos services",
+    "subtitle": "Les expériences que vous proposez avec vos logements — et qui les a demandées.",
+    "backToDashboard": "Retour au tableau de bord",
+    "backToBrowse": "Voir tous les services",
+    "loadFailed": "Impossible de charger vos services. Rechargez la page pour réessayer.",
+    "tabsLabel": "Vos services, demandes et nouveau service",
+    "tabs": {
+      "services": "Vos services",
+      "requests": "Demandes",
+      "new": "Ajouter un service"
+    },
+    "services": {
+      "emptyTitle": "Aucun service pour l’instant",
+      "emptyHint": "Ajoutez une sortie en bateau, une plongée ou un transfert que les voyageurs pourront demander.",
+      "emptyCta": "Ajouter un service",
+      "yourPrice": "votre prix",
+      "guestsPay": "Les voyageurs paient {price}",
+      "listedOn": "Publié le {date}",
+      "pendingRequests": "{count, plural, one {# demande en attente} other {# demandes en attente}}",
+      "blockedBody": "QuickIn a retiré ce service, vous ne pouvez donc pas le remettre vous-même. Contactez le support si c’est une erreur.",
+      "saving": "Enregistrement…",
+      "deactivate": "Le retirer",
+      "deactivateWithPending": "{count, plural, one {Le retirer (refuse # demande)} other {Le retirer (refuse # demandes)}}",
+      "reactivate": "Le remettre",
+      "toggleFailed": "Impossible de modifier cela. Réessayez.",
+      "state": {
+        "live": "En ligne",
+        "deactivated": "Retiré",
+        "blocked": "Bloqué"
+      }
+    },
+    "requests": {
+      "emptyTitle": "Aucune demande pour l’instant",
+      "emptyHint": "Quand un voyageur demandera l’un de vos services, il apparaîtra ici pour confirmation.",
+      "filterLabel": "Filtrer les demandes par statut",
+      "filter": {
+        "all": "Toutes",
+        "pending": "En attente",
+        "confirmed": "Confirmées",
+        "rejected": "Refusées"
+      },
+      "emptyFiltered": "Aucune demande dans cet état.",
+      "showAll": "Voir toutes les demandes",
+      "deletedGuest": "Voyageur",
+      "preferred": "Date souhaitée : {date}",
+      "code": "Code {code}",
+      "status": {
+        "pending": "En attente",
+        "confirmed": "Confirmée",
+        "rejected": "Refusée"
+      },
+      "confirm": "Confirmer",
+      "confirming": "Confirmation…",
+      "reject": "Refuser",
+      "rejecting": "Refus…",
+      "actionFailed": "Impossible de mettre à jour cette demande. Réessayez."
+    },
+    "new": {
+      "titleLabel": "Nom du service",
+      "titlePlaceholder": "Sortie en bateau au coucher du soleil",
+      "priceLabel": "Votre prix",
+      "priceHint": "Ce que vous voulez percevoir. Les voyageurs voient ce prix plus la commission QuickIn.",
+      "categoryLabel": "Catégorie",
+      "categoryPlaceholder": "Sports nautiques, transferts, excursions…",
+      "locationLabel": "Où",
+      "locationPlaceholder": "El Gouna",
+      "imageLabel": "Lien de la photo",
+      "imageHint": "Un lien vers une photo. Facultatif.",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Ce qui est inclus, la durée, quoi apporter…",
+      "problem": {
+        "title_required": "Donnez un nom au service.",
+        "title_long": "Ce nom est trop long.",
+        "price_required": "Saisissez un prix — mettez 0 si c’est gratuit.",
+        "price_negative": "Un prix ne peut pas être négatif.",
+        "description_long": "Cette description est trop longue."
+      },
+      "post": "Publier le service",
+      "posting": "Publication…",
+      "failed": "Impossible de publier ce service. Réessayez."
+    }
+  },
+  "servicesPage": {
+    "meta": {
+      "title": "Services · QuickIn",
+      "description": "Sorties en bateau, plongée, transferts et plus encore, par les hôtes QuickIn."
+    },
+    "title": "Services",
+    "backToExplore": "Retour à Explorer",
+    "manageYours": "Vos services",
+    "noneYet": "Aucun service proposé pour l’instant.",
+    "count": "{count, plural, one {# service proposé.} other {# services proposés.}}",
+    "empty": {
+      "title": "Rien pour l’instant",
+      "hint": "Les hôtes proposent ici sorties en bateau, plongée et transferts. Revenez bientôt.",
+      "cta": "Voir les logements"
+    }
+  },
+  "serviceDetail": {
+    "meta": {
+      "notFound": "Service introuvable · QuickIn",
+      "fallbackDescription": "Une expérience proposée par un hôte QuickIn."
+    },
+    "backToServices": "Retour aux services",
+    "backToExplore": "Retour à Explorer",
+    "about": "À propos de ce service",
+    "offeredBy": "Proposé par {host}",
+    "price": "Prix",
+    "chargedIn": "Vous serez débité en {currency}.",
+    "requestTitle": "Demander ce service",
+    "preferredDate": "Date souhaitée",
+    "note": "Message pour l’hôte",
+    "notePlaceholder": "Combien vous êtes, et ce qu’il doit savoir.",
+    "request": "Envoyer la demande",
+    "sending": "Envoi…",
+    "failed": "Impossible d’envoyer cette demande. Réessayez.",
+    "noChargeYet": "Rien n’est débité maintenant — l’hôte confirme d’abord.",
+    "signInToRequest": "Connectez-vous pour demander ce service.",
+    "signIn": "Se connecter",
+    "ownService": "C’est votre propre service.",
+    "manageService": "Gérer vos services",
+    "sent": {
+      "title": "Demande envoyée",
+      "body": "L’hôte va la confirmer ou la refuser. Vous la retrouverez dans vos demandes dans les deux cas.",
+      "code": "Votre code : {code}",
+      "viewRequests": "Voir mes demandes"
+    }
+  },
+  "mySubscriptions": {
+    "meta": {
+      "title": "Mes demandes de service · QuickIn",
+      "description": "Les services que vous avez demandés à des hôtes QuickIn."
+    },
+    "title": "Mes demandes de service",
+    "backToAccount": "Retour au compte",
+    "backToServices": "Voir les services",
+    "noneYet": "Vous n’avez encore demandé aucun service.",
+    "count": "{count, plural, one {# demande.} other {# demandes.}}",
+    "empty": {
+      "title": "Aucune demande pour l’instant",
+      "hint": "Les sorties en bateau, plongées et transferts proposés par les hôtes sont dans Services.",
+      "cta": "Voir les services"
+    },
+    "byHost": "Par {host}",
+    "byDeletedHost": "Hôte indisponible",
+    "preferred": "Date souhaitée : {date}",
+    "code": "Votre code : {code}",
+    "status": {
+      "pending": "En attente de l’hôte",
+      "confirmed": "Confirmée",
+      "rejected": "Refusée"
+    }
   }
 }

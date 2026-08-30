@@ -1957,7 +1957,13 @@
       "reservations": "My trips",
       "saved": "My favorites",
       "verification": "Identity verification",
-      "hosting": "Hosting"
+      "hosting": "Hosting",
+      "services": "Services",
+      "subscriptions": "My service requests",
+      "earnings": "Earnings & payouts",
+      "analytics": "Analytics",
+      "reviewGuests": "Review your guests",
+      "hostServices": "Your services"
     },
     "logout": "Log out",
     "profile": {
@@ -2102,6 +2108,25 @@
       "blocked": {
         "heading": "Hidden by our team",
         "body": "This listing isn’t visible to guests right now, and you can’t change that from here. Contact support to find out why."
+      },
+      "quickActions": {
+        "label": "Host tools",
+        "reviews": {
+          "label": "Review your guests",
+          "hint": "Rate guests whose stay has ended"
+        },
+        "analytics": {
+          "label": "Analytics",
+          "hint": "Bookings, revenue and trends"
+        },
+        "earnings": {
+          "label": "Earnings",
+          "hint": "What you’ve earned and what’s pending"
+        },
+        "services": {
+          "label": "Services",
+          "hint": "Experiences you offer, and requests"
+        }
       }
     },
     "reservations": {
@@ -2813,5 +2838,263 @@
     "accountName": "Account holder",
     "accountNumber": "Account number",
     "iban": "IBAN"
+  },
+  "hostEarnings": {
+    "meta": {
+      "title": "Earnings & payouts · QuickIn",
+      "description": "What you have earned hosting on QuickIn."
+    },
+    "title": "Earnings & payouts",
+    "backToDashboard": "Back to dashboard",
+    "backToAccount": "Back to account",
+    "noBookings": "No bookings have counted towards a payout yet.",
+    "countBookings": "{count, plural, one {# booking counted.} other {# bookings counted.}}",
+    "totalEarned": "Total earned",
+    "paidOut": "Paid out",
+    "pending": "Pending",
+    "commission": {
+      "title": "Guests pay {rate}% above your price",
+      "body": "Guests were charged {guestPaid} in total, of which {commission} was QuickIn’s commission. Nothing above is deducted from your earnings — the commission sits on top of the price you set."
+    },
+    "recent": {
+      "title": "Recent payouts",
+      "emptyTitle": "No payouts yet",
+      "emptyHint": "Payouts appear here once a guest has paid for a stay."
+    },
+    "row": {
+      "paidOut": "Paid out",
+      "upcoming": "Upcoming",
+      "refunded": "Refunded",
+      "partiallyRefunded": "Partly refunded",
+      "cancelledKept": "Cancelled",
+      "refundedPercent": "{percent}% refunded to the guest"
+    },
+    "empty": {
+      "title": "Nothing earned yet",
+      "hint": "Once a guest books and pays for one of your places, your earnings will show up here.",
+      "cta": "Go to your dashboard"
+    }
+  },
+  "hostAnalytics": {
+    "meta": {
+      "title": "Analytics · QuickIn",
+      "description": "How your places are performing on QuickIn."
+    },
+    "title": "Analytics",
+    "subtitle": "Bookings, revenue, rating and trends across your places.",
+    "backToDashboard": "Back to dashboard",
+    "backToAccount": "Back to account",
+    "revenue": "Revenue",
+    "bookingsCount": "{count, plural, one {# booking} other {# bookings}}",
+    "stat": {
+      "listings": "Listings",
+      "bookings": "Total bookings",
+      "paidBookings": "Paid bookings",
+      "avgRating": "Average rating",
+      "noReviews": "No reviews yet",
+      "reviews": "{count, plural, one {from # review} other {from # reviews}}",
+      "conversion": "Conversion",
+      "cancelled": "Cancelled"
+    },
+    "trend": {
+      "title": "Last months",
+      "empty": "Not enough history to chart yet."
+    },
+    "topListings": {
+      "title": "Top listings",
+      "empty": "No listing has been booked yet."
+    },
+    "empty": {
+      "title": "Nothing to report yet",
+      "hint": "Once guests start booking your places, their performance shows up here.",
+      "cta": "Go to your dashboard"
+    }
+  },
+  "hostReviews": {
+    "meta": {
+      "title": "Review your guests · QuickIn",
+      "description": "Rate the guests who have stayed with you."
+    },
+    "title": "Review your guests",
+    "subtitle": "Rate the guests whose stay has ended. Your review shows on their profile.",
+    "backToDashboard": "Back to dashboard",
+    "backToAccount": "Back to account",
+    "loadFailed": "We couldn’t load your past guests. Reload the page to try again.",
+    "thanks": "{count, plural, one {Thanks — # review submitted.} other {Thanks — # reviews submitted.}}",
+    "allDone": {
+      "title": "That’s everyone",
+      "hint": "You have reviewed every guest who is waiting on one."
+    },
+    "empty": {
+      "title": "No guests to review",
+      "hint": "Once a stay ends, the guest appears here for you to rate."
+    },
+    "deletedGuest": "Guest",
+    "stayedAt": "Stayed at {title}",
+    "ratingLegend": "Your rating",
+    "starLabel": "{count, plural, one {# star} other {# stars}}",
+    "commentPlaceholder": "How were they as a guest? (optional)",
+    "optionalComment": "A comment is optional.",
+    "submit": "Submit review",
+    "submitting": "Submitting…",
+    "submitFailed": "We couldn’t submit that review. Try again."
+  },
+  "hostServices": {
+    "meta": {
+      "title": "Your services · QuickIn",
+      "description": "Manage the experiences you offer alongside your places."
+    },
+    "title": "Your services",
+    "subtitle": "Experiences you offer alongside your places — and who has asked for them.",
+    "backToDashboard": "Back to dashboard",
+    "backToBrowse": "Browse all services",
+    "loadFailed": "We couldn’t load your services. Reload the page to try again.",
+    "tabsLabel": "Your services, requests and new service",
+    "tabs": {
+      "services": "Your services",
+      "requests": "Requests",
+      "new": "Add a service"
+    },
+    "services": {
+      "emptyTitle": "No services yet",
+      "emptyHint": "Add a boat trip, a diving session or an airport transfer that guests can request.",
+      "emptyCta": "Add a service",
+      "yourPrice": "your price",
+      "guestsPay": "Guests pay {price}",
+      "listedOn": "Listed {date}",
+      "pendingRequests": "{count, plural, one {# request waiting} other {# requests waiting}}",
+      "blockedBody": "This service was taken down by QuickIn, so you can’t put it back yourself. Contact support if you think that’s a mistake.",
+      "saving": "Saving…",
+      "deactivate": "Take it down",
+      "deactivateWithPending": "{count, plural, one {Take it down (declines # request)} other {Take it down (declines # requests)}}",
+      "reactivate": "Put it back",
+      "toggleFailed": "We couldn’t change that. Try again.",
+      "state": {
+        "live": "Live",
+        "deactivated": "Taken down",
+        "blocked": "Blocked"
+      }
+    },
+    "requests": {
+      "emptyTitle": "No requests yet",
+      "emptyHint": "When a guest asks for one of your services, it appears here for you to confirm.",
+      "filterLabel": "Filter requests by status",
+      "filter": {
+        "all": "All",
+        "pending": "Waiting",
+        "confirmed": "Confirmed",
+        "rejected": "Declined"
+      },
+      "emptyFiltered": "No requests in this state.",
+      "showAll": "Show all requests",
+      "deletedGuest": "Guest",
+      "preferred": "Preferred date: {date}",
+      "code": "Code {code}",
+      "status": {
+        "pending": "Waiting",
+        "confirmed": "Confirmed",
+        "rejected": "Declined"
+      },
+      "confirm": "Confirm",
+      "confirming": "Confirming…",
+      "reject": "Decline",
+      "rejecting": "Declining…",
+      "actionFailed": "We couldn’t update that request. Try again."
+    },
+    "new": {
+      "titleLabel": "Service name",
+      "titlePlaceholder": "Sunset boat trip",
+      "priceLabel": "Your price",
+      "priceHint": "What you want to be paid. Guests are quoted this plus QuickIn’s commission.",
+      "categoryLabel": "Category",
+      "categoryPlaceholder": "Water sports, transfers, tours…",
+      "locationLabel": "Where",
+      "locationPlaceholder": "El Gouna",
+      "imageLabel": "Photo link",
+      "imageHint": "A link to one photo. Optional.",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "What’s included, how long it lasts, what to bring…",
+      "problem": {
+        "title_required": "Give the service a name.",
+        "title_long": "That name is too long.",
+        "price_required": "Enter a price — use 0 if it’s free.",
+        "price_negative": "A price can’t be negative.",
+        "description_long": "That description is too long."
+      },
+      "post": "Post service",
+      "posting": "Posting…",
+      "failed": "We couldn’t post that service. Try again."
+    }
+  },
+  "servicesPage": {
+    "meta": {
+      "title": "Services · QuickIn",
+      "description": "Boat trips, diving, transfers and more from QuickIn hosts."
+    },
+    "title": "Services",
+    "backToExplore": "Back to Explore",
+    "manageYours": "Your services",
+    "noneYet": "No services are on offer just yet.",
+    "count": "{count, plural, one {# service on offer.} other {# services on offer.}}",
+    "empty": {
+      "title": "Nothing on offer yet",
+      "hint": "Hosts add boat trips, diving and transfers here. Check back soon.",
+      "cta": "Browse stays"
+    }
+  },
+  "serviceDetail": {
+    "meta": {
+      "notFound": "Service not found · QuickIn",
+      "fallbackDescription": "An experience offered by a QuickIn host."
+    },
+    "backToServices": "Back to services",
+    "backToExplore": "Back to Explore",
+    "about": "About this service",
+    "offeredBy": "Offered by {host}",
+    "price": "Price",
+    "chargedIn": "You’ll be charged in {currency}.",
+    "requestTitle": "Request this service",
+    "preferredDate": "Preferred date",
+    "note": "Note for the host",
+    "notePlaceholder": "How many of you, and anything they should know.",
+    "request": "Send request",
+    "sending": "Sending…",
+    "failed": "We couldn’t send that request. Try again.",
+    "noChargeYet": "Nothing is charged now — the host confirms first.",
+    "signInToRequest": "Sign in to request this service.",
+    "signIn": "Sign in",
+    "ownService": "This is your own service.",
+    "manageService": "Manage your services",
+    "sent": {
+      "title": "Request sent",
+      "body": "The host will confirm or decline it. You’ll find it under your requests either way.",
+      "code": "Your code: {code}",
+      "viewRequests": "View my requests"
+    }
+  },
+  "mySubscriptions": {
+    "meta": {
+      "title": "My service requests · QuickIn",
+      "description": "The services you have asked QuickIn hosts for."
+    },
+    "title": "My service requests",
+    "backToAccount": "Back to account",
+    "backToServices": "Browse services",
+    "noneYet": "You haven’t requested a service yet.",
+    "count": "{count, plural, one {# request.} other {# requests.}}",
+    "empty": {
+      "title": "No requests yet",
+      "hint": "Boat trips, diving and transfers offered by hosts show up under Services.",
+      "cta": "Browse services"
+    },
+    "byHost": "By {host}",
+    "byDeletedHost": "Host unavailable",
+    "preferred": "Preferred date: {date}",
+    "code": "Your code: {code}",
+    "status": {
+      "pending": "Waiting on the host",
+      "confirmed": "Confirmed",
+      "rejected": "Declined"
+    }
   }
 }

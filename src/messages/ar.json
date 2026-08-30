@@ -1957,7 +1957,13 @@
       "reservations": "رحلاتي",
       "saved": "مفضّلاتي",
       "verification": "التحقق من الهوية",
-      "hosting": "الاستضافة"
+      "hosting": "الاستضافة",
+      "services": "الخدمات",
+      "subscriptions": "طلبات الخدمات",
+      "earnings": "الأرباح والتحويلات",
+      "analytics": "التحليلات",
+      "reviewGuests": "قيّم ضيوفك",
+      "hostServices": "خدماتك"
     },
     "logout": "تسجيل الخروج",
     "profile": {
@@ -2102,6 +2108,25 @@
       "blocked": {
         "heading": "مخفي من قِبل فريقنا",
         "body": "هذا الإعلان غير ظاهر للضيوف حالياً، ولا يمكنك تغيير ذلك من هنا. تواصل مع الدعم لمعرفة السبب."
+      },
+      "quickActions": {
+        "label": "أدوات المضيف",
+        "reviews": {
+          "label": "قيّم ضيوفك",
+          "hint": "قيّم الضيوف الذين انتهت إقامتهم"
+        },
+        "analytics": {
+          "label": "التحليلات",
+          "hint": "الحجوزات والإيرادات والاتجاهات"
+        },
+        "earnings": {
+          "label": "الأرباح",
+          "hint": "ما حققته وما هو قيد الانتظار"
+        },
+        "services": {
+          "label": "الخدمات",
+          "hint": "التجارب التي تقدمها، والطلبات"
+        }
       }
     },
     "reservations": {
@@ -2813,5 +2838,263 @@
     "accountName": "اسم صاحب الحساب",
     "accountNumber": "رقم الحساب",
     "iban": "رقم الآيبان"
+  },
+  "hostEarnings": {
+    "meta": {
+      "title": "الأرباح والتحويلات · QuickIn",
+      "description": "ما حققته من الاستضافة على QuickIn."
+    },
+    "title": "الأرباح والتحويلات",
+    "backToDashboard": "العودة إلى لوحة المضيف",
+    "backToAccount": "العودة إلى الحساب",
+    "noBookings": "لا توجد حجوزات محتسبة بعد.",
+    "countBookings": "{count, plural, zero {لا حجوزات محتسبة.} one {حجز واحد محتسب.} two {حجزان محتسبان.} few {# حجوزات محتسبة.} many {# حجزًا محتسبًا.} other {# حجز محتسب.}}",
+    "totalEarned": "إجمالي الأرباح",
+    "paidOut": "تم تحويله",
+    "pending": "قيد الانتظار",
+    "commission": {
+      "title": "يدفع الضيوف {rate}% فوق سعرك",
+      "body": "دفع الضيوف {guestPaid} إجمالًا، منها {commission} عمولة QuickIn. لا يُخصم أي شيء مما سبق من أرباحك — العمولة تُضاف فوق السعر الذي حددته."
+    },
+    "recent": {
+      "title": "أحدث التحويلات",
+      "emptyTitle": "لا توجد تحويلات بعد",
+      "emptyHint": "تظهر التحويلات هنا بعد أن يدفع ضيف مقابل إقامة."
+    },
+    "row": {
+      "paidOut": "تم التحويل",
+      "upcoming": "قادم",
+      "refunded": "مسترد",
+      "partiallyRefunded": "مسترد جزئيًا",
+      "cancelledKept": "ملغي",
+      "refundedPercent": "تم رد {percent}% للضيف"
+    },
+    "empty": {
+      "title": "لا أرباح بعد",
+      "hint": "بمجرد أن يحجز ضيف ويدفع مقابل أحد أماكنك، ستظهر أرباحك هنا.",
+      "cta": "اذهب إلى لوحة المضيف"
+    }
+  },
+  "hostAnalytics": {
+    "meta": {
+      "title": "التحليلات · QuickIn",
+      "description": "أداء أماكنك على QuickIn."
+    },
+    "title": "التحليلات",
+    "subtitle": "الحجوزات والإيرادات والتقييم والاتجاهات عبر أماكنك.",
+    "backToDashboard": "العودة إلى لوحة المضيف",
+    "backToAccount": "العودة إلى الحساب",
+    "revenue": "الإيرادات",
+    "bookingsCount": "{count, plural, zero {لا حجوزات} one {حجز واحد} two {حجزان} few {# حجوزات} many {# حجزًا} other {# حجز}}",
+    "stat": {
+      "listings": "الإعلانات",
+      "bookings": "إجمالي الحجوزات",
+      "paidBookings": "الحجوزات المدفوعة",
+      "avgRating": "متوسط التقييم",
+      "noReviews": "لا تقييمات بعد",
+      "reviews": "{count, plural, zero {من دون تقييمات} one {من تقييم واحد} two {من تقييمين} few {من # تقييمات} many {من # تقييمًا} other {من # تقييم}}",
+      "conversion": "معدل التحويل",
+      "cancelled": "ملغاة"
+    },
+    "trend": {
+      "title": "الأشهر الأخيرة",
+      "empty": "لا يوجد سجل كافٍ لعرض الرسم بعد."
+    },
+    "topListings": {
+      "title": "أفضل الإعلانات",
+      "empty": "لم يُحجز أي إعلان بعد."
+    },
+    "empty": {
+      "title": "لا بيانات بعد",
+      "hint": "بمجرد أن يبدأ الضيوف بحجز أماكنك، سيظهر أداؤها هنا.",
+      "cta": "اذهب إلى لوحة المضيف"
+    }
+  },
+  "hostReviews": {
+    "meta": {
+      "title": "قيّم ضيوفك · QuickIn",
+      "description": "قيّم الضيوف الذين أقاموا عندك."
+    },
+    "title": "قيّم ضيوفك",
+    "subtitle": "قيّم الضيوف الذين انتهت إقامتهم. يظهر تقييمك على ملفهم الشخصي.",
+    "backToDashboard": "العودة إلى لوحة المضيف",
+    "backToAccount": "العودة إلى الحساب",
+    "loadFailed": "تعذّر تحميل ضيوفك السابقين. أعد تحميل الصفحة للمحاولة مرة أخرى.",
+    "thanks": "{count, plural, zero {شكرًا لك.} one {شكرًا — تم إرسال تقييم واحد.} two {شكرًا — تم إرسال تقييمين.} few {شكرًا — تم إرسال # تقييمات.} many {شكرًا — تم إرسال # تقييمًا.} other {شكرًا — تم إرسال # تقييم.}}",
+    "allDone": {
+      "title": "انتهيت من الجميع",
+      "hint": "قيّمت كل ضيف كان بانتظار تقييم."
+    },
+    "empty": {
+      "title": "لا ضيوف للتقييم",
+      "hint": "بعد انتهاء أي إقامة، يظهر الضيف هنا لتقييمه."
+    },
+    "deletedGuest": "ضيف",
+    "stayedAt": "أقام في {title}",
+    "ratingLegend": "تقييمك",
+    "starLabel": "{count, plural, zero {# نجوم} one {نجمة واحدة} two {نجمتان} few {# نجوم} many {# نجمة} other {# نجمة}}",
+    "commentPlaceholder": "كيف كان كضيف؟ (اختياري)",
+    "optionalComment": "التعليق اختياري.",
+    "submit": "إرسال التقييم",
+    "submitting": "جارٍ الإرسال…",
+    "submitFailed": "تعذّر إرسال التقييم. حاول مرة أخرى."
+  },
+  "hostServices": {
+    "meta": {
+      "title": "خدماتك · QuickIn",
+      "description": "أدر التجارب التي تقدمها بجانب أماكنك."
+    },
+    "title": "خدماتك",
+    "subtitle": "تجارب تقدمها بجانب أماكنك — ومن طلبها.",
+    "backToDashboard": "العودة إلى لوحة المضيف",
+    "backToBrowse": "تصفّح كل الخدمات",
+    "loadFailed": "تعذّر تحميل خدماتك. أعد تحميل الصفحة للمحاولة مرة أخرى.",
+    "tabsLabel": "خدماتك والطلبات وإضافة خدمة",
+    "tabs": {
+      "services": "خدماتك",
+      "requests": "الطلبات",
+      "new": "أضف خدمة"
+    },
+    "services": {
+      "emptyTitle": "لا خدمات بعد",
+      "emptyHint": "أضف رحلة بحرية أو جلسة غوص أو توصيلة من المطار يمكن للضيوف طلبها.",
+      "emptyCta": "أضف خدمة",
+      "yourPrice": "سعرك",
+      "guestsPay": "يدفع الضيوف {price}",
+      "listedOn": "أُضيفت في {date}",
+      "pendingRequests": "{count, plural, zero {لا طلبات بانتظارك} one {طلب واحد بانتظارك} two {طلبان بانتظارك} few {# طلبات بانتظارك} many {# طلبًا بانتظارك} other {# طلب بانتظارك}}",
+      "blockedBody": "أوقفت QuickIn هذه الخدمة، لذا لا يمكنك إعادتها بنفسك. تواصل مع الدعم إن كنت ترى أن هذا خطأ.",
+      "saving": "جارٍ الحفظ…",
+      "deactivate": "أوقفها",
+      "deactivateWithPending": "{count, plural, zero {أوقفها} one {أوقفها (سيُرفض طلب واحد)} two {أوقفها (سيُرفض طلبان)} few {أوقفها (سيُرفض # طلبات)} many {أوقفها (سيُرفض # طلبًا)} other {أوقفها (سيُرفض # طلب)}}",
+      "reactivate": "أعدها",
+      "toggleFailed": "تعذّر تغيير ذلك. حاول مرة أخرى.",
+      "state": {
+        "live": "نشطة",
+        "deactivated": "موقوفة",
+        "blocked": "محظورة"
+      }
+    },
+    "requests": {
+      "emptyTitle": "لا طلبات بعد",
+      "emptyHint": "عندما يطلب ضيف إحدى خدماتك، سيظهر الطلب هنا لتأكيده.",
+      "filterLabel": "تصفية الطلبات حسب الحالة",
+      "filter": {
+        "all": "الكل",
+        "pending": "بالانتظار",
+        "confirmed": "مؤكدة",
+        "rejected": "مرفوضة"
+      },
+      "emptyFiltered": "لا طلبات في هذه الحالة.",
+      "showAll": "اعرض كل الطلبات",
+      "deletedGuest": "ضيف",
+      "preferred": "التاريخ المفضّل: {date}",
+      "code": "الرمز {code}",
+      "status": {
+        "pending": "بالانتظار",
+        "confirmed": "مؤكد",
+        "rejected": "مرفوض"
+      },
+      "confirm": "تأكيد",
+      "confirming": "جارٍ التأكيد…",
+      "reject": "رفض",
+      "rejecting": "جارٍ الرفض…",
+      "actionFailed": "تعذّر تحديث الطلب. حاول مرة أخرى."
+    },
+    "new": {
+      "titleLabel": "اسم الخدمة",
+      "titlePlaceholder": "رحلة بحرية عند الغروب",
+      "priceLabel": "سعرك",
+      "priceHint": "ما تريد أن تتقاضاه. يُعرض على الضيوف هذا السعر مضافًا إليه عمولة QuickIn.",
+      "categoryLabel": "الفئة",
+      "categoryPlaceholder": "رياضات مائية، توصيل، جولات…",
+      "locationLabel": "المكان",
+      "locationPlaceholder": "الجونة",
+      "imageLabel": "رابط الصورة",
+      "imageHint": "رابط لصورة واحدة. اختياري.",
+      "descriptionLabel": "الوصف",
+      "descriptionPlaceholder": "ما الذي يشمله، وكم يستغرق، وما الذي يجب إحضاره…",
+      "problem": {
+        "title_required": "اكتب اسمًا للخدمة.",
+        "title_long": "هذا الاسم طويل جدًا.",
+        "price_required": "أدخل سعرًا — استخدم 0 إن كانت مجانية.",
+        "price_negative": "لا يمكن أن يكون السعر بالسالب.",
+        "description_long": "هذا الوصف طويل جدًا."
+      },
+      "post": "انشر الخدمة",
+      "posting": "جارٍ النشر…",
+      "failed": "تعذّر نشر الخدمة. حاول مرة أخرى."
+    }
+  },
+  "servicesPage": {
+    "meta": {
+      "title": "الخدمات · QuickIn",
+      "description": "رحلات بحرية وغوص وتوصيل والمزيد من مضيفي QuickIn."
+    },
+    "title": "الخدمات",
+    "backToExplore": "العودة إلى الاستكشاف",
+    "manageYours": "خدماتك",
+    "noneYet": "لا توجد خدمات معروضة بعد.",
+    "count": "{count, plural, zero {لا خدمات معروضة.} one {خدمة واحدة معروضة.} two {خدمتان معروضتان.} few {# خدمات معروضة.} many {# خدمة معروضة.} other {# خدمة معروضة.}}",
+    "empty": {
+      "title": "لا شيء معروض بعد",
+      "hint": "يضيف المضيفون هنا الرحلات البحرية والغوص والتوصيل. عد قريبًا.",
+      "cta": "تصفّح الإقامات"
+    }
+  },
+  "serviceDetail": {
+    "meta": {
+      "notFound": "الخدمة غير موجودة · QuickIn",
+      "fallbackDescription": "تجربة يقدمها أحد مضيفي QuickIn."
+    },
+    "backToServices": "العودة إلى الخدمات",
+    "backToExplore": "العودة إلى الاستكشاف",
+    "about": "عن هذه الخدمة",
+    "offeredBy": "يقدمها {host}",
+    "price": "السعر",
+    "chargedIn": "ستُحاسب بعملة {currency}.",
+    "requestTitle": "اطلب هذه الخدمة",
+    "preferredDate": "التاريخ المفضّل",
+    "note": "ملاحظة للمضيف",
+    "notePlaceholder": "كم عددكم، وأي شيء يجب أن يعرفه.",
+    "request": "أرسل الطلب",
+    "sending": "جارٍ الإرسال…",
+    "failed": "تعذّر إرسال الطلب. حاول مرة أخرى.",
+    "noChargeYet": "لن يُخصم شيء الآن — يؤكد المضيف أولًا.",
+    "signInToRequest": "سجّل الدخول لطلب هذه الخدمة.",
+    "signIn": "تسجيل الدخول",
+    "ownService": "هذه خدمتك أنت.",
+    "manageService": "أدر خدماتك",
+    "sent": {
+      "title": "تم إرسال الطلب",
+      "body": "سيؤكده المضيف أو يرفضه. ستجده ضمن طلباتك في الحالتين.",
+      "code": "رمزك: {code}",
+      "viewRequests": "اعرض طلباتي"
+    }
+  },
+  "mySubscriptions": {
+    "meta": {
+      "title": "طلبات الخدمات · QuickIn",
+      "description": "الخدمات التي طلبتها من مضيفي QuickIn."
+    },
+    "title": "طلبات الخدمات",
+    "backToAccount": "العودة إلى الحساب",
+    "backToServices": "تصفّح الخدمات",
+    "noneYet": "لم تطلب أي خدمة بعد.",
+    "count": "{count, plural, zero {لا طلبات.} one {طلب واحد.} two {طلبان.} few {# طلبات.} many {# طلبًا.} other {# طلب.}}",
+    "empty": {
+      "title": "لا طلبات بعد",
+      "hint": "الرحلات البحرية والغوص والتوصيل التي يقدمها المضيفون تظهر ضمن الخدمات.",
+      "cta": "تصفّح الخدمات"
+    },
+    "byHost": "من {host}",
+    "byDeletedHost": "المضيف غير متاح",
+    "preferred": "التاريخ المفضّل: {date}",
+    "code": "رمزك: {code}",
+    "status": {
+      "pending": "بانتظار المضيف",
+      "confirmed": "مؤكد",
+      "rejected": "مرفوض"
+    }
   }
 }

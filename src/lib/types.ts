@@ -351,3 +351,127 @@ export interface StayPass {
 }
 
 export type StayGuideKind = 'info' | 'photo' | 'place_qr' | 'attachment'
+
+// ---- Host money & performance ----------------------------------------------
+// Mirrors quickin-backend's `lib/local/money.ts`. Both surfaces read the same
+// two endpoints the mobile apps do, so a field added there only has to be
+// copied here to reach the web.
+
+/** `GET /api/local/host/earnings` — the signed-in host's payout summary. */
+export interface HostEarnings {
+  currency: string
+  /** The host's own take across every counted booking, net of refunds. */
+  totalEarned: number
+  paidOut: number
+  pending: number
+  bookingsCount: number
+  /** The live platform rate. Shown as "guests pay N% above your price", NOT as
+   *  a deduction — nothing in this object is reduced by it. */
+  commissionRate: number
+  /** What guests were charged across the same bookings. The gap from
+   *  `totalEarned` is the platform's commission. */
+  guestPaid: number
+  recent: HostEarningsRow[]
+}
+
+export interface HostEarningsRow {
+  booking_id: string
+  title: string
+  check_in: string
+  check_out: string
+  /** What the guest paid and did not get back (commission-inclusive). */
+  gross: number
+  /** What this host earns — their raw price, less any refunded share. */
+  net: number
+  /** Only ever these two: a cancellation the host kept money on reads
+   *  'paid_out' (no stay is coming, so nothing is pending) and is told apart
+   *  by `cancelled` rather than by a third status string. */
+  status: 'paid_out' | 'upcoming'
+  paid_at: string | null
+  cancelled: boolean
+  /** How much of the guest's money went back, 0–100. Non-zero only on a refund. */
+  refund_percent?: number | null
+}
+
+/** `GET /api/local/host/analytics` — the host's performance dashboard. */
+export interface HostAnalytics {
+  currency: string
+  listings: number
+  totalBookings: number
+  paidBookings: number
+  cancelledBookings: number
+  revenue: number
+  avgRating: number
+  reviewCount: number
+  /** paid / total bookings, already a 0–1 fraction. */
+  conversionRate: number
+  byMonth: { month: string; bookings: number; revenue: number }[]
+  topListings: { title: string; bookings: number; revenue: number }[]
+}
+
+// ---- Services ---------------------------------------------------------------
+// Mirrors quickin-backend's `lib/local/services.ts`. Services carry the platform
+// commission exactly like listings: `price` is whichever side the projection is
+// for — commission-inclusive on the guest routes, the host's raw price on
+// `/api/local/host/services`, where `guest_price` carries the quoted figure.
+
+export interface Service {
+  id: string
+  host_id: string
+  host_name: string | null
+  title: string
+  description: string | null
+  category: string | null
+  location: string | null
+  price: number
+  /** Host projection only — what a guest is quoted for this service. */
+  guest_price?: number
+  commission_rate?: number
+  currency: string
+  image_url: string | null
+  lat: number | null
+  lng: number | null
+  is_published: boolean
+  /** Host projection only. The host took this down themselves — the services
+   *  twin of `listings.unpublished_by_host`. */
+  unpublished_by_host?: boolean
+  /** Host projection only. Requests still waiting on this host — the number a
+   *  deactivate would decline. */
+  pending_request_count?: number
+  created_at: string
+}
+
+/** A guest's subscription to a service. The same row serves the guest's list
+ *  and the host's inbox, which is why it carries both sides' names. */
+export interface ServiceRequest {
+  id: string
+  service_id: string
+  user_id: string
+  status: string
+  preferred_date: string | null
+  note: string | null
+  request_code: string | null
+  created_at: string
+  service_title: string
+  service_category: string | null
+  service_image: string | null
+  service_price: number
+  service_currency: string
+  service_location: string | null
+  host_id: string
+  host_name: string | null
+  requester_name: string | null
+  requester_email: string | null
+}
+
+// ---- Host → guest reviews ----------------------------------------------------
+
+/** One past stay the host may still review the guest for.
+ *  `GET /api/local/guest-reviews` (no query string, host session). */
+export interface ReviewableGuest {
+  booking_id: string
+  listing_id: string
+  title: string
+  guest_name: string | null
+  check_out: string
+}

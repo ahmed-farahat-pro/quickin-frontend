@@ -16,6 +16,7 @@ import { ListingVisibilityAction } from './listing-visibility'
 import { hostVisibilityState } from '@/lib/local/host-visibility-core'
 import { CARD_ACTION_STYLE } from './card-action-style'
 import { BecomeHostButton } from '../account/account-forms'
+import { HostQuickActions } from './host-quick-actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -493,6 +494,39 @@ async function HostDashboard({ userId, firstName, t }: { userId: string; firstNa
             : t('dashboard.countPublished', { count: listings.length })}
         </p>
       </div>
+
+      {/* Everything the dashboard offers beyond listings and reservations. iOS
+          has carried these four as cards since the dashboard shipped; the web
+          had none of them, which is the parity gap this closes. */}
+      <HostQuickActions
+        ariaLabel={t('dashboard.quickActions.label')}
+        actions={[
+          {
+            href: '/host/reviews',
+            glyph: '★',
+            label: t('dashboard.quickActions.reviews.label'),
+            hint: t('dashboard.quickActions.reviews.hint'),
+          },
+          {
+            href: '/host/analytics',
+            glyph: '▤',
+            label: t('dashboard.quickActions.analytics.label'),
+            hint: t('dashboard.quickActions.analytics.hint'),
+          },
+          {
+            href: '/host/earnings',
+            glyph: '◈',
+            label: t('dashboard.quickActions.earnings.label'),
+            hint: t('dashboard.quickActions.earnings.hint'),
+          },
+          {
+            href: '/host/services',
+            glyph: '❖',
+            label: t('dashboard.quickActions.services.label'),
+            hint: t('dashboard.quickActions.services.hint'),
+          },
+        ]}
+      />
 
       {/* My Listings | Incoming Reservations tabs (client toggle, server slots) */}
       <HostTabs

@@ -382,8 +382,21 @@ export default async function AccountPage() {
         >
           <AccountLink href="/reservations" label={t('links.reservations')} />
           <AccountLink href="/saved" label={t('links.saved')} />
+          <AccountLink href="/services" label={t('links.services')} />
+          <AccountLink href="/account/subscriptions" label={t('links.subscriptions')} />
           <AccountLink href="/verify-id" label={t('links.verification')} />
-          {user.is_host && <AccountLink href="/host" label={t('links.hosting')} />}
+          {/* The host block. The dashboard is the hub — earnings, analytics,
+              guest reviews and services all hang off it too — but a host who
+              lands here looking for their money should not have to know that. */}
+          {user.is_host && (
+            <>
+              <AccountLink href="/host" label={t('links.hosting')} />
+              <AccountLink href="/host/earnings" label={t('links.earnings')} />
+              <AccountLink href="/host/analytics" label={t('links.analytics')} />
+              <AccountLink href="/host/reviews" label={t('links.reviewGuests')} />
+              <AccountLink href="/host/services" label={t('links.hostServices')} />
+            </>
+          )}
         </div>
 
         {/* Logout */}

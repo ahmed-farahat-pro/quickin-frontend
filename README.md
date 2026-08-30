@@ -159,11 +159,73 @@ never-verified user would reset their password only to be bounced to the OTP scr
   email-verification step and the **password reset** — see above.
 - `/reservations` — the signed-in user's bookings.
 - `/account` — profile, identity, password, **Preferences** (display currency + language) and — for an approved host — **Payment information**. See below.
+- `/host` — the host dashboard: listings + incoming reservations, and the quick-action
+  shelf into the four surfaces below.
 - `/host/[id]/calendar` — the host's **pricing calendar** for one of their own listings:
   a night's rate and its availability, day by day. See below.
 - `/host/apply` — the "become a host" application. See below.
+- `/host/earnings` — the host's earnings + payout summary. See below.
+- `/host/analytics` — bookings, revenue, rating, conversion, monthly trend, top listings.
+- `/host/reviews` — "review your guests", the host's half of the two-way review.
+- `/host/services` — the host's own services, their subscription-request inbox, and the
+  form that posts a new one.
+- `/services`, `/services/[id]` — public services browse and detail, with the request form.
+- `/account/subscriptions` — the guest's own service requests.
 - `/links` — the bio linktree. See below.
 - `/plan` — static launch-plan page.
+
+### The host area beyond listings — earnings, analytics, guest reviews, services
+
+These five routes were the web's half of a cross-platform parity gap. iOS has listed
+all four as cards on `HostDashboardView` since that screen shipped, and Android reaches
+them from Profile → Hosting; the web had **none** of them, so `/host` offered two tabs
+and a host had nowhere to go for their money. Services were missing on both sides —
+there was no guest-facing browse either, so a host could not have been given a way to
+post one without it being unreachable.
+
+No backend work was needed. Every endpoint already existed for the mobile apps, and the
+backend's `getUserFromRequest` accepts **either** a Bearer token **or** the `qk_token`
+cookie, which is exactly what `backendFetch` forwards:
+
+| Page | Endpoint |
+| --- | --- |
+| `/host/earnings` | `GET /api/local/host/earnings` |
+| `/host/analytics` | `GET /api/local/host/analytics` |
+| `/host/reviews` | `GET` + `POST /api/local/guest-reviews` |
+| `/host/services` | `GET /api/local/host/services`, `GET /api/local/host/service-requests`, `POST /api/local/services`, `PATCH /api/local/service-requests/:id`, `PATCH /api/local/host/services/:id/visibility` |
+| `/services`, `/services/[id]` | `GET /api/local/services`, `GET /api/local/services/:id`, `POST /api/local/service-requests` |
+| `/account/subscriptions` | `GET /api/local/service-requests` |
+
+The derived numbers each page renders live in tested core modules rather than inline in
+a component: `host-earnings-core.ts` (which of five states a payout row is in once
+cancellations and refunds are folded back in, and the platform's cut),
+`host-analytics-core.ts` (bar heights, conversion, the empty case, the month label),
+`guest-review-core.ts` (what the review form will submit) and `services-core.ts`
+(request buckets, a service's live/deactivated/blocked state, the new-service rules).
+
+#### A service's price is never re-marked-up on the web
+
+`guestFacingPrice` in `services-core.ts` **picks** a field, it does not price anything.
+The two projections already carry the answer: the host route sends the raw price in
+`price` and the quote in `guest_price`, and the guest route sends the quote in `price`
+with no `guest_price` at all. Recomputing from `commission_rate` would double-charge on
+the guest browse — a 400 EGP service reads 440 there, and `400 x 1.1` on top of it is
+484 — and would also skip the round-UP-to-10 that `commission-core.ts` owns and that the
+backend's `sqlWithCommission` actually priced these rows with. The rate stays on the
+wire only for the "guests pay N% above your price" line.
+
+#### Earnings never reads "Paid out" on a cancelled stay
+
+The wire carries two statuses (`paid_out` | `upcoming`) because shipped mobile decoders
+switch on that field, so a cancellation the host kept money on arrives as `paid_out`
+with `cancelled: true`. True to the money, wrong as a label. `earningsRowState` folds
+the flags back into the five states a host can tell apart — paid out, upcoming,
+refunded, partly refunded, cancelled-and-kept — and every surface renders from that.
+
+The commission line is derived as `guestPaid - totalEarned`, **not** as
+`totalEarned x commissionRate`: the rate on the wire is the LIVE one while each booking
+priced at whatever was live when it was taken, so multiplying would quietly disagree
+with the two totals printed directly above it.
 
 ### `/login` and `/signup` — signing in is optional, so the exit is always on screen
 
