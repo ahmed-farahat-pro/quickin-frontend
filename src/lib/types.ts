@@ -70,6 +70,11 @@ export interface Listing {
   lat: number | null
   lng: number | null
   listing_images: ListingImage[]
+  /** Average of this listing's review ratings, 0 when it has none. COALESCEd in
+   *  LISTING_COLS, so every listing projection carries it. */
+  rating: number
+  /** How many reviews that average is over. Also never null. */
+  review_count: number
   approval_status?: string | null
   /** The operator's reason for rejecting this listing, or null when they gave
    *  none (the note is optional). HOST PROJECTION ONLY — it is staff-authored
@@ -230,8 +235,39 @@ export interface PublicUser {
   created_at: string
 }
 
+/**
+ * GET /api/local/users/:id — the flat public profile the backend actually returns.
+ *
+ * Note there is no `created_at` here: the join date lives in `badges.memberSince`,
+ * because the badge block is what the backend computes trust from.
+ */
+export interface PublicProfile {
+  id: string
+  full_name: string | null
+  avatar_url: string | null
+  bio: string | null
+  verification_status: string
+  guest_rating: number
+  guest_review_count: number
+  badges: {
+    verified: boolean
+    superhost: boolean
+    newHost: boolean
+    isHost: boolean
+    completedStays: number
+    reviewCount: number
+    hostRating: number
+    memberSince: string | null
+  }
+}
+
+/**
+ * The host page's view model. No single endpoint returns this — it is assembled in
+ * the page from the profile, the host's listings and the host's reviews, which is
+ * why it is a local shape rather than a response type.
+ */
 export interface HostProfile {
-  profile: PublicUser & { bio: string | null; verification_status: string }
+  profile: PublicProfile
   listings: HostListingCard[]
   reviews: HostReviewCard[]
   avgRating: number | null

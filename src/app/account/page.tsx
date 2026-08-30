@@ -189,7 +189,6 @@ export default async function AccountPage() {
               name and the add/change/remove buttons are one client component, and
               the email + verification chip below stay server-rendered inside it. */}
           <AvatarPicker
-            userId={user.id}
             initialUrl={user.avatar_url}
             initials={initials(user.full_name, user.email)}
             displayName={displayName}
@@ -360,7 +359,6 @@ export default async function AccountPage() {
 
         {/* Profile + password forms (client) */}
         <AccountForms
-          userId={user.id}
           initialName={user.full_name ?? ''}
           initialAge={profile.age === null ? '' : String(profile.age)}
           initialPhone={profile.phone ?? ''}

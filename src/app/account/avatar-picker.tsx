@@ -49,13 +49,11 @@ function linkButton(disabled: boolean): React.CSSProperties {
 }
 
 export function AvatarPicker({
-  userId,
   initialUrl,
   initials,
   displayName,
   children,
 }: {
-  userId: string
   initialUrl: string | null
   initials: string
   displayName: string
@@ -79,7 +77,10 @@ export function AvatarPicker({
     setError(null)
     setSaved(false)
     try {
-      const res = await fetch(`/api/local/users/${userId}`, {
+      // The same door the profile form and both mobile apps save through; see the
+      // note in account-forms.tsx. `next` is null when the photo is removed, and
+      // the route reads a submitted null as "clear it" rather than "leave it".
+      const res = await fetch('/api/local/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',

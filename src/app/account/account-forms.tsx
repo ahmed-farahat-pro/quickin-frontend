@@ -164,13 +164,11 @@ function FieldError({ text }: { text?: string }) {
 type ProfileField = 'full_name' | 'age' | 'phone' | 'bio'
 
 export function AccountForms({
-  userId,
   initialName,
   initialAge,
   initialPhone,
   initialBio,
 }: {
-  userId: string
   initialName: string
   initialAge: string
   initialPhone: string
@@ -231,7 +229,13 @@ export function AccountForms({
 
     setSavingProfile(true)
     try {
-      const res = await fetch(`/api/local/users/${userId}`, {
+      // PATCH /api/local/profile, not /api/local/users/:id — the backend merge
+      // deleted the second writer, and calling the dead path answered 405 with
+      // the form reporting a generic failure. This is the same door the mobile
+      // apps save through, so one person editing on their phone and on the site
+      // is editing one profile. It takes the user from the session, so there is
+      // no id in the path to get wrong.
+      const res = await fetch('/api/local/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',

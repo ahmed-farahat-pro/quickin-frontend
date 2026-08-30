@@ -2,7 +2,13 @@
 // /explore and the listing detail. Shows the host's stays plus the reviews their
 // guests left, so a browsing guest can judge a host by their whole portfolio.
 import type { Metadata } from 'next'
-import type { PublicUser, HostProfile } from '@/lib/types'
+import type {
+  PublicProfile,
+  HostProfile,
+  HostListingCard,
+  HostReviewCard,
+  Listing,
+} from '@/lib/types'
 import { backendFetchOr } from '@/lib/backend'
 import { notFound } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
@@ -28,7 +34,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params
   const t = await getTranslations('hostProfile')
-  const user = await backendFetchOr<PublicUser | null>(`/api/local/users/${id}`, null)
+  const user = await backendFetchOr<PublicProfile | null>(`/api/local/users/${id}`, null)
   return {
     title: user?.full_name ? t('meta.title', { name: user.full_name }) : t('meta.fallback'),
     robots: { index: false, follow: true },
@@ -49,6 +55,73 @@ function Stars({ rating }: { rating: number }) {
   )
 }
 
+/**
+ * Assemble the host page from the three endpoints the backend actually exposes.
+ *
+ * `/api/local/users/:id` returns a FLAT profile — not the `{ profile, listings,
+ * reviews, ... }` envelope the old web API returned before the two backends were
+ * merged into quickin-backend. This page kept destructuring the old envelope, so
+ * `profile` came back undefined and the render threw. Fetching the three pieces and
+ * shaping them here is what keeps the page's markup unchanged.
+ */
+async function loadHostProfile(id: string): Promise<HostProfile | null> {
+  const profile = await backendFetchOr<PublicProfile | null>(`/api/local/users/${id}`, null)
+  if (!profile) return null
+
+  const [rawListings, rawReviews] = await Promise.all([
+    backendFetchOr<Listing[]>(`/api/local/listings?host=${encodeURIComponent(id)}`, []),
+    backendFetchOr<RawHostReview[]>(`/api/local/users/${id}/reviews`, []),
+  ])
+
+  const listings: HostListingCard[] = rawListings.map((l) => ({
+    id: l.id,
+    title: l.title,
+    location: l.location ?? null,
+    price_per_night: l.price_per_night,
+    currency: l.currency,
+    // Photos live in Blob and arrive as `listing_images`, ordered — same mapping
+    // /explore uses for its cards.
+    image_url: l.listing_images?.[0]?.url ?? null,
+    rating: l.rating ?? null,
+    rating_count: l.review_count ?? 0,
+  }))
+
+  const reviews: HostReviewCard[] = rawReviews.map((r) => ({
+    id: r.id,
+    rating: r.rating,
+    comment: r.comment ?? null,
+    created_at: r.created_at,
+    listing_title: r.listing_title ?? null,
+    reviewer_name: r.reviewer_name ?? null,
+    // The reviews endpoint does not join the reviewer's avatar; the initial shows.
+    reviewer_avatar: null,
+  }))
+
+  // Prefer the backend's own trust numbers — they count every review the host has,
+  // not just the page of them this endpoint returns.
+  const totalReviews = profile.badges?.reviewCount ?? reviews.length
+  const badgeRating = profile.badges?.hostRating ?? 0
+  const avgRating =
+    totalReviews > 0 && badgeRating > 0
+      ? badgeRating
+      : reviews.length > 0
+        ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+        : null
+
+  return { profile, listings, reviews, avgRating, totalReviews }
+}
+
+/** Rows as `/api/local/users/:id/reviews` returns them (no reviewer avatar). */
+interface RawHostReview {
+  id: string
+  rating: number
+  comment: string | null
+  created_at: string
+  reviewer_name: string | null
+  listing_id: string
+  listing_title: string | null
+}
+
 export default async function HostProfilePage({
   params,
 }: {
@@ -56,12 +129,15 @@ export default async function HostProfilePage({
 }) {
   const { id } = await params
   const t = await getTranslations('hostProfile')
-  const data = await backendFetchOr<HostProfile | null>(`/api/local/users/${id}`, null)
+  const data = await loadHostProfile(id)
   if (!data) notFound()
 
   const { profile, listings, reviews, avgRating, totalReviews } = data
   const name = profile.full_name?.trim() || t('hostedBy')
-  const memberYear = profile.created_at ? new Date(profile.created_at).getFullYear() : null
+  // The join date is only exposed via the badge block; there is no `created_at`.
+  const memberYear = profile.badges?.memberSince
+    ? new Date(profile.badges.memberSince).getFullYear()
+    : null
 
   return (
     <main style={{ minHeight: '100vh', background: COLORS.cream, color: COLORS.ink, fontFamily: FONT }}>
