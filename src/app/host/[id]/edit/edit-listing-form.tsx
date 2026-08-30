@@ -25,12 +25,31 @@ import dynamic from 'next/dynamic'
 import { PROPERTY_TYPES, MAX_WEB_LISTING_PHOTOS, iconForPropertyType } from '@/lib/property-types'
 import { REGIONS, AMENITIES } from '@/lib/listing-options'
 import { checkListingPin } from '@/lib/local/listing-geo-policy'
+import {
+  COUNTRIES,
+  REVERSE_GEOCODE_DEBOUNCE_MS,
+  countryCodeFor,
+  placeShort,
+  reverseGeocodeUrl,
+  reverseLabel,
+} from '@/lib/local/geo-label-core'
+import type { PlaceHit } from '@/lib/local/geo-label-core'
 import { checkListingEdit } from '@/lib/local/listing-completeness-policy'
 import { OTHER_RESORT, isResortNameMissing } from '@/lib/resort-choice'
 import { checkResortName, MIN_RESORT_NAME_LETTERS } from '@/lib/local/resort-core'
 import { fileToCompressedDataUrl } from '@/lib/image'
 import { DEFAULT_WEEKEND_DAYS } from '@/lib/geo'
-import { DAYS_IN_WEEK, checkWeekendPrice, resolveWeekendSchedule } from '@/lib/local/listing-pricing-core'
+import {
+  DAYS_IN_WEEK,
+  checkMonthlyPrices,
+  checkStayDiscount,
+  checkWeekendPrice,
+  resolveWeekendSchedule,
+  MAX_STAY_DISCOUNT,
+  MONTHS_IN_YEAR,
+} from '@/lib/local/listing-pricing-core'
+import { SeasonalPricingFields, useMonthNames } from '@/components/features/host/seasonal-pricing-fields'
+import { StayDiscountFields } from '@/components/features/host/stay-discount-fields'
 import { CANCELLATION_POLICIES, toPolicy } from '@/lib/cancellation-policies'
 import type { CancellationPolicy } from '@/lib/cancellation-policies'
 import {
@@ -101,42 +120,7 @@ const fieldWrap: React.CSSProperties = { marginBottom: 18 }
 
 const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
 
-// Egypt-first. `code` is the ISO country code used to scope map geocoding.
-// Kept in step with the create form so both flows offer the same choices.
-const COUNTRIES: { name: string; code: string }[] = [
-  { name: 'Egypt', code: 'eg' },
-  { name: 'Saudi Arabia', code: 'sa' },
-  { name: 'United Arab Emirates', code: 'ae' },
-  { name: 'Kuwait', code: 'kw' },
-  { name: 'Qatar', code: 'qa' },
-  { name: 'Bahrain', code: 'bh' },
-  { name: 'Oman', code: 'om' },
-  { name: 'Jordan', code: 'jo' },
-  { name: 'Lebanon', code: 'lb' },
-  { name: 'Morocco', code: 'ma' },
-]
-
 const CURRENCIES = ['EGP', 'USD', 'EUR', 'SAR', 'AED', 'GBP'] as const
-
-interface PlaceHit {
-  label: string // full display name (secondary line)
-  short: string // concise "place, city" (primary line + what we store)
-  lat: number
-  lon: number
-}
-
-// A concise "place, city" label from a Nominatim (jsonv2 + addressdetails) result.
-function placeShort(d: { name?: string; display_name?: string; address?: Record<string, string> }): string {
-  const a = d.address || {}
-  const primary =
-    d.name ||
-    a.suburb || a.neighbourhood || a.city_district ||
-    a.city || a.town || a.village ||
-    String(d.display_name || '').split(',')[0]
-  const city = a.city || a.town || a.village || a.state
-  if (primary && city && primary !== city) return `${primary}, ${city}`
-  return (primary || String(d.display_name || '').split(',').slice(0, 2).join(', ')).trim()
-}
 
 const dropdownStyle: React.CSSProperties = {
   listStyle: 'none',
@@ -169,6 +153,45 @@ function sameSet(a: readonly string[], b: readonly string[]): boolean {
   return x.every((v, i) => v === y[i])
 }
 
+/** The stored month → rate map, cleaned to exactly what the form can produce:
+ *  months 1..12 with a positive whole rate. Both the seed and the
+ *  did-this-change comparison go through here, so a listing carrying a junk or
+ *  out-of-range month doesn't read as an edit the moment the form loads. */
+function storedMonthlyPrices(stored: Record<string, number> | undefined): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const [month, price] of Object.entries(stored ?? {})) {
+    const m = Number(month)
+    if (!Number.isInteger(m) || m < 1 || m > MONTHS_IN_YEAR) continue
+    if (Number.isFinite(price) && price > 0) out[String(m)] = Math.round(price)
+  }
+  return out
+}
+
+/** The same map as the text the twelve fields hold. Months with no rate stay
+ *  absent, which is what "this month uses the price per night" looks like. */
+function seedMonthlyPrices(stored: Record<string, number> | undefined): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const [month, price] of Object.entries(storedMonthlyPrices(stored))) {
+    out[month] = String(price)
+  }
+  return out
+}
+
+/** A stored discount as field text. `0` is the resting value of a `NOT NULL
+ *  DEFAULT 0` column and means "no discount", so it shows as an empty field
+ *  rather than a literal 0 the host would have to clear. */
+function seedDiscount(stored: number | undefined): string {
+  return Number.isFinite(stored) && (stored ?? 0) > 0 ? String(Math.round(stored as number)) : ''
+}
+
+/** The month → rate maps compared as VALUES, so a re-render that rebuilds the
+ *  object doesn't read as an edit. */
+function sameMonthlyPrices(a: Record<string, number>, b: Record<string, number>): boolean {
+  const keys = Object.keys(a)
+  if (keys.length !== Object.keys(b).length) return false
+  return keys.every((k) => a[k] === b[k])
+}
+
 export type ResortOption = { id: string; name: string; region: string }
 
 export function EditListingForm({
@@ -190,6 +213,9 @@ export function EditListingForm({
   const tEdit = useTranslations('hostPage.edit')
   // The chips the host already knows from their listings screen.
   const tDash = useTranslations('hostPage.dashboard')
+  // Month names for the seasonal fields, and for naming the offending month
+  // when one of them is refused on save.
+  const monthNames = useMonthNames()
 
   const [title, setTitle] = useState(listing.title ?? '')
   const [description, setDescription] = useState(listing.description ?? '')
@@ -206,12 +232,19 @@ export function EditListingForm({
 
   const [lat, setLat] = useState<number | null>(listing.lat ?? null)
   const [lng, setLng] = useState<number | null>(listing.lng ?? null)
-  const [geo, setGeo] = useState<'idle' | 'locating' | 'fail'>('idle')
+  // 'locating'/'fail' belong to the forward geocode (words → pin); 'naming'/
+  // 'nameFail' to the reverse one (pin → words). One state because they share
+  // the single hint line under the map and can never run at the same time.
+  const [geo, setGeo] = useState<'idle' | 'locating' | 'fail' | 'naming' | 'nameFail'>('idle')
   const [placeResults, setPlaceResults] = useState<PlaceHit[]>([])
   const [placeOpen, setPlaceOpen] = useState(false)
   const placeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const placeAbortRef = useRef<AbortController | null>(null)
   const placeBlurRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // The reverse geocode gets its own debounce + abort so a pin drag and a
+  // half-typed location in the field never cancel one another.
+  const reverseDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reverseAbortRef = useRef<AbortController | null>(null)
   const [price, setPrice] = useState(listing.price_per_night != null ? String(listing.price_per_night) : '')
   const [weekendPrice, setWeekendPrice] = useState(listing.weekend_price != null ? String(listing.weekend_price) : '')
   // Seeded from the listing, falling back to moderate — the database default, so a
@@ -220,6 +253,15 @@ export function EditListingForm({
     toPolicy(listing.cancellation_policy)
   )
   const [weekendDays, setWeekendDays] = useState<number[]>(listing.weekend_days ?? DEFAULT_WEEKEND_DAYS)
+  // Seasonal per-month rates and the two length-of-stay discounts, seeded from
+  // the listing. Held as the raw text the host types (see the create form) —
+  // `''` is a cleared month / no discount, which is exactly what the API stores
+  // as an absent key and a 0.
+  const [monthlyPrices, setMonthlyPrices] = useState<Record<string, string>>(() =>
+    seedMonthlyPrices(listing.monthly_prices)
+  )
+  const [weeklyDiscount, setWeeklyDiscount] = useState(seedDiscount(listing.weekly_discount))
+  const [monthlyDiscount, setMonthlyDiscount] = useState(seedDiscount(listing.monthly_discount))
   const [currency, setCurrency] = useState(listing.currency?.trim() || 'EGP')
   const [bedrooms, setBedrooms] = useState(String(listing.bedrooms ?? 1))
   const [beds, setBeds] = useState(String(listing.beds ?? 1))
@@ -263,6 +305,12 @@ export function EditListingForm({
     approved: tDash('filters.published'),
     pending: tDash('badge.pending'),
     rejected: tDash('badge.rejected'),
+    // The editor derives its chip from approval_status alone, so it never shows
+    // these two — the visibility states belong to the dashboard card, where the
+    // button that changes them lives. Present so the label map stays total and a
+    // future use cannot ship without wording.
+    deactivated: tDash('badge.deactivated'),
+    blocked: tDash('badge.blocked'),
   }
 
   // Older listings may hold a value the standardised lists don't cover (the
@@ -308,6 +356,17 @@ export function EditListingForm({
     })
   }
 
+  // Emptying a month clears it, so the key is dropped rather than kept blank —
+  // same as the create form.
+  function setMonthPrice(month: string, value: string) {
+    setMonthlyPrices((prev) => {
+      const next = { ...prev }
+      if (value.trim() === '') delete next[month]
+      else next[month] = value
+      return next
+    })
+  }
+
   function toggleAmenity(value: string) {
     setAmenities((prev) =>
       prev.some((a) => a.toLowerCase() === value.toLowerCase())
@@ -323,7 +382,7 @@ export function EditListingForm({
     if (!q) return
     setGeo('locating')
     try {
-      const code = COUNTRIES.find((c) => c.name === country)?.code
+      const code = countryCodeFor(country)
       const cc = code ? `&countrycodes=${code}` : ''
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&limit=1${cc}&q=${encodeURIComponent(q)}`
@@ -354,7 +413,7 @@ export function EditListingForm({
     }
     const controller = new AbortController()
     placeAbortRef.current = controller
-    const code = COUNTRIES.find((c) => c.name === country)?.code
+    const code = countryCodeFor(country)
     const cc = code ? `&countrycodes=${code}` : ''
     fetch(
       `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6${cc}&q=${encodeURIComponent(q)}`,
@@ -384,6 +443,50 @@ export function EditListingForm({
     placeDebounceRef.current = setTimeout(() => runPlaceSearch(value), 300)
   }
 
+  // The other direction: the host moved the pin, so the words have to follow.
+  //
+  // Coordinates are set at once — the pin must never lag the drag — and the
+  // label is fetched after the pin settles. Whatever comes back REPLACES the
+  // Location field: the field means "the words for where the pin is", and a
+  // stale address next to a moved pin is the bug this exists to fix. A host who
+  // wants their own wording types it after they finish moving the pin.
+  //
+  // The open autocomplete is closed and its results dropped, because they answer
+  // a query the host has stopped caring about — the pin is the input now.
+  function onPinChange(nextLat: number, nextLng: number) {
+    setLat(nextLat)
+    setLng(nextLng)
+    setPlaceOpen(false)
+    setPlaceResults([])
+    if (placeDebounceRef.current) clearTimeout(placeDebounceRef.current)
+    placeAbortRef.current?.abort()
+
+    if (reverseDebounceRef.current) clearTimeout(reverseDebounceRef.current)
+    reverseAbortRef.current?.abort()
+    setGeo('naming')
+    reverseDebounceRef.current = setTimeout(() => {
+      const controller = new AbortController()
+      reverseAbortRef.current = controller
+      fetch(reverseGeocodeUrl(nextLat, nextLng), { signal: controller.signal })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (controller.signal.aborted) return
+          const label = reverseLabel(data)
+          if (label) {
+            setLocation(label)
+            setGeo('idle')
+          } else {
+            // Nominatim knows the coordinate but has no words for it (open
+            // desert, open sea). Leave the field alone and say so.
+            setGeo('nameFail')
+          }
+        })
+        .catch((err) => {
+          if ((err as Error)?.name !== 'AbortError') setGeo('nameFail')
+        })
+    }, REVERSE_GEOCODE_DEBOUNCE_MS)
+  }
+
   function pickPlace(h: PlaceHit) {
     setLocation(h.short || h.label)
     setLat(h.lat)
@@ -398,7 +501,9 @@ export function EditListingForm({
     return () => {
       if (placeDebounceRef.current) clearTimeout(placeDebounceRef.current)
       if (placeBlurRef.current) clearTimeout(placeBlurRef.current)
+      if (reverseDebounceRef.current) clearTimeout(reverseDebounceRef.current)
       placeAbortRef.current?.abort()
+      reverseAbortRef.current?.abort()
     }
   }, [])
 
@@ -497,6 +602,20 @@ export function EditListingForm({
         (nextWeekendDays.length !== currentWeekendDays.length ||
           nextWeekendDays.some((d, i) => d !== currentWeekendDays[i])))
     if (daysChanged) patch.weekend_days = nextWeekendDays
+    // Seasonal months and the two length-of-stay discounts. Like the weekend
+    // rate above, buildPatch never throws on a value the host is midway through
+    // typing — it falls back to what the listing already holds, and onSubmit is
+    // what stops and names the problem.
+    const storedMonths = storedMonthlyPrices(listing.monthly_prices)
+    const monthsCheck = checkMonthlyPrices(monthlyPrices)
+    const nextMonths = monthsCheck.ok ? monthsCheck.value : storedMonths
+    if (!sameMonthlyPrices(nextMonths, storedMonths)) patch.monthly_prices = nextMonths
+    const weeklyCheck = checkStayDiscount(weeklyDiscount)
+    const nextWeekly = weeklyCheck.ok ? weeklyCheck.value : (listing.weekly_discount ?? 0)
+    if (nextWeekly !== (listing.weekly_discount ?? 0)) patch.weekly_discount = nextWeekly
+    const monthlyCheck = checkStayDiscount(monthlyDiscount)
+    const nextMonthly = monthlyCheck.ok ? monthlyCheck.value : (listing.monthly_discount ?? 0)
+    if (nextMonthly !== (listing.monthly_discount ?? 0)) patch.monthly_discount = nextMonthly
     if (text(currency) !== (listing.currency ?? '').trim()) patch.currency = text(currency) || 'EGP'
 
     const nextBedrooms = int(bedrooms, listing.bedrooms, 1)
@@ -537,7 +656,20 @@ export function EditListingForm({
     weekendCheck.ok ? weekendCheck.value : null,
     weekendDays
   )
-  const dirty = patch !== null || !weekendPriceOk || !weekendSchedule.ok
+  // Same trick again for the seasonal months and the discounts: a value that
+  // isn't valid patches to what is already stored, i.e. to nothing, so without
+  // this the form would sit on "No changes yet" while the host waited for the 0
+  // they typed into August to save.
+  const monthsCheck = checkMonthlyPrices(monthlyPrices)
+  const weeklyCheck = checkStayDiscount(weeklyDiscount)
+  const monthlyCheck = checkStayDiscount(monthlyDiscount)
+  const dirty =
+    patch !== null ||
+    !weekendPriceOk ||
+    !weekendSchedule.ok ||
+    !monthsCheck.ok ||
+    !weeklyCheck.ok ||
+    !monthlyCheck.ok
 
   // Same helper, same keys and same field labels as the create form — the two
   // doors must not describe the same rule in two different ways.
@@ -636,6 +768,21 @@ export function EditListingForm({
     // day that IS one, or the weekend rate is.
     if (!weekendSchedule.ok) {
       setError(t(`errors.weekendDays.${weekendSchedule.problem}`))
+      return
+    }
+    // A seasonal month the host typed has to be a rate, for the same reason a
+    // weekend rate does: the API drops a non-positive month silently, and a
+    // dropped month looks exactly like one that was never set.
+    if (!monthsCheck.ok) {
+      setError(t(`errors.monthPrice.${monthsCheck.problem}`, { month: monthNames[monthsCheck.month - 1] }))
+      return
+    }
+    if (!weeklyCheck.ok) {
+      setError(t(`errors.stayDiscount.${weeklyCheck.problem}`, { field: t('fields.weeklyDiscount'), max: MAX_STAY_DISCOUNT }))
+      return
+    }
+    if (!monthlyCheck.ok) {
+      setError(t(`errors.stayDiscount.${monthlyCheck.problem}`, { field: t('fields.monthlyDiscount'), max: MAX_STAY_DISCOUNT }))
       return
     }
     if (!dirty) return
@@ -857,12 +1004,23 @@ export function EditListingForm({
       {/* Map pin — sets lat/lng; guests see an approximate area, not the exact pin. */}
       <div style={fieldWrap}>
         <label style={label}>{t('fields.pinLocation')}<Req /></label>
-        <LocationPickerMap lat={lat} lng={lng} onChange={(la, ln) => { setLat(la); setLng(ln) }} />
-        <p style={{ margin: '6px 0 0', fontSize: 12.5, color: geo === 'fail' ? C.burgundy : C.muted }}>
+        <LocationPickerMap lat={lat} lng={lng} onChange={onPinChange} />
+        <p
+          role="status"
+          style={{
+            margin: '6px 0 0',
+            fontSize: 12.5,
+            color: geo === 'fail' || geo === 'nameFail' ? C.burgundy : C.muted,
+          }}
+        >
           {geo === 'locating'
             ? t('locating')
             : geo === 'fail'
             ? t('geocodeFail')
+            : geo === 'naming'
+            ? t('pinNaming')
+            : geo === 'nameFail'
+            ? t('pinNameFail')
             : lat != null && lng != null
             ? t('pinSet', { lat: lat.toFixed(4), lng: lng.toFixed(4) })
             : t('pinHint')}
@@ -936,8 +1094,13 @@ export function EditListingForm({
         <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.muted }}>
           {t(`cancellationPolicyHints.${cancellationPolicy}`)}
         </p>
+        {/* `tEdit`, not `t` — this line is the one piece of the policy block that
+            is specific to editing, and it lives under hostPage.edit. Read off the
+            create namespace it resolved to nothing, and next-intl throws on a
+            missing message during a server render, which took the whole page
+            down with "Something went sideways". */}
         <p style={{ margin: '4px 0 0', fontSize: 12, color: C.muted }}>
-          {t('cancellationPolicyExisting')}
+          {tEdit('cancellationPolicyExisting')}
         </p>
       </div>
 
@@ -996,6 +1159,33 @@ export function EditListingForm({
             {t('errors.weekendDays.noDaysChosen')}
           </p>
         )}
+      </div>
+
+      {/* Seasonal pricing — same fields, same order and same copy as the create
+          form, so a host editing sees the page they filled in. */}
+      <div style={fieldWrap}>
+        <label style={label}>{t('fields.seasonalPricing')}</label>
+        <SeasonalPricingFields
+          values={monthlyPrices}
+          onChange={setMonthPrice}
+          currency={currency}
+          commissionRate={commissionRate}
+          idPrefix="edit-"
+          inputStyle={input}
+        />
+      </div>
+
+      {/* Length-of-stay discounts */}
+      <div style={fieldWrap}>
+        <label style={label}>{t('fields.stayDiscounts')}</label>
+        <StayDiscountFields
+          weekly={weeklyDiscount}
+          monthly={monthlyDiscount}
+          onWeekly={setWeeklyDiscount}
+          onMonthly={setMonthlyDiscount}
+          idPrefix="edit-"
+          inputStyle={input}
+        />
       </div>
 
       <div className="qk-edit-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, ...fieldWrap }}>

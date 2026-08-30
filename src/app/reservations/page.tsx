@@ -12,6 +12,9 @@ import { getRequestCurrency } from '@/lib/currency/request-currency'
 import { ReservationActions } from './reservation-actions'
 import { DisputePanel } from '@/components/dispute-panel'
 import { StayPassCard } from './stay-pass-card'
+import { ReservationsFilter } from './reservations-filter'
+import { reservationBucketFor } from '@/lib/local/reservation-filter-core'
+import { everPaid, paymentStageFor } from '@/lib/local/payment-flow-core'
 
 export const dynamic = 'force-dynamic'
 
@@ -367,8 +370,34 @@ async function ReservationsList({
           </a>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          {bookings.map((b) => {
+        <ReservationsFilter
+          labels={{
+            all: t('filter.label.all'),
+            pending: t('filter.label.pending'),
+            awaiting_payment: t('filter.label.awaiting_payment'),
+            under_review: t('filter.label.under_review'),
+            confirmed: t('filter.label.confirmed'),
+            completed: t('filter.label.completed'),
+            cancelled: t('filter.label.cancelled'),
+            partially_refunded: t('filter.label.partially_refunded'),
+            refunded: t('filter.label.refunded'),
+            rejected: t('filter.label.rejected'),
+          }}
+          emptyMessages={{
+            all: t('filter.empty.all'),
+            pending: t('filter.empty.pending'),
+            awaiting_payment: t('filter.empty.awaiting_payment'),
+            under_review: t('filter.empty.under_review'),
+            confirmed: t('filter.empty.confirmed'),
+            completed: t('filter.empty.completed'),
+            cancelled: t('filter.empty.cancelled'),
+            partially_refunded: t('filter.empty.partially_refunded'),
+            refunded: t('filter.empty.refunded'),
+            rejected: t('filter.empty.rejected'),
+          }}
+          showAllLabel={t('filter.showAll')}
+          groupLabel={t('filter.group')}
+          items={bookings.map((b) => {
             // The bookings API doesn't return a currency column (BOOKING_COLS in
             // the backend's db.ts joins the listing but never selects
             // l.currency), so `b.currency` arrives undefined — and formatPrice
@@ -376,7 +405,32 @@ async function ReservationsList({
             // the listings table itself defaults the column to 'EGP', so that is
             // the right floor here. Same guard as /pay/[id]/page.tsx.
             const currency = b.currency ?? 'EGP'
-            return (
+            return {
+              id: b.id,
+              // Folded here rather than client-side: the bucket depends on the payment
+              // stage, and `paymentStageFor` is the one thing allowed to decide that —
+              // the same call ReservationActions below is given. Only the answer
+              // crosses the server/client boundary.
+              bucket: reservationBucketFor({
+                status: b.status,
+                paymentStage: paymentStageFor({
+                  status: b.status,
+                  payment_state: b.payment_state ?? b.payment_status,
+                  payment_proof_status: b.payment_proof_status,
+                  paid_at: b.paid_at,
+                }),
+                refundPercent: b.refund_percent,
+                // A separate question from the stage, which calls everything cancelled
+                // `not_payable`. Without it, a booking cancelled before it was ever paid
+                // carried the policy's 100% and read as "Refunded".
+                wasPaid: everPaid({
+                  status: b.status,
+                  payment_state: b.payment_state ?? b.payment_status,
+                  payment_proof_status: b.payment_proof_status,
+                  paid_at: b.paid_at,
+                }),
+              }),
+              card: (
             <article
               key={b.id}
               className="qk-res-card"
@@ -456,10 +510,15 @@ async function ReservationsList({
                   bookingId={b.id}
                   status={b.status}
                   paid={b.payment_status === 'paid'}
-                  // The raw column and the latest proof — b.payment_status here is a
-                  // DERIVED paid_at flag that only ever reads 'paid'/'unpaid', so on
-                  // its own it cannot tell "not paid" from "paid, awaiting review".
-                  paymentState={b.payment_state}
+                  // The raw rollup and the latest proof. `payment_state` is the OLD
+                  // web API's name for the column and is ABSENT from today's payload,
+                  // so reading it alone handed `undefined` to paymentStageFor, which
+                  // normalizes that to 'unpaid' — and a guest whose transfer was
+                  // already submitted was offered "Pay now" again. That is the exact
+                  // double-payment bug the note in reservation-actions.tsx describes,
+                  // reintroduced at the call site. StayPassCard below has always read
+                  // both names; this one now does too.
+                  paymentState={b.payment_state ?? b.payment_status}
                   proofStatus={b.payment_proof_status}
                   checkIn={b.check_in}
                   checkOut={b.check_out}
@@ -471,12 +530,21 @@ async function ReservationsList({
                   eligible={eligible.includes(b.id)}
                   existing={disputeByBooking.get(b.id) ?? null}
                 />
-                {/* QR + link to the public pass — rendered only once the host
-                    has approved and a code exists (see StayPassCard). */}
+                {/* QR + link to the public pass — rendered only once the stay is
+                    confirmed AND PAID and a code exists (see StayPassCard).
+                    Host approval alone mints the code but leaves the booking
+                    unpaid, so the payment columns are part of the gate. */}
                 <StayPassCard
                   status={b.status}
                   reservationCode={b.reservation_code}
                   origin={origin}
+                  // quickin-backend's BOOKING_COLS names the raw rollup
+                  // `payment_status`; `payment_state` is the older web API's name
+                  // for the same column and is absent from today's payload. Read
+                  // both so the gate sees the real value on either shape.
+                  paymentState={b.payment_state ?? b.payment_status}
+                  proofStatus={b.payment_proof_status}
+                  paidAt={b.paid_at}
                 />
               </div>
 
@@ -507,9 +575,10 @@ async function ReservationsList({
                 )}
               </div>
             </article>
-            )
+              ),
+            }
           })}
-        </div>
+        />
       )}
     </>
   )

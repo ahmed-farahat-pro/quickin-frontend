@@ -157,7 +157,9 @@
     "asHost": "Host",
     "warningTitle": "A note from QuickIn",
     "warningAck": "I understand",
-    "warningAckFailed": "Couldn't save that. Please try again."
+    "warningAckFailed": "Couldn't save that. Please try again.",
+    "reservationThread": "Reservation",
+    "reservationDates": "{checkIn} – {checkOut}"
   },
   "bookingPage": {
     "title": "Confirm and Request",
@@ -1573,6 +1575,11 @@
       "hint": "You can't book or message your own place.",
       "edit": "Edit listing",
       "manage": "View incoming reservations"
+    },
+    "hiddenPreview": {
+      "title": "Only you can see this",
+      "body": "This listing isn’t visible to guests right now.",
+      "manage": "Manage it"
     }
   },
   "loginLocal": {
@@ -1805,7 +1812,35 @@
       "reviewFailed": "Could not submit review"
     },
     "tripsHint": "Stays you've booked as a guest.",
-    "emptyTitle": "No stays booked yet"
+    "emptyTitle": "No stays booked yet",
+    "filter": {
+      "group": "Filter reservations by status",
+      "showAll": "Show all reservations",
+      "label": {
+        "all": "All",
+        "pending": "Pending approval",
+        "awaiting_payment": "Awaiting payment",
+        "under_review": "Payment under review",
+        "confirmed": "Confirmed",
+        "completed": "Completed",
+        "cancelled": "Cancelled",
+        "partially_refunded": "Partially refunded",
+        "refunded": "Refunded",
+        "rejected": "Declined"
+      },
+      "empty": {
+        "all": "You haven't booked any stays yet.",
+        "pending": "Nothing waiting on a host right now.",
+        "awaiting_payment": "No reservations are waiting on a payment.",
+        "under_review": "No transfers are being checked right now.",
+        "confirmed": "No confirmed stays yet.",
+        "completed": "No past stays yet.",
+        "cancelled": "No cancelled reservations.",
+        "partially_refunded": "No partially refunded reservations.",
+        "refunded": "No refunded reservations.",
+        "rejected": "No declined requests."
+      }
+    }
   },
   "signupLocal": {
     "subtitle": "Create your account to start exploring",
@@ -2040,12 +2075,16 @@
         "all": "All",
         "published": "Published",
         "pending": "Under review",
-        "rejected": "Rejected"
+        "rejected": "Rejected",
+        "deactivated": "Deactivated",
+        "blocked": "Hidden by us"
       },
       "emptyFiltered": "No listings match this filter.",
       "badge": {
         "pending": "Under review",
-        "rejected": "Rejected"
+        "rejected": "Rejected",
+        "deactivated": "Deactivated",
+        "blocked": "Hidden by our team"
       },
       "listingsHint": "The places you host.",
       "reservationsHint": "Booking requests from guests for your places.",
@@ -2055,6 +2094,14 @@
       "rejected": {
         "heading": "Why it wasn't approved",
         "noReason": "Our team didn't leave a reason. Check your details, then edit and resubmit."
+      },
+      "deactivated": {
+        "heading": "You deactivated this listing",
+        "body": "Guests can’t find or book it. Reservations you already confirmed are unaffected — your guests keep their stay, their pass and your messages. Reactivate whenever you’re ready."
+      },
+      "blocked": {
+        "heading": "Hidden by our team",
+        "body": "This listing isn’t visible to guests right now, and you can’t change that from here. Contact support to find out why."
       }
     },
     "reservations": {
@@ -2075,6 +2122,20 @@
         "approvedPaid": "Approved & paid",
         "cancelled": "Cancelled",
         "rejected": "Declined"
+      },
+      "filter": {
+        "label": "Filter by status",
+        "all": "All",
+        "pending": "Awaiting your reply",
+        "awaitingPayment": "Awaiting payment",
+        "confirmed": "Confirmed",
+        "rejected": "Declined",
+        "cancelled": "Cancelled",
+        "refunded": "Refunded",
+        "partiallyRefunded": "Partially refunded",
+        "emptyTitle": "Nothing in this status",
+        "emptySubtitle": "No reservations match this filter right now.",
+        "showAll": "Show all reservations"
       },
       "approve": "Approve",
       "working": "Working…",
@@ -2118,7 +2179,11 @@
         "region": "Area",
         "amenities": "Amenities",
         "resort": "Resort / compound",
-        "cancellationPolicy": "Cancellation policy"
+        "cancellationPolicy": "Cancellation policy",
+        "seasonalPricing": "Seasonal pricing (optional)",
+        "stayDiscounts": "Length-of-stay discounts (optional)",
+        "weeklyDiscount": "Weekly discount",
+        "monthlyDiscount": "Monthly discount"
       },
       "placeholders": {
         "title": "Sunlit loft by the Nile",
@@ -2127,6 +2192,12 @@
         "country": "Egypt",
         "photos": "One URL per line, or comma-separated\nhttps://images.unsplash.com/photo-...",
         "weekendPrice": "e.g. 1500"
+      },
+      "hints": {
+        "seasonalPricing": "Charge a different nightly rate in your busy months. Leave a month empty and it uses your normal price per night.",
+        "weeklyDiscount": "Comes off stays of {nights} nights or more.",
+        "monthlyDiscount": "Comes off stays of {nights} nights or more, instead of the weekly discount.",
+        "stayDiscountsInvert": "Your monthly discount is smaller than your weekly one, so a {monthly}-night stay would cost more than a {weekly}-night one. Only one discount ever applies."
       },
       "propertyTypes": {
         "apartment": "Apartment",
@@ -2176,7 +2247,16 @@
         "invalidImageUrl": "This photo link doesn’t look like a valid URL: {url}",
         "createFailed": "Could not create the listing",
         "tooManyPhotos": "You can upload up to {max} photos.",
-        "photoFailed": "Couldn't process that image. Try another."
+        "photoFailed": "Couldn't process that image. Try another.",
+        "monthPrice": {
+          "notANumber": "The {month} rate must be a number. Leave it empty to use your normal price per night.",
+          "notPositive": "The {month} rate must be more than zero. Leave it empty to use your normal price per night."
+        },
+        "stayDiscount": {
+          "notANumber": "{field} must be a number.",
+          "notWhole": "{field} must be a whole percentage.",
+          "outOfRange": "{field} must be between 0% and {max}%."
+        }
       },
       "pinHint": "Tap the map to drop a pin. Guests see an approximate area, not the exact address.",
       "searchHint": "Search a city, area or address and pick a result to pin it on the map — then drag the pin to fine-tune.",
@@ -2202,6 +2282,8 @@
       "photosRemove": "Remove photo",
       "locating": "Finding on map…",
       "geocodeFail": "Couldn't find that place — tap the map to set it.",
+      "pinNaming": "Naming this spot…",
+      "pinNameFail": "Pin moved — we couldn't name this spot, so Location is unchanged. Edit it by hand.",
       "regionNone": "No area selected",
       "requiredLegend": "Fields marked with an asterisk are required.",
       "regionHint": "Curated areas guests browse by. Optional — pick the one your place belongs to.",
@@ -2357,6 +2439,29 @@
         "failed": "Couldn't process that document. Upload a photo or a PDF.",
         "uploadFailed": "Couldn't send that document. Please try again."
       }
+    },
+    "visibility": {
+      "deactivate": "Deactivate",
+      "reactivate": "Reactivate",
+      "working": "Working…",
+      "declined": "{count, plural, one {# booking request was declined.} other {# booking requests were declined.}}",
+      "confirm": {
+        "title": "Deactivate this listing?",
+        "body": "“{title}” will disappear from search and nobody will be able to book it.",
+        "declines": "{count, plural, one {# booking request still waiting on you will be declined.} other {# booking requests still waiting on you will be declined.}}",
+        "reassurance": "Nothing is deleted. Reservations you already confirmed stay exactly as they are, and you can reactivate this listing at any time.",
+        "cta": "Yes, deactivate",
+        "cancel": "Keep it live"
+      },
+      "blocked": {
+        "verification": "Reactivated — but your listing stays hidden until your identity is verified again.",
+        "staff": "Reactivated — but your listing stays hidden while our team reviews it. Contact support for details.",
+        "rejected": "Reactivated — but your listing stays hidden because it wasn’t approved. Fix the points in the review note and resubmit.",
+        "under_review": "Reactivated — your listing goes live as soon as our team approves it."
+      },
+      "errors": {
+        "failed": "Couldn’t update this listing. Please try again."
+      }
     }
   },
   "hostApply": {
@@ -2508,6 +2613,7 @@
       "rejected": "Declined"
     },
     "inactiveNotice": "This reservation is no longer active. Please contact your host if you think this is a mistake.",
+    "unpaidNotice": "This pass isn't active yet — the payment for this stay is still outstanding. It opens as soon as we confirm the transfer.",
     "hostNotes": "A note from your host",
     "guide": {
       "heading": "Your stay guide",
@@ -2535,7 +2641,9 @@
       "heading": "Your stay pass",
       "scanHint": "Show this QR code at check-in.",
       "pendingTitle": "Your QR code will appear here once your reservation is confirmed.",
-      "pendingBody": "We create it the moment your host approves this request.",
+      "pendingBody": "We create it once your host approves the request and your payment is confirmed.",
+      "unpaidTitle": "Your QR code opens once your payment is confirmed.",
+      "unpaidBody": "Your host has approved the stay. Send the transfer and we'll unlock your pass as soon as we've checked it.",
       "openPass": "Open stay pass",
       "copyLink": "Copy link",
       "copied": "Link copied"
@@ -2549,6 +2657,7 @@
       "loading": "Loading the stay guide…",
       "empty": "Nothing added yet.",
       "guestLink": "Guest link",
+      "guestLinkUnpaid": "The guest's pass opens once their payment is confirmed. You can prepare the guide now — they'll see it then.",
       "itemsCount": "{count, plural, one {# item} other {# items}}",
       "kindLabel": "Type",
       "kinds": {

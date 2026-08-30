@@ -4,10 +4,17 @@
 //  - HostTabs: "My Listings" vs "Incoming Reservations". Both sections are
 //    rendered server-side and passed in as slots; this only toggles which one
 //    is visible (reuses the boutique pill toggle used on /explore).
-//  - HostListingsFilter: All / Published / Under review / Rejected filter above
-//    the listings grid. The cards themselves are still server-rendered and
-//    handed over as slots, so the filter never duplicates card markup.
-import { Fragment, useState, type ReactNode } from 'react'
+//  - HostListingsFilter: All / Published / Under review / Rejected / Deactivated
+//    filter above the listings grid. The cards themselves are still server-rendered
+//    and handed over as slots, so the filter never duplicates card markup.
+import { Fragment, useMemo, useState, type ReactNode } from 'react'
+import {
+  HOST_LISTING_FILTER_ORDER,
+  hostListingFilterCounts,
+  hostListingFilterMatches,
+  type HostListingFilter,
+  type HostListingStatus,
+} from '@/lib/local/host-listing-filter-core'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -54,12 +61,23 @@ export function HostTabs({
   )
 }
 
-/** Approval state a host listing can be filtered by ('approved' = published). */
-export type HostListingStatus = 'approved' | 'pending' | 'rejected'
-/** The filter pills, in display order. */
-export type HostListingFilter = 'all' | HostListingStatus
-
-const FILTER_ORDER: HostListingFilter[] = ['all', 'approved', 'pending', 'rejected']
+/**
+ * The state a host listing is shown in — the union of moderation and visibility,
+ * because from the host's side "why can nobody see this?" has one answer, not two.
+ *
+ * Computed by `hostVisibilityState()` in lib/local/host-visibility-core.ts (the
+ * module the backend enforces the same rules from), then mapped onto these names:
+ *   live         → 'approved'     — the wire name the filter has always used
+ *   deactivated  → 'deactivated'  — the HOST took it down; only they can undo it
+ *   blocked      → 'blocked'      — someone else did; the host cannot undo it
+ *   under_review / rejected       — unchanged
+ *
+ * The union itself, the chip order and the counting live in
+ * lib/local/host-listing-filter-core.ts so they can be unit-tested off the DOM;
+ * both types are re-exported here because page.tsx has always imported them
+ * from this module.
+ */
+export type { HostListingFilter, HostListingStatus }
 
 export type HostListingItem = {
   id: string
@@ -88,13 +106,16 @@ export function HostListingsFilter({
   showAllLabel: string
 }) {
   const [filter, setFilter] = useState<HostListingFilter>('all')
-  const visible = filter === 'all' ? items : items.filter((item) => item.status === filter)
+  const visible = items.filter((item) => hostListingFilterMatches(filter, item.status))
+  // Counted over every listing, not the visible slice — a chip has to say what
+  // it would show, which is the opposite of what is on screen right now.
+  const counts = useMemo(() => hostListingFilterCounts(items.map((item) => item.status)), [items])
 
   return (
     <>
       <div
         role="group"
-        aria-label={FILTER_ORDER.map((key) => labels[key]).join(' / ')}
+        aria-label={HOST_LISTING_FILTER_ORDER.map((key) => labels[key]).join(' / ')}
         style={{
           display: 'flex',
           flexWrap: 'wrap',
@@ -102,10 +123,13 @@ export function HostListingsFilter({
           marginBottom: 18,
         }}
       >
-        {FILTER_ORDER.map((key) => (
+        {HOST_LISTING_FILTER_ORDER.map((key) => (
           <FilterPill
             key={key}
             label={labels[key]}
+            // "All" stays bare: its count is just the number of cards below it,
+            // and iOS leaves it bare for the same reason.
+            count={key === 'all' ? undefined : counts[key]}
             active={filter === key}
             onClick={() => setFilter(key)}
           />
@@ -163,8 +187,22 @@ export function HostListingsFilter({
   )
 }
 
-/** Filter chip: burgundy fill when active, white + hairline border otherwise. */
-function FilterPill({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+/**
+ * Filter chip: burgundy fill when active, white + hairline border otherwise,
+ * with the number of listings behind it in a small counter pill (omit `count`
+ * to render the chip bare). Mirrors QKChip on iOS.
+ */
+function FilterPill({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string
+  count?: number
+  active: boolean
+  onClick: () => void
+}) {
   return (
     <button
       type="button"
@@ -176,7 +214,10 @@ function FilterPill({ label, active, onClick }: { label: string; active: boolean
         fontFamily: FONT,
         fontSize: 13.5,
         fontWeight: 600,
-        padding: '8px 16px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: count === undefined ? '8px 16px' : '8px 10px 8px 16px',
         borderRadius: 999,
         border: `1px solid ${active ? COLORS.burgundy : 'rgba(42,34,32,0.16)'}`,
         color: active ? '#fff' : COLORS.ink,
@@ -186,6 +227,23 @@ function FilterPill({ label, active, onClick }: { label: string; active: boolean
       }}
     >
       {label}
+      {count === undefined ? null : (
+        <span
+          style={{
+            fontSize: 11.5,
+            fontWeight: 700,
+            lineHeight: 1,
+            padding: '3px 7px',
+            borderRadius: 999,
+            minWidth: 20,
+            textAlign: 'center',
+            color: active ? '#fff' : COLORS.muted,
+            background: active ? 'rgba(255,255,255,0.22)' : COLORS.tan,
+          }}
+        >
+          {count}
+        </span>
+      )}
     </button>
   )
 }

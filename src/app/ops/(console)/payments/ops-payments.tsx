@@ -1,6 +1,6 @@
 'use client'
 
-// Payments ops (World 1) — four panels:
+// Payments ops (World 1) — five panels:
 //  1. Instapay destination: GET/PUT /api/local/admin/settings/instapay — the
 //     handle/number, the deep link, the QR image and the instructions guests see.
 //  2. Bank transfer destination: GET/PUT /api/local/admin/settings/bank — the bank,
@@ -9,6 +9,10 @@
 //     /api/local/admin/payments with a per-row "view screenshot"
 //     (GET /api/local/bookings/:id/payment-proof) and Accept / Reject / Approve /
 //     Uphold (POST /api/local/admin/payments).
+//  5. Refunds owed on cancelled reservations: GET /api/local/admin/refunds, with
+//     "Mark as refunded" (POST /api/local/admin/refunds). Money only moves OUT by
+//     hand too — a cancellation records what the guest is owed and nothing else
+//     settles it, so this is the other half of panel 3.
 //
 // Each destination has its own on/off switch, so one can be withdrawn without its
 // details being discarded — the guest-facing list comes from `available_methods`,
@@ -99,6 +103,7 @@ export interface OpsPaymentsInitial {
   config: PaymentConfig
   pending: PendingProof[]
   disputes: Dispute[]
+  refunds: { due: RefundRow[]; settled: RefundRow[] }
 }
 
 export function OpsPayments({ initial }: { initial: OpsPaymentsInitial | null }) {
@@ -107,6 +112,7 @@ export function OpsPayments({ initial }: { initial: OpsPaymentsInitial | null })
       <InstapaySettings initial={initial?.config ?? null} />
       <BankSettings initial={initial?.config ?? null} />
       <PendingPaymentsQueue initial={initial?.pending ?? null} />
+      <RefundsQueue initial={initial?.refunds ?? null} />
       <DisputesQueue initial={initial?.disputes ?? null} />
     </div>
   )
@@ -183,6 +189,205 @@ function MethodChip({ method }: { method: string | null }) {
       {label}
     </span>
   )
+}
+
+// ---- Refunds owed on cancelled reservations ---------------------------------
+
+interface RefundRow {
+  booking_id: string
+  reservation_code: string | null
+  title: string | null
+  guest_name: string | null
+  guest_email: string | null
+  guest_phone: string | null
+  total_price: number
+  refund_percent: number
+  refund_amount: number
+  cancelled_at: string | null
+  cancelled_by_role: string | null
+  check_in: string
+  check_out: string
+  refunded_at: string | null
+  refund_reference: string | null
+}
+
+/**
+ * Money owed OUT, and the record that it went.
+ *
+ * There is no gateway in either direction: a guest transfers by hand and is refunded
+ * by hand. The paying-in half has had a reviewer since the queue above existed; the
+ * paying-back half had nobody. Cancelling stamped `refund_amount` and stopped, so a
+ * guest's app could say "Refunded" while nothing on this side listed them as waiting.
+ *
+ * A row appears here only when all four are true — cancelled, a refund earned, the
+ * guest had ACTUALLY paid, and nobody has settled it. The unpaid case matters: the
+ * ladder quotes a percentage for every cancellation, so a pending request called off
+ * before any transfer is "owed" 100% of nothing.
+ */
+function RefundsQueue({ initial }: { initial: { due: RefundRow[]; settled: RefundRow[] } | null }) {
+  const [data, setData] = useState<{ due: RefundRow[]; settled: RefundRow[] } | null>(initial)
+  const [error, setError] = useState<string | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [rowError, setRowError] = useState<{ id: string; msg: string } | null>(null)
+  const [showSettled, setShowSettled] = useState(false)
+
+  const load = useCallback(async () => {
+    setError(null)
+    try {
+      const res = await fetch('/api/local/admin/refunds', { credentials: 'same-origin' })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed to load')
+      const body = await res.json()
+      setData({ due: body?.due ?? [], settled: body?.settled ?? [] })
+    } catch (e) {
+      setData({ due: [], settled: [] })
+      setError(e instanceof Error ? e.message : 'Failed to load')
+    }
+  }, [])
+
+  useEffect(() => { if (initial === null) load() }, [initial, load])
+
+  async function markRefunded(r: RefundRow) {
+    // Typed, not generated: this is the reference on the operator's OWN transfer, and
+    // it is the only thing a guest asking "did you send it?" can be quoted. Optional,
+    // because a wallet transfer may not produce one and a missing reference must not
+    // block the record of a payment that really happened.
+    const reference = window.prompt(
+      `Mark ${fmtMoney(r.refund_amount)} to ${r.guest_name || r.guest_email || 'this guest'} as refunded?\n\n` +
+        'Transfer reference (optional) — the guest can be quoted this.',
+      '',
+    )
+    if (reference === null) return
+    setBusyId(r.booking_id); setRowError(null)
+    try {
+      const res = await fetch('/api/local/admin/refunds', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ booking_id: r.booking_id, reference: reference.trim() || null }),
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'That did not work')
+      await load()
+    } catch (e) {
+      setRowError({ id: r.booking_id, msg: e instanceof Error ? e.message : 'That did not work' })
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const due = data?.due ?? null
+  const owed = (due ?? []).reduce((sum, r) => sum + (Number(r.refund_amount) || 0), 0)
+
+  return (
+    <section style={card}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline', flexWrap: 'wrap' }}>
+        <h2 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800, color: C.burgundy }}>
+          Refunds due {due && due.length > 0 ? `(${due.length})` : ''}
+        </h2>
+        {due && due.length > 0 && (
+          // The total, because the operator is about to make this many transfers out
+          // of one account and needs to know what it comes to before they start.
+          <strong style={{ fontSize: 15, color: C.burgundy }}>{fmtMoney(owed)} owed</strong>
+        )}
+      </div>
+      <p style={{ margin: '0 0 16px', fontSize: 13, color: C.muted, lineHeight: 1.6 }}>
+        Guests whose cancellation earned money back and who had already paid. Transfer the
+        amount, then mark it here — the guest is notified straight away, and their
+        reservation stops showing the refund as pending. Oldest first.
+      </p>
+
+      {error && <p style={{ margin: '0 0 12px', fontSize: 13, color: '#b3261e', fontWeight: 600 }}>{error}</p>}
+      {due === null && <OpsSkeletonQueueRows rows={2} />}
+      {due?.length === 0 && (
+        <Empty
+          inset
+          tone="clear"
+          title="Nobody is waiting on a refund"
+          body="Cancellations that earn money back appear here until the transfer is marked as sent."
+        />
+      )}
+
+      <div style={{ display: 'grid', gap: 12 }}>
+        {due?.map((r) => (
+          <div key={r.booking_id} style={{ border: `1px solid ${C.tan}`, borderRadius: 14, padding: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <strong style={{ fontSize: 14.5, color: C.ink }}>{r.title ?? 'Stay'}</strong>
+                <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>
+                  {r.guest_name || r.guest_email || 'Deleted account'} · {r.check_in} → {r.check_out}
+                  {r.reservation_code ? ` · ${r.reservation_code}` : ''}
+                </div>
+                {/* Where the money actually goes. Without it the operator has a name
+                    and an amount and no way to send anything. */}
+                <div style={{ fontSize: 13, color: C.ink, marginTop: 4 }}>
+                  {r.guest_phone || r.guest_email || <span style={{ color: '#b3261e' }}>No contact on file</span>}
+                </div>
+                <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
+                  {r.refund_percent}% of {fmtMoney(r.total_price)}
+                  {r.cancelled_at ? ` · cancelled ${new Date(r.cancelled_at).toLocaleDateString()}` : ''}
+                  {r.cancelled_by_role ? ` by the ${r.cancelled_by_role}` : ''}
+                </div>
+              </div>
+              <strong style={{ fontSize: 16, color: C.burgundy, whiteSpace: 'nowrap' }}>
+                {fmtMoney(r.refund_amount)}
+              </strong>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+              <button type="button" disabled={busyId === r.booking_id} onClick={() => markRefunded(r)} style={primaryBtn}>
+                {busyId === r.booking_id ? 'Working…' : 'Mark as refunded'}
+              </button>
+            </div>
+
+            {rowError?.id === r.booking_id && (
+              <p style={{ margin: '10px 0 0', fontSize: 13, color: '#b3261e' }}>{rowError.msg}</p>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* The receipt half. "Did you refund me?" is the question this queue creates,
+          and it cannot be answered from a list that only shows what is still owed. */}
+      {data && data.settled.length > 0 && (
+        <div style={{ marginTop: 18 }}>
+          <button
+            type="button"
+            onClick={() => setShowSettled((v) => !v)}
+            style={{ ...ghostBtn, padding: '6px 14px', fontSize: 13 }}
+          >
+            {showSettled ? 'Hide' : 'Show'} recently refunded ({data.settled.length})
+          </button>
+          {showSettled && (
+            <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+              {data.settled.map((r) => (
+                <div
+                  key={r.booking_id}
+                  style={{
+                    display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+                    border: `1px solid ${C.tan}`, borderRadius: 12, padding: '10px 12px', fontSize: 13,
+                  }}
+                >
+                  <span style={{ color: C.ink }}>
+                    {r.guest_name || r.guest_email || 'Deleted account'} · {r.title ?? 'Stay'}
+                    {r.refund_reference ? ` · ref ${r.refund_reference}` : ''}
+                  </span>
+                  <span style={{ color: C.muted, whiteSpace: 'nowrap' }}>
+                    {fmtMoney(r.refund_amount)}
+                    {r.refunded_at ? ` · ${new Date(r.refunded_at).toLocaleDateString()}` : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
+/** "EGP 5,500". Every figure in this panel is money owed to a named person, so none
+ *  of them are worth showing to the fraction of a pound. */
+function fmtMoney(amount: number): string {
+  return `EGP ${Math.round(Number(amount) || 0).toLocaleString()}`
 }
 
 // ---- Payments awaiting confirmation -----------------------------------------

@@ -29,6 +29,7 @@ import {
   outcomeFor,
   normalizeRejectReason,
   assertProofImage,
+  everPaid,
 } from '../../src/lib/local/payment-flow-core.ts'
 
 const confirmed = (over = {}) => ({ status: 'confirmed', payment_state: 'unpaid', ...over })
@@ -168,5 +169,62 @@ describe('assertProofImage', () => {
     // Just under is fine.
     const ok = 'data:image/jpeg;base64,' + 'A'.repeat(MAX_PROOF_CHARS - 100)
     assert.equal(assertProofImage(ok).length, MAX_PROOF_CHARS - 100 + 'data:image/jpeg;base64,'.length)
+  })
+})
+
+describe('everPaid — did money ever arrive?', () => {
+  // A different question from paymentStageFor, which asks "can this be paid NOW".
+  // It exists because `bookings.refund_percent` is stamped from the cancellation policy
+  // whether or not anything was ever paid, so the refund chips cannot trust it alone.
+
+  test('a paid booking has been paid', () => {
+    assert.equal(everPaid({ payment_state: 'paid' }), true)
+    assert.equal(everPaid({ payment_status: 'paid' }), true)
+  })
+
+  test('an approved proof counts even when the rollup never landed', () => {
+    assert.equal(everPaid({ payment_state: 'unpaid', payment_proof_status: 'approved' }), true)
+  })
+
+  test('a paid_at stamp is enough on its own', () => {
+    assert.equal(everPaid({ payment_state: 'unpaid', paid_at: '2026-08-01T00:00:00Z' }), true)
+  })
+
+  // ⚠️ THE paid_at TRAP. setBookingPaymentOutcome NULLs paid_at on a refund, so a
+  // refunded booking has no paid marker left — the payment column is the only proof.
+  test('a refunded or voided booking counts, though the refund wiped paid_at', () => {
+    assert.equal(everPaid({ payment_state: 'refunded', paid_at: null }), true)
+    assert.equal(everPaid({ payment_state: 'voided', paid_at: null }), true)
+  })
+
+  test('nothing paid is nothing paid', () => {
+    assert.equal(everPaid({ payment_state: 'unpaid' }), false)
+    assert.equal(everPaid({}), false)
+    assert.equal(everPaid({ payment_state: null, paid_at: null }), false)
+  })
+
+  test('a transfer still under review has NOT been paid — the money has not cleared', () => {
+    assert.equal(everPaid({ payment_state: 'submitted', payment_proof_status: 'submitted' }), false)
+    assert.equal(everPaid({ payment_state: 'disputed' }), false)
+  })
+
+  test('a rejected screenshot has not been paid', () => {
+    assert.equal(everPaid({ payment_state: 'rejected', payment_proof_status: 'rejected' }), false)
+  })
+
+  test('an unrecognised payment value reads as unpaid rather than as paid', () => {
+    assert.equal(everPaid({ payment_state: 'weird' }), false)
+  })
+
+  test('payment_state wins over payment_status, matching isLiveStayPass', () => {
+    assert.equal(everPaid({ payment_state: 'paid', payment_status: 'unpaid' }), true)
+  })
+
+  // The distinction the whole thing rests on: a cancelled booking is never payable, but
+  // it can certainly have been paid. Asking the stage instead loses every refund.
+  test('it disagrees with paymentStageFor on a cancelled booking, which is the point', () => {
+    const refunded = { status: 'cancelled', payment_state: 'refunded', paid_at: null }
+    assert.equal(paymentStageFor(refunded), 'not_payable')
+    assert.equal(everPaid(refunded), true)
   })
 })

@@ -111,6 +111,10 @@ type AdminListing = {
   currency: string
   price_per_night: number
   is_published: boolean
+  /** The HOST took this listing down themselves. Staff cannot put it back — the
+   *  write layer refuses — so the row says so instead of offering a Show button
+   *  that would quietly do nothing. See the backend's host-visibility-core.ts. */
+  unpublished_by_host?: boolean
   host_id: string | null
   host_name: string | null
   created_at: string
@@ -1142,7 +1146,13 @@ export function OpsDashboard({
                           ? badge('Rejected', '#F6E0E2', BURGUNDY)
                           : l.is_published
                             ? badge('Published', '#E2F0E9', GREEN)
-                            : badge('Hidden', TAN, MUTED)}
+                            // WHO hid it matters: "Hidden by host" is not a
+                            // moderation state and needs no operator action,
+                            // whereas a plain "Hidden" is a staff decision
+                            // somebody made and may need to revisit.
+                            : l.unpublished_by_host
+                              ? badge('Hidden by host', TAN, MUTED)
+                              : badge('Hidden', TAN, MUTED)}
                       {/* Free text needs a decision before this listing can go live. */}
                       {l.resort_name ? badge('Resort: review needed', '#F6E0E2', BURGUNDY) : null}
                       {/* The host was warned about this pin and chose to submit anyway
@@ -1208,13 +1218,24 @@ export function OpsDashboard({
                         </button>
                       </>
                     ) : null}
-                    <button
-                      style={outlineBtn}
-                      disabled={busyId === l.id}
-                      onClick={() => togglePublish(l)}
-                    >
-                      {busyId === l.id ? 'Working…' : l.is_published ? 'Hide' : 'Show'}
-                    </button>
+                    {/* No Show button on a listing its host took down: the API
+                        refuses to republish one (a host's own takedown is not a
+                        staff decision to undo), so the button would report
+                        success and change nothing. Hide is still offered on a
+                        live listing, as always. */}
+                    {l.is_published || !l.unpublished_by_host ? (
+                      <button
+                        style={outlineBtn}
+                        disabled={busyId === l.id}
+                        onClick={() => togglePublish(l)}
+                      >
+                        {busyId === l.id ? 'Working…' : l.is_published ? 'Hide' : 'Show'}
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: 12.5, color: MUTED, alignSelf: 'center' }}>
+                        Host deactivated this
+                      </span>
+                    )}
                     <button
                       style={dangerBtn}
                       disabled={busyId === l.id}

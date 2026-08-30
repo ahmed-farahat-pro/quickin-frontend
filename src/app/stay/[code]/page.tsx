@@ -15,7 +15,7 @@
 import type { Metadata } from 'next'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { backendFetch } from '@/lib/backend'
-import { isLiveStayStatus, normalizeReservationCode, stayPassPath } from '@/lib/stay-code'
+import { normalizeReservationCode, stayPassPath } from '@/lib/stay-code'
 import type { StayGuideItem, StayPass } from '@/lib/types'
 import { localeToBcp47, type Locale } from '@/i18n/config'
 import { getRequestOrigin } from '@/lib/site-origin'
@@ -183,8 +183,12 @@ async function Pass({ pass }: { pass: StayPass }) {
     : pass.status === 'cancelled' ? t('status.cancelled')
     : pass.status === 'rejected' ? t('status.rejected')
     : pass.status
-  // Same gate as getStayByCode (and as iOS/Android): confirmed OR completed.
-  const isLive = isLiveStayStatus(pass.status)
+  // `is_live` is the server's own verdict from `isLiveStayPass` — confirmed AND
+  // PAID, or completed. Host approval alone mints the reservation code but leaves
+  // the stay unpaid, so a scan of that QR must land on the "not yet" notice
+  // rather than a working pass. The backend also withholds `guide` when this is
+  // false, so the sections below cannot leak the host's gate codes either.
+  const isLive = pass.is_live
   const place = [pass.location, pass.country].filter(Boolean).join(', ')
   // stayPassPath() is the only place a stay URL is built; it returns null for a
   // missing/"null" code, so the QR below simply doesn't render in that case.
@@ -250,7 +254,7 @@ async function Pass({ pass }: { pass: StayPass }) {
             <span style={{ background: chip.bg, color: chip.fg, fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 999 }}>
               {statusLabel}
             </span>
-            {isLive && pass.payment_status === 'paid' && (
+            {isLive && (
               <span style={{ background: '#e7f5ec', color: '#177245', fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 999 }}>
                 ✓ {t('paid')}
               </span>
@@ -270,7 +274,10 @@ async function Pass({ pass }: { pass: StayPass }) {
                 color: C.muted,
               }}
             >
-              {t('inactiveNotice')}
+              {/* Two very different reasons a pass isn't live, and the guest can
+                  act on only one of them: an approved-but-unpaid stay is waiting
+                  on THEM, while cancelled/rejected is over. */}
+              {pass.status === 'confirmed' ? t('unpaidNotice') : t('inactiveNotice')}
             </p>
           )}
 

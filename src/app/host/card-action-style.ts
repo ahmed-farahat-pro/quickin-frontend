@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react'
 
 /**
  * Shared box + label placement for the pill actions on a host listing card
- * ("View", "Edit", and "Re-upload ownership document"). They sit in a row that
+ * ("View", "Edit", and the ownership-document upload). They sit in a row that
  * stretches every pill to the tallest one, so they only look aligned if they all
  * position their label identically:
  *  - inline-flex + centre/centre puts the label in the middle of the pill rather

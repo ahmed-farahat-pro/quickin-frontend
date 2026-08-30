@@ -11,7 +11,9 @@ import { formatPrice } from '@/lib/utils'
 import { HostReservations } from './host-reservations'
 import { HostTabs, HostListingsFilter, type HostListingStatus } from './host-tabs'
 import { ListingStatusChip } from './listing-status-chip'
-import { OwnershipDocReupload } from './ownership-doc'
+import { OwnershipDocAction } from './ownership-doc'
+import { ListingVisibilityAction } from './listing-visibility'
+import { hostVisibilityState } from '@/lib/local/host-visibility-core'
 import { CARD_ACTION_STYLE } from './card-action-style'
 import { BecomeHostButton } from '../account/account-forms'
 
@@ -42,11 +44,20 @@ const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
 const FALLBACK_IMG =
   'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800&q=80'
 
-/** Legacy rows have no approval_status — treat anything unknown as published. */
+/**
+ * The single state the card is shown in, from the SAME rules the backend enforces
+ * on the write (host-visibility-core.ts, byte-identical in both repos). It folds
+ * moderation and visibility together, because from the host's side "why can
+ * nobody see this?" has one answer, not two — and because a listing can be both
+ * approved and hidden at once.
+ *
+ * `live` is renamed to 'approved' here only because that is the wire name the
+ * filter chips have always used. Legacy rows with no approval_status still land
+ * on 'approved', as they always did.
+ */
 function listingStatus(listing: Listing): HostListingStatus {
-  return listing.approval_status === 'pending' || listing.approval_status === 'rejected'
-    ? listing.approval_status
-    : 'approved'
+  const state = hostVisibilityState(listing)
+  return state === 'live' ? 'approved' : state === 'under_review' ? 'pending' : state
 }
 
 /**
@@ -381,6 +392,12 @@ async function HostDashboard({ userId, firstName, t }: { userId: string; firstNa
     calendar: t('dashboard.calendar'),
     badgePending: t('dashboard.badge.pending'),
     badgeRejected: t('dashboard.badge.rejected'),
+    badgeDeactivated: t('dashboard.badge.deactivated'),
+    badgeBlocked: t('dashboard.badge.blocked'),
+    deactivatedHeading: t('dashboard.deactivated.heading'),
+    deactivatedBody: t('dashboard.deactivated.body'),
+    blockedHeading: t('dashboard.blocked.heading'),
+    blockedBody: t('dashboard.blocked.body'),
     rejectedHeading: t('dashboard.rejected.heading'),
     rejectedNoReason: t('dashboard.rejected.noReason'),
   }
@@ -444,6 +461,10 @@ async function HostDashboard({ userId, firstName, t }: { userId: string; firstNa
         approved: t('dashboard.filters.published'),
         pending: t('dashboard.filters.pending'),
         rejected: t('dashboard.filters.rejected'),
+        deactivated: t('dashboard.filters.deactivated'),
+        // Not a chip (see FILTER_ORDER in host-tabs.tsx) — supplied so the label
+        // map stays total and a future chip cannot ship without its wording.
+        blocked: t('dashboard.filters.blocked'),
       }}
       emptyLabel={t('dashboard.emptyFiltered')}
       emptyTitle={t('dashboard.emptyFilteredTitle')}
@@ -521,10 +542,30 @@ type CardLabels = {
   calendar: string
   badgePending: string
   badgeRejected: string
+  badgeDeactivated: string
+  badgeBlocked: string
   /** Heading over the operator's reason on a rejected card. */
   rejectedHeading: string
   /** Shown in place of the reason when the operator rejected without writing one. */
   rejectedNoReason: string
+  /** The "you took this down" explainer, so a deactivated card says what that
+   *  means for the bookings the host already has. */
+  deactivatedHeading: string
+  deactivatedBody: string
+  /** The "someone else took this down" explainer. The host cannot undo it, so
+   *  the card says who to ask instead of showing a button that would fail. */
+  blockedHeading: string
+  blockedBody: string
+}
+
+/** Which label each non-live status wears on its chip. A map rather than a chain
+ *  of ternaries so adding a state cannot silently fall through to the wrong one —
+ *  TypeScript demands an entry here the moment HostListingStatus grows. */
+const BADGE_LABEL: Record<Exclude<HostListingStatus, 'approved'>, (l: CardLabels) => string> = {
+  pending: (l) => l.badgePending,
+  rejected: (l) => l.badgeRejected,
+  deactivated: (l) => l.badgeDeactivated,
+  blocked: (l) => l.badgeBlocked,
 }
 
 function ListingCard({
@@ -588,7 +629,7 @@ function ListingCard({
           {status !== 'approved' && (
             <ListingStatusChip
               status={status}
-              label={status === 'pending' ? labels.badgePending : labels.badgeRejected}
+              label={BADGE_LABEL[status](labels)}
               style={{ position: 'absolute', top: 10, insetInlineStart: 10 }}
             />
           )}
@@ -623,7 +664,11 @@ function ListingCard({
           reason (it is optional) and on every listing rejected before the column
           existed — both fall back to generic guidance rather than an empty box.
           Outside the <a> above: the reason is text to read, not part of the link. */}
-      {status === 'rejected' && (
+      {/* Keyed on approval_status, not on `status`: a listing the host deactivated
+          badges as "Deactivated", but if it was ALSO rejected the host still has
+          to be told why — that reason is the thing they have to act on before it
+          can ever go live again. */}
+      {listing.approval_status === 'rejected' && (
         <div
           style={{
             margin: '12px 16px 0',
@@ -697,10 +742,74 @@ function ListingCard({
           {labels.edit}
         </a>
       </div>
+      {/* What "deactivated" actually means, because the word alone does not say
+          whether the guests already booked in have lost their stay. They have not,
+          and that is the first thing a host wants to know. */}
+      {status === 'deactivated' && (
+        <Explainer heading={labels.deactivatedHeading} body={labels.deactivatedBody} tone="neutral" />
+      )}
+      {/* Hidden by someone other than the host — an account block, the identity
+          gate, or an operator. There is no button for this: the host cannot clear
+          it, and offering one that the API refuses would be worse than saying so. */}
+      {status === 'blocked' && (
+        <Explainer heading={labels.blockedHeading} body={labels.blockedBody} tone="warn" />
+      )}
+
       {/* Under review or rejected → let the host (re)submit the ownership
           document straight from the card, which re-queues it for review.
-          Mirrors the iOS/Android host dashboards. */}
-      {status !== 'approved' && <OwnershipDocReupload listingId={listing.id} />}
+          Mirrors the iOS/Android host dashboards. Whether the button says
+          "Upload" or "Re-upload" is a SEPARATE question from the status: the
+          document is optional at create time, so a listing reaches the queue
+          with nothing attached. */}
+      {(status === 'pending' || status === 'rejected') && (
+        <OwnershipDocAction listingId={listing.id} hasDoc={listing.has_ownership_doc === true} />
+      )}
+
+      {/* Take the listing off the market, or put it back. QuickIn has no
+          host-facing delete — this IS "remove my listing", and it keeps every
+          booking, review and payment record intact. Offered on every state the
+          host controls; withheld only on 'blocked', which is not theirs to undo. */}
+      {status !== 'blocked' && (
+        <ListingVisibilityAction
+          listingId={listing.id}
+          listingTitle={listing.title}
+          // NOT `!listing.is_published`: a listing an operator hid is unpublished
+          // too, and offering the host a Reactivate the API would refuse is the
+          // exact confusion this flag exists to prevent.
+          deactivated={listing.unpublished_by_host === true}
+          pendingRequests={listing.pending_request_count ?? 0}
+        />
+      )}
     </article>
+  )
+}
+
+/** A short "here is what this state means" note under a card. Two tones: neutral
+ *  for a state the host chose, warn for one imposed on them. */
+function Explainer({
+  heading,
+  body,
+  tone,
+}: {
+  heading: string
+  body: string
+  tone: 'neutral' | 'warn'
+}) {
+  const warm = tone === 'warn'
+  return (
+    <div
+      style={{
+        margin: '12px 16px 0',
+        padding: '10px 12px',
+        background: warm ? '#fbf3ee' : COLORS.cream,
+        border: `1px solid ${warm ? 'rgba(106,74,60,0.18)' : 'rgba(42,34,32,0.08)'}`,
+        borderRadius: 12,
+      }}
+    >
+      <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: warm ? '#6A4A3C' : COLORS.ink }}>
+        {heading}
+      </p>
+      <p style={{ margin: '4px 0 0', fontSize: 13, lineHeight: 1.45, color: COLORS.muted }}>{body}</p>
+    </div>
   )
 }

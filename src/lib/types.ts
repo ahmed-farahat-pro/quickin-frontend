@@ -27,6 +27,19 @@ export interface Listing {
    *  price. See LISTING_COLS vs LISTING_COLS_HOST. */
   price_per_night: number
   weekend_price: number | null
+  /** Seasonal per-month nightly rates, month "1".."12" → price. The rung of the
+   *  ladder under the weekend rate; a month with no entry uses price_per_night.
+   *  Same projection as the prices above (guest = commission-inclusive). The
+   *  backend COALESCEs a missing column to `{}`, so this is never null. */
+  monthly_prices?: Record<string, number>
+  /** Host projection only — the guest-facing twin of `monthly_prices`. */
+  guest_monthly_prices?: Record<string, number>
+  /** Whole percent off a stay of WEEKLY_DISCOUNT_MIN_NIGHTS or more. The
+   *  backend COALESCEs a missing value to 0, so these are never null. */
+  weekly_discount?: number
+  /** Whole percent off a stay of MONTHLY_DISCOUNT_MIN_NIGHTS or more. Replaces
+   *  the weekly discount rather than compounding with it. */
+  monthly_discount?: number
   /** 'flexible' | 'moderate' | 'strict'. The backend always sends one — it
    *  COALESCEs a missing value to 'moderate', the database default. */
   cancellation_policy?: string
@@ -64,6 +77,31 @@ export interface Listing {
    *  listing goes back into the queue, so it always describes the CURRENT
    *  'rejected' state rather than a decision the host has already answered. */
   review_note?: string | null
+  /** Whether guests can see the listing at all. False covers all four takedown
+   *  reasons — the flags below say which. QuickIn has no host-facing DELETE:
+   *  "remove my listing" is this flag going false, with every booking, review and
+   *  payment record left intact. See the backend README, *A host removes a
+   *  listing by hiding it*. */
+  is_published?: boolean
+  /** HOST PROJECTION ONLY. The host took this listing down themselves — the only
+   *  one of the four flags they can clear, and the one the dashboard's
+   *  Deactivate / Reactivate button acts on. */
+  unpublished_by_host?: boolean
+  /** HOST PROJECTION ONLY. An account block hid it; only a restore brings it back. */
+  unpublished_by_admin?: boolean
+  /** HOST PROJECTION ONLY. The identity gate hid it; only re-verifying brings it back. */
+  unpublished_by_verification?: boolean
+  /** HOST PROJECTION ONLY. Booking requests still waiting on this host — the
+   *  number a deactivate would decline, named in the confirmation dialog before
+   *  the host commits. */
+  pending_request_count?: number
+  /** HOST PROJECTION ONLY. True when a proof-of-ownership document is stored for
+   *  this listing — never the document itself, which is admin-only and served
+   *  one at a time from the audited /api/local/admin/documents/ownership/:id.
+   *  The document is optional at create time, so this is the flag that decides
+   *  whether the card offers "Upload ownership document" or "Re-upload ownership
+   *  document" (see ownershipDocAction in lib/local/ownership-doc-core.ts). */
+  has_ownership_doc?: boolean
   created_at?: string | null
   host_id?: string | null
   host_name?: string | null
@@ -124,10 +162,13 @@ export interface Booking {
   guests: number
   total_price: number
   status: string
-  payment_status: 'paid' | 'unpaid'
-  /** Raw rollup from the shared bookings.payment_status column: 'paid' | 'unpaid' |
-   *  'submitted' | 'rejected' | 'disputed' | 'pending' | 'failed' | 'refunded' | 'voided'.
-   *  Written by the backend Paymob webhook AND the Instapay manual-payment flow. */
+  /** The raw `bookings.payment_status` rollup as quickin-backend's BOOKING_COLS
+   *  sends it: 'unpaid' | 'submitted' | 'paid' | 'rejected' | 'disputed', plus the
+   *  legacy Paymob values. NOT a derived paid/unpaid flag — the old web API's
+   *  narrower projection is what the `'paid' | 'unpaid'` here used to describe. */
+  payment_status: string
+  /** The old web API's name for the same column. **Absent from today's payload** —
+   *  keep reading it as `payment_state ?? payment_status` so either shape works. */
   payment_state?: string
   /** 'instapay' once a transfer screenshot is submitted (else null / legacy value). */
   payment_method?: string | null
@@ -135,14 +176,24 @@ export interface Booking {
   payment_proof_status?: string | null
   /** Reason the host/admin gave when rejecting the latest transfer screenshot. */
   payment_reject_reason?: string | null
+  /** ⚠️ CLEARED by a refund — see the paid_at trap in analytics-core.ts. Read it as
+   *  "is this paid right now", never as "was this ever paid". */
   paid_at: string | null
+  /** ISO-8601 timestamp the booking was cancelled, from `cancelled_at`. */
+  cancelled_at?: string | null
+  /** Percent of the total refunded on cancel (0–100), null until cancelled. What
+   *  separates the "Refunded" and "Partially refunded" chips — see
+   *  reservation-filter-core.ts. */
+  refund_percent?: number | null
   created_at: string
   title: string
   location: string | null
   currency: string
   image: string | null
   /** Issued once, at the confirmation transition. NULL while pending — and a
-   *  booking without a code has no QR, no wallet pass and no /stay link. */
+   *  booking without a code has no QR, no wallet pass and no /stay link. Note a
+   *  code is only HALF the gate: it is minted when the host approves, while the
+   *  pass itself waits for payment (`isLiveStayPass`). */
   reservation_code: string | null
   host_notes: string | null
 }
@@ -282,7 +333,16 @@ export interface StayPass {
   check_out: string
   guests: number
   status: string
-  payment_status: 'paid' | 'unpaid'
+  /** Raw bookings.payment_status: unpaid | submitted | paid | rejected | disputed. */
+  payment_status: string
+  /** Stamped when the payment was APPROVED; null while unpaid/submitted/disputed. */
+  paid_at: string | null
+  /** Latest payment_proofs.status, null when the guest hasn't uploaded one. */
+  payment_proof_status: string | null
+  /** The server's verdict from `isLiveStayPass`: confirmed AND paid, or completed.
+   *  Render the pass on THIS, not on `status` — a host-approved booking is still
+   *  unpaid, and the guide below is empty whenever this is false. */
+  is_live: boolean
   host_notes: string | null
   guest_name: string | null   // first name only
   host_name: string | null

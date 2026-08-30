@@ -157,7 +157,9 @@
     "asHost": "Anfitrión",
     "warningTitle": "Un mensaje de QuickIn",
     "warningAck": "Entendido",
-    "warningAckFailed": "No se pudo guardar. Inténtalo de nuevo."
+    "warningAckFailed": "No se pudo guardar. Inténtalo de nuevo.",
+    "reservationThread": "Reserva",
+    "reservationDates": "{checkIn} – {checkOut}"
   },
   "bookingPage": {
     "title": "Confirmar y solicitar",
@@ -1573,6 +1575,11 @@
       "hint": "No puedes reservar ni contactar tu propio alojamiento.",
       "edit": "Editar anuncio",
       "manage": "Ver reservas entrantes"
+    },
+    "hiddenPreview": {
+      "title": "Solo tú puedes ver esto",
+      "body": "Ahora mismo este alojamiento no es visible para los huéspedes.",
+      "manage": "Gestionarlo"
     }
   },
   "loginLocal": {
@@ -1750,7 +1757,35 @@
       "reviewFailed": "No se pudo enviar la reseña"
     },
     "tripsHint": "Las estancias que has reservado como huésped.",
-    "emptyTitle": "Aún no has reservado ninguna estancia"
+    "emptyTitle": "Aún no has reservado ninguna estancia",
+    "filter": {
+      "group": "Filtrar reservas por estado",
+      "showAll": "Mostrar todas las reservas",
+      "label": {
+        "all": "Todo",
+        "pending": "Pendiente de aprobación",
+        "awaiting_payment": "Pendiente de pago",
+        "under_review": "Pago en revisión",
+        "confirmed": "Confirmada",
+        "completed": "Completada",
+        "cancelled": "Cancelada",
+        "partially_refunded": "Reembolsada parcialmente",
+        "refunded": "Reembolsada",
+        "rejected": "Rechazada"
+      },
+      "empty": {
+        "all": "Todavía no has reservado ninguna estancia.",
+        "pending": "Nada esperando respuesta de un anfitrión ahora mismo.",
+        "awaiting_payment": "Ninguna reserva está pendiente de pago.",
+        "under_review": "No hay transferencias en revisión ahora mismo.",
+        "confirmed": "Todavía no hay estancias confirmadas.",
+        "completed": "Todavía no hay estancias pasadas.",
+        "cancelled": "No hay reservas canceladas.",
+        "partially_refunded": "No hay reservas reembolsadas parcialmente.",
+        "refunded": "No hay reservas reembolsadas.",
+        "rejected": "No hay solicitudes rechazadas."
+      }
+    }
   },
   "verifyIdPage": {
     "meta": {
@@ -2040,12 +2075,16 @@
         "all": "Todos",
         "published": "Publicados",
         "pending": "En revisión",
-        "rejected": "Rechazados"
+        "rejected": "Rechazados",
+        "deactivated": "Desactivados",
+        "blocked": "Ocultos por nosotros"
       },
       "emptyFiltered": "Ningún anuncio coincide con este filtro.",
       "badge": {
         "pending": "En revisión",
-        "rejected": "Rechazado"
+        "rejected": "Rechazado",
+        "deactivated": "Desactivado",
+        "blocked": "Oculto por nuestro equipo"
       },
       "listingsHint": "Los alojamientos que gestionas.",
       "reservationsHint": "Solicitudes de reserva de huéspedes para tus alojamientos.",
@@ -2055,6 +2094,14 @@
       "rejected": {
         "heading": "Por qué no se aprobó",
         "noReason": "Nuestro equipo no dejó un motivo. Revisa los datos, edítalos y vuelve a enviarlo."
+      },
+      "deactivated": {
+        "heading": "Has desactivado este alojamiento",
+        "body": "Los huéspedes no pueden encontrarlo ni reservarlo. Las reservas que ya confirmaste no se ven afectadas: tus huéspedes conservan su estancia, su pase y vuestros mensajes. Reactívalo cuando quieras."
+      },
+      "blocked": {
+        "heading": "Oculto por nuestro equipo",
+        "body": "Ahora mismo este alojamiento no es visible para los huéspedes y no puedes cambiarlo desde aquí. Contacta con soporte para saber por qué."
       }
     },
     "reservations": {
@@ -2075,6 +2122,20 @@
         "approvedPaid": "Aprobado y pagado",
         "cancelled": "Cancelado",
         "rejected": "Rechazado"
+      },
+      "filter": {
+        "label": "Filtrar por estado",
+        "all": "Todas",
+        "pending": "Esperando tu respuesta",
+        "awaitingPayment": "Esperando el pago",
+        "confirmed": "Confirmada",
+        "rejected": "Rechazada",
+        "cancelled": "Cancelada",
+        "refunded": "Reembolsada",
+        "partiallyRefunded": "Parcialmente reembolsada",
+        "emptyTitle": "Nada en este estado",
+        "emptySubtitle": "Ninguna reserva coincide con este filtro ahora mismo.",
+        "showAll": "Mostrar todas las reservas"
       },
       "approve": "Aprobar",
       "working": "Procesando…",
@@ -2118,7 +2179,11 @@
         "region": "Zona",
         "amenities": "Servicios",
         "resort": "Resort / complejo",
-        "cancellationPolicy": "Política de cancelación"
+        "cancellationPolicy": "Política de cancelación",
+        "seasonalPricing": "Precios de temporada (opcional)",
+        "stayDiscounts": "Descuentos por estancias largas (opcional)",
+        "weeklyDiscount": "Descuento semanal",
+        "monthlyDiscount": "Descuento mensual"
       },
       "placeholders": {
         "title": "Loft soleado junto al Nilo",
@@ -2127,6 +2192,12 @@
         "country": "Egipto",
         "photos": "Una URL por línea, o separadas por comas\nhttps://images.unsplash.com/photo-...",
         "weekendPrice": "p. ej. 1500"
+      },
+      "hints": {
+        "seasonalPricing": "Cobra una tarifa por noche distinta en tus meses de más demanda. Si dejas un mes vacío, se usa tu precio por noche habitual.",
+        "weeklyDiscount": "Se aplica a estancias de {nights} noches o más.",
+        "monthlyDiscount": "Se aplica a estancias de {nights} noches o más, en lugar del descuento semanal.",
+        "stayDiscountsInvert": "Tu descuento mensual es menor que el semanal, así que una estancia de {monthly} noches costaría más que una de {weekly}. Solo se aplica un descuento."
       },
       "propertyTypes": {
         "apartment": "Apartamento",
@@ -2176,7 +2247,16 @@
         "invalidImageUrl": "Este enlace de foto no parece una URL válida: {url}",
         "createFailed": "No se pudo crear el anuncio",
         "tooManyPhotos": "Puedes subir hasta {max} fotos.",
-        "photoFailed": "No se pudo procesar la imagen. Prueba con otra."
+        "photoFailed": "No se pudo procesar la imagen. Prueba con otra.",
+        "monthPrice": {
+          "notANumber": "La tarifa de {month} debe ser un número. Déjala vacía para usar tu precio por noche habitual.",
+          "notPositive": "La tarifa de {month} debe ser mayor que cero. Déjala vacía para usar tu precio por noche habitual."
+        },
+        "stayDiscount": {
+          "notANumber": "{field} debe ser un número.",
+          "notWhole": "{field} debe ser un porcentaje entero.",
+          "outOfRange": "{field} debe estar entre 0 % y {max} %."
+        }
       },
       "pinHint": "Toca el mapa para colocar un pin. Los huéspedes ven una zona aproximada, no la dirección exacta.",
       "searchHint": "Busca una ciudad, zona o dirección y elige un resultado para fijarlo en el mapa; luego arrastra el pin para ajustarlo.",
@@ -2202,6 +2282,8 @@
       "photosRemove": "Eliminar foto",
       "locating": "Buscando en el mapa…",
       "geocodeFail": "No se encontró el lugar — toca el mapa para ubicarlo.",
+      "pinNaming": "Identificando este lugar…",
+      "pinNameFail": "Marcador movido — no pudimos nombrar este lugar, así que Ubicación no cambió. Edítalo a mano.",
       "regionNone": "Ninguna zona seleccionada",
       "requiredLegend": "Los campos marcados con un asterisco son obligatorios.",
       "regionHint": "Zonas destacadas que los huéspedes exploran. Opcional: elige la que corresponda a tu alojamiento.",
@@ -2357,6 +2439,29 @@
         "failed": "No se pudo procesar el documento. Sube una foto o un PDF.",
         "uploadFailed": "No se pudo enviar el documento. Inténtalo de nuevo."
       }
+    },
+    "visibility": {
+      "deactivate": "Desactivar",
+      "reactivate": "Reactivar",
+      "working": "Procesando…",
+      "declined": "{count, plural, one {Se ha rechazado # solicitud de reserva.} other {Se han rechazado # solicitudes de reserva.}}",
+      "confirm": {
+        "title": "¿Desactivar este alojamiento?",
+        "body": "«{title}» desaparecerá de las búsquedas y nadie podrá reservarlo.",
+        "declines": "{count, plural, one {Se rechazará # solicitud de reserva que sigue esperando tu respuesta.} other {Se rechazarán # solicitudes de reserva que siguen esperando tu respuesta.}}",
+        "reassurance": "No se borra nada. Las reservas que ya confirmaste quedan exactamente igual y puedes reactivar este alojamiento cuando quieras.",
+        "cta": "Sí, desactivar",
+        "cancel": "Mantenerlo publicado"
+      },
+      "blocked": {
+        "verification": "Reactivado, pero tu alojamiento seguirá oculto hasta que se verifique tu identidad de nuevo.",
+        "staff": "Reactivado, pero tu alojamiento seguirá oculto mientras nuestro equipo lo revisa. Contacta con soporte para más detalles.",
+        "rejected": "Reactivado, pero tu alojamiento seguirá oculto porque no fue aprobado. Corrige los puntos de la nota de revisión y vuelve a enviarlo.",
+        "under_review": "Reactivado: tu alojamiento se publicará en cuanto nuestro equipo lo apruebe."
+      },
+      "errors": {
+        "failed": "No se pudo actualizar este alojamiento. Inténtalo de nuevo."
+      }
     }
   },
   "hostApply": {
@@ -2508,6 +2613,7 @@
       "rejected": "Rechazada"
     },
     "inactiveNotice": "Esta reserva ya no está activa. Contacta con tu anfitrión si crees que es un error.",
+    "unpaidNotice": "Este pase aún no está activo: el pago de esta estancia sigue pendiente. Se abrirá en cuanto confirmemos la transferencia.",
     "hostNotes": "Una nota de tu anfitrión",
     "guide": {
       "heading": "Tu guía de estancia",
@@ -2535,7 +2641,9 @@
       "heading": "Tu pase de estancia",
       "scanHint": "Muestra este código QR al llegar.",
       "pendingTitle": "Tu código QR aparecerá aquí en cuanto se confirme tu reserva.",
-      "pendingBody": "Lo creamos en cuanto tu anfitrión apruebe la solicitud.",
+      "pendingBody": "Lo creamos cuando tu anfitrión apruebe la solicitud y se confirme tu pago.",
+      "unpaidTitle": "Tu código QR se abrirá en cuanto se confirme tu pago.",
+      "unpaidBody": "Tu anfitrión ha aprobado la estancia. Envía la transferencia y desbloquearemos tu pase en cuanto la comprobemos.",
       "openPass": "Abrir el pase",
       "copyLink": "Copiar enlace",
       "copied": "Enlace copiado"
@@ -2549,6 +2657,7 @@
       "loading": "Cargando la guía…",
       "empty": "Aún no has añadido nada.",
       "guestLink": "Enlace del huésped",
+      "guestLinkUnpaid": "El pase del huésped se abre cuando se confirme su pago. Puedes preparar la guía ahora: la verá entonces.",
       "itemsCount": "{count, plural, one {# elemento} other {# elementos}}",
       "kindLabel": "Tipo",
       "kinds": {

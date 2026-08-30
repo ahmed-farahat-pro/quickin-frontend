@@ -3,12 +3,19 @@
 //
 // Weekend pricing is optional: an empty field means "no weekend rate", and that
 // is what clears it. What is NOT optional is that a rate the host actually typed
-// has to be money. `0` used to be swallowed silently at every layer — the form
-// coerced it away, `createListing` wrote NULL — so the listing saved with the
-// weekend-day pills still lit up and no weekend price behind them. The host had
-// no way to tell the rate they entered had been dropped. A refusal is the only
-// honest answer: 0 is either a typo or a misunderstanding of the field, and both
+// has to be money. `0` was swallowed silently at every layer — the web form
+// coerced it away, both mobile pricing screens parsed it to nil, `createListing`
+// and `updateListing` wrote NULL — so the listing saved with the weekend-day
+// pills still lit up and no weekend price behind them. The host had no way to
+// tell the rate they entered had been dropped. A refusal is the only honest
+// answer: 0 is either a typo or a misunderstanding of the field, and both
 // deserve to be said out loud.
+//
+// Every door now runs this file or a twin of it: the two web forms import it
+// directly, `createListing`/`updateListing` run it before they write, and the
+// iOS (`ListingPricingRules.swift`) and Android (`ListingPricingRules.kt`)
+// pricing screens answer the same two questions in the same two words, so a
+// host is told by the screen they are typing into rather than by a 400.
 //
 // The days are deliberately not part of *that* rule. `DEFAULT_WEEKEND_DAYS` is
 // pre-selected on both forms, so "days chosen but no price" is the *normal*
@@ -211,4 +218,156 @@ export function resolveWeekendSchedule(
   if (!checked.ok) return checked
   if (checked.value.length === 0) return { ok: false, problem: 'noDaysChosen' }
   return { ok: true, days: checked.value }
+}
+
+// ---------------------------------------------------------------------------
+// Seasonal pricing: the per-month nightly rates
+// ---------------------------------------------------------------------------
+//
+// `listings.monthly_prices` is a jsonb map, month "1".."12" → nightly rate, and
+// it is the rung of the ladder directly under the weekend rate:
+//
+//     host calendar (listing_date_prices) → weekend → month → price_per_night
+//
+// (see date-pricing-core.ts, which owns the ladder itself.) A month with no
+// entry is not priced at zero — it simply has no opinion and falls through to
+// the base nightly price, so a blank field is how a host CLEARS a month.
+//
+// The rule for a month a host did fill in is the weekend rate's rule, for the
+// same reason: `0` is a typo or a misreading of the field, never "free in
+// August", and the storage layer used to drop it silently (`cleanMonthlyPrices`
+// on the API side kept only positive months). A dropped month looks exactly like
+// a month that was never set, so the host had no way to tell their August rate
+// went nowhere. Refuse it, and name the month that has to be fixed — which is
+// what `month` on the failure is for, and why `monthPriceMessage` exists.
+
+/** Months in a year — the keys `monthly_prices` is indexed by, 1..12. */
+export const MONTHS_IN_YEAR = 12
+
+/** How one typed month rate can fail. Clients switch on this, not on text. */
+export type MonthPriceProblem =
+  /** Not a number at all — `abc`, `1,500`, `--`. */
+  | 'notANumber'
+  /** A number, but not a price — `0`, `-200`. */
+  | 'notPositive'
+
+export type MonthlyPricesResult =
+  /** The cleaned map: only the months the host priced, as positive whole
+   *  numbers. `{}` is normal and means "no seasonal months". */
+  | { ok: true; value: Record<string, number> }
+  /** `month` is 1..12, so the caller can say WHICH month is wrong. */
+  | { ok: false; problem: MonthPriceProblem; month: number }
+
+/**
+ * Validate a month → nightly-rate map (values as typed: strings from a form, or
+ * numbers from a client). Blank, `null` and `undefined` entries are dropped —
+ * that is a month with no override, not an error. Keys outside 1..12 are
+ * dropped too: they cannot be reached by the ladder, so there is nothing to
+ * tell the host about them.
+ *
+ * Answers the cleaned map in ascending month order, or the first month whose
+ * value was typed and is not a price.
+ */
+export function checkMonthlyPrices(input: unknown): MonthlyPricesResult {
+  if (!input || typeof input !== 'object') return { ok: true, value: {} }
+  const entries = Object.entries(input as Record<string, unknown>)
+  // Sorted so the month reported back is the FIRST bad one on the form rather
+  // than whichever the object happened to enumerate first.
+  const months = entries
+    .map(([k, v]) => [Number(k), v] as const)
+    .filter(([m]) => Number.isInteger(m) && m >= 1 && m <= MONTHS_IN_YEAR)
+    .sort((a, b) => a[0] - b[0])
+  const out: Record<string, number> = {}
+  for (const [month, raw] of months) {
+    const checked = checkWeekendPrice(raw)
+    if (!checked.ok) return { ok: false, problem: checked.problem, month }
+    if (checked.value === null) continue
+    out[String(month)] = Math.round(checked.value)
+  }
+  return { ok: true, value: out }
+}
+
+/** Month 1..12 → its English name. Only the API says these out loud: the web
+ *  forms and both mobile apps name the month in the reader's own language, from
+ *  their own month formatter. */
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+
+/**
+ * English message for a rejected month rate — what the API answers with, and
+ * the reason `checkMonthlyPrices` reports WHICH month rather than just failing.
+ *
+ * A host with one bad month among twelve fields needs to be told which one; a
+ * bare "seasonal price must be greater than 0" sends them hunting.
+ */
+export function monthPriceMessage(problem: MonthPriceProblem, month: number): string {
+  const name = MONTH_NAMES[month - 1] ?? `Month ${month}`
+  return problem === 'notPositive'
+    ? `${name} price must be greater than 0`
+    : `${name} price must be a number`
+}
+
+// ---------------------------------------------------------------------------
+// Length-of-stay discounts
+// ---------------------------------------------------------------------------
+//
+// `listings.weekly_discount` comes off a stay of WEEKLY_DISCOUNT_MIN_NIGHTS or
+// more, `listings.monthly_discount` from MONTHLY_DISCOUNT_MIN_NIGHTS — whole
+// percentages off the summed nightly total, and only one of them applies (see
+// stayDiscountPercent in date-pricing-core.ts, which is the rule itself).
+//
+// The ceiling is 90, matching the API's clamp. It is a clamp there and a
+// refusal here for the usual reason: the API is clamping values arriving from
+// clients that never showed the host a field, while a host who typed 95 into a
+// field that saves 90 is owed the correction rather than the surprise.
+
+/** The most a host may take off a long stay, in whole percent. */
+export const MAX_STAY_DISCOUNT = 90
+
+/** How a typed length-of-stay discount can fail. */
+export type StayDiscountProblem =
+  /** Not a number at all — `abc`, `10%`, `--`. */
+  | 'notANumber'
+  /** A number, but not a whole percent — `7.5`. */
+  | 'notWhole'
+  /** Whole, but outside 0..MAX_STAY_DISCOUNT — `-5`, `95`. */
+  | 'outOfRange'
+
+export type StayDiscountResult =
+  /** `0` = no discount, which is what an empty field means and what clears one. */
+  | { ok: true; value: number }
+  | { ok: false; problem: StayDiscountProblem }
+
+/**
+ * Validate what the host typed for `weekly_discount` / `monthly_discount`.
+ *
+ * Empty means no discount rather than "leave it alone": these are `NOT NULL
+ * DEFAULT 0` columns, so `0` is both the resting value and the way back to it.
+ */
+export function checkStayDiscount(input: unknown): StayDiscountResult {
+  if (input === undefined || input === null) return { ok: true, value: 0 }
+  if (typeof input === 'string' && input.trim() === '') return { ok: true, value: 0 }
+  if (typeof input !== 'number' && typeof input !== 'string') return { ok: false, problem: 'notANumber' }
+  const n = Number(input)
+  if (!Number.isFinite(n)) return { ok: false, problem: 'notANumber' }
+  // Floored rather than refused on the API side; refused here — a host who
+  // typed 7.5 meant something, and 7 is not obviously it.
+  if (!Number.isInteger(n)) return { ok: false, problem: 'notWhole' }
+  if (n < 0 || n > MAX_STAY_DISCOUNT) return { ok: false, problem: 'outOfRange' }
+  return { ok: true, value: n }
+}
+
+/**
+ * Do these two discounts invert — i.e. does the monthly rate take LESS off than
+ * the weekly one it supersedes?
+ *
+ * Only one discount ever applies, so weekly 20 / monthly 10 means a 28-night
+ * stay costs more than a 27-night one on the same listing. That is legal, and
+ * a host may even want it, so it is not refused at any door — but it is almost
+ * always a mistake, and the forms say so beside the fields.
+ */
+export function stayDiscountsInvert(weekly: number, monthly: number): boolean {
+  return monthly > 0 && weekly > 0 && monthly < weekly
 }

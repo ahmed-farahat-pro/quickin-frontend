@@ -30,6 +30,14 @@ export interface Convo {
   last_message: string | null
   last_message_at: string
   is_host: boolean
+  /** 'booking' rows are the thread inside a reservation request — they used to be
+   *  missing from this list entirely, which is why the fields below exist. The
+   *  whole group is optional so an older API can still feed this page. */
+  kind?: 'listing' | 'booking'
+  booking_id?: string | null
+  check_in?: string | null
+  check_out?: string | null
+  booking_status?: string | null
 }
 
 export function MessagesClient({
@@ -131,6 +139,18 @@ export function MessagesClient({
                     {c.is_host && <span style={{ fontSize: 10.5, fontWeight: 700, color: C.burgundy, background: C.cream, borderRadius: 999, padding: '2px 7px' }}>{t('asHost')}</span>}
                   </div>
                   {c.listing_title && <div style={{ fontSize: 12.5, color: C.muted, marginTop: 2 }}>{c.listing_title}</div>}
+                  {/* Which stay this thread is about. Two threads with the same
+                      person about the same listing are otherwise identical rows —
+                      the dates are what tells a repeat guest's March booking from
+                      their August one. */}
+                  {c.kind === 'booking' && (
+                    <div style={{ fontSize: 11.5, color: C.burgundy, marginTop: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontWeight: 700, background: C.cream, borderRadius: 999, padding: '2px 7px' }}>{t('reservationThread')}</span>
+                      {c.check_in && c.check_out && (
+                        <span style={{ color: C.muted }}>{t('reservationDates', { checkIn: c.check_in, checkOut: c.check_out })}</span>
+                      )}
+                    </div>
+                  )}
                   {c.last_message && <div style={{ fontSize: 12.5, color: C.muted, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.last_message}</div>}
                 </button>
               ))}

@@ -162,6 +162,47 @@ export default async function ListingDetailPage({
           {t('backToExplore')}
         </a>
 
+        {/* Only the owner can be standing here looking at an unpublished listing —
+            the backend 404s it for everyone else — so this needs no isOwner check
+            of its own. Worth saying plainly: the page otherwise renders exactly as
+            it does when live, and a host who deactivated yesterday would have no
+            way to tell their listing is dark. */}
+        {listing.is_published === false && (
+          <div
+            role="status"
+            style={{
+              margin: '0 0 22px',
+              padding: '12px 16px',
+              borderRadius: 14,
+              background: '#fff',
+              border: '1px solid rgba(42,34,32,0.12)',
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: 10,
+            }}
+          >
+            <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink }}>
+              {t('hiddenPreview.title')}
+            </span>
+            <span style={{ fontSize: 13.5, color: COLORS.muted, flex: '1 1 240px' }}>
+              {t('hiddenPreview.body')}
+            </span>
+            <a
+              href="/host"
+              style={{
+                fontSize: 13.5,
+                fontWeight: 700,
+                color: COLORS.burgundy,
+                textDecoration: 'none',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {t('hiddenPreview.manage')} &rarr;
+            </a>
+          </div>
+        )}
+
         {/* Photos — clickable hero + thumbnail strip opening a lightbox */}
         <PhotoGallery images={images} title={listing.title} />
 

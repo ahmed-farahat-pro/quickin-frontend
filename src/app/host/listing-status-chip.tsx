@@ -1,7 +1,7 @@
-// The approval-status chip a host sees on their own listings: "Published",
-// "Under review", "Rejected". Shared by the dashboard cards (host/page.tsx, where
-// it sits over the photo) and the listing editor, so a listing that just went
-// back for review looks the same on both screens.
+// The status chip a host sees on their own listings: "Published", "Under review",
+// "Rejected", "Deactivated", "Hidden by our team". Shared by the dashboard cards
+// (host/page.tsx, where it sits over the photo) and the listing editor, so a
+// listing that just went back for review looks the same on both screens.
 //
 // Presentational only — the label arrives already translated (the dashboard's
 // hostPage.dashboard.badge.* / filters.* strings), so this works from a server
@@ -13,6 +13,12 @@ const BACKGROUNDS: Record<HostListingStatus, string> = {
   approved: 'rgba(23,114,69,0.95)',
   pending: 'rgba(138,109,27,0.95)',
   rejected: 'rgba(138,43,35,0.95)',
+  // Deactivated is a neutral slate, not a red: the host chose this, nothing is
+  // wrong, and colouring their own decision like a rejection would read as one.
+  deactivated: 'rgba(64,58,54,0.95)',
+  // Hidden by someone else. Warmer than deactivated so the two are told apart at
+  // a glance, but still not the rejection red — the listing was not judged.
+  blocked: 'rgba(106,74,60,0.95)',
 }
 
 export function ListingStatusChip({

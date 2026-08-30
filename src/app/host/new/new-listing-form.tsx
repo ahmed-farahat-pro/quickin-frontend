@@ -15,6 +15,15 @@ import { PROPERTY_TYPES, MAX_WEB_LISTING_PHOTOS } from '@/lib/property-types'
 import { REGIONS, AMENITIES } from '@/lib/listing-options'
 import { checkListingPin } from '@/lib/local/listing-geo-policy'
 import {
+  COUNTRIES,
+  REVERSE_GEOCODE_DEBOUNCE_MS,
+  countryCodeFor,
+  placeShort,
+  reverseGeocodeUrl,
+  reverseLabel,
+} from '@/lib/local/geo-label-core'
+import type { PlaceHit } from '@/lib/local/geo-label-core'
+import {
   checkListingAddress,
   checkListingArea,
   checkListingDescription,
@@ -26,7 +35,16 @@ import { OTHER_RESORT, isResortNameMissing } from '@/lib/resort-choice'
 import { checkResortName, MIN_RESORT_NAME_LETTERS } from '@/lib/local/resort-core'
 import { fileToCompressedDataUrl } from '@/lib/image'
 import { DEFAULT_WEEKEND_DAYS } from '@/lib/geo'
-import { DAYS_IN_WEEK, checkWeekendPrice, resolveWeekendSchedule } from '@/lib/local/listing-pricing-core'
+import {
+  DAYS_IN_WEEK,
+  checkMonthlyPrices,
+  checkStayDiscount,
+  checkWeekendPrice,
+  resolveWeekendSchedule,
+  MAX_STAY_DISCOUNT,
+} from '@/lib/local/listing-pricing-core'
+import { SeasonalPricingFields, useMonthNames } from '@/components/features/host/seasonal-pricing-fields'
+import { StayDiscountFields } from '@/components/features/host/stay-discount-fields'
 import { CANCELLATION_POLICIES, toPolicy } from '@/lib/cancellation-policies'
 import type { CancellationPolicy } from '@/lib/cancellation-policies'
 import {
@@ -95,41 +113,7 @@ function Req() {
 
 const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
 
-// Egypt-first. `code` is the ISO country code used to scope map geocoding.
-const COUNTRIES: { name: string; code: string }[] = [
-  { name: 'Egypt', code: 'eg' },
-  { name: 'Saudi Arabia', code: 'sa' },
-  { name: 'United Arab Emirates', code: 'ae' },
-  { name: 'Kuwait', code: 'kw' },
-  { name: 'Qatar', code: 'qa' },
-  { name: 'Bahrain', code: 'bh' },
-  { name: 'Oman', code: 'om' },
-  { name: 'Jordan', code: 'jo' },
-  { name: 'Lebanon', code: 'lb' },
-  { name: 'Morocco', code: 'ma' },
-]
-
 const CURRENCIES = ['EGP', 'USD', 'EUR', 'SAR', 'AED', 'GBP'] as const
-
-interface PlaceHit {
-  label: string // full display name (secondary line)
-  short: string // concise "place, city" (primary line + what we store)
-  lat: number
-  lon: number
-}
-
-// A concise "place, city" label from a Nominatim (jsonv2 + addressdetails) result.
-function placeShort(d: { name?: string; display_name?: string; address?: Record<string, string> }): string {
-  const a = d.address || {}
-  const primary =
-    d.name ||
-    a.suburb || a.neighbourhood || a.city_district ||
-    a.city || a.town || a.village ||
-    String(d.display_name || '').split(',')[0]
-  const city = a.city || a.town || a.village || a.state
-  if (primary && city && primary !== city) return `${primary}, ${city}`
-  return (primary || String(d.display_name || '').split(',').slice(0, 2).join(', ')).trim()
-}
 
 const dropdownStyle: React.CSSProperties = {
   listStyle: 'none',
@@ -160,6 +144,9 @@ export function NewListingForm({
 }) {
   const router = useRouter()
   const t = useTranslations('hostPage.create')
+  // Month names for the seasonal fields — and for naming the offending month
+  // when one of them is refused on submit.
+  const monthNames = useMonthNames()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -176,18 +163,32 @@ export function NewListingForm({
   const [resortOther, setResortOther] = useState('')
   const [lat, setLat] = useState<number | null>(null)
   const [lng, setLng] = useState<number | null>(null)
-  const [geo, setGeo] = useState<'idle' | 'locating' | 'fail'>('idle')
+  // 'locating'/'fail' belong to the forward geocode (words → pin); 'naming'/
+  // 'nameFail' to the reverse one (pin → words). One state because they share
+  // the single hint line under the map and can never run at the same time.
+  const [geo, setGeo] = useState<'idle' | 'locating' | 'fail' | 'naming' | 'nameFail'>('idle')
   const [placeResults, setPlaceResults] = useState<PlaceHit[]>([])
   const [placeOpen, setPlaceOpen] = useState(false)
   const placeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const placeAbortRef = useRef<AbortController | null>(null)
   const placeBlurRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // The reverse geocode gets its own debounce + abort so a pin drag and a
+  // half-typed location in the field never cancel one another.
+  const reverseDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reverseAbortRef = useRef<AbortController | null>(null)
   const [price, setPrice] = useState('')
   const [weekendPrice, setWeekendPrice] = useState('')
   // Moderate is the middle ground and the database default — a host who never
   // opens this field gets the same terms the backend would have given them.
   const [cancellationPolicy, setCancellationPolicy] = useState<CancellationPolicy>('moderate')
   const [weekendDays, setWeekendDays] = useState<number[]>(DEFAULT_WEEKEND_DAYS)
+  // Seasonal per-month rates ("1".."12" → the raw text typed) and the two
+  // length-of-stay discounts. All optional, all stored as strings until submit
+  // so a half-typed value isn't coerced into a price or a percentage — the
+  // same treatment weekendPrice above gets.
+  const [monthlyPrices, setMonthlyPrices] = useState<Record<string, string>>({})
+  const [weeklyDiscount, setWeeklyDiscount] = useState('')
+  const [monthlyDiscount, setMonthlyDiscount] = useState('')
   const [currency, setCurrency] = useState('EGP')
   const [bedrooms, setBedrooms] = useState('1')
   const [beds, setBeds] = useState('1')
@@ -221,6 +222,19 @@ export function NewListingForm({
     })
   }
 
+  // A month is set by typing a rate and cleared by emptying the field, so the
+  // key is dropped rather than kept as '' — the two mean the same thing to
+  // checkMonthlyPrices, and dropping it keeps the state honest about what the
+  // host has actually priced.
+  function setMonthPrice(month: string, value: string) {
+    setMonthlyPrices((prev) => {
+      const next = { ...prev }
+      if (value.trim() === '') delete next[month]
+      else next[month] = value
+      return next
+    })
+  }
+
   function toggleAmenity(value: string) {
     setAmenities((prev) => (prev.includes(value) ? prev.filter((a) => a !== value) : [...prev, value]))
   }
@@ -232,7 +246,7 @@ export function NewListingForm({
     if (!q) return
     setGeo('locating')
     try {
-      const code = COUNTRIES.find((c) => c.name === country)?.code
+      const code = countryCodeFor(country)
       const cc = code ? `&countrycodes=${code}` : ''
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&limit=1${cc}&q=${encodeURIComponent(q)}`
@@ -263,7 +277,7 @@ export function NewListingForm({
     }
     const controller = new AbortController()
     placeAbortRef.current = controller
-    const code = COUNTRIES.find((c) => c.name === country)?.code
+    const code = countryCodeFor(country)
     const cc = code ? `&countrycodes=${code}` : ''
     fetch(
       `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6${cc}&q=${encodeURIComponent(q)}`,
@@ -293,6 +307,50 @@ export function NewListingForm({
     placeDebounceRef.current = setTimeout(() => runPlaceSearch(value), 300)
   }
 
+  // The other direction: the host moved the pin, so the words have to follow.
+  //
+  // Coordinates are set at once — the pin must never lag the drag — and the
+  // label is fetched after the pin settles. Whatever comes back REPLACES the
+  // Location field: the field means "the words for where the pin is", and a
+  // stale address next to a moved pin is the bug this exists to fix. A host who
+  // wants their own wording types it after they finish moving the pin.
+  //
+  // The open autocomplete is closed and its results dropped, because they answer
+  // a query the host has stopped caring about — the pin is the input now.
+  function onPinChange(nextLat: number, nextLng: number) {
+    setLat(nextLat)
+    setLng(nextLng)
+    setPlaceOpen(false)
+    setPlaceResults([])
+    if (placeDebounceRef.current) clearTimeout(placeDebounceRef.current)
+    placeAbortRef.current?.abort()
+
+    if (reverseDebounceRef.current) clearTimeout(reverseDebounceRef.current)
+    reverseAbortRef.current?.abort()
+    setGeo('naming')
+    reverseDebounceRef.current = setTimeout(() => {
+      const controller = new AbortController()
+      reverseAbortRef.current = controller
+      fetch(reverseGeocodeUrl(nextLat, nextLng), { signal: controller.signal })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (controller.signal.aborted) return
+          const label = reverseLabel(data)
+          if (label) {
+            setLocation(label)
+            setGeo('idle')
+          } else {
+            // Nominatim knows the coordinate but has no words for it (open
+            // desert, open sea). Leave the field alone and say so.
+            setGeo('nameFail')
+          }
+        })
+        .catch((err) => {
+          if ((err as Error)?.name !== 'AbortError') setGeo('nameFail')
+        })
+    }, REVERSE_GEOCODE_DEBOUNCE_MS)
+  }
+
   function pickPlace(h: PlaceHit) {
     setLocation(h.short || h.label)
     setLat(h.lat)
@@ -307,7 +365,9 @@ export function NewListingForm({
     return () => {
       if (placeDebounceRef.current) clearTimeout(placeDebounceRef.current)
       if (placeBlurRef.current) clearTimeout(placeBlurRef.current)
+      if (reverseDebounceRef.current) clearTimeout(reverseDebounceRef.current)
       placeAbortRef.current?.abort()
+      reverseAbortRef.current?.abort()
     }
   }, [])
 
@@ -460,6 +520,29 @@ export function NewListingForm({
       return
     }
 
+    // The rung under the weekend rate: a nightly price for whichever months the
+    // host filled in. Blank months are dropped, a typed 0 is refused and named —
+    // the API's cleanMonthlyPrices would drop it silently, and a dropped month
+    // is indistinguishable from a month that was never set.
+    const months = checkMonthlyPrices(monthlyPrices)
+    if (!months.ok) {
+      setError(t(`errors.monthPrice.${months.problem}`, { month: monthNames[months.month - 1] }))
+      return
+    }
+
+    // Length-of-stay discounts. Empty means 0, which is the column default and
+    // the resting state of every listing that doesn't discount long stays.
+    const weekly = checkStayDiscount(weeklyDiscount)
+    if (!weekly.ok) {
+      setError(t(`errors.stayDiscount.${weekly.problem}`, { field: t('fields.weeklyDiscount'), max: MAX_STAY_DISCOUNT }))
+      return
+    }
+    const monthly = checkStayDiscount(monthlyDiscount)
+    if (!monthly.ok) {
+      setError(t(`errors.stayDiscount.${monthly.problem}`, { field: t('fields.monthlyDiscount'), max: MAX_STAY_DISCOUNT }))
+      return
+    }
+
     // …and the two required fields that sit below the capacity row: the property
     // type (always prefilled here, but the API accepts a payload without one)
     // and the photos. A listing with no photo is the one a guest scrolls past.
@@ -485,6 +568,9 @@ export function NewListingForm({
           price_per_night: priceNum,
           weekend_price,
           weekend_days: weekendSchedule.days ?? undefined,
+          monthly_prices: months.value,
+          weekly_discount: weekly.value,
+          monthly_discount: monthly.value,
           currency: currency.trim() || 'EGP',
           bedrooms,
           beds,
@@ -702,12 +788,23 @@ export function NewListingForm({
       {/* Map pin — sets lat/lng; guests see an approximate area, not the exact pin. */}
       <div style={fieldWrap}>
         <label style={label}>{t('fields.pinLocation')}<Req /></label>
-        <LocationPickerMap lat={lat} lng={lng} onChange={(la, ln) => { setLat(la); setLng(ln) }} />
-        <p style={{ margin: '6px 0 0', fontSize: 12.5, color: geo === 'fail' ? C.burgundy : C.muted }}>
+        <LocationPickerMap lat={lat} lng={lng} onChange={onPinChange} />
+        <p
+          role="status"
+          style={{
+            margin: '6px 0 0',
+            fontSize: 12.5,
+            color: geo === 'fail' || geo === 'nameFail' ? C.burgundy : C.muted,
+          }}
+        >
           {geo === 'locating'
             ? t('locating')
             : geo === 'fail'
             ? t('geocodeFail')
+            : geo === 'naming'
+            ? t('pinNaming')
+            : geo === 'nameFail'
+            ? t('pinNameFail')
             : lat != null && lng != null
             ? t('pinSet', { lat: lat.toFixed(4), lng: lng.toFixed(4) })
             : t('pinHint')}
@@ -841,6 +938,31 @@ export function NewListingForm({
             {t('errors.weekendDays.noDaysChosen')}
           </p>
         )}
+      </div>
+
+      {/* Seasonal pricing — a nightly rate per month, under the weekend rate on
+          the ladder. Optional; a blank month uses the price per night above. */}
+      <div style={fieldWrap}>
+        <label style={label}>{t('fields.seasonalPricing')}</label>
+        <SeasonalPricingFields
+          values={monthlyPrices}
+          onChange={setMonthPrice}
+          currency={currency}
+          commissionRate={commissionRate}
+          inputStyle={input}
+        />
+      </div>
+
+      {/* Length-of-stay discounts — off the whole stay, not the nightly rate. */}
+      <div style={fieldWrap}>
+        <label style={label}>{t('fields.stayDiscounts')}</label>
+        <StayDiscountFields
+          weekly={weeklyDiscount}
+          monthly={monthlyDiscount}
+          onWeekly={setWeeklyDiscount}
+          onMonthly={setMonthlyDiscount}
+          inputStyle={input}
+        />
       </div>
 
       <div className="qk-new-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, ...fieldWrap }}>

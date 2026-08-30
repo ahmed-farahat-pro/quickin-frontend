@@ -2,20 +2,24 @@
 
 // Ownership document (proof the host owns / may list the place) — the web half
 // of the flow the iOS + Android apps already have. A deed or a utility bill is
-// as often a PDF as a photo, so both are accepted here (the mobile pickers are
-// photos-only); ownership-doc-core.ts holds the rule the server enforces. Two
+// as often a PDF as a photo, so both are accepted here — and, since 2026-08-26,
+// on both phones too (`OwnershipDocPicker.swift` / `OwnershipDocLoader.kt`);
+// ownership-doc-core.ts holds the rule the server enforces. Two
 // widgets, both talking to the same `ownership_doc` field:
 //  - OwnershipDocField: the labelled picker used by the create and edit forms.
 //    It only holds the compressed data URL; the parent form sends it.
-//  - OwnershipDocReupload: the "Re-upload ownership document" button on the host
-//    dashboard cards. It PATCHes /api/local/listings/:id itself, which re-queues
-//    the listing for review (approval_status='pending', unpublished).
+//  - OwnershipDocAction: the upload button on the host dashboard cards. It
+//    PATCHes /api/local/listings/:id itself, which re-queues the listing for
+//    review (approval_status='pending', unpublished). It says "Upload" or
+//    "Re-upload" depending on whether a document is actually on file — the
+//    document is optional at create time, so most listings in the queue have
+//    never had one.
 // The document is admin-only — it is reviewed in /ops and never shown publicly.
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { fileToOwnershipDocDataUrl, MAX_OWNERSHIP_DOC_CHARS } from '@/lib/image'
-import { isPdfDataUrl, OWNERSHIP_DOC_ACCEPT } from '@/lib/local/ownership-doc-core'
+import { isPdfDataUrl, ownershipDocAction, OWNERSHIP_DOC_ACCEPT } from '@/lib/local/ownership-doc-core'
 import { CARD_ACTION_STYLE } from './card-action-style'
 
 const C = {
@@ -169,12 +173,26 @@ export function OwnershipDocField({
 }
 
 /**
- * "Re-upload ownership document" for a listing that is under review or was
- * rejected (mirrors iOS `approval.reupload`). Sends the new document straight to
- * PATCH /api/local/listings/:id, then refreshes the server-rendered dashboard so
- * the card's status badge reflects the fresh review queue entry.
+ * The ownership-document button on a host card for a listing that is under review
+ * or was rejected (mirrors iOS `approval.uploadDoc` / `approval.reupload`). Sends
+ * the new document straight to PATCH /api/local/listings/:id, then refreshes the
+ * server-rendered dashboard so the card's status badge reflects the fresh review
+ * queue entry.
+ *
+ * `hasDoc` decides the wording, and only the wording. It is NOT the same question
+ * as the listing's moderation state: the document is optional at create time, so
+ * a listing lands in the queue as 'pending' with nothing attached, and labelling
+ * this button off the status alone told those hosts to "re-upload" a document
+ * they had never uploaded.
  */
-export function OwnershipDocReupload({ listingId }: { listingId: string }) {
+export function OwnershipDocAction({
+  listingId,
+  hasDoc = false,
+}: {
+  listingId: string
+  /** `has_ownership_doc` from the host listing projection. */
+  hasDoc?: boolean
+}) {
   const router = useRouter()
   const t = useTranslations('hostPage.ownershipDoc')
   const [busy, setBusy] = useState(false)
@@ -231,7 +249,7 @@ export function OwnershipDocReupload({ listingId }: { listingId: string }) {
           opacity: busy ? 0.7 : 1,
         }}
       >
-        {busy ? t('uploading') : t('reupload')}
+        {busy ? t('uploading') : t(ownershipDocAction(hasDoc))}
       </button>
       {done && !error && (
         <p role="status" style={{ margin: '8px 0 0', fontSize: 12.5, color: '#177245', fontWeight: 700 }}>

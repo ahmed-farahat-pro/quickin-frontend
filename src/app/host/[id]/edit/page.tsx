@@ -78,6 +78,12 @@ export default async function EditListingPage({ params }: { params: Promise<{ id
     approved: tDash('filters.published'),
     pending: tDash('badge.pending'),
     rejected: tDash('badge.rejected'),
+    // The editor derives its chip from approval_status alone, so it never shows
+    // these two — the visibility states belong to the dashboard card, where the
+    // button that changes them lives. Present so the label map stays total and a
+    // future use cannot ship without wording.
+    deactivated: tDash('badge.deactivated'),
+    blocked: tDash('badge.blocked'),
   }
 
   return (

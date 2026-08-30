@@ -50,16 +50,19 @@ export default async function OpsPaymentsPage() {
     // The config comes from the staff-gated settings route — /api/local/payment-config
     // is the GUEST view and rejects a staff cookie. One call covers BOTH destination
     // panels: either settings route returns the whole config.
-    const [config, queues] = await Promise.all([
+    const [config, queues, refunds] = await Promise.all([
       backendFetchOr<Initial['config'] | null>('/api/local/admin/settings/instapay', null),
       backendFetchOr<{ pending: Initial['pending']; disputes: Initial['disputes'] }>(
         '/api/local/admin/payments',
         { pending: [] as unknown as Initial['pending'], disputes: [] as unknown as Initial['disputes'] },
       ),
+      // Money owed OUT on cancelled reservations. Its own call because it is its own
+      // route — the two queues above share one endpoint, this one does not.
+      backendFetchOr<Initial['refunds']>('/api/local/admin/refunds', { due: [], settled: [] }),
     ])
     // `null` means the load failed, which is not the same as "no rows" — the client
     // then fetches for itself, so a hiccup costs a moment rather than the screen.
-    if (config) initial = { config, pending: queues.pending, disputes: queues.disputes }
+    if (config) initial = { config, pending: queues.pending, disputes: queues.disputes, refunds }
   }
 
   return (
@@ -91,7 +94,8 @@ export default async function OpsPaymentsPage() {
           Payments
         </h1>
         <p style={{ margin: '0 0 28px', fontSize: 15, color: COLORS.muted }}>
-          Set the destinations guests transfer to, confirm transfers, and resolve disputes.
+          Set the destinations guests transfer to, confirm transfers, refund cancelled
+          reservations, and resolve disputes.
         </p>
 
         {!allowed ? (

@@ -3,10 +3,20 @@
 // Incoming reservations for the host: fetches GET /api/local/host/bookings and
 // renders each request with Approve / Decline buttons that PATCH
 // /api/local/bookings/[id] { status: 'confirm' | 'reject' } and refresh the list.
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslations, useLocale } from 'next-intl'
 import { ShimmerStyles, SkeletonRow } from '@/components/ui/skeleton-block'
 import { StayGuideEditor } from './stay-guide-editor'
+import { hostBookingsFrom } from '@/lib/local/host-bookings-core'
+import { everPaid, paymentStageFor } from '@/lib/local/payment-flow-core'
+import {
+  HOST_BOOKING_FILTER_ORDER,
+  hostBookingBucketFor,
+  hostBookingFilterCounts,
+  hostBookingFilterMatches,
+  type HostBookingBucket,
+  type HostBookingFilter,
+} from '@/lib/local/host-booking-filter-core'
 
 const C = {
   burgundy: '#5B0F16',
@@ -30,11 +40,22 @@ interface HostBooking {
   payment_reject_reason?: string | null
   payment_method?: string | null
   created_at: string
+  /** The guest's full name. Host-only, and null when their account is gone. */
   guest_name: string | null
-  listing_title: string | null
+  /** The listing's name. `listing_title` was the pre-merge alias and is no longer
+   *  sent; it stays in the union so a row from either shape still renders. */
   title?: string
-  /** Issued at approval — null while the request is still pending. */
+  listing_title?: string | null
+  /** Issued at approval — null while the request is still pending. Not the pass:
+   *  see `isLiveStayPass`, which also requires the payment. */
   reservation_code: string | null
+  /** Raw bookings.payment_status — the rollup, not the derived paid/unpaid flag. */
+  payment_state?: string | null
+  /** Stamped when the payment was approved; null while it is outstanding. */
+  paid_at?: string | null
+  /** Percent of the total refunded on cancel (0–100); null when never cancelled.
+   *  Splits the Cancelled chip into Cancelled / Refunded / Partially refunded. */
+  refund_percent?: number | null
 }
 
 // BCP47 mapping mirrors the app's i18n config so dates render in the active locale.
@@ -71,6 +92,95 @@ function paymentChip(
   return null
 }
 
+/**
+ * Which bucket a reservation sits in. The payment half comes from
+ * `paymentStageFor` rather than being re-read off the columns here — that
+ * function is the single source of truth for "has the money landed", and a
+ * second opinion is how the guest UI once ended up asking for payment twice.
+ */
+function bucketOf(b: HostBooking): HostBookingBucket {
+  return hostBookingBucketFor({
+    status: b.status,
+    paymentStage: paymentStageFor(b),
+    refundPercent: b.refund_percent,
+    // A separate question from the stage, which calls everything cancelled
+    // `not_payable` and so cannot tell a refund from a booking nobody ever paid for.
+    wasPaid: everPaid(b),
+  })
+}
+
+/** Chip key → the camelCase leaf under `hostPage.reservations.filter`. The
+ *  filter keys are snake_case (they mirror the database vocabulary) and the
+ *  message catalogue is camelCase, so the mapping is spelled out rather than
+ *  built by string surgery. */
+const FILTER_KEYS: Record<HostBookingFilter, string> = {
+  all: 'all',
+  pending: 'pending',
+  awaiting_payment: 'awaitingPayment',
+  confirmed: 'confirmed',
+  rejected: 'rejected',
+  cancelled: 'cancelled',
+  refunded: 'refunded',
+  partially_refunded: 'partiallyRefunded',
+}
+
+/** A pill in the status chip row, matching the listings filter on host-tabs.tsx. */
+function FilterPill({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string
+  count?: number
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      style={{
+        appearance: 'none',
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+        fontSize: 13.5,
+        fontWeight: 600,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: count === undefined ? '8px 16px' : '8px 10px 8px 16px',
+        borderRadius: 999,
+        border: `1px solid ${active ? C.burgundy : 'rgba(42,34,32,0.16)'}`,
+        color: active ? '#fff' : C.ink,
+        background: active ? C.burgundy : '#fff',
+        transition: 'background 0.15s ease, color 0.15s ease, border-color 0.15s ease',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {label}
+      {count === undefined ? null : (
+        <span
+          style={{
+            fontSize: 11.5,
+            fontWeight: 700,
+            lineHeight: 1,
+            padding: '3px 7px',
+            borderRadius: 999,
+            minWidth: 20,
+            textAlign: 'center',
+            color: active ? '#fff' : C.muted,
+            background: active ? 'rgba(255,255,255,0.22)' : C.tan,
+          }}
+        >
+          {count}
+        </span>
+      )}
+    </button>
+  )
+}
+
 function fmtDate(d: string, locale: string): string {
   const date = new Date(d + 'T00:00:00')
   if (Number.isNaN(date.getTime())) return d
@@ -98,6 +208,16 @@ export function HostReservations() {
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [rowError, setRowError] = useState<{ id: string; msg: string } | null>(null)
+  // The status chip row. Client-side over the already-loaded rows, so switching
+  // is instant — /api/local/host/bookings takes no query params and returns
+  // every reservation, the same way the listings filter works.
+  const [filter, setFilter] = useState<HostBookingFilter>('all')
+  // Counted over every reservation, not the visible slice — a chip has to say
+  // what it would show, which is the opposite of what is on screen right now.
+  const counts = useMemo(
+    () => hostBookingFilterCounts((bookings ?? []).map(bucketOf)),
+    [bookings]
+  )
   // Per-booking transfer-screenshot viewer (fetched on demand, then toggled).
 
   const load = useCallback(async () => {
@@ -112,8 +232,10 @@ export function HostReservations() {
         const e = await res.json().catch(() => ({}))
         throw new Error(e.error || t('loadError'))
       }
+      // The backend answers this route with a bare array (the same body iOS and
+      // Android decode). Reading `data.bookings` here is what hid every request.
       const data = await res.json()
-      setBookings(Array.isArray(data.bookings) ? data.bookings : [])
+      setBookings(hostBookingsFrom<HostBooking>(data))
     } catch (e) {
       setBookings([])
       setError(e instanceof Error ? e.message : t('loadError'))
@@ -185,6 +307,9 @@ export function HostReservations() {
     )
   }
 
+  // The "you have no reservations at all" state, which is a different thing from
+  // "nothing in this status" below — it gets no chip row, because there is
+  // nothing to filter and eight empty chips would only be noise.
   if (bookings.length === 0) {
     return (
       <div style={{ ...card, textAlign: 'center', color: C.muted, padding: '40px 24px' }}>
@@ -196,9 +321,43 @@ export function HostReservations() {
     )
   }
 
+  const visible = bookings.filter((b) => hostBookingFilterMatches(filter, bucketOf(b)))
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {bookings.map((b) => {
+      <div
+        role="group"
+        aria-label={t('filter.label')}
+        style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}
+      >
+        {HOST_BOOKING_FILTER_ORDER.map((key) => (
+          <FilterPill
+            key={key}
+            label={t(`filter.${FILTER_KEYS[key]}`)}
+            // "All" stays bare: its count is just the number of cards below it,
+            // and iOS leaves it bare for the same reason.
+            count={key === 'all' ? undefined : counts[key]}
+            active={filter === key}
+            onClick={() => setFilter(key)}
+          />
+        ))}
+      </div>
+
+      {visible.length === 0 ? (
+        <div style={{ ...card, textAlign: 'center', color: C.muted, padding: '36px 24px' }} role="status">
+          <p style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 700, color: C.ink }}>
+            {t('filter.emptyTitle')}
+          </p>
+          <p style={{ margin: 0, fontSize: 14 }}>{t('filter.emptySubtitle')}</p>
+          {/* The only action that can change this result — a host cannot conjure
+              a reservation into a status, so "show all" is the way out. */}
+          <button type="button" onClick={() => setFilter('all')} style={{ ...ghostBtn, marginTop: 14 }}>
+            {t('filter.showAll')}
+          </button>
+        </div>
+      ) : null}
+
+      {visible.map((b) => {
         const chipColors = statusChipColors(b.status)
         const paid = b.payment_status === 'paid'
         const payChip = paymentChip(b, t)
@@ -327,14 +486,24 @@ export function HostReservations() {
               </div>
             )}
 
-            {/* The stay guide (and the guest's QR with it) only exists on an
-                approved reservation — while it's pending we say so instead of
-                offering an editor whose writes the API would reject. */}
+            {/* The stay guide only exists on an approved reservation — while it's
+                pending we say so instead of offering an editor whose writes the
+                API would reject. The guest's QR is gated more tightly still,
+                inside the editor: it waits for the payment (isLiveStayPass). */}
             {b.status === 'pending' && (
               <p style={{ margin: '12px 0 0', fontSize: 13, color: C.muted }}>{tGuide('locked')}</p>
             )}
             {b.status === 'confirmed' && (
-              <StayGuideEditor bookingId={b.id} reservationCode={b.reservation_code} />
+              <StayGuideEditor
+                bookingId={b.id}
+                reservationCode={b.reservation_code}
+                status={b.status}
+                // `payment_status` is the raw rollup the backend sends today;
+                // `payment_state` was the older web API's name for it.
+                paymentState={b.payment_state ?? b.payment_status}
+                proofStatus={b.payment_proof_status}
+                paidAt={b.paid_at}
+              />
             )}
 
             {rowError?.id === b.id && (

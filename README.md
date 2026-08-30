@@ -814,7 +814,10 @@ The verdict comes from **bounding boxes** — one per country the form offers, o
 curated area (North Coast, Ain Sokhna, El Gouna, Cairo). Not a polygon and not a
 reverse-geocode: a reverse-geocode is a rate-limited Nominatim call on every pin drag,
 offline on mobile and fuzzy to compare against free text, while a box is explainable
-to the operator who has to act on it. The boxes are padded outward and the regions are
+to the operator who has to act on it. (The web forms *do* now reverse-geocode a moved
+pin — see [The Location field follows the pin](#the-location-field-follows-the-pin) —
+but for the **words**, not the verdict. The check above still runs on boxes, still runs
+with no network, and still runs on mobile and in the backend where no such call is made.) The boxes are padded outward and the regions are
 drawn wide — "Cairo" is Greater Cairo including Giza, Sheikh Zayed, 6th of October and
 New Cairo — because a warning on a genuine listing is the expensive failure here.
 
@@ -847,6 +850,51 @@ drift. `mobile/ios/Sources/ListingGeoPolicy.swift` and
 `mobile/android/…/com/quickin/app/ListingGeoPolicy.kt` carry the same boxes in Swift and
 Kotlin. Those two are kept in step **by hand** — no script guards them — so the boxes
 are the contract between all four files.
+
+## The Location field follows the pin
+
+The host form asks for the place twice — in words (**Location**) and as a pin on the
+map — and the wiring only ever ran one way. Typing a place and picking a suggestion
+moved the pin; **dragging the pin changed nothing but the coordinates**. The field kept
+the words of wherever the pin used to be, so a listing could read `Porto Marina, El
+Alamein` with its pin an hour down the coast, and the host had no way to tell which of
+the two a guest would be shown. Reported as *[Web] Location Field Is Not Updated After
+Manually Moving Map Pin*.
+
+**`src/lib/local/geo-label-core.ts`** is the missing direction. It is pure — no fetch,
+no React — because the fiddly part is what a coordinate should *read* as, and pure rules
+run under `node --test`:
+
+| Export | What it decides |
+| --- | --- |
+| `reverseLabel(result)` | The Location text for a pin the host just moved. `"suburb, city"`, reaching down through `village` → `hamlet` → `town` → `road` when Nominatim has nothing finer, then falling back to `"governorate, country"` and finally the country alone. A `name` that is merely the **road** mirrored back is demoted to where `road` already sits — otherwise a pin near Ain Sokhna reads `Street 92, Suez` instead of `Al Obour Housing, Suez`. Returns `''` when there are no place words at all |
+| `placeShort(result)` | The autocomplete label, unchanged — it lived duplicated byte-for-byte in both host forms before it moved here |
+| `reverseGeocodeUrl(lat, lng)` | `zoom=16`, so the field gets `Sidi Abdel Rahman, Marsa Matrouh` rather than a house number |
+| `COUNTRIES` / `countryCodeFor` | The ten countries and the ISO code the geocoder scopes by. Also previously duplicated in both forms |
+
+Both forms now hand the map an `onPinChange` that sets the coordinates **immediately**
+(the pin must never lag the drag) and fetches the label after the pin settles —
+`REVERSE_GEOCODE_DEBOUNCE_MS` = 500 ms, behind an `AbortController`, because Nominatim's
+usage policy is one request a second and a host correcting themselves fires several map
+clicks in a row. The open autocomplete is closed and its results dropped: they answer a
+query the host has stopped caring about.
+
+The label **replaces** whatever is in the field, including text the host typed by hand.
+The field means *the words for where the pin is*; a stale address beside a moved pin is
+the bug, and a host who wants their own wording types it after they finish moving the
+pin. Both directions run the same label rules, so picking `Marassi` from the dropdown and
+dragging the pin onto Marassi put the same words in the field — a rewrite the host cannot
+account for is its own kind of bug.
+
+When Nominatim knows the coordinate but has no words for it — open desert, open sea — the
+field is **left alone** and the line under the map says so
+(`hostPage.create.pinNameFail`). Blanking a Location the host typed is worse than leaving
+it stale, and unlike the stale case they can watch it happen. The same line carries
+`pinNaming` while the lookup is in flight, and it is a `role="status"` so the change is
+announced rather than only drawn.
+
+This is web-only. The iOS and Android add-listing flows have the same two fields and were
+not touched here.
 
 ## A rejected listing has to say why
 
@@ -1008,6 +1056,22 @@ refused on both sides now — `/ops` never rendered it, so accepting it only eve
 stored a document nobody could open. A PDF is stored exactly as uploaded: there
 is nothing to downscale, so the cap is a limit hosts actually meet, and `/ops`
 opens it in the browser's own sandboxed PDF viewer.
+
+**"Re-upload" is a claim, and it has to be true.** The ownership document is
+*optional* at create time, so a listing reaches the moderation queue with nothing
+attached — and the host card used to label its button off the approval status
+(pending or rejected → **Re-upload ownership document**), telling hosts to
+re-upload a document they had never uploaded. All three clients did this. The host
+listing projection now carries **`has_ownership_doc`** — a boolean, never the
+document — and `ownershipDocAction` in `ownership-doc-core.ts` turns it into the
+label: `'reupload'` only for `true`, `'upload'` for `false` **and for absent**,
+since an older client's unknown must not become a claim that a document is on file.
+
+| Piece | What it does |
+| --- | --- |
+| `app/host/page.tsx` → `OwnershipDocAction` | The card button on a pending / rejected listing. `hasDoc` decides the wording; the moderation status still decides whether the button appears at all |
+| `app/host/[id]/edit/page.tsx` | Already read `has_ownership_doc` to say "Document on file" vs "Not added" on the edit form — the field the host projection never actually sent, so it read "Not added" for every listing. The same backend change fixes it |
+| iOS `Listing.hasOwnershipDoc`, Android `Listing.hasOwnershipDoc` | The same rule, mirrored — the mobile dashboards cannot import the core |
 
 **1. `users.verification_status` is the source of truth.** `id_verifications` is the
 submission log; the user row is what every badge reads — the mobile apps'
@@ -1337,9 +1401,9 @@ npm run check     # same; the pre-deploy gate
 | `resort-choice.ts` | The resort dropdown's form rule: that **Other** with an empty or whitespace-only name is refused — it used to submit as `resort_name: undefined`, which the server cannot tell from "no resort chosen", so the host's answer was silently dropped — and the half that matters more, that the rule never fires for the no-resort choice or a catalog pick, including when stale text is left in the hidden box |
 | `user-admin-core.ts` | Users-list query parsing and clamping, the full block/remove transition matrix, the `ORDER BY` injection guard, blocked-login copy |
 | `activity-core.ts` | Activity/audit filter parsing, the UNION branch limits, the audit-action label map, and `alertsFor` — including that an operator never receives an alert for a module they don't hold |
-| `payment-flow-core.ts` | Which stage a booking is at (`paymentStageFor`), the shared `canPay` predicate, what an admin decision writes, and the proof-image validator — including that a submitted screenshot is never "awaiting payment" |
+| `payment-flow-core.ts` | Which stage a booking is at (`paymentStageFor`), the shared `canPay` predicate, what an admin decision writes, and the proof-image validator — including that a submitted screenshot is never "awaiting payment". Plus `everPaid`, the OTHER payment question: not "can this be paid now" but "did money ever arrive", which the stage cannot answer because it calls everything cancelled `not_payable`. Its tests pin the `paid_at` trap — a refund NULLs that column, so `refunded`/`voided` have to be read off `payment_status` or every refunded booking reads as never paid |
 | `document-core.ts` | Document-kind validation, the data-URL parser and its mime allowlist (SVG and HTML are rejected — these bytes render in an admin's browser), the verification state machine, and which module owns which document |
-| `ownership-doc-core.ts` | What a host may attach as proof of ownership: an image, a real PDF (checked by magic number, not by the mime the uploader typed) or an http(s) link, under the 3.5M-char cap. Shared verbatim with quickin-backend — `scripts/check-ownership-doc-core-parity.mjs` there fails on drift |
+| `ownership-doc-core.ts` | What a host may attach as proof of ownership: an image, a real PDF (checked by magic number, not by the mime the uploader typed) or an http(s) link, under the 3.5M-char cap — plus `ownershipDocAction`, which offers "Upload" rather than "Re-upload" for a listing that has never had a document, including when the flag is absent entirely. Shared verbatim with quickin-backend — `scripts/check-ownership-doc-core-parity.mjs` there fails on drift |
 | `xlsx.ts` | Cell typing (numbers stay numeric so Excel can sum them), sheet-name sanitizing, filename safety |
 | `moderation-core.ts` | The flag threshold (one attempt, and why not three), the three moderator actions and the fact that permanent removal is not one of them, the warning fallback copy, and the 409 `policyWarning` contract all three clients branch on — including that `error` repeats the warning so an old app build still shows it |
 | `disputes-core.ts` | Which bookings can be disputed (and why pending and cancelled can't), that `closed` is terminal while `resolved` can reopen, that a no-op transition is refused, and the validators — including that one bad attachment out of four doesn't lose the whole filing |
@@ -1356,8 +1420,12 @@ npm run check     # same; the pre-deploy gate
 | `avatar-core.ts` | The profile photo: that a base64 `data:` JPEG/PNG/WebP gets in and an `https://` link does **not** (the reason is in `/account` → Profile photo above), that HTML, PDF and SVG data URLs are refused, that a mangled base64 payload is not a photo, the size ceiling and the decoded-bytes math behind it, that `null`/`''`/blank all mean "remove" while the literal string `null` does not — and that the 256px / q0.8 constants still match the iOS picker, since a drift there is a photo that weighs one thing on the phone and another on the site |
 | `listing-capacity-policy.ts` | The four capacity counts: that `0`, `'0'` and `٠` are refused for bedrooms, beds, bathrooms **and** guests (the bug the module was written for), that a fraction is refused rather than floored into that same zero, that the JSON shapes `Number()` would coerce into a count (`true`, `['2']`) are not counts — and the half that matters as much, that an omitted field still falls back to the create defaults so the mobile apps' partial payloads are never answered with a 400, that a 40-bedroom villa is not an error, and that `required` is reported before `notWhole` so a blank field hears the real problem |
 | `listing-completeness-policy.ts` | The bar a NEW listing clears: that a title and a price alone are refused (the reported bug), that each of the six required fields is caught when it alone is missing, that the first problem is reported in **form order** so a host is sent to the topmost empty field, that twenty symbols are `letters` rather than a long-enough description, that half a pin is no pin while `0,0` is a real coordinate, and that a non-array or junk `images` value is zero photos rather than an exemption — plus the halves that matter as much, that a complete listing passes untouched and that a chosen **resort** answers the area question on its own, since the region is derived from it. For the edit door: that every required field is refused when a patch clears it, that a field the patch does not mention is left alone (the empty ownership-doc-only patch the iOS app sends still goes through), that half a pin patch is judged against the half already stored, and that a resort on the listing answers a cleared region |
+| `geo-label-core.ts` | The words that go with the pin: the reported bug's case (a pin dragged out of Porto into a named suburb reads as that suburb), that a named feature at the pin outranks the administrative words, that a village outranks the road running through it — `Sahl Hasheesh`, not `Sahl Hasheesh Road, Sahl Hasheesh` — while a desert highway with no settlement does use the road, and six **captured live responses** (Sidi Abdel Rahman, El Gouna, Ain Sokhna, downtown Cairo, the Western Desert, the open Mediterranean) that pin the road-vs-neighbourhood ordering to what the service really returns at `zoom=16`, that a city is never qualified by the governorate that shares its name, the coarse desert/sea fallbacks down to the country, that `''` (not a wrong label) comes back when there are no place words and when the fetch itself failed, and that the two directions agree — the same place picked from the dropdown and reached by dragging the pin produce identical text |
 | `listing-geo-policy.ts` | The map pin against the words around it: the reported bug (Egypt + North Coast, pin in Berlin) and that the country is named before the region, since it is the bigger mistake; every curated area against every other, so a Cairo pin on a North Coast listing is caught too; that Greater Cairo and the whole Alexandria → Marsa Matrouh strip are **not** flagged, because a box that refuses real listings is the worse failure; Morocco's negative longitudes; and the silence the module keeps where it cannot judge — no pin, an unknown country, an unknown region, an unparseable coordinate |
-| `listing-pricing-core.ts` | The host's weekend rate: that `0`, `'0'`, `'0.0'` and `-50` are refused rather than silently stored as "no weekend rate" (the bug the module was written for), and the half that matters as much — that `null`, `undefined` and a blank field still mean "no weekend rate" so a host can turn the feature off and the apps' `null` is never answered with a 400; plus the JSON shapes `Number()` would happily coerce into a price (`true`, `[]`, `['1500']`); and the day set that rate applies to — that all seven days is refused however it is padded (repeats, junk, reverse order), that six of seven and a lone day are not, that an empty set still means "nothing is a weekend", and that `3.7` is dropped rather than floored into Wednesday; and the two halves judged as a pair — that a rate with no day is refused, that a *missing* day set is not an empty one (it takes `DEFAULT_WEEKEND_DAYS`, which is what the mobile apps rely on) and that no rate means no days without a word of complaint, whatever the pills were showing |
+| `listing-pricing-core.ts` | The host's weekend rate: that `0`, `'0'`, `'0.0'` and `-50` are refused rather than silently stored as "no weekend rate" (the bug the module was written for), and the half that matters as much — that `null`, `undefined` and a blank field still mean "no weekend rate" so a host can turn the feature off and the apps' `null` is never answered with a 400; plus the JSON shapes `Number()` would happily coerce into a price (`true`, `[]`, `['1500']`); and the day set that rate applies to — that all seven days is refused however it is padded (repeats, junk, reverse order), that six of seven and a lone day are not, that an empty set still means "nothing is a weekend", and that `3.7` is dropped rather than floored into Wednesday; and the two halves judged as a pair — that a rate with no day is refused, that a *missing* day set is not an empty one (it takes `DEFAULT_WEEKEND_DAYS`, which is what the mobile apps rely on) and that no rate means no days without a word of complaint, whatever the pills were showing; and the same rule one rung down, on the twelve seasonal months — that a month typed as `0` is refused and reported BY NUMBER (the first one on the form, not the first the object enumerated), that a blank month is still how a month is cleared, that months outside 1..12 are dropped rather than made unsaveable, and that `monthPriceMessage` names the month the API refused |
+| `host-listing-filter-core.ts` | The status chips over `/host`'s listings: that **All** takes every state including `blocked`, that a status chip takes only its own, and the counts each chip is badged with — that an empty status reads `0` rather than going missing (a chip with no number is the one a host has to click to find out), that a `blocked` listing is counted under All but under no chip of its own, that a status the UI does not know still counts under All instead of inventing a key, and the property that keeps the badge honest: every count equals what its own chip would actually show |
+| `host-booking-filter-core.ts` | The status chips over the host's **reservations**: which bucket each reservation folds into and what each chip selects. The checks that matter most are the ones pinning the ORDER of the fold — that a cancelled or rejected reservation is never `awaiting_payment` (that chip is a to-do list of money still coming, and a dead booking in it is a host chasing a guest for a stay that no longer exists), and that `pending` wins over a transfer already under review, since a guest can upload a screenshot before the host has replied. Plus the refund split — `100` is refunded, `1–99` partially, `0` and a **null** (a cancellation from before the refund ladder) plain cancelled, and an out-of-range percent clamped rather than trusted; that a missing payment stage reads as unpaid rather than silently paid; that an unknown status reads as `pending` instead of vanishing from every chip; that a stray `refund_percent` never splits a live booking; and the property that keeps the badges honest — the bucket counts sum to the total, so every reservation is in exactly one |
+| `reservation-filter-core.ts` | The status chips over the **guest's** reservations — the guest-side sibling of the row above, and tested against it. Half the suite pins what it does DIFFERENTLY: that a transfer already under review is its own bucket rather than `awaiting_payment` (to a host those are one to-do, to the guest they are opposites — one means "send the transfer", the other "we have it", and conflating them is what makes people pay twice), and that `completed` is its own bucket rather than folding into confirmed, since a guest's finished stays are the trip history they go looking for. The other half pins what it does IDENTICALLY, by importing `hostBookingBucketFor` and walking the whole *(status × stage × refund)* matrix: the two folds agree on every input but those two, so a host and a guest can never read the same reservation differently. Plus the shared inheritance — the refund split, the clamp, an unknown status reading as `pending` rather than vanishing, a missing stage reading as unpaid rather than silently paid — and the property that keeps the badges honest: every count equals what its own chip would render, and the buckets sum to the total |
 | `contentguard.ts` | Every de-obfuscation the contact guard undoes (Arabic-Indic/fullwidth/enclosed digits, zero-width and soft hyphens, Cyrillic lookalikes, spelled-out EN/AR numbers, `at`/`dot` spelling, letters used as separators — `A0101 S416 M3280`, and a number padded letter-by-letter — `0a1b0c1d2e3f4g5h6i7j8`, whatever plan it is written to), the four categories it blocks, the split-across-messages check — and an equally large **false-positive** half, because a guard that rejects "we are 2 adults arriving on the 12th" is worse than one that misses |
 
 Those modules deliberately have **no runtime imports** — Node's ESM resolver
@@ -1773,6 +1841,140 @@ column first — so an unqualified `ORDER BY created_at` sorts by the
 second-precision **string**, and rows in the same second fall back to the uuid
 tiebreak. That scrambled the dispute timeline. Every such `ORDER BY` in both repos
 is now table-qualified; if you add one, qualify it.
+
+## The status chips say how many
+
+The host dashboard's listing filter — **All · Published · Under review · Rejected ·
+Deactivated** — shipped on all three clients, but only iOS put a number on the chips.
+On web and Android a host could not tell whether **Under review** held four listings or
+none without clicking it, so the only way to read the shape of your own portfolio was to
+click every chip in turn — including the ones that turned out to be empty, which is the
+click that buys nothing.
+
+The chips now carry their count everywhere.
+
+| Piece | What it does |
+| --- | --- |
+| `lib/local/host-listing-filter-core.ts` | The chip order, what each chip selects, and `hostListingFilterCounts` — one tally over every listing, with an entry for every filter, zeros included. `blocked` is counted even though no chip shows it, so the counts remain a complete partition of what "All" holds. No imports, so `node --test` loads it — see **Testing** |
+| `app/host/host-tabs.tsx` | `FilterPill` takes an optional `count` and renders it in a small counter pill (tan on white, translucent white on the burgundy active chip). The counts are memoized off `items`, not off the visible slice — a chip has to say what it *would* show, which is the opposite of what is on screen |
+| `mobile/android/.../ui/HostScreen.kt` | The same thing in Compose: `hostListingFilterCounts` over `Listing.hostVisibility`, badged by `HostFilterChip`. `HostListingFilter` and the counting are `internal` rather than `private` so `HostListingFilterTest` can hold them to the same rules |
+
+**All** stays bare on every client: its count is just the number of cards below it, and
+a number that repeats what the page already shows is noise. `blocked` still has no chip
+of its own — those listings appear under All with their badge, as before.
+
+Nothing about which listings each chip selects changed, and no API or column was touched:
+the counts are computed from the listings the dashboard already had in hand.
+
+## The host can filter their reservations
+
+Reported as *"[Android] Reservation filters are missing for Host"* — and true on all
+three clients, not just Android. A host's reservations were one flat list: web mapped
+the whole array, iOS split it into Pending / Past, Android rendered a bare column. The
+listing filter above them had chips; the reservations below them had none.
+
+The reported wish-list was **pending · awaiting payment · confirmed · cancelled ·
+refunded · partially refunded**, and only two of those are values of `bookings.status`.
+That column holds five things (`pending | confirmed | completed | rejected | cancelled`)
+and nothing else. The other three are folded out of columns beside it:
+
+- **Awaiting payment** — `confirmed`, but `paymentStageFor` does not say `paid`. The
+  money is what separates the two, not the status.
+- **Refunded** / **Partially refunded** — a cancellation carries `refund_percent`
+  (0–100), written from the listing's cancellation policy at the moment the guest
+  cancels. `100` is refunded, `1–99` partially, `0` (strict policy, or the check-in-day
+  floor) plain cancelled.
+
+So a chip is a function of *(status, payment stage, refund percent)* — a fold, not a
+column read. Three clients each hand-rolling it is how a host ends up with three
+different answers to "how many reservations are waiting on payment", so it is one rule,
+ported twice, and pinned by the same suite on each side.
+
+**Declined is its own chip**, not folded into Cancelled: they are separate values, a
+host caused one and a guest the other, and the row badges have always shown them apart.
+`completed` folds into **Confirmed** — a completed stay is a confirmed one that has
+finished, and finished stays were not asked for as a chip of their own.
+
+| Piece | What it does |
+| --- | --- |
+| `lib/local/host-booking-filter-core.ts` | The fold, the chip order and `hostBookingFilterCounts`. Takes the payment **stage** as an argument rather than re-deriving it — `paymentStageFor` is the single source of truth for "has the money landed", and a second opinion is how the guest UI once asked for payment twice. No imports, so `node --test` loads it — see **Testing** |
+| `app/host/host-reservations.tsx` | The chip row, `FilterPill` copied from the listings filter so the two match. Counts memoized off every reservation, not the visible slice. An empty status keeps the chip row on screen with a **show all** way out — the only action that can change the result, since a host cannot conjure a reservation into a status |
+| `mobile/ios/Sources/HostBookingFilterRules.swift` | The Swift twin. Pure — the chip labels live in an extension in `HostDashboardView.swift` so `Tests/run.sh` can build the rules with no app frameworks. `HostBooking` gained `payment_status`, `payment_proof_status`, `paid_at` and `refund_percent`, which it had been discarding |
+| `mobile/android/.../HostBookingFilterRules.kt` | The Kotlin twin, badged by the existing `HostFilterChip`. `parseHostBooking` reads the same four columns — `refund_percent` via an explicit `isNull` check, because `0` is a real value here (a strict-policy cancellation) and `optInt`'s default would erase the difference |
+
+No backend change: `/api/local/host/bookings` already returned every one of those
+columns and takes no query params, so all three clients filter the array they hold —
+the same way the listings filter works, and switching is instant.
+
+## Reservation filters, guest side
+
+The guest's Trips list had no filters at all — every reservation, from one still waiting
+on a host to one refunded last spring, in a single flat list. The host's inbox had been
+given chips already (above); this is the same fix for the other side of the booking.
+
+It is deliberately **not** the same chip set. The two rows are folded by two modules
+that agree everywhere except twice, and both divergences are asserted rather than
+tolerated, because a silent one would mean a host and a guest reading one reservation
+and seeing different words:
+
+* **Payment under review** is a guest chip, folded into *Awaiting payment* for the host.
+  To a host those are one to-do — no money yet. To the guest they are opposites: one
+  says *send the transfer*, the other says *we have it, sit tight*. A guest shown
+  "awaiting payment" for a screenshot already in the ops queue pays twice, which is the
+  same failure `paymentStageFor` exists to prevent one layer down.
+* **Completed** is a guest chip, folded into *Confirmed* for the host. A guest's
+  finished stays are their trip history, and people go looking for it; a host's are old
+  rows.
+
+Everything else — the cancelled / refunded / partially-refunded split, the clamping, an
+unknown status reading as `pending` — is inherited from the host fold on purpose.
+
+| Piece | What it does |
+| --- | --- |
+| `lib/local/reservation-filter-core.ts` | The guest fold, the chip order and `reservationFilterCounts`. Takes the payment **stage** as an argument for the same reason the host module does. No imports, so `node --test` loads it — see **Testing** |
+| `app/reservations/reservations-filter.tsx` | The chip row, `FilterPill` copied from the host filter so all three rows match. The cards arrive **pre-rendered** from the server component, so this only decides which to mount — lifting the list into a client component would have dragged the dispute panel, the stay pass and the pay actions across the boundary for nothing. The bucket is folded server-side, next to the same `paymentStageFor` the rest of the page already calls |
+| `mobile/ios/Sources/ReservationFilter.swift` | The Swift twin. Pure — the chip labels live in an extension in `ReservationsView.swift` so `Tests/run.sh` can build the rules with no app frameworks. `StatusBadge` gained a `bucket`, so the pill on a card and the chip above it always read the same words |
+| `mobile/android/.../ReservationFilterRules.kt` | The Kotlin twin, badged by a `ReservationFilterChip` cloned from `HostFilterChip` |
+
+**Empty chips are dropped rather than badged `0`** — the one place this row departs from
+the host's, which shows all eight always. A host works through a fixed vocabulary; these
+ten describe a story most guests only ever see part of, and eight empty chips to scroll
+past would bury the two that hold something. **All** and the active chip always survive,
+so the row can never go blank and the current filter can never vanish from under the list.
+
+### The refund chips needed a second question
+
+Building the guest row surfaced a bug in the host row that had already shipped, and the
+fix landed on the rule both share.
+
+`cancelBooking` stamps `refund_percent` from the listing's cancellation policy the
+moment a guest cancels — it never asks whether anything was ever paid
+(`getCancellationQuote` reads the policy and the dates, nothing else). So a **pending,
+never-paid** booking cancelled a fortnight out is written with `refund_percent = 100`.
+Confirmed against the live endpoint: `POST /api/local/bookings/:id/cancel` on an unpaid
+booking returned `status=cancelled, payment_status=unpaid, refund_percent=100`, and both
+filters called it **Refunded** — money back that was never money in, shown to the guest
+who never paid it and the host who never received it.
+
+Splitting a cancellation on `refund_percent` alone cannot get this right, so the fold now
+takes a second fact: `wasPaid`, from the new **`everPaid()`** in `payment-flow-core.ts`.
+That is a genuinely different question from `paymentStageFor` — the stage answers "can
+this be paid *now*", and says `not_payable` for everything cancelled, so it can never
+answer "did money ever arrive". Nothing re-derives it; callers hand it in, exactly as
+they already do the stage.
+
+⚠️ `everPaid` reads the **payment column**, not `paid_at` — a refund NULLs `paid_at`
+(the trap `analytics-core.ts` documents), so `refunded`/`voided` are what still prove
+money moved on a legacy row.
+
+`wasPaid` is a **required** field on both folds rather than an optional one with a
+default. That is the whole safety mechanism: it turned every call site into a compile
+error until it was updated, on all four codebases, instead of letting one keep the bug by
+saying nothing.
+
+No backend change: `/api/local/bookings` already returned `status`, `payment_status`,
+`payment_proof_status`, `paid_at` and `refund_percent`, and takes no query params — so
+all three clients filter the array they already hold, and switching is instant.
 
 ## Build
 

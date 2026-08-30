@@ -1,5 +1,6 @@
-// Unit tests for src/lib/local/listing-pricing-core.ts — the weekend rate a host
-// types on /host/new and /host/:id/edit.
+// Unit tests for src/lib/local/listing-pricing-core.ts — the weekend rate, the
+// seasonal per-month rates and the two length-of-stay discounts a host types on
+// /host/new and /host/:id/edit.
 //
 // Offline: no database, no network, no server. Run with `npm test`.
 // Note the explicit `.ts` extension — Node 22 strips types, but its ESM resolver
@@ -16,6 +17,12 @@ import {
   resolveWeekendSchedule,
   weekendDaysMessage,
   weekendPriceMessage,
+  MAX_STAY_DISCOUNT,
+  MONTHS_IN_YEAR,
+  checkMonthlyPrices,
+  monthPriceMessage,
+  checkStayDiscount,
+  stayDiscountsInvert,
 } from '../../src/lib/local/listing-pricing-core.ts'
 
 /** The rejection under test; fails loudly if a value was accepted instead. */
@@ -307,5 +314,182 @@ describe('resolveWeekendSchedule — a real pair still gets through', () => {
     // chose must not refuse the save that is fixing them. Covered from the other
     // side in "no rate means no days".
     assert.equal(scheduleOf(null, [0, 1, 2, 3, 4, 5, 6]), null)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Seasonal pricing — the per-month nightly rates
+// ---------------------------------------------------------------------------
+
+/** The cleaned map; fails loudly if the input was rejected instead. */
+function monthsOf(input) {
+  const r = checkMonthlyPrices(input)
+  assert.equal(r.ok, true, `${JSON.stringify(input)} was rejected: ${JSON.stringify(r)}`)
+  return r.value
+}
+
+/** The rejection under test, as `[problem, month]`. */
+function monthsProblemOf(input) {
+  const r = checkMonthlyPrices(input)
+  assert.equal(r.ok, false, `${JSON.stringify(input)} was accepted: ${JSON.stringify(r)}`)
+  return [r.problem, r.month]
+}
+
+describe('checkMonthlyPrices — the months a host actually priced', () => {
+  test('an empty field is a month with no opinion, not a month priced at zero', () => {
+    // This is how a month is CLEARED. Absent, blank and null all mean the same
+    // thing, because all three are what an emptied input can produce.
+    assert.deepEqual(monthsOf({}), {})
+    assert.deepEqual(monthsOf({ 7: '' }), {})
+    assert.deepEqual(monthsOf({ 7: '   ' }), {})
+    assert.deepEqual(monthsOf({ 7: null }), {})
+    assert.deepEqual(monthsOf({ 7: undefined }), {})
+  })
+
+  test('nothing at all is nothing, not a crash', () => {
+    assert.deepEqual(monthsOf(null), {})
+    assert.deepEqual(monthsOf(undefined), {})
+    assert.deepEqual(monthsOf('august'), {})
+    assert.deepEqual(monthsOf(42), {})
+  })
+
+  test('a typed rate is kept, as a whole number, keyed by month', () => {
+    assert.deepEqual(monthsOf({ 7: '8500', 8: 9000 }), { 7: 8500, 8: 9000 })
+    assert.deepEqual(monthsOf({ 12: '4999.6' }), { 12: 5000 })
+  })
+
+  test('0 is refused and the month is named — the whole point of the check', () => {
+    // The API's cleanMonthlyPrices DROPS a non-positive month, and a dropped
+    // month is indistinguishable from one that was never set. Without this the
+    // host types 0 into August, saves, and is shown an empty August.
+    assert.deepEqual(monthsProblemOf({ 8: '0' }), ['notPositive', 8])
+    assert.deepEqual(monthsProblemOf({ 8: 0 }), ['notPositive', 8])
+    assert.deepEqual(monthsProblemOf({ 8: '-200' }), ['notPositive', 8])
+    assert.deepEqual(monthsProblemOf({ 3: 'abc' }), ['notANumber', 3])
+    assert.deepEqual(monthsProblemOf({ 3: '1,500' }), ['notANumber', 3])
+  })
+
+  test('the month reported is the first one on the form, not the first enumerated', () => {
+    // Object key order puts "10" before "3" for a caller building the map by
+    // hand; the host reads their form top to bottom.
+    assert.deepEqual(monthsProblemOf({ 10: '0', 3: '0' }), ['notPositive', 3])
+  })
+
+  test('months outside 1..12 are dropped rather than reported', () => {
+    // They cannot be reached by the ladder, so there is nothing to tell the host
+    // about them — and a stored junk key must not make the form unsaveable.
+    assert.deepEqual(monthsOf({ 0: '900', 13: '900', '': '900', abc: '900', 6: '900' }), { 6: 900 })
+    // Including a junk key holding a junk value: still dropped, not refused.
+    assert.deepEqual(monthsOf({ 13: '0' }), {})
+  })
+
+  test('every month of the year is reachable', () => {
+    const all = {}
+    for (let m = 1; m <= MONTHS_IN_YEAR; m += 1) all[m] = String(m * 100)
+    assert.equal(Object.keys(monthsOf(all)).length, MONTHS_IN_YEAR)
+  })
+})
+
+describe('monthPriceMessage — the refusal names the month', () => {
+  // Twelve fields in a column and one of them is wrong: "seasonal price must be
+  // greater than 0" would send the host hunting. This is what the API answers
+  // with; the web forms and both mobile apps name the month in the reader's own
+  // language instead, from their own month formatter.
+  test('the month is spelled out, and what is wrong with it is said', () => {
+    assert.equal(monthPriceMessage('notPositive', 8), 'August price must be greater than 0')
+    assert.equal(monthPriceMessage('notANumber', 3), 'March price must be a number')
+    assert.equal(monthPriceMessage('notPositive', 1), 'January price must be greater than 0')
+    assert.equal(monthPriceMessage('notPositive', MONTHS_IN_YEAR), 'December price must be greater than 0')
+  })
+
+  test('a month that cannot exist still produces a message, not a crash', () => {
+    // checkMonthlyPrices never reports one — it drops out-of-range keys — but a
+    // message function that can throw is a 500 waiting for a caller who does.
+    assert.equal(monthPriceMessage('notPositive', 13), 'Month 13 price must be greater than 0')
+    assert.equal(monthPriceMessage('notPositive', 0), 'Month 0 price must be greater than 0')
+  })
+
+  test('it pairs with what checkMonthlyPrices actually reported', () => {
+    const [problem, month] = monthsProblemOf({ 10: '900', 8: '0' })
+    assert.equal(monthPriceMessage(problem, month), 'August price must be greater than 0')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Length-of-stay discounts
+// ---------------------------------------------------------------------------
+
+/** The accepted percentage; fails loudly if it was rejected instead. */
+function discountOf(input) {
+  const r = checkStayDiscount(input)
+  assert.equal(r.ok, true, `${JSON.stringify(input)} was rejected: ${JSON.stringify(r)}`)
+  return r.value
+}
+
+/** The rejection under test. */
+function discountProblemOf(input) {
+  const r = checkStayDiscount(input)
+  assert.equal(r.ok, false, `${JSON.stringify(input)} was accepted: ${JSON.stringify(r)}`)
+  return r.problem
+}
+
+describe('checkStayDiscount', () => {
+  test('empty is no discount — the column default, and the way back to it', () => {
+    assert.equal(discountOf(''), 0)
+    assert.equal(discountOf('  '), 0)
+    assert.equal(discountOf(null), 0)
+    assert.equal(discountOf(undefined), 0)
+  })
+
+  test('whole percentages inside the range are kept', () => {
+    assert.equal(discountOf('0'), 0)
+    assert.equal(discountOf('15'), 15)
+    assert.equal(discountOf(15), 15)
+    assert.equal(discountOf(MAX_STAY_DISCOUNT), MAX_STAY_DISCOUNT)
+  })
+
+  test('a fraction is refused rather than floored', () => {
+    // The API floors it. A host who typed 7.5 meant something, and 7 is not
+    // obviously it — so the form asks rather than guesses.
+    assert.equal(discountProblemOf('7.5'), 'notWhole')
+    assert.equal(discountProblemOf(7.5), 'notWhole')
+  })
+
+  test('outside 0..MAX is refused rather than clamped', () => {
+    assert.equal(discountProblemOf('-5'), 'outOfRange')
+    assert.equal(discountProblemOf(MAX_STAY_DISCOUNT + 1), 'outOfRange')
+    assert.equal(discountProblemOf('100'), 'outOfRange')
+  })
+
+  test('things that are not numbers are not percentages', () => {
+    assert.equal(discountProblemOf('abc'), 'notANumber')
+    assert.equal(discountProblemOf('10%'), 'notANumber')
+    // Number(true) is 1 and Number([]) is 0 — neither is a percentage a host typed.
+    assert.equal(discountProblemOf(true), 'notANumber')
+    assert.equal(discountProblemOf([]), 'notANumber')
+    assert.equal(discountProblemOf({}), 'notANumber')
+    assert.equal(discountProblemOf(NaN), 'notANumber')
+    assert.equal(discountProblemOf(Infinity), 'notANumber')
+  })
+})
+
+describe('stayDiscountsInvert — said, never refused', () => {
+  test('a monthly discount smaller than the weekly one inverts the ladder', () => {
+    // Only ONE discount applies, so weekly 20 / monthly 10 makes a 28-night stay
+    // dearer than a 27-night one on the same listing.
+    assert.equal(stayDiscountsInvert(20, 10), true)
+  })
+
+  test('equal or larger does not', () => {
+    assert.equal(stayDiscountsInvert(10, 10), false)
+    assert.equal(stayDiscountsInvert(10, 20), false)
+  })
+
+  test('a discount that is off is not an inversion', () => {
+    // The resting state of every listing that doesn't discount long stays, and
+    // the state of one that discounts only monthly. Neither is a warning.
+    assert.equal(stayDiscountsInvert(0, 0), false)
+    assert.equal(stayDiscountsInvert(20, 0), false)
+    assert.equal(stayDiscountsInvert(0, 20), false)
   })
 })

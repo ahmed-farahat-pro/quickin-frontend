@@ -5,6 +5,10 @@
 // Background: a reservation only gets a code when it is CONFIRMED, so "no code"
 // is a normal state, not an error — and a client that turns a missing code into
 // a link produces `/stay/null`, which is exactly the bug guests reported.
+//
+// A code is only HALF the gate. Whether the pass is live is `isLiveStayPass` in
+// lib/local/payment-flow-core.ts (confirmed AND paid, or completed) — the code
+// exists from host approval onward, well before any money arrives.
 
 /**
  * Normalise a reservation code coming from a URL, a QR scan or an API payload.
@@ -21,14 +25,16 @@ export function normalizeReservationCode(raw: unknown): string | null {
 }
 
 /**
- * THE one definition of "this pass is still live". `confirmed` and `completed`
- * only: the code is issued at the confirmation transition and is never cleared,
- * so a cancelled/rejected booking keeps a code that must stop working, while a
- * finished stay keeps its pass (the guest's receipt of what happened).
- * Deliberately identical to quickin-backend's getStayByCode gate and to
- * `isApproved` on iOS/Android, so one reservation looks the same on every
- * surface. Lives here (no `pg`, no node built-ins) so client components can
- * import it; `lib/local/db.ts` re-exports it for the server.
+ * THE one definition of "this pass is still live" lives in
+ * `lib/local/payment-flow-core.ts` as `isLiveStayPass`, because the rule needs
+ * the payment columns as well as the status — import that, not this.
+ *
+ * This function is the STATUS HALF only, kept for the places that genuinely
+ * have nothing but a status string. It is NOT the pass gate: `confirmed` means
+ * the host accepted the request, and the guest pays afterwards, so a booking can
+ * be `confirmed` (with a reservation code already minted) and still owe every
+ * piastre. Gating a QR on this alone is what handed hosts and guests a working
+ * pass for an unpaid stay.
  */
 export function isLiveStayStatus(status: string | null | undefined): boolean {
   return status === 'confirmed' || status === 'completed'

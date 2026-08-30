@@ -28,7 +28,7 @@ type Detail = {
     avatar_url: string | null
     host_type: string | null; company: string | null; referral_code: string | null
   }
-  listings: Array<{ id: string; title: string; is_published: boolean; approval_status: string; unpublished_by_admin: boolean; price_per_night: number; currency: string; created_at: string; booking_count: number }>
+  listings: Array<{ id: string; title: string; is_published: boolean; approval_status: string; unpublished_by_admin: boolean; unpublished_by_host?: boolean; price_per_night: number; currency: string; created_at: string; booking_count: number }>
   bookings: Array<{ id: string; reservation_code: string | null; listing_title: string | null; status: string; payment_status: string; total_price: number; check_in: string; check_out: string; created_at: string }>
   payments: Array<{ id: string; booking_id: string; reservation_code: string | null; listing_title: string | null; amount: number; status: string; submitted_at: string | null; reviewed_at: string | null; reject_reason: string | null }>
   conversations: Array<{ id: string; listing_title: string | null; counterparty_name: string | null; counterparty_email: string | null; message_count: number; last_message_at: string | null; viewer_role: 'guest' | 'host' }>
@@ -260,7 +260,12 @@ export function OpsUserDetail({ initial, isSuperAdmin }: { initial: Detail; isSu
                 ? pill('Live', '#E4F3EC', COLORS.green)
                 : l.unpublished_by_admin
                   ? pill('Hidden by removal', '#FDF0DC', '#8A5A12')
-                  : pill('Unpublished', COLORS.tan, COLORS.muted),
+                  // Checked after the removal flag on purpose: when both hold the
+                  // listing, the account removal is the one an operator is here to
+                  // act on. See the backend's host-visibility-core.ts.
+                  : l.unpublished_by_host
+                    ? pill('Host deactivated', COLORS.tan, COLORS.muted)
+                    : pill('Unpublished', COLORS.tan, COLORS.muted),
               l.approval_status,
               money(l.price_per_night),
               { num: l.booking_count },
