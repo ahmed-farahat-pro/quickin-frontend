@@ -43,6 +43,7 @@ export function PayClient({
   currency,
   checkIn,
   checkOut,
+  rejected,
   rejectedReason,
 }: {
   bookingId: string
@@ -51,10 +52,14 @@ export function PayClient({
   currency: string
   checkIn: string
   checkOut: string
+  /** The booking is at the `rejected` stage — announce it even with no reason. */
+  rejected: boolean
+  /** The reviewer's verbatim words, already normalized; null when none was given. */
   rejectedReason: string | null
 }) {
   const router = useRouter()
   const tCurrency = useTranslations('currency')
+  const tPay = useTranslations('instapay')
   // The transfer is made in the booking's currency, so that figure stays the
   // headline. The guest's currency is a second line to help them recognise the
   // amount in their banking app, never to tell them what to send.
@@ -173,10 +178,17 @@ export function PayClient({
           </p>
         )}
 
-        {rejectedReason && (
-          <div style={{ ...card, marginBottom: 16, borderLeft: `4px solid ${C.red}`, padding: 16 }}>
-            <strong style={{ fontSize: 14, color: C.red }}>Your last screenshot wasn&apos;t accepted</strong>
-            <p style={{ margin: '4px 0 0', fontSize: 13.5, color: C.muted }}>{rejectedReason}</p>
+        {/* Same three lines the reservations list and both mobile apps show, from
+            the same keys — a guest who arrives here from either place reads the
+            identical explanation. The generic line covers a rejection the admin
+            left unexplained, which used to render nothing at all. */}
+        {rejected && (
+          <div role="status" style={{ ...card, marginBottom: 16, borderLeft: `4px solid ${C.red}`, padding: 16 }}>
+            <strong style={{ fontSize: 14, color: C.red }}>{tPay('rejected.title')}</strong>
+            <p style={{ margin: '4px 0 0', fontSize: 13.5, color: C.ink, whiteSpace: 'pre-wrap' }}>
+              {rejectedReason ?? tPay('rejected.noReason')}
+            </p>
+            <p style={{ margin: '4px 0 0', fontSize: 12.5, color: C.muted }}>{tPay('rejected.subtitle')}</p>
           </div>
         )}
 

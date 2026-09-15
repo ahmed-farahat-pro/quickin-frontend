@@ -1537,6 +1537,7 @@
     "maxGuests": "Jusqu'à {count, plural, one {# voyageur} other {# voyageurs}} (adultes + enfants).",
     "nightsCount": "{nights, plural, one {# nuit} other {# nuits}}",
     "total": "Total",
+    "stayDiscount": "{percent} % de réduction",
     "reserve": "Réserver",
     "reserving": "Réservation…",
     "pickDates": "Choisissez vos dates pour voir le total.",
@@ -1707,7 +1708,12 @@
     "openInstapay": "Ouvrir dans Instapay",
     "scanHint": "Scannez avec votre application bancaire",
     "underReview": "En cours de vérification",
-    "tryAgain": "Envoyer une nouvelle capture"
+    "tryAgain": "Envoyer une nouvelle capture",
+    "rejected": {
+      "title": "Votre virement n'a pas été accepté",
+      "noReason": "Nous n'avons pas pu confirmer votre virement à partir de la capture d'écran envoyée.",
+      "subtitle": "Corrigez ce point et envoyez une nouvelle capture — votre réservation reste maintenue."
+    }
   },
   "reservationsLocal": {
     "meta": {
@@ -2239,6 +2245,10 @@
       "publish": "Publier l’annonce",
       "publishing": "Publication…",
       "cancel": "Annuler",
+      "partialCreated": "Votre annonce a été créée.",
+      "partialPhotos": "{count} de vos photos n’ont pas pu être envoyées — ajoutez-les depuis Modifier l’annonce.",
+      "partialDoc": "Votre document de propriété n’a pas pu être envoyé — renvoyez-le depuis votre annonce.",
+      "partialLink": "Modifier l’annonce",
       "errors": {
         "title": {
           "required": "Veuillez donner un titre à votre annonce.",

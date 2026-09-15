@@ -1537,6 +1537,7 @@
     "maxGuests": "حتى {count, plural, one {# ضيف} other {# ضيوف}} (بالغون + أطفال).",
     "nightsCount": "{nights, plural, one {# ليلة} other {# ليالٍ}}",
     "total": "الإجمالي",
+    "stayDiscount": "خصم {percent}٪",
     "reserve": "احجز",
     "reserving": "جارٍ الحجز…",
     "pickDates": "اختر تواريخك لعرض الإجمالي.",
@@ -1707,7 +1708,12 @@
     "openInstapay": "فتح في إنستاباي",
     "scanHint": "امسح الرمز بتطبيق البنك",
     "underReview": "قيد المراجعة",
-    "tryAgain": "إرسال لقطة شاشة جديدة"
+    "tryAgain": "إرسال لقطة شاشة جديدة",
+    "rejected": {
+      "title": "لم يتم قبول تحويلك",
+      "noReason": "تعذّر علينا تأكيد تحويلك من لقطة الشاشة التي أرسلتها.",
+      "subtitle": "صحّح ما سبق وأرسل لقطة شاشة جديدة — حجزك ما زال محفوظًا."
+    }
   },
   "reservationsLocal": {
     "meta": {
@@ -2239,6 +2245,10 @@
       "publish": "نشر القائمة",
       "publishing": "جارٍ النشر…",
       "cancel": "إلغاء",
+      "partialCreated": "تم إنشاء إعلانك.",
+      "partialPhotos": "لم يتم تحميل {count} من صورك — أضفها من تعديل الإعلان.",
+      "partialDoc": "لم يتم تحميل مستند الملكية — أعد إرساله من إعلانك.",
+      "partialLink": "تعديل الإعلان",
       "errors": {
         "title": {
           "required": "يرجى إعطاء قائمتك عنوانًا.",

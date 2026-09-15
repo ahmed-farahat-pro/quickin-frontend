@@ -1537,6 +1537,7 @@
     "maxGuests": "Hasta {count, plural, one {# huésped} other {# huéspedes}} (adultos + niños).",
     "nightsCount": "{nights, plural, one {# noche} other {# noches}}",
     "total": "Total",
+    "stayDiscount": "{percent} % de descuento",
     "reserve": "Reservar",
     "reserving": "Reservando…",
     "pickDates": "Elige tus fechas para ver el total.",
@@ -1707,7 +1708,12 @@
     "openInstapay": "Abrir en Instapay",
     "scanHint": "Escanéalo con tu app bancaria",
     "underReview": "En revisión",
-    "tryAgain": "Subir otra captura"
+    "tryAgain": "Subir otra captura",
+    "rejected": {
+      "title": "Su transferencia no fue aceptada",
+      "noReason": "No pudimos confirmar su transferencia con la captura de pantalla que envió.",
+      "subtitle": "Corrija lo anterior y envíe una nueva captura: su reserva sigue reservada."
+    }
   },
   "reservationsLocal": {
     "meta": {
@@ -2239,6 +2245,10 @@
       "publish": "Publicar anuncio",
       "publishing": "Publicando…",
       "cancel": "Cancelar",
+      "partialCreated": "Tu anuncio se ha creado.",
+      "partialPhotos": "No se pudieron subir {count} de tus fotos: añádelas desde Editar anuncio.",
+      "partialDoc": "No se pudo subir tu documento de propiedad: vuelve a enviarlo desde tu anuncio.",
+      "partialLink": "Editar anuncio",
       "errors": {
         "title": {
           "required": "Dale un título a tu anuncio.",

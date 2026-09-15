@@ -1537,6 +1537,7 @@
     "maxGuests": "Up to {count, plural, one {# guest} other {# guests}} (adults + children).",
     "nightsCount": "{nights, plural, one {# night} other {# nights}}",
     "total": "Total",
+    "stayDiscount": "{percent}% off",
     "reserve": "Reserve",
     "reserving": "Reserving…",
     "pickDates": "Pick your dates to see the total.",
@@ -1762,7 +1763,12 @@
     "openInstapay": "Open in Instapay",
     "scanHint": "Scan with your banking app",
     "underReview": "Under review",
-    "tryAgain": "Upload a new screenshot"
+    "tryAgain": "Upload a new screenshot",
+    "rejected": {
+      "title": "Your transfer wasn't accepted",
+      "noReason": "We couldn't confirm your transfer from the screenshot you sent.",
+      "subtitle": "Fix the above and send a new screenshot — your reservation is still held."
+    }
   },
   "reservationsLocal": {
     "meta": {
@@ -2239,6 +2245,10 @@
       "publish": "Publish listing",
       "publishing": "Publishing…",
       "cancel": "Cancel",
+      "partialCreated": "Your listing was created.",
+      "partialPhotos": "{count} of your photos couldn’t be uploaded — add them from Edit listing.",
+      "partialDoc": "Your ownership document couldn’t be uploaded — re-submit it from your listing.",
+      "partialLink": "Edit listing",
       "errors": {
         "title": {
           "required": "Please give your listing a title.",

@@ -1023,6 +1023,56 @@ in `HostListingRow`, Android in the host listing card, both replacing the generi
 type, and forcing a reason there would only produce `.` — the fallback copy is the honest
 answer for those.
 
+## A listing's photos are sent in more than one request
+
+The host forms posted the whole listing at once, photos included. Each photo is a
+base64 data URL of 300–700 KB (`fileToCompressedDataUrl`, 1600 px / q0.72), so ten
+of them is 3–7 MB — and the API runs as a Vercel function, which refuses a request
+body over **~4.5 MB before the function runs**. Nothing server-side saw the
+request, so there was no `{"error"}` to render: on the web the save just failed,
+and on iOS, which reported it first, it surfaced as
+`Couldn't create the listing (413).` Measured against the deployed backend: a
+4.19 MB body reaches the function (401 from its own auth), a 4.61 MB body comes
+back 413.
+
+The edit form already knew about the wall — `photosDirty` exists so a text-only
+edit doesn't re-send the whole gallery — but that never helped the host who adds
+eight photos.
+
+**`lib/listing-photo-upload.ts`** plans the requests under a 3.5 MB ceiling, and
+both host forms follow the plan:
+
+| | request |
+| --- | --- |
+| create / edit | the fields + the photos that fit, cover first |
+| then | `POST /api/local/listings/:id/images` per batch, in order |
+| then | `PATCH /api/local/listings/:id { ownership_doc }`, only if the document couldn't share a body |
+
+Two rules the split cannot break. The first request always carries at least one
+photo, because `checkListingCompleteness` refuses a listing with none — "send an
+empty set, then append everything" answers 400. And the deferred photos are always
+the **tail** of the wanted order, because the append endpoint puts each batch after
+the last: that is what makes the edit form's replacement path come out in the order
+the host arranged.
+
+Photo quality is deliberately untouched. Re-encoding smaller was the other way to
+make ten photos fit, and it would degrade every listing on the site to serve a
+limit that has nothing to do with photos.
+
+**The create reports a partial landing rather than an error.** Once the POST
+returns, the listing exists; an append that fails after that is a note on the form
+("Your listing was created… add them from Edit listing") with Publish disabled, not
+`errors.createFailed`. A host who reads "could not create the listing" over a
+listing that WAS created submits the form again and ends up with two. The edit form
+does throw on a failed batch, because a replacement is idempotent — pressing Save
+again sends the same set and converges.
+
+`ListingPhotoUpload.swift` (iOS) and `ListingPhotoUpload.kt` (Android) are the
+hand-written twins of this file and answer with the same numbers; each has its own
+suite (`test/unit/listing-photo-upload.test.mjs` here). The backend README's
+*A listing's photos arrive in more than one request* carries the measurements and
+the notification rule that goes with the appends.
+
 ## Loading states
 
 Every route that awaits data on the server needs its own `loading.tsx`. Without one,

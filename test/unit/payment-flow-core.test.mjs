@@ -28,6 +28,8 @@ import {
   stageTone,
   outcomeFor,
   normalizeRejectReason,
+  rejectReasonText,
+  paymentRejectionFor,
   assertProofImage,
   everPaid,
 } from '../../src/lib/local/payment-flow-core.ts'
@@ -226,5 +228,98 @@ describe('everPaid — did money ever arrive?', () => {
     const refunded = { status: 'cancelled', payment_state: 'refunded', paid_at: null }
     assert.equal(paymentStageFor(refunded), 'not_payable')
     assert.equal(everPaid(refunded), true)
+  })
+})
+
+// The guest-facing half of a rejection. The web used to send a guest back to the
+// payment page with "Upload a new screenshot" and no hint of what was wrong with
+// the last one, while iOS and Android both showed the reviewer's words — these
+// are the guards on the rule the three surfaces now share.
+describe('rejectReasonText', () => {
+  test('the reviewer\'s words come back verbatim, trimmed', () => {
+    assert.equal(rejectReasonText('The amount does not match'), 'The amount does not match')
+    assert.equal(rejectReasonText('  blurry screenshot  '), 'blurry screenshot')
+  })
+
+  test('nothing worth showing is null, so the caller can fall back to its generic line', () => {
+    for (const v of [null, undefined, '', '   ', '\n\t']) {
+      assert.equal(rejectReasonText(v), null)
+    }
+  })
+
+  // A client that stringified a missing value on the way in leaves the literal
+  // word in the column. Printing it would show the guest "null" as the reason.
+  test('a stringified null/undefined is not a reason', () => {
+    for (const v of ['null', 'NULL', ' Null ', 'undefined', 'UNDEFINED']) {
+      assert.equal(rejectReasonText(v), null)
+    }
+  })
+
+  test('a reason that merely CONTAINS those words survives', () => {
+    assert.equal(rejectReasonText('the reference is null in your receipt'),
+      'the reference is null in your receipt')
+  })
+})
+
+describe('paymentRejectionFor', () => {
+  const rejected = (over = {}) => ({
+    status: 'confirmed',
+    payment_status: 'rejected',
+    payment_proof_status: 'rejected',
+    payment_reject_reason: 'The amount does not match',
+    ...over,
+  })
+
+  test('a rejected payment hands back the reason to show', () => {
+    assert.deepEqual(paymentRejectionFor(rejected()), { reason: 'The amount does not match' })
+  })
+
+  test('a rejection with no reason is still a rejection — the caller shows the generic line', () => {
+    assert.deepEqual(paymentRejectionFor(rejected({ payment_reject_reason: null })), { reason: null })
+    assert.deepEqual(paymentRejectionFor(rejected({ payment_reject_reason: '  ' })), { reason: null })
+  })
+
+  // THE bug this guards. `payment_reject_reason` is the latest proof's reason and
+  // it outlives the rejection: a guest who re-uploaded and was approved still has
+  // one on the row. Reading the column alone puts "your transfer wasn't accepted"
+  // beside a payment that has since gone through.
+  test('a reason left over from an earlier round never surfaces on a payment that succeeded', () => {
+    assert.equal(paymentRejectionFor({
+      status: 'confirmed',
+      payment_status: 'paid',
+      payment_proof_status: 'approved',
+      payment_reject_reason: 'The amount does not match',
+    }), null)
+  })
+
+  test('nor while the re-uploaded screenshot is back under review', () => {
+    assert.equal(paymentRejectionFor(rejected({
+      payment_status: 'submitted',
+      payment_proof_status: 'submitted',
+    })), null)
+  })
+
+  test('nor on a booking that was never rejected at all', () => {
+    assert.equal(paymentRejectionFor({ status: 'confirmed', payment_status: 'unpaid' }), null)
+    assert.equal(paymentRejectionFor({ status: 'pending', payment_status: 'unpaid' }), null)
+  })
+
+  // A cancelled booking is `not_payable` whatever its payment columns say, so
+  // there is no retry to explain.
+  test('nor on a cancelled booking carrying a stale reason', () => {
+    assert.equal(paymentRejectionFor(rejected({ status: 'cancelled' })), null)
+  })
+
+  // Same alias trap as isLiveStayPass/everPaid: BOOKING_COLS names the rollup
+  // `payment_status`, the older web API called it `payment_state`. Both are read.
+  test('it reads payment_status as well as payment_state', () => {
+    assert.deepEqual(
+      paymentRejectionFor({ status: 'confirmed', payment_state: 'rejected', payment_reject_reason: 'blurry' }),
+      { reason: 'blurry' },
+    )
+    assert.deepEqual(
+      paymentRejectionFor({ status: 'confirmed', payment_status: 'rejected', payment_reject_reason: 'blurry' }),
+      { reason: 'blurry' },
+    )
   })
 })

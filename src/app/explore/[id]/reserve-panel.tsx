@@ -6,8 +6,9 @@ import { formatPrice } from '@/lib/utils'
 import { formatDisplayPrice, isConverted } from '@/lib/currency/display'
 import { useDisplayCurrency } from '@/components/providers/display-currency-provider'
 import { stayQuote } from '@/lib/geo'
-import { nightsOfStay } from '@/lib/local/date-pricing-core'
+import { nightsOfStay, stayDiscountPercent } from '@/lib/local/date-pricing-core'
 import type { PriceSource } from '@/lib/local/date-pricing-core'
+import { roundUpToStep } from '@/lib/local/commission-core'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 
 const COLORS = {
@@ -37,11 +38,24 @@ type Status =
   | { kind: 'error'; message: string }
   | { kind: 'success'; nights: number; total: number }
 
+/** What `GET /api/local/listings/:id/quote` answers — the authoritative price for
+ *  a date range. Every figure already includes the platform commission, and
+ *  `total` is `subtotal` with the length-of-stay discount taken off. */
+type StayQuote = {
+  nights: number
+  subtotal: number
+  discountPercent: number
+  total: number
+  nights_breakdown: { date: string; price: number; source: PriceSource }[]
+}
+
 export default function ReservePanel({
   listingId,
   pricePerNight,
   weekendPrice,
   weekendDays,
+  weeklyDiscount,
+  monthlyDiscount,
   currency,
   maxGuests,
 }: {
@@ -49,6 +63,8 @@ export default function ReservePanel({
   pricePerNight: number
   weekendPrice?: number | null
   weekendDays?: number[] | null
+  weeklyDiscount?: number | null
+  monthlyDiscount?: number | null
   currency: string
   maxGuests: number | null
 }) {
@@ -68,71 +84,101 @@ export default function ReservePanel({
   const guests = adults + children // total headcount (infants/pets don't count)
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
 
-  // What each night of the chosen stay costs, straight from the host's calendar.
-  // These are GUEST prices — the calendar endpoint marks each night up and rounds
-  // it individually for a public reader, so the list here always adds up to the
-  // total, and nothing has to re-derive the markup on the client.
-  const [dayPrices, setDayPrices] = useState<Record<string, { price: number; source: PriceSource }>>({})
+  // The authoritative price for the chosen dates, from
+  // `GET /api/local/listings/:id/quote` — the same endpoint the booking is
+  // priced against and the same one the iOS app reads. It carries the per-night
+  // list AND the length-of-stay discount, which is why the panel asks it rather
+  // than the calendar: the calendar only prices nights, so a panel summing that
+  // list showed a guest the undiscounted total and then charged them the
+  // discounted one on the confirmation screen.
+  //
+  // These are GUEST prices — every figure is marked up and rounded for a public
+  // reader server-side, so the list adds up to the subtotal and nothing has to
+  // re-derive the markup on the client.
+  // Kept per RANGE rather than as one latest-quote, for the same reason the
+  // per-night prices used to be kept per date: a guest moving Oct 1–8 to Nov 1–8
+  // is asking about a different stay that happens to be the same LENGTH, and a
+  // single slot would answer the second question with the first one's price.
+  const [quotes, setQuotes] = useState<Record<string, StayQuote>>({})
 
   const stayNights = useMemo(() => nightsOfStay(checkIn, checkOut), [checkIn, checkOut])
 
-  // Windows already requested, so a window that comes back short is not asked for
-  // again. Without this the effect would re-run on every merge — setDayPrices
-  // always returns a fresh object — and a response missing even one night would
-  // never satisfy the guard below, turning a slow day into an endless refetch.
+  // Only the nights being paid for: [checkIn, checkOut), so the checkout day is
+  // never priced. The quote endpoint takes the stay, not a calendar window.
+  const range = `${listingId}:${checkIn}:${checkOut}`
+
+  // Ranges already requested, so a range whose quote failed is not asked for in
+  // a loop. (A range already ANSWERED is held in `quotes` above, which is what
+  // makes going back to earlier dates instant.)
   const fetched = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     if (stayNights.length === 0) return
-    // Only the nights being paid for: [checkIn, checkOut), so the checkout day
-    // is never fetched and never priced.
-    const start = stayNights[0]
-    const end = stayNights[stayNights.length - 1]
-    const window = `${listingId}:${start}:${end}`
-    if (fetched.current.has(window)) return
-    if (stayNights.every((d) => dayPrices[d])) return
-    fetched.current.add(window)
+    if (quotes[range] || fetched.current.has(range)) return
+    fetched.current.add(range)
     const ac = new AbortController()
     ;(async () => {
       try {
         const res = await fetch(
-          `/api/local/listings/${listingId}/calendar?start=${start}&end=${end}`,
+          `/api/local/listings/${listingId}/quote?checkIn=${checkIn}&checkOut=${checkOut}`,
           { signal: ac.signal, cache: 'no-store' }
         )
         if (!res.ok) {
           // Let a transient failure be retried when the guest next changes dates.
-          fetched.current.delete(window)
+          fetched.current.delete(range)
           return
         }
-        const payload = await res.json()
-        setDayPrices((prev) => {
-          const next = { ...prev }
-          for (const d of payload.days ?? []) next[d.date] = { price: d.price, source: d.source }
-          return next
-        })
+        const payload = (await res.json()) as StayQuote
+        // Hold the answer to the night count we asked about. A response that
+        // disagrees is not a price for this stay, and showing it would be the
+        // same mismatch in a different costume.
+        if (payload?.nights !== stayNights.length) return
+        setQuotes((prev) => ({ ...prev, [range]: payload }))
       } catch {
         // Offline or a slow network: the panel falls back to the local estimate
-        // below, which is what it always showed before the calendar existed.
-        fetched.current.delete(window)
+        // below, which is what it always showed before the quote existed.
+        fetched.current.delete(range)
       }
     })()
     return () => ac.abort()
-  }, [listingId, stayNights, dayPrices])
+  }, [listingId, checkIn, checkOut, range, stayNights, quotes])
+
+  const nights = stayNights.length
+
+  /** The quote for the dates on screen, or nothing while one is in flight — the
+   *  panel shows its own estimate rather than another stay's price. */
+  const liveQuote = quotes[range] ?? null
 
   /** Per-night prices, but only when we have every night — a partial list would
-   *  add up to less than the total and read as a discount. */
+   *  add up to less than the subtotal and read as a discount. */
   const breakdown = useMemo(() => {
-    if (stayNights.length === 0) return null
-    if (!stayNights.every((d) => dayPrices[d])) return null
-    return stayNights.map((date) => ({ date, ...dayPrices[date] }))
-  }, [stayNights, dayPrices])
+    if (!liveQuote) return null
+    const list = liveQuote.nights_breakdown
+    if (!Array.isArray(list) || list.length !== nights) return null
+    return list
+  }, [liveQuote, nights])
 
-  // The local estimate is still the fallback for the moment before the calendar
-  // arrives (and if it never does). It knows the base and weekend rates, which
-  // covers every listing whose host has not touched their calendar.
+  // The local estimate is still the fallback for the moment before the quote
+  // arrives (and if it never does). It knows the base and weekend rates and both
+  // length-of-stay rates, which covers every listing whose host has not touched
+  // their calendar.
   const local = stayQuote(checkIn, checkOut, pricePerNight, weekendPrice, weekendDays)
-  const nights = stayNights.length
-  const total = breakdown ? breakdown.reduce((sum, n) => sum + n.price, 0) : local.total
+  const subtotal = liveQuote ? liveQuote.subtotal : local.total
+  /** The length-of-stay discount, in whole percent. Off the quote when we have
+   *  one; otherwise the shared rule, run on the listing's own two rates — so the
+   *  estimate and the authoritative figure agree about whether a discount exists
+   *  even before the quote lands. */
+  const discountPercent = liveQuote
+    ? liveQuote.discountPercent
+    : stayDiscountPercent(nights, weeklyDiscount, monthlyDiscount)
+  // roundUpToStep matches what the server does to the discounted total, so the
+  // estimate lands on the same multiple of 10 the quote will.
+  const total = liveQuote
+    ? liveQuote.total
+    : discountPercent > 0
+      ? roundUpToStep(subtotal * (1 - discountPercent / 100))
+      : subtotal
+  const discountAmount = subtotal - total
 
   const weekendActive = typeof weekendPrice === 'number' && weekendPrice > 0 && !!weekendDays && weekendDays.length > 0
   /** Itemise only when the nights actually differ. A stay at one flat rate reads
@@ -258,7 +304,7 @@ export default function ReservePanel({
               ? t('nightsCount', { nights })
               : `${price(breakdown?.[0]?.price ?? pricePerNight)} × ${t('nightsCount', { nights })}`}
           </span>
-          <span style={{ fontWeight: 700 }}>{price(total)}</span>
+          <span style={{ fontWeight: 700 }}>{price(subtotal)}</span>
         </div>
 
         {/* The nightly prices behind that number. Shown only when the nights
@@ -283,6 +329,25 @@ export default function ReservePanel({
               </li>
             ))}
           </ul>
+        )}
+        {/* The host's length-of-stay discount, named and priced. Shown as its
+            own line rather than folded into the total: a guest who qualified for
+            it by stretching their stay should be able to see that it landed, and
+            a guest who did not should not be shown a row that says nothing. */}
+        {discountPercent > 0 && nights > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              marginTop: 10,
+              fontSize: 14,
+              fontWeight: 600,
+              color: COLORS.burgundy,
+            }}
+          >
+            <span>{t('stayDiscount', { percent: discountPercent })}</span>
+            <span>−{price(discountAmount)}</span>
+          </div>
         )}
         <div
           style={{

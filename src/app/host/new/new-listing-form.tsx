@@ -34,6 +34,7 @@ import {
 import { OTHER_RESORT, isResortNameMissing } from '@/lib/resort-choice'
 import { checkResortName, MIN_RESORT_NAME_LETTERS } from '@/lib/local/resort-core'
 import { fileToCompressedDataUrl } from '@/lib/image'
+import { bodyBytes, planPhotoUpload } from '@/lib/listing-photo-upload'
 import { DEFAULT_WEEKEND_DAYS } from '@/lib/geo'
 import {
   DAYS_IN_WEEK,
@@ -150,6 +151,14 @@ export function NewListingForm({
   const monthNames = useMonthNames()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Set when the listing was created but one of its photo requests failed. The form stays put and
+  // says so rather than navigating: this is not an error — the listing EXISTS — and a host who
+  // reads "could not create the listing" submits the form again and ends up with two.
+  const [partial, setPartial] = useState<{
+    id: string
+    photosMissing: number
+    documentMissing: boolean
+  } | null>(null)
 
   // Controlled fields
   const [title, setTitle] = useState('')
@@ -572,11 +581,11 @@ export function NewListingForm({
 
     setBusy(true)
     try {
-      const res = await fetch('/api/local/listings', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      // Everything except the photos and the ownership document is text. All of them in one body
+      // is what Vercel refuses with a bare 413 before the API is ever invoked, so the fields are
+      // measured (a description is host-written and has no useful ceiling to assume) and the
+      // photos are dealt out across as many requests as they need — see listing-photo-upload.ts.
+      const fields = {
           title: trimmedTitle,
           description: description.trim() || undefined,
           location: location.trim() || undefined,
@@ -600,8 +609,24 @@ export function NewListingForm({
           resort_name: resortId === OTHER_RESORT ? resortOther.trim() || undefined : undefined,
           amenities,
           cancellation_policy: cancellationPolicy,
-          images: photos,
-          ownership_doc: ownershipDoc || undefined,
+      }
+      const doc = ownershipDoc || ''
+      const plan = planPhotoUpload({
+        photos,
+        // `"ownership_doc":` and the comma around it, on top of the value itself.
+        docBytes: doc ? bodyBytes(doc) + 16 : 0,
+        fixedBytes: new TextEncoder().encode(JSON.stringify(fields)).length,
+      })
+
+      const res = await fetch('/api/local/listings', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...fields,
+          // The cover always travels with the create: the API refuses a listing with no photo.
+          images: plan.withRequest,
+          ownership_doc: plan.docDeferred ? undefined : doc || undefined,
         }),
       })
       if (res.status === 401) {
@@ -611,6 +636,47 @@ export function NewListingForm({
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         throw new Error(err.error || t('errors.createFailed'))
+      }
+
+      // From here the listing exists. The photos that did not fit follow it, and a failure among
+      // them is reported as a partial success — never thrown. See `partial` above.
+      const created = (await res.json().catch(() => ({}))) as { id?: string }
+      const id = created.id ?? ''
+      let photosMissing = 0
+      if (id) {
+        for (const [index, batch] of plan.appended.entries()) {
+          const appended = await fetch(`/api/local/listings/${id}/images`, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ images: batch }),
+          }).catch(() => null)
+          if (!appended?.ok) {
+            // Stop rather than try the rest: the usual cause is the connection, and more doomed
+            // uploads only make the host wait longer to be told.
+            photosMissing = plan.appended.slice(index).reduce((n, b) => n + b.length, 0)
+            break
+          }
+        }
+      } else {
+        photosMissing = plan.appended.reduce((n, b) => n + b.length, 0)
+      }
+
+      let documentMissing = false
+      if (id && plan.docDeferred && doc) {
+        const patched = await fetch(`/api/local/listings/${id}`, {
+          method: 'PATCH',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ownership_doc: doc }),
+        }).catch(() => null)
+        documentMissing = !patched?.ok
+      }
+
+      if (photosMissing || documentMissing) {
+        setBusy(false)
+        setPartial({ id, photosMissing, documentMissing })
+        return
       }
       router.push('/host')
       router.refresh()
@@ -1171,10 +1237,26 @@ export function NewListingForm({
         <p style={{ margin: '0 0 14px', fontSize: 13.5, color: '#b3261e', fontWeight: 600 }}>{error}</p>
       )}
 
+      {/* The listing was created; only some of its photos were not. Deliberately not the red
+          error style — nothing failed that the host has to redo here, and Publish is disabled
+          below so the form cannot make a second listing. */}
+      {partial && (
+        <p style={{ margin: '0 0 14px', fontSize: 13.5, color: C.ink, fontWeight: 600 }}>
+          {t('partialCreated')}{' '}
+          {partial.photosMissing > 0 && t('partialPhotos', { count: partial.photosMissing })}{' '}
+          {partial.documentMissing && t('partialDoc')}{' '}
+          {partial.id && (
+            <a href={`/host/${partial.id}/edit`} style={{ color: C.burgundy }}>
+              {t('partialLink')}
+            </a>
+          )}
+        </p>
+      )}
+
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <button
           type="submit"
-          disabled={busy}
+          disabled={busy || partial !== null}
           style={{
             background: C.burgundy,
             color: '#fff',
@@ -1183,8 +1265,8 @@ export function NewListingForm({
             padding: '12px 30px',
             fontWeight: 700,
             fontSize: 15,
-            cursor: busy ? 'default' : 'pointer',
-            opacity: busy ? 0.7 : 1,
+            cursor: busy || partial ? 'default' : 'pointer',
+            opacity: busy || partial ? 0.7 : 1,
             fontFamily: 'inherit',
           }}
         >

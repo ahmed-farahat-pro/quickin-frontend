@@ -550,6 +550,8 @@ export default async function ListingDetailPage({
                 pricePerNight={listing.price_per_night}
                 weekendPrice={listing.weekend_price}
                 weekendDays={listing.weekend_days}
+                weeklyDiscount={listing.weekly_discount}
+                monthlyDiscount={listing.monthly_discount}
                 currency={listing.currency}
                 maxGuests={listing.max_guests}
               />

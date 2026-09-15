@@ -520,6 +520,11 @@ async function ReservationsList({
                   // both names; this one now does too.
                   paymentState={b.payment_state ?? b.payment_status}
                   proofStatus={b.payment_proof_status}
+                  // Why the last transfer was turned down. Already on every
+                  // booking row BOOKING_COLS returns — it was simply never read
+                  // here, so the web offered "Upload a new screenshot" without
+                  // ever saying what was wrong with the last one.
+                  rejectReason={b.payment_reject_reason}
                   checkIn={b.check_in}
                   checkOut={b.check_out}
                 />

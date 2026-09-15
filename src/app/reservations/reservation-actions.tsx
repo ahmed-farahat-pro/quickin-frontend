@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { PaymentDestination } from '@/components/payment-destination'
-import { paymentStageFor } from '@/lib/local/payment-flow-core'
+import { paymentStageFor, paymentRejectionFor } from '@/lib/local/payment-flow-core'
 
 const C = { burgundy: '#5B0F16', tan: '#EFE6D8', ink: '#2A2220', muted: '#6B6055' }
 
@@ -35,10 +35,13 @@ export function ReservationActions(props: {
   paymentState?: string | null
   /** Latest payment_proofs.status. */
   proofStatus?: string | null
+  /** `payment_reject_reason` — the reviewer's verbatim words. Only rendered when
+   *  the stage is actually `rejected`; the column outlives the rejection. */
+  rejectReason?: string | null
   checkIn: string
   checkOut: string
 }) {
-  const { bookingId, status, paid, paymentState, proofStatus, checkIn, checkOut } = props
+  const { bookingId, status, paid, paymentState, proofStatus, rejectReason, checkIn, checkOut } = props
   const t = useTranslations('reservationsLocal')
   const tPay = useTranslations('instapay')
   const router = useRouter()
@@ -98,9 +101,50 @@ export function ReservationActions(props: {
   })
   const awaitingPayment = stage === 'awaiting_payment' || stage === 'rejected'
   const underReview = stage === 'under_review'
+  // Non-null ONLY at the rejected stage — `rejectReason` is the latest proof's
+  // reason and it outlives the rejection, so the gate is what stops a guest who
+  // re-uploaded and was approved from still being told their transfer wasn't
+  // accepted. A `null` reason INSIDE a rejection is a different thing: the admin
+  // left the box empty (and dispute outcomes carry none), and the generic line
+  // stands in, because "we couldn't confirm it" is still far more than the guest
+  // used to be told. Same helper the payment page asks.
+  const rejection = paymentRejectionFor({
+    status,
+    payment_state: paymentState,
+    payment_proof_status: proofStatus,
+    paid_at: paid ? 'set' : null,
+    payment_reject_reason: rejectReason,
+  })
 
   return (
     <>
+    {/* Why the last transfer was turned down, in the reviewer's own words. Sits
+        ABOVE the Try-again button so the guest reads the fix before re-uploading
+        the same unreadable photo — the web used to show the retry with no reason
+        at all, while iOS and Android both showed this card. */}
+    {rejection && (
+      <div
+        role="status"
+        style={{
+          marginTop: 12,
+          padding: '12px 14px',
+          background: '#fdecea',
+          border: '1px solid rgba(179,38,30,0.25)',
+          borderRadius: 14,
+        }}
+      >
+        <strong style={{ display: 'block', fontSize: 13.5, fontWeight: 800, color: '#b3261e' }}>
+          {tPay('rejected.title')}
+        </strong>
+        <p style={{ margin: '4px 0 0', fontSize: 13.5, color: C.ink, whiteSpace: 'pre-wrap' }}>
+          {rejection.reason ?? tPay('rejected.noReason')}
+        </p>
+        <p style={{ margin: '4px 0 0', fontSize: 12.5, color: C.muted }}>
+          {tPay('rejected.subtitle')}
+        </p>
+      </div>
+    )}
+
     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, marginTop: 12 }}>
       <span style={{ background: chip.bg, color: chip.fg, fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999 }}>
         {chipLabel}

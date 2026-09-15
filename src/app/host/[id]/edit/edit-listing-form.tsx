@@ -38,6 +38,7 @@ import { checkListingEdit } from '@/lib/local/listing-completeness-policy'
 import { OTHER_RESORT, isResortNameMissing } from '@/lib/resort-choice'
 import { checkResortName, MIN_RESORT_NAME_LETTERS } from '@/lib/local/resort-core'
 import { fileToCompressedDataUrl } from '@/lib/image'
+import { bodyBytes, planPhotoUpload } from '@/lib/listing-photo-upload'
 import { DEFAULT_WEEKEND_DAYS } from '@/lib/geo'
 import {
   DAYS_IN_WEEK,
@@ -820,11 +821,37 @@ export function EditListingForm({
     setBusy(true)
     setError(null)
     try {
+      // The replacement photo set stops fitting one request as soon as the host
+      // adds photos to it: Vercel answers 413 over ~4.5 MB, before the API is
+      // invoked, which is a failure with no sentence attached (see
+      // lib/listing-photo-upload.ts — and note the `photosDirty` guard above,
+      // which is the same wall met from the text-only side). The PATCH carries
+      // the prefix of the set that fits and the tail is appended after it, which
+      // is exactly where the append endpoint puts it — so deferring from the END
+      // is what keeps the order the host arranged. A failure part-way still
+      // throws: the whole edit is a replacement, so pressing Save again sends
+      // the same set and converges rather than duplicating anything.
+      const replacing = Array.isArray(body.images) ? (body.images as string[]) : null
+      const doc = typeof body.ownership_doc === 'string' ? body.ownership_doc : ''
+      // The fields WITHOUT the two big ones, so the body they produce can be measured.
+      const rest: Record<string, unknown> = { ...body }
+      delete rest.images
+      delete rest.ownership_doc
+      const plan = planPhotoUpload({
+        photos: replacing ?? [],
+        // `"ownership_doc":` and the comma around it, on top of the value itself.
+        docBytes: doc ? bodyBytes(doc) + 16 : 0,
+        fixedBytes: new TextEncoder().encode(JSON.stringify(rest)).length,
+      })
+      const first: Record<string, unknown> = { ...rest }
+      if (replacing) first.images = plan.withRequest
+      if (doc && !plan.docDeferred) first.ownership_doc = doc
+
       const res = await fetch(`/api/local/listings/${listing.id}`, {
         method: 'PATCH',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(first),
       })
       if (res.status === 401) {
         router.push('/login')
@@ -836,7 +863,35 @@ export function EditListingForm({
       }
       // Every mutation answers with the updated listing, so the new status is
       // shown straight away — no refetch.
-      const updated = (await res.json().catch(() => null)) as Listing | null
+      let updated = (await res.json().catch(() => null)) as Listing | null
+
+      for (const batch of plan.appended) {
+        const appended = await fetch(`/api/local/listings/${listing.id}/images`, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ images: batch }),
+        })
+        if (!appended.ok) {
+          const err = await appended.json().catch(() => ({}))
+          throw new Error(err.error || tEdit('errors.saveFailed'))
+        }
+        updated = (await appended.json().catch(() => null)) as Listing | null
+      }
+
+      if (plan.docDeferred && doc) {
+        const patched = await fetch(`/api/local/listings/${listing.id}`, {
+          method: 'PATCH',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ownership_doc: doc }),
+        })
+        if (!patched.ok) {
+          const err = await patched.json().catch(() => ({}))
+          throw new Error(err.error || tEdit('errors.saveFailed'))
+        }
+        updated = (await patched.json().catch(() => null)) as Listing | null
+      }
       setBusy(false)
       setConfirming(false)
       setSavedStatus(statusOf(updated?.approval_status))

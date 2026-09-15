@@ -9,7 +9,7 @@ import type { Booking } from '@/lib/types'
 import { viewer, backendFetch } from '@/lib/backend'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { canPay, paymentStageFor } from '@/lib/local/payment-flow-core'
+import { canPay, paymentRejectionFor } from '@/lib/local/payment-flow-core'
 import { PayClient } from './pay-client'
 
 export const dynamic = 'force-dynamic'
@@ -33,6 +33,10 @@ export default async function PayPage(ctx: { params: Promise<{ id: string }> }) 
   // real state is shown.
   if (!canPay(booking)) redirect('/reservations')
 
+  // Non-null only when the last transfer was actually turned down — the same
+  // helper the reservations list uses, so both doors explain it identically.
+  const rejection = paymentRejectionFor(booking)
+
   return (
     <PayClient
       bookingId={id}
@@ -42,8 +46,11 @@ export default async function PayPage(ctx: { params: Promise<{ id: string }> }) 
       checkIn={booking.check_in ?? ''}
       checkOut={booking.check_out ?? ''}
       // A previously-rejected transfer lands here again — tell them why, so they
-      // don't upload the same unreadable photo twice.
-      rejectedReason={paymentStageFor(booking) === 'rejected' ? (booking.payment_reject_reason ?? null) : null}
+      // don't upload the same unreadable photo twice. The two props are separate
+      // because a rejection with NO reason is still worth announcing: the admin
+      // may have left the box empty, and dispute outcomes never carry one.
+      rejected={!!rejection}
+      rejectedReason={rejection?.reason ?? null}
     />
   )
 }
