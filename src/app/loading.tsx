@@ -3,7 +3,7 @@
 // =============================================================================
 // The last-resort fallback: shown only when a route has no nearer loading.tsx of
 // its own. In practice that now means a cold app boot and the handful of client-
-// rendered guest screens (/login, /signup, /messages, /auth/*) whose payloads are
+// rendered guest screens (/login, /signup, /auth/*) whose payloads are
 // small enough that this barely flashes.
 //
 // It used to be a dark, blurred, fullscreen overlay — and because /ops declared no

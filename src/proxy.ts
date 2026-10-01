@@ -77,6 +77,18 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(redirectUrl, 308)
   }
 
+  // Host ⇄ guest messaging was removed (2026-10-02) in favour of public questions on
+  // each listing. Old /messages bookmarks, emails and push links land on the browse
+  // page instead of a 404. Temporary (307) rather than permanent: a browser that
+  // caches a 308 would keep skipping the route if it is ever reused.
+  if (strippedPath === '/messages' || strippedPath.startsWith('/messages/')) {
+    const locale = localeFromPath || preferredLocale
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.pathname = `/${locale}/explore`
+    redirectUrl.search = ''
+    return NextResponse.redirect(redirectUrl)
+  }
+
   if (localeFromPath) {
     const rewriteUrl = request.nextUrl.clone()
     rewriteUrl.pathname = strippedPath

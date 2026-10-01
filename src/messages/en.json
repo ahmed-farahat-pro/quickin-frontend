@@ -126,10 +126,8 @@
     "goHome": "Go to homepage"
   },
   "chat": {
-    "title": "Chat with",
     "poweredBy": "Powered by Gemini",
     "welcome": "Hi! I'm your QuickIn assistant. I can help you find the perfect place to stay, answer questions about listings, or give travel recommendations. How can I help you today?",
-    "placeholder": "Write a message…",
     "suggested": {
       "beach": "Find beachfront properties",
       "included": "What's included in this listing?",
@@ -140,26 +138,7 @@
     "fallbackError": "Sorry, something went wrong.",
     "ariaOpenChat": "Open chat",
     "ariaCloseChat": "Close chat",
-    "ariaSendMessage": "Send message",
-    "needsLogin": "Please sign in to chat with the host.",
-    "logIn": "Log in",
-    "loading": "Loading…",
-    "empty": "No messages yet — say hello!",
-    "send": "Send",
-    "guardNote": "For your safety, keep chats on QuickIn. Phone numbers, emails, handles and outside links are blocked.",
-    "messageHost": "Message host",
-    "host": "Host",
-    "close": "Close",
-    "backToExplore": "Back to Explore",
-    "inboxTitle": "Messages",
-    "noThreads": "No conversations yet.",
-    "pickThread": "Select a conversation to read it.",
-    "asHost": "Host",
-    "warningTitle": "A note from QuickIn",
-    "warningAck": "I understand",
-    "warningAckFailed": "Couldn't save that. Please try again.",
-    "reservationThread": "Reservation",
-    "reservationDates": "{checkIn} – {checkOut}"
+    "ariaSendMessage": "Send message"
   },
   "bookingPage": {
     "title": "Confirm and Request",
@@ -1408,9 +1387,9 @@
       "markAllRead": "Mark all read",
       "noNotifications": "No notifications yet",
       "trips": "Trips",
+      "guestQuestions": "Guest questions",
       "saved": "My Favorites",
       "account": "Account",
-      "messages": "Messages",
       "contact": "Contact"
     },
     "hero": {
@@ -1573,7 +1552,7 @@
     },
     "owner": {
       "badge": "This is your listing",
-      "hint": "You can't book or message your own place.",
+      "hint": "You can't book your own place. Answer guest questions in the comments below.",
       "edit": "Edit listing",
       "manage": "View incoming reservations"
     },
@@ -1581,7 +1560,39 @@
       "title": "Only you can see this",
       "body": "This listing isn’t visible to guests right now.",
       "manage": "Manage it"
-    }
+    },
+    "askQuestion": "Ask the host a question"
+  },
+  "listingComments": {
+    "title": "Questions & comments",
+    "titleWithCount": "Questions & comments ({count})",
+    "empty": "No questions yet. Ask the host anything about this stay.",
+    "emptyHost": "No questions yet. When guests ask something, it shows up here for you to answer.",
+    "placeholder": "Ask a question about this stay…",
+    "hint": "Comments are public. Don't share phone numbers or contact details.",
+    "post": "Post",
+    "posting": "Posting…",
+    "signInPrompt": "Sign in to ask a question",
+    "signIn": "Sign in",
+    "signedOut": "Your session has ended. Sign in again to continue.",
+    "hostLabel": "Host",
+    "you": "You",
+    "guest": "QuickIn guest",
+    "reply": "Reply",
+    "editReply": "Edit reply",
+    "deleteReply": "Delete reply",
+    "replyPlaceholder": "Write a public reply…",
+    "saveReply": "Save reply",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "confirmDelete": "Delete your comment? This can’t be undone.",
+    "confirmDeleteReply": "Delete your reply?",
+    "genericError": "Something went wrong. Please try again.",
+    "loadFailed": "We couldn’t load the questions. Reload the page to try again.",
+    "warningTitle": "A note from QuickIn",
+    "warningAck": "I understand",
+    "warningAckFailed": "Couldn’t save that. Please try again."
   },
   "loginLocal": {
     "subtitle": "Welcome back — sign in to continue",
@@ -1964,6 +1975,7 @@
       "saved": "My favorites",
       "verification": "Identity verification",
       "hosting": "Hosting",
+      "guestQuestions": "Guest questions",
       "services": "Services",
       "subscriptions": "My service requests",
       "earnings": "Earnings & payouts",
@@ -2117,6 +2129,10 @@
       },
       "quickActions": {
         "label": "Host tools",
+        "questions": {
+          "label": "Guest questions",
+          "hint": "{count, plural, =0 {Answer what guests ask on your listings} one {# question waiting for your reply} other {# questions waiting for your reply}}"
+        },
         "reviews": {
           "label": "Review your guests",
           "hint": "Rate guests whose stay has ended"
@@ -2948,6 +2964,24 @@
     "submit": "Submit review",
     "submitting": "Submitting…",
     "submitFailed": "We couldn’t submit that review. Try again."
+  },
+  "hostQuestions": {
+    "meta": {
+      "title": "Guest questions · QuickIn",
+      "description": "Answer the questions guests ask on your listings."
+    },
+    "title": "Guest questions",
+    "subtitle": "Questions guests asked publicly on your listings. Your reply shows under the question for everyone.",
+    "backToDashboard": "Back to dashboard",
+    "backToAccount": "Back to account",
+    "loadFailed": "We couldn’t load your guest questions. Reload the page to try again.",
+    "unanswered": "{count, plural, =0 {All caught up — every question has a reply.} one {# question needs a reply} other {# questions need a reply}}",
+    "needsReply": "Needs a reply",
+    "untitledListing": "Your listing",
+    "empty": {
+      "title": "No questions yet",
+      "hint": "When a guest asks about one of your listings, it shows up here."
+    }
   },
   "hostServices": {
     "meta": {

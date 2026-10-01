@@ -126,10 +126,8 @@
     "goHome": "Ir a la página de inicio"
   },
   "chat": {
-    "title": "Chatear con",
     "poweredBy": "Con tecnología de Gemini",
     "welcome": "¡Hola! Soy tu asistente de QuickIn. Puedo ayudarte a encontrar el alojamiento perfecto, responder preguntas sobre los anuncios o darte recomendaciones de viaje. ¿En qué puedo ayudarte hoy?",
-    "placeholder": "Escribe un mensaje…",
     "suggested": {
       "beach": "Buscar alojamientos frente al mar",
       "included": "¿Qué incluye este anuncio?",
@@ -140,26 +138,7 @@
     "fallbackError": "Lo siento, algo salió mal.",
     "ariaOpenChat": "Abrir chat",
     "ariaCloseChat": "Cerrar chat",
-    "ariaSendMessage": "Enviar mensaje",
-    "needsLogin": "Inicia sesión para chatear con el anfitrión.",
-    "logIn": "Iniciar sesión",
-    "loading": "Cargando…",
-    "empty": "Aún no hay mensajes, ¡saluda!",
-    "send": "Enviar",
-    "guardNote": "Por tu seguridad, mantén los chats en QuickIn. Números, correos, usuarios y enlaces externos están bloqueados.",
-    "messageHost": "Mensaje al anfitrión",
-    "host": "Anfitrión",
-    "close": "Cerrar",
-    "backToExplore": "Volver a Explorar",
-    "inboxTitle": "Mensajes",
-    "noThreads": "Aún no hay conversaciones.",
-    "pickThread": "Selecciona una conversación.",
-    "asHost": "Anfitrión",
-    "warningTitle": "Un mensaje de QuickIn",
-    "warningAck": "Entendido",
-    "warningAckFailed": "No se pudo guardar. Inténtalo de nuevo.",
-    "reservationThread": "Reserva",
-    "reservationDates": "{checkIn} – {checkOut}"
+    "ariaSendMessage": "Enviar mensaje"
   },
   "bookingPage": {
     "title": "Confirmar y solicitar",
@@ -1408,9 +1387,9 @@
       "markAllRead": "Marcar todo como leído",
       "noNotifications": "Sin notificaciones",
       "trips": "Viajes",
+      "guestQuestions": "Preguntas de huéspedes",
       "saved": "Mis favoritos",
       "account": "Cuenta",
-      "messages": "Mensajes",
       "contact": "Contacto"
     },
     "hero": {
@@ -1573,7 +1552,7 @@
     },
     "owner": {
       "badge": "Este es tu anuncio",
-      "hint": "No puedes reservar ni contactar tu propio alojamiento.",
+      "hint": "No puedes reservar tu propio alojamiento. Responde a las preguntas de los huéspedes en los comentarios de abajo.",
       "edit": "Editar anuncio",
       "manage": "Ver reservas entrantes"
     },
@@ -1581,7 +1560,39 @@
       "title": "Solo tú puedes ver esto",
       "body": "Ahora mismo este alojamiento no es visible para los huéspedes.",
       "manage": "Gestionarlo"
-    }
+    },
+    "askQuestion": "Hazle una pregunta al anfitrión"
+  },
+  "listingComments": {
+    "title": "Preguntas y comentarios",
+    "titleWithCount": "Preguntas y comentarios ({count})",
+    "empty": "Todavía no hay preguntas. Pregúntale al anfitrión lo que quieras sobre esta estancia.",
+    "emptyHost": "Todavía no hay preguntas. Cuando los huéspedes pregunten algo, aparecerá aquí para que respondas.",
+    "placeholder": "Haz una pregunta sobre esta estancia…",
+    "hint": "Los comentarios son públicos. No compartas números de teléfono ni datos de contacto.",
+    "post": "Publicar",
+    "posting": "Publicando…",
+    "signInPrompt": "Inicia sesión para hacer una pregunta",
+    "signIn": "Iniciar sesión",
+    "signedOut": "Tu sesión ha terminado. Vuelve a iniciar sesión para continuar.",
+    "hostLabel": "Anfitrión",
+    "you": "Tú",
+    "guest": "Huésped de QuickIn",
+    "reply": "Responder",
+    "editReply": "Editar respuesta",
+    "deleteReply": "Eliminar respuesta",
+    "replyPlaceholder": "Escribe una respuesta pública…",
+    "saveReply": "Guardar respuesta",
+    "saving": "Guardando…",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "confirmDelete": "¿Eliminar tu comentario? No se puede deshacer.",
+    "confirmDeleteReply": "¿Eliminar tu respuesta?",
+    "genericError": "Algo salió mal. Inténtalo de nuevo.",
+    "loadFailed": "No pudimos cargar las preguntas. Recarga la página para intentarlo de nuevo.",
+    "warningTitle": "Un aviso de QuickIn",
+    "warningAck": "Entendido",
+    "warningAckFailed": "No se pudo guardar. Inténtalo de nuevo."
   },
   "loginLocal": {
     "subtitle": "Bienvenido de nuevo: inicia sesión para continuar",
@@ -1964,6 +1975,7 @@
       "saved": "Mis favoritos",
       "verification": "Verificación de identidad",
       "hosting": "Alojamiento",
+      "guestQuestions": "Preguntas de huéspedes",
       "services": "Servicios",
       "subscriptions": "Mis solicitudes de servicio",
       "earnings": "Ganancias y pagos",
@@ -2117,6 +2129,10 @@
       },
       "quickActions": {
         "label": "Herramientas de anfitrión",
+        "questions": {
+          "label": "Preguntas de huéspedes",
+          "hint": "{count, plural, =0 {Responde a lo que preguntan en tus anuncios} one {# pregunta espera tu respuesta} other {# preguntas esperan tu respuesta}}"
+        },
         "reviews": {
           "label": "Valora a tus huéspedes",
           "hint": "Valora estancias ya terminadas"
@@ -2948,6 +2964,24 @@
     "submit": "Enviar reseña",
     "submitting": "Enviando…",
     "submitFailed": "No pudimos enviar esa reseña. Inténtalo de nuevo."
+  },
+  "hostQuestions": {
+    "meta": {
+      "title": "Preguntas de huéspedes · QuickIn",
+      "description": "Responde a las preguntas que hacen los huéspedes en tus anuncios."
+    },
+    "title": "Preguntas de huéspedes",
+    "subtitle": "Preguntas que los huéspedes hicieron públicamente en tus anuncios. Tu respuesta aparece debajo de la pregunta para todos.",
+    "backToDashboard": "Volver al panel",
+    "backToAccount": "Volver a la cuenta",
+    "loadFailed": "No pudimos cargar las preguntas de los huéspedes. Recarga la página para intentarlo de nuevo.",
+    "unanswered": "{count, plural, =0 {Todo al día: cada pregunta tiene respuesta.} one {# pregunta necesita respuesta} other {# preguntas necesitan respuesta}}",
+    "needsReply": "Sin responder",
+    "untitledListing": "Tu anuncio",
+    "empty": {
+      "title": "Todavía no hay preguntas",
+      "hint": "Cuando un huésped pregunte por uno de tus anuncios, aparecerá aquí."
+    }
   },
   "hostServices": {
     "meta": {

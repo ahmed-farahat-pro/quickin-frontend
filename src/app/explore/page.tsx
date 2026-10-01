@@ -10,7 +10,7 @@ import { CurrencySwitcher } from '@/components/layout/currency-switcher'
 import { NotificationsBell } from './notifications-bell'
 import { MobileMenu } from './mobile-menu'
 import { getTranslations, getLocale } from 'next-intl/server'
-import { Heart, MessageCircle } from 'lucide-react'
+import { Heart, MessageCircleQuestion } from 'lucide-react'
 import ExploreClient from './explore-client'
 import AddListingFab from './add-listing-fab'
 import { whatsappHref } from '@/lib/contact'
@@ -177,16 +177,17 @@ export default async function ExplorePage({
             <NotificationsBell />
             <LocaleSwitcher className="font-semibold text-[color:var(--qk-ink,#3a2a23)]" />
             <CurrencySwitcher className="font-semibold text-[color:var(--qk-ink,#3a2a23)]" />
-            {firstName && (
-              // Messages inbox — the mobile apps surface chat as a top-level
-              // icon, so the web header carries the same affordance rather than
-              // burying it in the hamburger menu.
+            {isHost && (
+              // Guest questions — where the Messages inbox used to sit. Host ⇄ guest
+              // messaging was replaced by public questions on each listing, so the
+              // header affordance now leads a host to the questions waiting on them.
               <a
-                href="/messages"
-                aria-label={t('nav.messages')}
+                href="/host/questions"
+                aria-label={t('nav.guestQuestions')}
+                title={t('nav.guestQuestions')}
                 className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#2A2220] transition-colors hover:bg-black/5"
               >
-                <MessageCircle className="h-5 w-5" />
+                <MessageCircleQuestion className="h-5 w-5" />
               </a>
             )}
             {firstName && (

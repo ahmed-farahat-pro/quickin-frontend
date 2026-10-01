@@ -4,7 +4,7 @@
 // containing the nav links + the language switcher. Shown only on small screens.
 
 import { useState } from 'react'
-import { Menu, Home, Ticket, Heart, User, MessageCircle, LogOut, LogIn, Mail, Plus } from 'lucide-react'
+import { Menu, Home, Ticket, Heart, User, MessageCircleQuestion, LogOut, LogIn, Mail, Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import {
   Sheet,
@@ -51,6 +51,11 @@ export function MobileMenu({ firstName, isHost }: { firstName: string | null; is
                 <Plus className="h-[18px] w-[18px] shrink-0 text-[#5B0F16]" />
                 {t('nav.addListing')}
               </a>
+              {/* Where Messages used to be: hosts answer public listing questions now. */}
+              <a href="/host/questions" onClick={close} className={ROW}>
+                <MessageCircleQuestion className="h-[18px] w-[18px] shrink-0 text-[#5B0F16]" />
+                {t('nav.guestQuestions')}
+              </a>
             </>
           ) : (
             <a href="/host" onClick={close} className={ROW}>
@@ -64,10 +69,6 @@ export function MobileMenu({ firstName, isHost }: { firstName: string | null; is
               <a href="/reservations" onClick={close} className={ROW}>
                 <Ticket className="h-[18px] w-[18px] shrink-0 text-[#5B0F16]" />
                 {t('nav.trips')}
-              </a>
-              <a href="/messages" onClick={close} className={ROW}>
-                <MessageCircle className="h-[18px] w-[18px] shrink-0 text-[#5B0F16]" />
-                {t('nav.messages')}
               </a>
               <a href="/saved" onClick={close} className={ROW}>
                 <Heart className="h-[18px] w-[18px] shrink-0 text-[#5B0F16]" />
@@ -88,10 +89,6 @@ export function MobileMenu({ firstName, isHost }: { firstName: string | null; is
             </>
           ) : (
             <>
-              <a href="/messages" onClick={close} className={ROW}>
-                <MessageCircle className="h-[18px] w-[18px] shrink-0 text-[#5B0F16]" />
-                {t('nav.messages')}
-              </a>
               <a href="/contact" onClick={close} className={ROW}>
                 <Mail className="h-[18px] w-[18px] shrink-0 text-[#5B0F16]" />
                 {t('nav.contact')}

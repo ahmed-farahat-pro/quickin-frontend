@@ -389,6 +389,7 @@ export default async function AccountPage() {
           {user.is_host && (
             <>
               <AccountLink href="/host" label={t('links.hosting')} />
+              <AccountLink href="/host/questions" label={t('links.guestQuestions')} />
               <AccountLink href="/host/earnings" label={t('links.earnings')} />
               <AccountLink href="/host/analytics" label={t('links.analytics')} />
               <AccountLink href="/host/reviews" label={t('links.reviewGuests')} />

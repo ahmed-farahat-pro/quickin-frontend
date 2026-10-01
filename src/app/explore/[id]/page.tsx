@@ -6,7 +6,8 @@ import { cookies } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
 import ReservePanel from './reserve-panel'
-import MessageHostButton from './message-host-button'
+import ListingComments from '@/components/listing-comments'
+import type { ListingCommentsResponse } from '@/lib/local/listing-comments-ui-core'
 import ListingLocationMap from './listing-location-map-client'
 import WishlistButton from '../wishlist-button'
 import PhotoGallery from './photo-gallery'
@@ -97,8 +98,8 @@ export default async function ListingDetailPage({
   const listing = await backendFetch<Listing | null>(`/api/local/listings/${id}`, { allow404: true })
   if (!listing) notFound()
 
-  // Resolve the viewer: the owner gets an ownership view (no self-booking /
-  // self-messaging) and the heart reflects their saved state.
+  // Resolve the viewer: the owner gets an ownership view (no self-booking; they
+  // answer questions rather than ask them) and the heart reflects their saved state.
   const me = await viewer()
   const isOwner = !!me && me.id === listing.host_id
   // A pending / rejected listing (under moderation) is not public — only its owner
@@ -109,8 +110,13 @@ export default async function ListingDetailPage({
     : false
 
   // A reviews failure must never crash the stay page — fall back to none.
-  const { reviews } = await backendFetchOr<{ reviews: Review[] }>(
-    `/api/local/listings/${listing.id}/reviews`, { reviews: [] })
+  // Questions & comments load alongside: forwarded cookies make `mine` / `is_host` /
+  // `can_comment` right on first paint, and null (the load failed) lets the section
+  // retry in the browser rather than claim there are no questions.
+  const [{ reviews }, comments] = await Promise.all([
+    backendFetchOr<{ reviews: Review[] }>(`/api/local/listings/${listing.id}/reviews`, { reviews: [] }),
+    backendFetchOr<ListingCommentsResponse | null>(`/api/local/listings/${listing.id}/comments`, null),
+  ])
   const avgRating = reviews.length
     ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
     : null
@@ -367,7 +373,8 @@ export default async function ListingDetailPage({
             </a>
           )}
 
-          {/* Owner sees an ownership badge; everyone else can message the host. */}
+          {/* Owner sees an ownership badge; everyone else is pointed at the public
+              questions below (host ⇄ guest messaging was removed 2026-10-02). */}
           {isOwner ? (
             <div style={{ marginTop: 14 }}>
               <span
@@ -388,7 +395,24 @@ export default async function ListingDetailPage({
             </div>
           ) : listing.host_id ? (
             <div style={{ marginTop: 14 }}>
-              <MessageHostButton listingId={listing.id} hostName={listing.host_company?.trim() || listing.host_name || ''} />
+              <a
+                href="#comments"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  background: '#fff',
+                  color: COLORS.burgundy,
+                  border: `1px solid ${COLORS.burgundy}`,
+                  borderRadius: 999,
+                  padding: '10px 18px',
+                  fontWeight: 700,
+                  fontSize: 14,
+                  textDecoration: 'none',
+                }}
+              >
+                {t('askQuestion')}
+              </a>
             </div>
           ) : null}
         </div>
@@ -489,6 +513,10 @@ export default async function ListingDetailPage({
                 </div>
               )}
             </div>
+
+            {/* Questions & comments — public Q&A, below reviews. Anchored at
+                #comments, which is where comment notifications link. */}
+            <ListingComments listingId={listing.id} initial={comments} signedIn={!!me} />
           </div>
 
           {/* Reserve panel */}

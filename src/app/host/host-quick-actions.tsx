@@ -1,12 +1,12 @@
-// The host dashboard's quick-action shelf: Review your guests, Analytics,
-// Earnings and Services.
+// The host dashboard's quick-action shelf: Guest questions, Review your guests,
+// Analytics, Earnings and Services.
 //
 // This is what the parity ticket was actually about. iOS lists all four as
 // cards on HostDashboardView and Android reaches them from Profile → Hosting;
 // on the web they did not exist at all until now, so /host offered only the two
 // tabs (listings, reservations) and a host had nowhere to go for their money.
 //
-// A server component — four links, no state.
+// A server component — a handful of links, no state.
 import { FRAME_COLORS as C } from '@/components/layout/page-frame'
 
 export interface QuickAction {
@@ -16,13 +16,17 @@ export interface QuickAction {
   glyph: string
   label: string
   hint: string
+  /** A count that needs the host's attention (e.g. unanswered guest questions).
+   *  Rendered as a pill beside the label; omitted or 0 shows nothing. */
+  badge?: number
 }
 
 export function HostQuickActions({ actions, ariaLabel }: { actions: readonly QuickAction[]; ariaLabel: string }) {
   return (
     <>
       <style>{`
-        .qk-host-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+        .qk-host-actions { display: grid; grid-template-columns: repeat(${Math.max(1, actions.length)}, 1fr); gap: 12px; }
+        @media (max-width: 1080px) { .qk-host-actions { grid-template-columns: repeat(3, 1fr) !important; } }
         @media (max-width: 900px) { .qk-host-actions { grid-template-columns: 1fr 1fr !important; } }
         @media (max-width: 460px) { .qk-host-actions { grid-template-columns: 1fr !important; } }
       `}</style>
@@ -59,7 +63,9 @@ export function HostQuickActions({ actions, ariaLabel }: { actions: readonly Qui
             </span>
             <span
               style={{
-                display: 'block',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
                 fontSize: 15,
                 fontWeight: 700,
                 color: C.ink,
@@ -67,6 +73,23 @@ export function HostQuickActions({ actions, ariaLabel }: { actions: readonly Qui
               }}
             >
               {action.label}
+              {action.badge ? (
+                <span
+                  style={{
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    lineHeight: 1,
+                    padding: '3px 7px',
+                    borderRadius: 999,
+                    minWidth: 20,
+                    textAlign: 'center',
+                    color: '#fff',
+                    background: C.burgundy,
+                  }}
+                >
+                  {action.badge > 99 ? '99+' : action.badge}
+                </span>
+              ) : null}
             </span>
             <span style={{ display: 'block', fontSize: 13, color: C.muted, lineHeight: 1.4 }}>
               {action.hint}

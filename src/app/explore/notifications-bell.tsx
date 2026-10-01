@@ -4,7 +4,7 @@
 // (cookie auth), shows an unread badge, and a dropdown of recent items with "mark all read".
 // Renders nothing when signed out (401).
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Bell, Check } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 import {
@@ -12,44 +12,19 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { notificationHref } from '@/lib/local/listing-comments-ui-core'
+import { useRelativeTime } from '@/lib/use-relative-time'
 
 // `created_at` comes back from getNotifications() as an ISO-8601 UTC string
 // (to_char(..., 'YYYY-MM-DD"T"HH24:MI:SS"Z"')).
-type Notif = { id: string; title: string; body?: string | null; read: boolean; created_at?: string | null }
-
-// Relative "2 hours ago" formatter bound to the active locale. Intl handles the
-// en/ar/fr/es wording natively, so this needs no translation keys.
-//   < 60s → "now" · < 60m → minutes · < 24h → hours · < 7d → days
-//   older → short absolute date ("14 Mar"), with the year when it isn't this one.
-// Returns '' for missing/unparseable dates so we never render "Invalid Date".
-function useRelativeTime(locale: string) {
-  return useMemo(() => {
-    const build = (tag: string | undefined) => ({
-      rtf: new Intl.RelativeTimeFormat(tag, { numeric: 'auto' }),
-      sameYear: new Intl.DateTimeFormat(tag, { day: 'numeric', month: 'short' }),
-      otherYear: new Intl.DateTimeFormat(tag, { day: 'numeric', month: 'short', year: 'numeric' }),
-    })
-    // Fall back to the runtime default if the locale tag is somehow unusable.
-    let fmt: ReturnType<typeof build>
-    try { fmt = build(locale) } catch { fmt = build(undefined) }
-
-    // `now` is passed in rather than read from Date.now() so the caller controls
-    // when the clock is sampled (client-only — see the `now` state below).
-    return (iso: string | null | undefined, now: number): string => {
-      if (!iso || !now) return ''
-      const then = Date.parse(iso)
-      if (!Number.isFinite(then)) return ''
-      const sec = Math.round((now - then) / 1000)
-      // Negative (clock skew / future-dated) also lands here and reads as "now".
-      if (sec < 60) return fmt.rtf.format(0, 'second')
-      if (sec < 3600) return fmt.rtf.format(-Math.floor(sec / 60), 'minute')
-      if (sec < 86400) return fmt.rtf.format(-Math.floor(sec / 3600), 'hour')
-      if (sec < 604800) return fmt.rtf.format(-Math.floor(sec / 86400), 'day')
-      const d = new Date(then)
-      const df = d.getFullYear() === new Date(now).getFullYear() ? fmt.sameYear : fmt.otherYear
-      return df.format(d)
-    }
-  }, [locale])
+type Notif = {
+  id: string
+  type?: string | null
+  title: string
+  body?: string | null
+  link?: string | null
+  read: boolean
+  created_at?: string | null
 }
 
 export function NotificationsBell({ className }: { className?: string }) {
@@ -85,6 +60,19 @@ export function NotificationsBell({ className }: { className?: string }) {
     try { await fetch('/api/local/notifications/read-all', { method: 'POST', credentials: 'same-origin' }) } catch { /* ignore */ }
   }
 
+  // Opening a notification marks it read on the server; the navigation itself is a
+  // plain link, so this is fire-and-forget (keepalive lets it outlive the page).
+  function markOne(n: Notif) {
+    if (n.read) return
+    setUnread((u) => Math.max(0, u - 1))
+    setItems((prev) => prev.map((i) => (i.id === n.id ? { ...i, read: true } : i)))
+    try {
+      void fetch(`/api/local/notifications/${encodeURIComponent(n.id)}`, {
+        method: 'PATCH', credentials: 'same-origin', keepalive: true,
+      }).catch(() => {})
+    } catch { /* ignore */ }
+  }
+
   if (!signedIn) return null
 
   return (
@@ -118,22 +106,34 @@ export function NotificationsBell({ className }: { className?: string }) {
           <ul className="divide-y">
             {items.map((n) => {
               const when = relativeTime(n.created_at, now)
-              return (
-                <li key={n.id} className={`px-4 py-3 ${n.read ? '' : 'bg-[#5B0F16]/5'}`}>
-                  <div className="flex gap-2">
-                    {!n.read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#5B0F16]" />}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <p className="min-w-0 text-sm font-semibold text-[#2A2220]">{n.title}</p>
-                        {when && (
-                          <time dateTime={n.created_at ?? undefined} className="shrink-0 text-[11.5px] leading-none text-[#6B6055]">
-                            {when}
-                          </time>
-                        )}
-                      </div>
-                      {n.body && <p className="mt-0.5 text-xs text-muted-foreground">{n.body}</p>}
+              // comment / comment_reply open the listing's Questions & comments;
+              // `message` (messaging was removed) and anything else open nothing.
+              const href = notificationHref(n)
+              const content = (
+                <div className="flex gap-2">
+                  {!n.read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#5B0F16]" />}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="min-w-0 text-sm font-semibold text-[#2A2220]">{n.title}</p>
+                      {when && (
+                        <time dateTime={n.created_at ?? undefined} className="shrink-0 text-[11.5px] leading-none text-[#6B6055]">
+                          {when}
+                        </time>
+                      )}
                     </div>
+                    {n.body && <p className="mt-0.5 text-xs text-muted-foreground">{n.body}</p>}
                   </div>
+                </div>
+              )
+              return (
+                <li key={n.id} className={n.read ? '' : 'bg-[#5B0F16]/5'}>
+                  {href ? (
+                    <a href={href} onClick={() => markOne(n)} className="block px-4 py-3 transition-colors hover:bg-black/5">
+                      {content}
+                    </a>
+                  ) : (
+                    <div className="px-4 py-3">{content}</div>
+                  )}
                 </li>
               )
             })}

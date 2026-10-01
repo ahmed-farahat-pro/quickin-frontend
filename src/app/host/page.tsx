@@ -382,7 +382,13 @@ function BecomeAHost({
 
 /** Signed-in dashboard: listings grid + a "Create a listing" CTA + incoming reservations. */
 async function HostDashboard({ userId, firstName, t }: { userId: string; firstName: string; t: T }) {
-  const listings = await backendFetchOr<Listing[]>('/api/local/host/listings', [])
+  // Unanswered guest questions drive the badge on the "Guest questions" card. A
+  // failed load just drops the badge — it must never take the dashboard down.
+  const [listings, questions] = await Promise.all([
+    backendFetchOr<Listing[]>('/api/local/host/listings', []),
+    backendFetchOr<{ unanswered?: number }>('/api/local/host/comments', { unanswered: 0 }),
+  ])
+  const unansweredQuestions = Math.max(0, Number(questions?.unanswered) || 0)
   const locale = await getLocale()
   const dateFmt = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' })
 
@@ -496,11 +502,19 @@ async function HostDashboard({ userId, firstName, t }: { userId: string; firstNa
       </div>
 
       {/* Everything the dashboard offers beyond listings and reservations. iOS
-          has carried these four as cards since the dashboard shipped; the web
-          had none of them, which is the parity gap this closes. */}
+          has carried these as cards since the dashboard shipped; the web had none
+          of them, which is the parity gap this closes. */}
       <HostQuickActions
         ariaLabel={t('dashboard.quickActions.label')}
         actions={[
+          {
+            // Where Messages used to be: guests now ask in public on the listing.
+            href: '/host/questions',
+            glyph: '?',
+            label: t('dashboard.quickActions.questions.label'),
+            hint: t('dashboard.quickActions.questions.hint', { count: unansweredQuestions }),
+            badge: unansweredQuestions,
+          },
           {
             href: '/host/reviews',
             glyph: '★',
