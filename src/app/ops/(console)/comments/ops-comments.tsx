@@ -225,7 +225,7 @@ export function OpsComments({ initial }: { initial: AdminComment[] }) {
                       <td style={{ ...td, maxWidth: 420 }}>
                         <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{c.body}</div>
                         {c.host_reply && (
-                          <div style={{ marginTop: 6, paddingLeft: 10, borderLeft: `3px solid ${COLORS.tan}` }}>
+                          <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, background: COLORS.cream }}>
                             <span style={{ color: COLORS.muted, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.05em' }}>Host reply</span>
                             <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{c.host_reply}</div>
                           </div>

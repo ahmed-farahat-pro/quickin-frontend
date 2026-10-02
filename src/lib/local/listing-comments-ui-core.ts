@@ -91,15 +91,26 @@ export function unansweredCount(comments: readonly { reply: CommentReply | null 
  * Where tapping a notification in the header bell should go, or null for "nowhere"
  * (the row just sits in the list).
  *
- * `comment` / `comment_reply` carry `/explore/<listingId>#comments` from the backend.
- * `message` notifications predate the removal of messaging: they must never lead to a
- * chat screen, so they — and any stale `/messages…` link — route nowhere. Only
- * same-site `/explore/…` links are followed; older notification types carry links to
- * routes from the retired Supabase app that would 404 here.
+ * The backend writes app-neutral paths (the same `link` drives the iOS and Android
+ * routers), so this maps each one onto a page the web actually has:
+ *
+ *   /explore/<id>[#comments]   → as is (a listing; comment notifications add #comments)
+ *   /reservation/<bookingId>   → /reservations — the web has no single-trip page
+ *   /reservations /host /account /verify-id → as is
+ *   /subscriptions             → /account/subscriptions
+ *
+ * Anything else routes nowhere: `message` notifications and `/messages…` (messaging
+ * was removed), `/ops` (staff only), and links left by the retired Supabase app
+ * (`/dashboard/…`) that would 404 here. Only same-site paths are followed.
  */
 export function notificationHref(n: { type?: string | null; link?: string | null }): string | null {
   if (n.type === 'message') return null
   const link = typeof n.link === 'string' ? n.link.trim() : ''
-  if (!link.startsWith('/explore/') || link.startsWith('//')) return null
-  return link
+  if (!link.startsWith('/') || link.startsWith('//')) return null
+  const path = link.split(/[?#]/)[0].replace(/\/+$/, '')
+  if (/^\/explore\/[^/]+$/.test(path)) return link
+  if (/^\/reservations?(\/[^/]+)?$/.test(path)) return '/reservations'
+  if (path === '/subscriptions') return '/account/subscriptions'
+  if (['/host', '/account', '/verify-id'].includes(path)) return path
+  return null
 }

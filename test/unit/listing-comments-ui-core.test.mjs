@@ -76,7 +76,24 @@ describe('notificationHref', () => {
     assert.equal(notificationHref({ type: 'info', link: '/messages?c=1' }), null)
   })
 
-  test('only same-site /explore/ links are followed', () => {
+  test('every link the backend writes maps to a real web page', () => {
+    assert.equal(notificationHref({ type: 'booking_confirmed', link: '/reservation/b1' }), '/reservations')
+    assert.equal(notificationHref({ type: 'info', link: '/reservations' }), '/reservations')
+    assert.equal(notificationHref({ type: 'booking_request', link: '/host' }), '/host')
+    assert.equal(notificationHref({ type: 'info', link: '/account' }), '/account')
+    assert.equal(notificationHref({ type: 'host', link: '/verify-id' }), '/verify-id')
+    assert.equal(notificationHref({ type: 'service_confirmed', link: '/subscriptions' }), '/account/subscriptions')
+    assert.equal(notificationHref({ type: 'favorite', link: '/explore/abc' }), '/explore/abc')
+  })
+
+  test('staff, unknown and nested paths route nowhere', () => {
+    assert.equal(notificationHref({ type: 'info', link: '/ops' }), null)
+    assert.equal(notificationHref({ type: 'info', link: '/explore/abc/edit' }), null)
+    assert.equal(notificationHref({ type: 'info', link: '' }), null)
+    assert.equal(notificationHref({ type: 'info', link: null }), null)
+  })
+
+  test('only same-site links are followed', () => {
     assert.equal(notificationHref({ type: 'booking', link: '/dashboard/bookings' }), null)
     assert.equal(notificationHref({ type: 'comment', link: 'https://evil.example/explore/x' }), null)
     assert.equal(notificationHref({ type: 'comment', link: '//evil.example/explore/x' }), null)
