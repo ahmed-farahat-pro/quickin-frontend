@@ -12,6 +12,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { COLORS, SERIF } from '../../ops-theme'
 import { EmptyRow, adminGet, adminSend, btnBase, controlStyle, ghostBtn, pageStyle, panelStyle, solidBtn, td, th } from '../ops-ui'
 import { waitingLabel } from '@/lib/local/activity-core'
+
+/** "3 hours ago", but "just now" rather than "just now ago". */
+function agoLabel(since: string, now: number): string {
+  const label = waitingLabel(since, now)
+  return label === 'just now' || label === '—' ? label : `${label} ago`
+}
 import {
   DEFAULT_WARNING,
   MAX_WARNING_CHARS,
@@ -143,7 +149,7 @@ export function OpsModeration({ initial }: { initial: FlaggedUser[] }) {
       action === 'warn'
         ? ((res.data as { alreadyPending?: boolean })?.alreadyPending
             ? 'They already have an unacknowledged warning — queue cleared instead'
-            : 'Warning issued. They must acknowledge it before they can send another message.')
+            : 'Warning issued. They must acknowledge it before they can post another comment.')
         : action === 'suspend'
           ? 'Account suspended and listings hidden'
           : 'Cleared without action',
@@ -158,8 +164,8 @@ export function OpsModeration({ initial }: { initial: FlaggedUser[] }) {
           Moderation
         </h1>
         <p style={{ margin: '0 0 16px', fontSize: 13, color: COLORS.muted }}>
-          Guests and hosts whose message, review, listing or profile was blocked for carrying contact
-          details. The message was never delivered — this is the record that they tried.
+          Guests and hosts whose comment, review, listing or profile was blocked for carrying contact
+          details. It was never published — this is the record that they tried.
         </p>
 
         {flash && <div style={{ ...panelStyle, marginBottom: 12, color: COLORS.green, fontSize: 13, fontWeight: 700 }}>{flash}</div>}
@@ -203,7 +209,7 @@ export function OpsModeration({ initial }: { initial: FlaggedUser[] }) {
                     <>
                       <tr key={u.user_id}>
                         <td style={{ ...td, whiteSpace: 'nowrap', color: COLORS.muted }}>
-                          {now ? `${waitingLabel(u.last_at, now)} ago` : '—'}
+                          {now ? agoLabel(u.last_at, now) : '—'}
                         </td>
                         <td style={td}>
                           <a href={`/ops/users/${u.user_id}`} style={{ color: COLORS.burgundy, textDecoration: 'none', fontWeight: 700 }}>
@@ -244,7 +250,7 @@ export function OpsModeration({ initial }: { initial: FlaggedUser[] }) {
                             {u.account_status}
                           </span>
                           {u.pending_warning && (
-                            <div style={{ color: COLORS.red, fontSize: 11.5 }}>Warning unread — chat gated</div>
+                            <div style={{ color: COLORS.red, fontSize: 11.5 }}>Warning unread — posting gated</div>
                           )}
                           {!u.pending_warning && u.warnings > 0 && (
                             <div style={{ color: COLORS.muted, fontSize: 11.5 }}>
@@ -308,7 +314,7 @@ export function OpsModeration({ initial }: { initial: FlaggedUser[] }) {
                                             {new Date(w.issued_at).toLocaleString()} ·{' '}
                                             {w.acknowledged_at
                                               ? `acknowledged ${new Date(w.acknowledged_at).toLocaleString()}`
-                                              : 'not yet read — their chat is gated'}
+                                              : 'not yet read — their comments are gated'}
                                           </div>
                                           <p style={{ margin: '4px 0 0', whiteSpace: 'pre-wrap' }}>{w.message}</p>
                                         </div>
@@ -322,7 +328,7 @@ export function OpsModeration({ initial }: { initial: FlaggedUser[] }) {
                                     Act
                                   </h3>
                                   <label style={{ display: 'block', fontSize: 12, color: COLORS.muted, marginBottom: 4 }}>
-                                    Warning text — they must read and acknowledge this before they can send another message.
+                                    Warning text — they must read and acknowledge this before they can post another comment or reply.
                                   </label>
                                   <textarea
                                     value={draft[u.user_id] ?? DEFAULT_WARNING}
@@ -361,7 +367,7 @@ export function OpsModeration({ initial }: { initial: FlaggedUser[] }) {
                       colSpan={6}
                       tone="clear"
                       title="Nobody to review"
-                      body="No blocked attempt is waiting on a decision. The guard is still running on every message, review, listing and profile."
+                      body="No blocked attempt is waiting on a decision. The guard is still running on every comment, review, listing and profile."
                     />
                   ) : (
                     <EmptyRow

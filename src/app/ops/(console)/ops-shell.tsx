@@ -89,6 +89,7 @@ const NAV: NavGroup[] = [
     items: [
       { href: '/ops/users', label: 'Users', module: 'users' },
       { href: '/ops/moderation', label: 'Moderation', module: 'moderation' },
+      { href: '/ops/comments', label: 'Comments', module: 'moderation' },
       { href: '/ops/applications', label: 'Host applications', module: 'applications' },
       {
         href: '/ops/verifications',
