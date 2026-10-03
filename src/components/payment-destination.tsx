@@ -1,8 +1,8 @@
 'use client'
 
 // Guest-facing payment destinations: the Instapay number/QR/link and the bank
-// account an admin set in /ops/payments, read from GET /api/local/payment-config
-// (World 1 — Neon, no Supabase).
+// account an admin set in /ops/payments, plus the automatic Flash card/wallet
+// checkout, read from GET /api/local/payment-config (World 1 — Neon, no Supabase).
 //
 // Which methods appear is the server's decision, not this component's: it renders
 // a picker from `available_methods`, which the API derives from enabled AND
@@ -27,6 +27,13 @@ import type { PaymentConfig, PaymentMethod } from '@/lib/local/payment-config-co
 const C = { burgundy: '#5B0F16', cream: '#F6F1E6', tan: '#EFE6D8', ink: '#2A2220', muted: '#6B6055' }
 
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, monospace'
+
+/** `payMethods.*` key for each picker segment. A Record so a new method fails to compile here. */
+const METHOD_LABEL_KEYS: Record<PaymentMethod, string> = {
+  instapay: 'instapay',
+  bank_transfer: 'bankTransfer',
+  flash: 'flash',
+}
 
 export function PaymentDestination({
   onMethodChange,
@@ -210,7 +217,7 @@ export function PaymentDestination({
                     border: `1px solid ${on ? C.burgundy : C.tan}`,
                   }}
                 >
-                  {tm(m === 'instapay' ? 'instapay' : 'bankTransfer')}
+                  {tm(METHOD_LABEL_KEYS[m])}
                 </button>
               )
             })}
@@ -229,7 +236,17 @@ export function PaymentDestination({
           background: C.cream,
         }}
       >
-        {active === 'instapay' ? (
+        {active === 'flash' ? (
+          // Nothing to copy: Flash is a hosted checkout, so the destination is just
+          // what it is. The Pay button itself lives with the caller (/pay), beside
+          // where the screenshot upload sits for the manual methods.
+          <div style={{ flex: '1 1 240px', minWidth: 200 }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>{tm('flash')}</span>
+            <p style={{ margin: '6px 0 0', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
+              {tm('flashSubtitle')}
+            </p>
+          </div>
+        ) : active === 'instapay' ? (
           <>
             {(cfg.instapay_qr_image || cfg.qr_payload) && (
               <div style={{ flexShrink: 0, textAlign: 'center' }}>

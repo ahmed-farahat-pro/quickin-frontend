@@ -1,10 +1,13 @@
 'use client'
 
-// Payments ops (World 1) — five panels:
+// Payments ops (World 1) — six panels:
 //  1. Instapay destination: GET/PUT /api/local/admin/settings/instapay — the
 //     handle/number, the deep link, the QR image and the instructions guests see.
 //  2. Bank transfer destination: GET/PUT /api/local/admin/settings/bank — the bank,
 //     the account holder, the account number and an optional IBAN.
+//  2b. Flash (automatic card/wallet checkout): GET/PUT
+//     /api/local/admin/settings/flash — only an on/off switch; its credentials are
+//     FLASH_* env vars on the backend, so the panel just reports `configured`.
 //  3. Payments awaiting confirmation, and 4. the disputes queue: GET
 //     /api/local/admin/payments with a per-row "view screenshot"
 //     (GET /api/local/bookings/:id/payment-proof) and Accept / Reject / Approve /
@@ -111,6 +114,7 @@ export function OpsPayments({ initial }: { initial: OpsPaymentsInitial | null })
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
       <InstapaySettings initial={initial?.config ?? null} />
       <BankSettings initial={initial?.config ?? null} />
+      <FlashSettings initial={initial?.config ?? null} />
       <PendingPaymentsQueue initial={initial?.pending ?? null} />
       <RefundsQueue initial={initial?.refunds ?? null} />
       <DisputesQueue initial={initial?.disputes ?? null} />
@@ -164,6 +168,7 @@ function MethodToggle({
 const METHOD_LABELS: Record<string, string> = {
   instapay: 'Instapay',
   bank_transfer: 'Bank transfer',
+  flash: 'Card / wallet (Flash)',
 }
 
 /**
@@ -977,6 +982,118 @@ function BankSettings({ initial }: { initial: OpsPaymentsInitial['config'] | nul
             <p style={{ margin: 0, fontSize: 12.5, color: C.muted }}>
               Guests won&apos;t see bank transfer while this is off. Nothing above is deleted —
               switch it back on and it returns as it was.
+            </p>
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button onClick={save} disabled={saving} style={{ ...primaryBtn, opacity: saving ? 0.7 : 1 }}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            {msg && (
+              <span style={{ fontSize: 13, color: msg.kind === 'ok' ? '#177245' : '#b3261e' }}>{msg.text}</span>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
+// ---- Flash (card / wallet) --------------------------------------------------
+
+/**
+ * The third method, and the only automatic one: a hosted Flash checkout that
+ * confirms the booking itself, so nothing here ever lands in the queues below.
+ *
+ * There is nothing to type — the merchant credentials are FLASH_* env vars on the
+ * backend, deliberately kept out of a settings row an admin screen could leak. So
+ * the panel is the switch plus a line saying whether those credentials exist; the
+ * API only offers Flash to guests when it is on AND configured. Unlike the manual
+ * methods it defaults OFF, matching the server.
+ */
+function FlashSettings({ initial }: { initial: OpsPaymentsInitial['config'] | null }) {
+  const [enabled, setEnabled] = useState(initial?.flash?.enabled ?? false)
+  const [configured, setConfigured] = useState(initial?.flash?.configured ?? false)
+  const [loading, setLoading] = useState(initial === null)
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+
+  function apply(data: Partial<PaymentConfig>) {
+    setEnabled(data.flash?.enabled ?? false)
+    setConfigured(data.flash?.configured ?? false)
+  }
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/local/admin/settings/flash', { credentials: 'same-origin' })
+      if (!res.ok) throw new Error('Failed to load settings')
+      apply(await res.json())
+    } catch (e) {
+      setMsg({ kind: 'err', text: e instanceof Error ? e.message : 'Failed to load settings' })
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  // See PendingPaymentsQueue — only fetch when the server render didn't supply it.
+  useEffect(() => {
+    if (initial === null) load()
+  }, [initial, load])
+
+  async function save() {
+    setSaving(true)
+    setMsg(null)
+    try {
+      const res = await fetch('/api/local/admin/settings/flash', {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      })
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}))
+        throw new Error(e.error || 'Failed to save')
+      }
+      apply(await res.json())
+      setMsg({ kind: 'ok', text: 'Saved' })
+    } catch (e) {
+      setMsg({ kind: 'err', text: e instanceof Error ? e.message : 'Failed to save' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <section style={card}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 700, color: C.ink }}>Card or wallet (Flash)</h2>
+          <p style={{ margin: '0 0 16px', fontSize: 13.5, color: C.muted }}>
+            Guests pay by debit/credit card, mobile wallet or Valu on Flash&apos;s hosted checkout, and
+            the booking is confirmed automatically — no screenshot to review.
+          </p>
+        </div>
+        {!loading && <MethodToggle on={enabled} onChange={setEnabled} disabled={saving} />}
+      </div>
+
+      {loading ? (
+        <OpsSkeletonFields fields={1} />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 560 }}>
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: configured ? '#177245' : '#8a6d1f' }}>
+            {configured
+              ? 'Credentials configured on the server'
+              : 'Not configured — set FLASH_* env vars on the backend'}
+          </p>
+          {enabled && !configured && (
+            <p style={{ margin: 0, fontSize: 12.5, color: C.muted }}>
+              Guests won&apos;t see Flash until the credentials are in place, even with this on.
+            </p>
+          )}
+          {!enabled && (
+            <p style={{ margin: 0, fontSize: 12.5, color: C.muted }}>
+              Guests won&apos;t see card or wallet payment while this is off.
             </p>
           )}
 

@@ -6,6 +6,10 @@
 // back to upload a screenshot shouldn't have to hunt for the upload, and the two
 // halves are one task. It stacks on narrow screens, where side-by-side would squash
 // the QR below scanning size.
+//
+// Flash (card/wallet) is the exception to "transfer, then prove it": it confirms
+// itself, so when it is the picked method the right half becomes its checkout
+// (flash-checkout.tsx) and no screenshot is ever posted with method 'flash'.
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -13,8 +17,10 @@ import { useTranslations } from 'next-intl'
 import { formatDisplayPrice, isConverted } from '@/lib/currency/display'
 import { useDisplayCurrency } from '@/components/providers/display-currency-provider'
 import { PaymentDestination } from '@/components/payment-destination'
+import { FlashCheckout } from './flash-checkout'
 import { fileToCompressedDataUrl } from '@/lib/image'
 import { MAX_PROOF_CHARS } from '@/lib/local/payment-flow-core'
+import { normalizePaymentMethod } from '@/lib/local/payment-config-core'
 import type { PaymentMethod } from '@/lib/local/payment-config-core'
 
 const C = {
@@ -60,6 +66,7 @@ export function PayClient({
   const router = useRouter()
   const tCurrency = useTranslations('currency')
   const tPay = useTranslations('instapay')
+  const tm = useTranslations('payMethods')
   // The transfer is made in the booking's currency, so that figure stays the
   // headline. The guest's currency is a second line to help them recognise the
   // amount in their banking app, never to tell them what to send.
@@ -73,6 +80,10 @@ export function PayClient({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
+  // Flash reported the booking paid — the automatic counterpart of `done`, but
+  // there is nothing left to review, so it gets its own screen.
+  const [flashPaid, setFlashPaid] = useState(false)
+  const isFlash = method === 'flash'
 
   async function pick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -95,14 +106,16 @@ export function PayClient({
   }
 
   async function submit() {
-    if (!image) return
+    if (!image || isFlash) return
     setBusy(true); setError(null)
     try {
       const res = await fetch(`/api/local/bookings/${bookingId}/payment-proof`, {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image, method: method ?? 'instapay' }),
+        // Normalized to a MANUAL method: a screenshot is never a Flash payment, and
+        // the upload is not even rendered while Flash is picked.
+        body: JSON.stringify({ image, method: normalizePaymentMethod(method) }),
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -117,6 +130,33 @@ export function PayClient({
     } finally {
       setBusy(false)
     }
+  }
+
+  if (flashPaid) {
+    return (
+      <main style={{ minHeight: '100vh', background: C.cream, color: C.ink, fontFamily: FONT }}>
+        <section style={{ maxWidth: 640, margin: '0 auto', padding: '64px 20px' }}>
+          <div role="status" style={{ ...card, textAlign: 'center', padding: '44px 24px' }}>
+            <div style={{ fontSize: 40, lineHeight: 1, color: C.green }}>✓</div>
+            <h1 style={{ margin: '14px 0 6px', fontFamily: '"Playfair Display", Georgia, serif', fontSize: 26, color: C.burgundy }}>
+              {tm('flashPaidTitle')}
+            </h1>
+            <p style={{ margin: '0 0 20px', fontSize: 14.5, color: C.muted, lineHeight: 1.6 }}>
+              {tm('flashPaidBody', { title })}
+            </p>
+            <Link
+              href="/reservations"
+              style={{
+                display: 'inline-block', background: C.burgundy, color: '#fff', borderRadius: 999,
+                padding: '11px 24px', fontWeight: 700, fontSize: 14, textDecoration: 'none',
+              }}
+            >
+              {tm('backToReservations')}
+            </Link>
+          </div>
+        </section>
+      </main>
+    )
   }
 
   if (done) {
@@ -195,70 +235,82 @@ export function PayClient({
         {/* Two halves of one task: transfer, then prove it. */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, alignItems: 'start' }}>
           <div style={card}>
-            <h2 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800, color: C.burgundy }}>1. Send the transfer</h2>
+            <h2 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800, color: C.burgundy }}>
+              {isFlash ? tm('flashStepOne') : '1. Send the transfer'}
+            </h2>
             <p style={{ margin: '0 0 14px', fontSize: 13, color: C.muted }}>
-              Copy the details into your banking app.
+              {isFlash ? tm('flashStepOneHint') : 'Copy the details into your banking app.'}
             </p>
             <PaymentDestination onMethodChange={setMethod} />
           </div>
 
-          <div style={card}>
-            <h2 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800, color: C.burgundy }}>2. Upload the receipt</h2>
-            <p style={{ margin: '0 0 14px', fontSize: 13, color: C.muted }}>
-              A screenshot of the completed transfer — we check it before confirming.
-            </p>
+          {isFlash ? (
+            <div style={card}>
+              <h2 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800, color: C.burgundy }}>{tm('flashStepTwo')}</h2>
+              <p style={{ margin: '0 0 14px', fontSize: 13, color: C.muted }}>{tm('flashStepTwoHint')}</p>
+              {/* Rejection banners above still apply: a guest whose transfer was turned
+                  down may well settle it by card instead. */}
+              <FlashCheckout bookingId={bookingId} total={total} currency={currency} onPaid={() => setFlashPaid(true)} />
+            </div>
+          ) : (
+            <div style={card}>
+              <h2 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800, color: C.burgundy }}>2. Upload the receipt</h2>
+              <p style={{ margin: '0 0 14px', fontSize: 13, color: C.muted }}>
+                A screenshot of the completed transfer — we check it before confirming.
+              </p>
 
-            <label
-              style={{
-                display: 'block', border: `1.5px dashed ${C.tan}`, borderRadius: 14,
-                padding: image ? 10 : '32px 16px', textAlign: 'center', cursor: 'pointer',
-                background: C.cream,
-              }}
-            >
-              <input type="file" accept="image/*" onChange={pick} style={{ display: 'none' }} />
-              {image ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={image} alt="Your transfer screenshot" style={{ maxWidth: '100%', maxHeight: 260, borderRadius: 10, display: 'block', margin: '0 auto' }} />
-              ) : (
-                <>
-                  <div style={{ fontSize: 26 }}>📷</div>
-                  <div style={{ marginTop: 8, fontSize: 14, fontWeight: 700, color: C.burgundy }}>
-                    Choose a screenshot
-                  </div>
-                  <div style={{ marginTop: 2, fontSize: 12, color: C.muted }}>PNG or JPEG</div>
-                </>
+              <label
+                style={{
+                  display: 'block', border: `1.5px dashed ${C.tan}`, borderRadius: 14,
+                  padding: image ? 10 : '32px 16px', textAlign: 'center', cursor: 'pointer',
+                  background: C.cream,
+                }}
+              >
+                <input type="file" accept="image/*" onChange={pick} style={{ display: 'none' }} />
+                {image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={image} alt="Your transfer screenshot" style={{ maxWidth: '100%', maxHeight: 260, borderRadius: 10, display: 'block', margin: '0 auto' }} />
+                ) : (
+                  <>
+                    <div style={{ fontSize: 26 }}>📷</div>
+                    <div style={{ marginTop: 8, fontSize: 14, fontWeight: 700, color: C.burgundy }}>
+                      Choose a screenshot
+                    </div>
+                    <div style={{ marginTop: 2, fontSize: 12, color: C.muted }}>PNG or JPEG</div>
+                  </>
+                )}
+              </label>
+              {image && (
+                <button
+                  type="button"
+                  onClick={() => setImage(null)}
+                  style={{ marginTop: 8, background: 'none', border: 'none', color: C.muted, fontSize: 12.5, cursor: 'pointer', textDecoration: 'underline' }}
+                >
+                  Choose a different one
+                </button>
               )}
-            </label>
-            {image && (
+
+              {error && <p style={{ margin: '12px 0 0', fontSize: 13, color: C.red, fontWeight: 600 }}>{error}</p>}
+
               <button
                 type="button"
-                onClick={() => setImage(null)}
-                style={{ marginTop: 8, background: 'none', border: 'none', color: C.muted, fontSize: 12.5, cursor: 'pointer', textDecoration: 'underline' }}
+                onClick={submit}
+                disabled={!image || busy}
+                style={{
+                  width: '100%', marginTop: 16, padding: '13px 20px', borderRadius: 999, border: 'none',
+                  background: image && !busy ? C.burgundy : C.tan,
+                  color: image && !busy ? '#fff' : C.muted,
+                  fontWeight: 800, fontSize: 15,
+                  cursor: image && !busy ? 'pointer' : 'not-allowed',
+                }}
               >
-                Choose a different one
+                {busy ? 'Sending…' : 'I have paid'}
               </button>
-            )}
-
-            {error && <p style={{ margin: '12px 0 0', fontSize: 13, color: C.red, fontWeight: 600 }}>{error}</p>}
-
-            <button
-              type="button"
-              onClick={submit}
-              disabled={!image || busy}
-              style={{
-                width: '100%', marginTop: 16, padding: '13px 20px', borderRadius: 999, border: 'none',
-                background: image && !busy ? C.burgundy : C.tan,
-                color: image && !busy ? '#fff' : C.muted,
-                fontWeight: 800, fontSize: 15,
-                cursor: image && !busy ? 'pointer' : 'not-allowed',
-              }}
-            >
-              {busy ? 'Sending…' : 'I have paid'}
-            </button>
-            <p style={{ margin: '10px 0 0', fontSize: 12, color: C.muted, textAlign: 'center' }}>
-              Your booking is confirmed once we verify the transfer.
-            </p>
-          </div>
+              <p style={{ margin: '10px 0 0', fontSize: 12, color: C.muted, textAlign: 'center' }}>
+                Your booking is confirmed once we verify the transfer.
+              </p>
+            </div>
+          )}
         </div>
       </section>
     </main>

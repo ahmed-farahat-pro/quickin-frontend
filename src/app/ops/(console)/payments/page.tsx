@@ -3,9 +3,9 @@
 // this adds the per-module check, so only a super admin or a moderator holding the
 // 'payments' module sees the panels. The API routes behind them re-check the same
 // permission independently.
-// Four panels live in the 'use client' component below: the two destination forms
-// (Instapay, and the bank account), the payments-awaiting-confirmation queue and
-// the payment-disputes queue.
+// The panels live in the 'use client' component below: the three method panels
+// (Instapay, the bank account, and the Flash card/wallet switch), the
+// payments-awaiting-confirmation queue, refunds and the payment-disputes queue.
 // Strings are hardcoded English (this ops page
 // is intentionally not wired into next-intl to keep the change contained).
 import type { Metadata } from 'next'
@@ -48,8 +48,8 @@ export default async function OpsPaymentsPage() {
     // One admin call returns BOTH queues, which is why this page exists in this shape:
     // the two used to request the same endpoint separately and pull the same rows twice.
     // The config comes from the staff-gated settings route — /api/local/payment-config
-    // is the GUEST view and rejects a staff cookie. One call covers BOTH destination
-    // panels: either settings route returns the whole config.
+    // is the GUEST view and rejects a staff cookie. One call covers ALL THREE method
+    // panels (Flash included): every settings route returns the whole config.
     const [config, queues, refunds] = await Promise.all([
       backendFetchOr<Initial['config'] | null>('/api/local/admin/settings/instapay', null),
       backendFetchOr<{ pending: Initial['pending']; disputes: Initial['disputes'] }>(
