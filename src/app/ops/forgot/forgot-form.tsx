@@ -84,7 +84,7 @@ export function StaffForgotForm() {
       <div style={{ width: '100%', maxWidth: 400 }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="QuickIn" height={44} style={{ height: 44, width: 'auto', display: 'inline-block' }} />
+          <img src="/logo.png" alt="Quick In" height={44} style={{ height: 44, width: 'auto', display: 'inline-block' }} />
         </div>
 
         <div style={{ ...cardStyle, padding: '30px 26px' }}>

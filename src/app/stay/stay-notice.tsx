@@ -91,7 +91,7 @@ export function StayNotice({
       </Link>
       <p style={{ margin: '18px 0 0', fontSize: 13.5 }}>
         <Link href="/explore" style={{ color: C.muted, textDecoration: 'underline', textUnderlineOffset: 3 }}>
-          QuickIn
+          Quick In
         </Link>
       </p>
     </div>

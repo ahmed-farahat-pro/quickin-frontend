@@ -358,7 +358,7 @@ export default function SignupPage() {
           padding: '40px 36px 36px',
         }}
       >
-        {/* An account is optional for browsing QuickIn, so the way back out stays on
+        {/* An account is optional for browsing Quick In, so the way back out stays on
             screen through every step — including the OTP one, where the account
             already exists and the guest may just want to look around first. */}
         <AuthExitLink label={t('exitToBrowsing')} />
@@ -367,7 +367,7 @@ export default function SignupPage() {
           <a href={returnHref} aria-label={t('exitToBrowsing')}>
             <img
               src="/logo.png"
-              alt="QuickIn"
+              alt="Quick In"
               style={{ height: 54, width: 'auto', margin: '0 auto', display: 'block' }}
             />
           </a>
@@ -410,6 +410,24 @@ export default function SignupPage() {
 
         {pendingEmail ? (
           <form onSubmit={verifyOtp}>
+            <div
+              role="status"
+              style={{
+                background: COLORS.burgundy + '0d',
+                border: `1px solid ${COLORS.burgundy}33`,
+                color: COLORS.ink,
+                fontSize: 13.5,
+                lineHeight: 1.45,
+                padding: '12px 14px',
+                borderRadius: 12,
+                marginBottom: 16,
+              }}
+            >
+              <strong style={{ display: 'block', color: COLORS.burgundy, marginBottom: 2 }}>
+                {t('otp.spamTitle')}
+              </strong>
+              {t('otp.spamBody')}
+            </div>
             {devCode && (
               <div style={{
                 background: COLORS.burgundy + '12',

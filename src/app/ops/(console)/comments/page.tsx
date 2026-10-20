@@ -11,7 +11,7 @@ import { OpsComments, type AdminComment } from './ops-comments'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Comments — QuickIn Ops',
+  title: 'Comments — Quick In Ops',
   robots: { index: false, follow: false },
 }
 

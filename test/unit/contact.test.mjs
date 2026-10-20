@@ -18,7 +18,7 @@ import {
 } from '../../src/lib/contact.ts'
 
 describe('contact details', () => {
-  test('the printed number is the live QuickIn line', () => {
+  test('the printed number is the live Quick In line', () => {
     assert.equal(CONTACT_PHONE_DISPLAY, '01013010119')
   })
 
@@ -47,8 +47,8 @@ describe('whatsappHref', () => {
 
   test('pre-fills and encodes a message', () => {
     assert.equal(
-      whatsappHref('Hello QuickIn 👋'),
-      'https://wa.me/201013010119?text=Hello%20QuickIn%20%F0%9F%91%8B',
+      whatsappHref('Hello Quick In 👋'),
+      'https://wa.me/201013010119?text=Hello%20Quick%20In%20%F0%9F%91%8B',
     )
   })
 

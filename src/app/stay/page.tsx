@@ -33,7 +33,7 @@ export default async function StayIndexPage() {
       >
         <div style={{ maxWidth: 760, margin: '0 auto' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="QuickIn" style={{ height: 38, width: 'auto', display: 'block' }} />
+          <img src="/logo.png" alt="Quick In" style={{ height: 38, width: 'auto', display: 'block' }} />
         </div>
       </header>
       <section style={{ maxWidth: 760, margin: '0 auto', padding: '28px 20px 72px' }}>

@@ -15,8 +15,9 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import {
   PAYOUT_METHODS,
-  WALLET_PROVIDERS,
   formatIban,
+  isRetiredPayoutMethod,
+  type ChoosablePayoutMethod,
   type PayoutMethod,
   type PayoutMethodView,
 } from '@/lib/local/payout-method-core'
@@ -99,15 +100,15 @@ function Notice({ kind, text }: { kind: 'ok' | 'error'; text: string }) {
   )
 }
 
-/** The three destinations, as the boutique pill toggle used elsewhere on the site. */
+/** The choosable destinations, as the boutique pill toggle used elsewhere on the site. */
 function MethodPicker({
   value,
   onChange,
   label,
   labelFor,
 }: {
-  value: PayoutMethod
-  onChange: (m: PayoutMethod) => void
+  value: ChoosablePayoutMethod
+  onChange: (m: ChoosablePayoutMethod) => void
   label: string
   labelFor: (m: PayoutMethod) => string
 }) {
@@ -173,7 +174,11 @@ export function PayoutMethodCard({ initial }: { initial: PayoutMethodView | null
   const [saved, setSaved] = useState<PayoutMethodView | null>(initial)
   // A host with nothing saved has nothing to preview, so open on the form.
   const [editing, setEditing] = useState(initial === null)
-  const [method, setMethod] = useState<PayoutMethod>(initial?.method ?? 'bank_account')
+  // A retired method (a wallet saved before it was withdrawn) can't be picked
+  // again, so editing one starts the host on a bank account instead.
+  const [method, setMethod] = useState<ChoosablePayoutMethod>(
+    initial && !isRetiredPayoutMethod(initial.method) ? (initial.method as ChoosablePayoutMethod) : 'bank_account'
+  )
   const [accountName, setAccountName] = useState(initial?.account_name ?? '')
   const isBank = initial?.method === 'bank_account'
   const [bankName, setBankName] = useState(isBank ? initial.bank_name : '')
@@ -182,8 +187,6 @@ export function PayoutMethodCard({ initial }: { initial: PayoutMethodView | null
   const [swiftBic, setSwiftBic] = useState(isBank ? initial.swift_bic : '')
   const [branch, setBranch] = useState(isBank ? initial.branch : '')
   const [instapayAddress, setInstapayAddress] = useState(initial?.method === 'instapay' ? initial.account_ref : '')
-  const [walletProvider, setWalletProvider] = useState(initial?.method === 'wallet' ? initial.provider : 'vodafone_cash')
-  const [walletNumber, setWalletNumber] = useState(initial?.method === 'wallet' ? initial.account_ref : '')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
 
@@ -207,8 +210,6 @@ export function PayoutMethodCard({ initial }: { initial: PayoutMethodView | null
           swift_bic: swiftBic,
           branch,
           instapay_address: instapayAddress,
-          wallet_provider: walletProvider,
-          wallet_number: walletNumber,
         }),
       })
       if (res.status === 401) {
@@ -333,6 +334,8 @@ export function PayoutMethodCard({ initial }: { initial: PayoutMethodView | null
             />
           )}
         </div>
+
+        {isRetiredPayoutMethod(saved.method) && <Notice kind="error" text={t('retiredNotice')} />}
 
         <div style={{ marginTop: 18, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button type="button" onClick={() => setEditing(true)} style={buttonStyle(false)}>
@@ -477,43 +480,6 @@ export function PayoutMethodCard({ initial }: { initial: PayoutMethodView | null
             {t('instapayHint')}
           </p>
         </div>
-      )}
-
-      {method === 'wallet' && (
-        <>
-          <div style={{ marginBottom: 16 }}>
-            <label htmlFor="payout-wallet-provider" style={labelStyle}>
-              {t('fields.walletProvider')}
-            </label>
-            <select
-              id="payout-wallet-provider"
-              value={walletProvider}
-              onChange={(e) => setWalletProvider(e.target.value)}
-              style={inputStyle}
-            >
-              {WALLET_PROVIDERS.map((p) => (
-                <option key={p.key} value={p.key}>
-                  {t(`walletProviders.${p.key}`)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div style={{ marginBottom: 16 }}>
-            <label htmlFor="payout-wallet-number" style={labelStyle}>
-              {t('fields.walletNumber')}
-            </label>
-            <input
-              id="payout-wallet-number"
-              type="tel"
-              inputMode="tel"
-              value={walletNumber}
-              onChange={(e) => setWalletNumber(e.target.value)}
-              placeholder={t('placeholders.walletNumber')}
-              autoComplete="tel"
-              style={inputStyle}
-            />
-          </div>
-        </>
       )}
 
       <div style={{ marginTop: 18, display: 'flex', gap: 10, flexWrap: 'wrap' }}>

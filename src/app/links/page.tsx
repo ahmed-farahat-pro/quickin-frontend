@@ -1,5 +1,5 @@
 // =============================================================================
-// /links — QuickIn's bio linktree.
+// /links — Quick In's bio linktree.
 //
 // The one URL we put in the Instagram / TikTok / Facebook bios, pointing at
 // everything else we run. It sits OUTSIDE the (main) route group on purpose, so
@@ -41,8 +41,8 @@ export const revalidate = 300
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('linksPage')
   return {
-    // `absolute` opts out of the root layout's "%s | QuickIn" template — the
-    // title already says QuickIn, and the tab is read straight off a bio link.
+    // `absolute` opts out of the root layout's "%s | Quick In" template — the
+    // title already says Quick In, and the tab is read straight off a bio link.
     title: { absolute: t('meta.title') },
     description: t('meta.description'),
     alternates: { canonical: '/links' },
@@ -176,13 +176,13 @@ export default async function LinksPage() {
         <header className="flex flex-col items-center text-center">
           <Image
             src="/logo-icon.png"
-            alt="QuickIn"
+            alt="Quick In"
             width={88}
             height={88}
             priority
             className="h-[88px] w-[88px] rounded-full bg-card object-contain p-3 card-shadow ring-1 ring-border"
           />
-          <h1 className="text-hero mt-5 text-[32px] font-bold leading-none text-primary">QuickIn</h1>
+          <h1 className="text-hero mt-5 text-[32px] font-bold leading-none text-primary">Quick In</h1>
           <p className="mt-3 max-w-[19rem] text-[14px] leading-relaxed text-muted-foreground">
             {t('tagline')}
           </p>
@@ -238,7 +238,7 @@ export default async function LinksPage() {
           })}
 
           <Row
-            href={whatsappHref('Hello QuickIn 👋')}
+            href={whatsappHref('Hello Quick In 👋')}
             icon={<IconBrandWhatsapp {...iconProps} />}
             label={t('whatsapp')}
             sub={t('whatsappSub')}
@@ -255,7 +255,7 @@ export default async function LinksPage() {
         </nav>
 
         <footer className="mt-12 text-center text-[12px] text-muted-foreground">
-          © {new Date().getFullYear()} QuickIn · {t('rights')}
+          © {new Date().getFullYear()} Quick In · {t('rights')}
         </footer>
       </div>
     </main>

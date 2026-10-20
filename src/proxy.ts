@@ -89,6 +89,22 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(redirectUrl)
   }
 
+  // The Services feature (host experiences + guest requests) was removed
+  // (2026-10-20). Old /services, /host/services and /account/subscriptions links
+  // land on the browse page instead of a 404 — temporary (307) for the same reason
+  // as /messages above.
+  if (
+    strippedPath === '/services' || strippedPath.startsWith('/services/') ||
+    strippedPath === '/host/services' || strippedPath.startsWith('/host/services/') ||
+    strippedPath === '/account/subscriptions' || strippedPath.startsWith('/account/subscriptions/')
+  ) {
+    const locale = localeFromPath || preferredLocale
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.pathname = `/${locale}/explore`
+    redirectUrl.search = ''
+    return NextResponse.redirect(redirectUrl)
+  }
+
   if (localeFromPath) {
     const rewriteUrl = request.nextUrl.clone()
     rewriteUrl.pathname = strippedPath

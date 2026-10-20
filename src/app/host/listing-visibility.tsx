@@ -3,7 +3,7 @@
 // "Deactivate" / "Reactivate" on a host listing card — the web half of the flow
 // the iOS and Android host dashboards also carry.
 //
-// This is QuickIn's answer to "delete my listing", and it is deliberately not a
+// This is Quick In's answer to "delete my listing", and it is deliberately not a
 // delete. Bookings, reviews, messages and payment records all point at the
 // listing id; removing the row would cascade a guest's completed stay away with
 // it. So the button flips `is_published` instead — search drops the listing, the

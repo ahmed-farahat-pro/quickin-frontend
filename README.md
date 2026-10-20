@@ -167,21 +167,20 @@ never-verified user would reset their password only to be bounced to the OTP scr
 - `/host/earnings` — the host's earnings + payout summary. See below.
 - `/host/analytics` — bookings, revenue, rating, conversion, monthly trend, top listings.
 - `/host/reviews` — "review your guests", the host's half of the two-way review.
-- `/host/services` — the host's own services, their subscription-request inbox, and the
-  form that posts a new one.
-- `/services`, `/services/[id]` — public services browse and detail, with the request form.
-- `/account/subscriptions` — the guest's own service requests.
+- `/services`, `/services/*`, `/host/services`, `/account/subscriptions` — **removed**
+  (2026-10-20, the Services/experiences feature). `src/proxy.ts` 307-redirects them to
+  `/<locale>/explore`, and a notification whose link points at one of them opens
+  `/explore` (`notificationHref`).
 - `/links` — the bio linktree. See below.
 - `/plan` — static launch-plan page.
 
-### The host area beyond listings — earnings, analytics, guest reviews, services
+### The host area beyond listings — earnings, analytics, guest reviews
 
-These five routes were the web's half of a cross-platform parity gap. iOS has listed
-all four as cards on `HostDashboardView` since that screen shipped, and Android reaches
+These routes were the web's half of a cross-platform parity gap. iOS has listed
+them as cards on `HostDashboardView` since that screen shipped, and Android reaches
 them from Profile → Hosting; the web had **none** of them, so `/host` offered two tabs
-and a host had nowhere to go for their money. Services were missing on both sides —
-there was no guest-facing browse either, so a host could not have been given a way to
-post one without it being unreachable.
+and a host had nowhere to go for their money. (A Services surface shipped alongside
+them and was removed on 2026-10-20.)
 
 No backend work was needed. Every endpoint already existed for the mobile apps, and the
 backend's `getUserFromRequest` accepts **either** a Bearer token **or** the `qk_token`
@@ -192,27 +191,12 @@ cookie, which is exactly what `backendFetch` forwards:
 | `/host/earnings` | `GET /api/local/host/earnings` |
 | `/host/analytics` | `GET /api/local/host/analytics` |
 | `/host/reviews` | `GET` + `POST /api/local/guest-reviews` |
-| `/host/services` | `GET /api/local/host/services`, `GET /api/local/host/service-requests`, `POST /api/local/services`, `PATCH /api/local/service-requests/:id`, `PATCH /api/local/host/services/:id/visibility` |
-| `/services`, `/services/[id]` | `GET /api/local/services`, `GET /api/local/services/:id`, `POST /api/local/service-requests` |
-| `/account/subscriptions` | `GET /api/local/service-requests` |
 
 The derived numbers each page renders live in tested core modules rather than inline in
 a component: `host-earnings-core.ts` (which of five states a payout row is in once
 cancellations and refunds are folded back in, and the platform's cut),
 `host-analytics-core.ts` (bar heights, conversion, the empty case, the month label),
-`guest-review-core.ts` (what the review form will submit) and `services-core.ts`
-(request buckets, a service's live/deactivated/blocked state, the new-service rules).
-
-#### A service's price is never re-marked-up on the web
-
-`guestFacingPrice` in `services-core.ts` **picks** a field, it does not price anything.
-The two projections already carry the answer: the host route sends the raw price in
-`price` and the quote in `guest_price`, and the guest route sends the quote in `price`
-with no `guest_price` at all. Recomputing from `commission_rate` would double-charge on
-the guest browse — a 400 EGP service reads 440 there, and `400 x 1.1` on top of it is
-484 — and would also skip the round-UP-to-10 that `commission-core.ts` owns and that the
-backend's `sqlWithCommission` actually priced these rows with. The rate stays on the
-wire only for the "guests pay N% above your price" line.
+and `guest-review-core.ts` (what the review form will submit).
 
 #### Earnings never reads "Paid out" on a cancelled stay
 

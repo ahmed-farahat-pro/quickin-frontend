@@ -83,7 +83,7 @@ export interface Listing {
    *  'rejected' state rather than a decision the host has already answered. */
   review_note?: string | null
   /** Whether guests can see the listing at all. False covers all four takedown
-   *  reasons — the flags below say which. QuickIn has no host-facing DELETE:
+   *  reasons — the flags below say which. Quick In has no host-facing DELETE:
    *  "remove my listing" is this flag going false, with every booking, review and
    *  payment record left intact. See the backend README, *A host removes a
    *  listing by hiding it*. */
@@ -443,61 +443,6 @@ export interface HostAnalytics {
   conversionRate: number
   byMonth: { month: string; bookings: number; revenue: number }[]
   topListings: { title: string; bookings: number; revenue: number }[]
-}
-
-// ---- Services ---------------------------------------------------------------
-// Mirrors quickin-backend's `lib/local/services.ts`. Services carry the platform
-// commission exactly like listings: `price` is whichever side the projection is
-// for — commission-inclusive on the guest routes, the host's raw price on
-// `/api/local/host/services`, where `guest_price` carries the quoted figure.
-
-export interface Service {
-  id: string
-  host_id: string
-  host_name: string | null
-  title: string
-  description: string | null
-  category: string | null
-  location: string | null
-  price: number
-  /** Host projection only — what a guest is quoted for this service. */
-  guest_price?: number
-  commission_rate?: number
-  currency: string
-  image_url: string | null
-  lat: number | null
-  lng: number | null
-  is_published: boolean
-  /** Host projection only. The host took this down themselves — the services
-   *  twin of `listings.unpublished_by_host`. */
-  unpublished_by_host?: boolean
-  /** Host projection only. Requests still waiting on this host — the number a
-   *  deactivate would decline. */
-  pending_request_count?: number
-  created_at: string
-}
-
-/** A guest's subscription to a service. The same row serves the guest's list
- *  and the host's inbox, which is why it carries both sides' names. */
-export interface ServiceRequest {
-  id: string
-  service_id: string
-  user_id: string
-  status: string
-  preferred_date: string | null
-  note: string | null
-  request_code: string | null
-  created_at: string
-  service_title: string
-  service_category: string | null
-  service_image: string | null
-  service_price: number
-  service_currency: string
-  service_location: string | null
-  host_id: string
-  host_name: string | null
-  requester_name: string | null
-  requester_email: string | null
 }
 
 // ---- Host → guest reviews ----------------------------------------------------

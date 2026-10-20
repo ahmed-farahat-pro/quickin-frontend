@@ -12,7 +12,7 @@ import { StaffClient, type Account } from './staff-client'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Staff & permissions — QuickIn Ops',
+  title: 'Staff & permissions — Quick In Ops',
   robots: { index: false, follow: false },
 }
 

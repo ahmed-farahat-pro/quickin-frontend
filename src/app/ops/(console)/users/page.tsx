@@ -12,7 +12,7 @@ import { OpsUsers } from './ops-users'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Users — QuickIn Ops',
+  title: 'Users — Quick In Ops',
   robots: { index: false, follow: false },
 }
 

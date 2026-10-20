@@ -12,7 +12,7 @@ import { OpsAudit } from './ops-audit'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Audit log — QuickIn Ops',
+  title: 'Audit log — Quick In Ops',
   robots: { index: false, follow: false },
 }
 

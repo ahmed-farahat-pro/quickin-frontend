@@ -2,7 +2,7 @@
 // links, a serif title and a subtitle.
 //
 // Extracted when the host area gained four screens at once (earnings,
-// analytics, guest reviews, services) and the services browse gained two more.
+// analytics, guest reviews, and the since-removed services).
 // /saved, /host and /reservations each hand-rolled this header before that; a
 // seventh copy was the point at which "the pages look alike" stopped being true
 // by luck. Those three are deliberately left alone — this is for the new
@@ -82,7 +82,7 @@ export function PageFrame({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/logo.png"
-              alt="QuickIn"
+              alt="Quick In"
               height={40}
               style={{ height: 40, width: 'auto', display: 'block' }}
             />

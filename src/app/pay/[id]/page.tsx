@@ -15,7 +15,7 @@ import { PayClient } from './pay-client'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Pay for your stay — QuickIn',
+  title: 'Pay for your stay — Quick In',
   robots: { index: false, follow: false },
 }
 

@@ -97,7 +97,8 @@ export function unansweredCount(comments: readonly { reply: CommentReply | null 
  *   /explore/<id>[#comments]   → as is (a listing; comment notifications add #comments)
  *   /reservation/<bookingId>   → /reservations — the web has no single-trip page
  *   /reservations /host /account /verify-id → as is
- *   /subscriptions             → /account/subscriptions
+ *   /subscriptions, /services…, /host/services… → /explore — Services was removed
+ *                                (2026-10-20); old service notifications land on browse
  *
  * Anything else routes nowhere: `message` notifications and `/messages…` (messaging
  * was removed), `/ops` (staff only), and links left by the retired Supabase app
@@ -110,7 +111,7 @@ export function notificationHref(n: { type?: string | null; link?: string | null
   const path = link.split(/[?#]/)[0].replace(/\/+$/, '')
   if (/^\/explore\/[^/]+$/.test(path)) return link
   if (/^\/reservations?(\/[^/]+)?$/.test(path)) return '/reservations'
-  if (path === '/subscriptions') return '/account/subscriptions'
+  if (path === '/subscriptions' || /^\/(host\/)?services(\/|$)/.test(path)) return '/explore'
   if (['/host', '/account', '/verify-id'].includes(path)) return path
   return null
 }

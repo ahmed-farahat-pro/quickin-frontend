@@ -15,8 +15,8 @@ export async function generateMetadata(): Promise<Metadata> {
       description: t('meta.description'),
       url: '/signup',
       type: 'website',
-      siteName: 'QuickIn',
-      images: [{ url: '/logo.png', width: 700, height: 454, alt: 'QuickIn' }],
+      siteName: 'Quick In',
+      images: [{ url: '/logo.png', width: 700, height: 454, alt: 'Quick In' }],
     },
     twitter: {
       card: 'summary_large_image',

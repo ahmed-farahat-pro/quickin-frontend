@@ -11,7 +11,7 @@ import { OpsAnalytics } from './ops-analytics'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Analytics — QuickIn Ops',
+  title: 'Analytics — Quick In Ops',
   robots: { index: false, follow: false },
 }
 

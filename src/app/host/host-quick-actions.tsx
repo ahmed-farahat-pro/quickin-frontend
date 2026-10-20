@@ -1,5 +1,5 @@
 // The host dashboard's quick-action shelf: Guest questions, Review your guests,
-// Analytics, Earnings and Services.
+// Analytics and Earnings.
 //
 // This is what the parity ticket was actually about. iOS lists all four as
 // cards on HostDashboardView and Android reaches them from Profile → Hosting;

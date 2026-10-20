@@ -6,7 +6,7 @@ import { StaffForgotForm } from './forgot-form'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Reset admin password — QuickIn',
+  title: 'Reset admin password — Quick In',
   robots: { index: false, follow: false },
 }
 

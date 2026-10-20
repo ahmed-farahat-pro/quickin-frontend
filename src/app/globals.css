@@ -15,7 +15,7 @@
    QUICKIN THEME - Tailwind v4 Configuration
    ----------------------------------------------------------------------------- */
 @theme inline {
-  /* QuickIn Color Palette */
+  /* Quick In Color Palette */
   --color-background: #F6F1E6;
   --color-background-secondary: #EFE6D8;
   --color-foreground: #2B2B2B;
@@ -75,7 +75,7 @@
   --font-serif: var(--font-playfair), Georgia, serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
-  /* Radius tokens - QuickIn Design Spec */
+  /* Radius tokens - Quick In Design Spec */
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.625rem;
@@ -275,7 +275,7 @@
     font-family: var(--font-serif);
   }
 
-  /* QuickIn specific border radius */
+  /* Quick In specific border radius */
   .rounded-card {
     border-radius: 1.75rem;
   }
@@ -344,7 +344,7 @@ header {
 }
 
 /* -----------------------------------------------------------------------------
-   REACT PHONE NUMBER INPUT - QuickIn Theme
+   REACT PHONE NUMBER INPUT - Quick In Theme
    ----------------------------------------------------------------------------- */
 .PhoneInput {
   --PhoneInputCountrySelectArrow-color: #7A746A;
@@ -405,7 +405,7 @@ header {
 }
 
 /* -----------------------------------------------------------------------------
-   SCROLLBAR - Custom QuickIn Styling
+   SCROLLBAR - Custom Quick In Styling
    ----------------------------------------------------------------------------- */
 ::-webkit-scrollbar {
   width: 8px;

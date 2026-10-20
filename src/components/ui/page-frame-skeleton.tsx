@@ -2,7 +2,7 @@
 // subtitle, then a stack of panel placeholders.
 //
 // One component rather than a hand-rolled loading.tsx per route, because the
-// four new host sub-pages and the two services pages all wear the same frame —
+// host sub-pages all wear the same frame —
 // see components/layout/page-frame.tsx. Without a loading.tsx of their own,
 // every /host/* route inherits /host/loading.tsx and flashes a LISTINGS GRID on
 // the way to Earnings or Analytics, which is what /host/new/loading.tsx already

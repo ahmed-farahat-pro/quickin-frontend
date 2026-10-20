@@ -21,7 +21,7 @@ export default function WhatsAppFab() {
     /checkout|\/pay(\/|$)/.test(path)
   if (hidden) return null
 
-  const href = whatsappHref('Hello QuickIn 👋')
+  const href = whatsappHref('Hello Quick In 👋')
 
   return (
     <a

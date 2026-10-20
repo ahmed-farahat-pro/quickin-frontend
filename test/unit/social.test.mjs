@@ -18,15 +18,15 @@ import {
 } from '../../src/lib/social.ts'
 
 describe('social profiles', () => {
-  test('instagram is the live QuickIn account', () => {
+  test('instagram is the live Quick In account', () => {
     assert.equal(SOCIAL_INSTAGRAM, 'https://www.instagram.com/quickin.egy_')
   })
 
-  test('tiktok is the live QuickIn account', () => {
+  test('tiktok is the live Quick In account', () => {
     assert.equal(SOCIAL_TIKTOK, 'https://www.tiktok.com/@quick.in1')
   })
 
-  test('facebook is the live QuickIn page', () => {
+  test('facebook is the live Quick In page', () => {
     assert.equal(SOCIAL_FACEBOOK, 'https://www.facebook.com/share/18zDkKG35x/')
   })
 })

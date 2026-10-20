@@ -19,7 +19,7 @@ const LAST_UPDATED = '21 August 2026'
 export const metadata: Metadata = {
   title: 'Privacy Policy',
   description:
-    'How QuickIn collects, uses, stores and protects your personal data — and how to access or delete it.',
+    'How Quick In collects, uses, stores and protects your personal data — and how to access or delete it.',
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -48,15 +48,15 @@ export default function PrivacyPolicyPage() {
           padding: '40px 34px 44px',
         }}
       >
-        <img src="/logo.png" alt="QuickIn" style={{ height: 44, display: 'block', margin: '0 auto 20px' }} />
+        <img src="/logo.png" alt="Quick In" style={{ height: 44, display: 'block', margin: '0 auto 20px' }} />
         <h1 style={{ fontSize: 26, textAlign: 'center', margin: '0 0 6px' }}>Privacy Policy</h1>
         <p style={{ fontSize: 13.5, color: C.muted, textAlign: 'center', margin: 0 }}>Last updated {LAST_UPDATED}</p>
 
         <p style={{ fontSize: 14.5, lineHeight: 1.75, marginTop: 26 }}>
-          QuickIn (&ldquo;we&rdquo;, &ldquo;us&rdquo;) operates the QuickIn website and mobile apps, a platform for
+          Quick In (&ldquo;we&rdquo;, &ldquo;us&rdquo;) operates the Quick In website and mobile apps, a platform for
           booking boutique stays in Egypt. This policy explains what personal data we collect, why we
           collect it, who we share it with, and the control you have over it. It applies to the
-          website and to the QuickIn iOS and Android apps.
+          website and to the Quick In iOS and Android apps.
         </p>
 
         <Section title="Information you give us">
@@ -165,7 +165,7 @@ export default function PrivacyPolicyPage() {
 
         <Section title="Children">
           <p style={{ margin: 0 }}>
-            QuickIn is not intended for anyone under 18, and we do not knowingly collect data from
+            Quick In is not intended for anyone under 18, and we do not knowingly collect data from
             children. If you believe a child has given us personal data, contact us and we will
             delete it.
           </p>
@@ -187,7 +187,7 @@ export default function PrivacyPolicyPage() {
         </Section>
 
         <p style={{ marginTop: 34, textAlign: 'center' }}>
-          <a href="/" style={{ color: C.burgundy, fontWeight: 600, fontSize: 14, textDecoration: 'none' }}>Return to QuickIn</a>
+          <a href="/" style={{ color: C.burgundy, fontWeight: 600, fontSize: 14, textDecoration: 'none' }}>Return to Quick In</a>
         </p>
       </article>
     </main>

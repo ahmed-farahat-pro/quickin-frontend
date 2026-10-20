@@ -290,7 +290,7 @@ export function DisputePanel({
             cursor: canSubmit ? 'pointer' : 'default', opacity: canSubmit ? 1 : 0.6,
           }}
         >
-          {busy ? 'Sending…' : 'Send to QuickIn'}
+          {busy ? 'Sending…' : 'Send to Quick In'}
         </button>
         <button type="button" onClick={() => { setOpen(false); setError(null) }} style={{ ...linkBtn, color: C.muted, fontWeight: 600 }}>
           Cancel
@@ -298,7 +298,7 @@ export function DisputePanel({
       </div>
 
       <p style={{ margin: 0, fontSize: 11.5, color: C.muted }}>
-        This goes to the QuickIn team, not to your host.
+        This goes to the Quick In team, not to your host.
       </p>
     </div>
   )

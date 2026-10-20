@@ -1,6 +1,6 @@
 'use client'
 
-// QuickIn — operations console (local-stack admin).
+// Quick In — operations console (local-stack admin).
 // Runs a full admin dashboard against the real (Neon) data — overview stats,
 // listings (with publish/hide/delete), bookings, host applications and ID
 // verifications.
@@ -1273,7 +1273,7 @@ export function OpsDashboard({
                 const cells: Array<{ label: string; value: number; hint: string }> = [
                   { label: 'Guests paid', value: sum(paid, (b) => b.total_price), hint: `${paid.length} paid` },
                   { label: 'Host payouts', value: sum(paid, (b) => b.host_payout), hint: 'owed in full' },
-                  { label: 'Commission', value: sum(paid, (b) => b.commission), hint: 'QuickIn keeps' },
+                  { label: 'Commission', value: sum(paid, (b) => b.commission), hint: 'Quick In keeps' },
                 ]
                 return (
                   <div
@@ -2072,7 +2072,7 @@ export function OpsDashboard({
  * lines of tiles and the section around it now has three siblings to keep straight,
  * so leaving it inline made the ordering impossible to read at a glance.
  *
- * Money used to lead the Overview, and the reasoning still holds: what QuickIn has
+ * Money used to lead the Overview, and the reasoning still holds: what Quick In has
  * earned is the question this console gets asked most, and it was once a single
  * unlabelled "Gross paid" sitting eleventh in a grid of user counts. It now sits
  * below the growth graph, which answers the second-most-asked question.
@@ -2088,7 +2088,7 @@ function MoneySection({
     {
       label: 'Commission earned',
       value: money(stats.commission_paid),
-      hint: `QuickIn's cut of ${stats.paid_bookings} paid bookings`,
+      hint: `Quick In's cut of ${stats.paid_bookings} paid bookings`,
       accent: true,
     },
     {

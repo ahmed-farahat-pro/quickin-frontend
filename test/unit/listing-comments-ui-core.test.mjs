@@ -82,8 +82,16 @@ describe('notificationHref', () => {
     assert.equal(notificationHref({ type: 'booking_request', link: '/host' }), '/host')
     assert.equal(notificationHref({ type: 'info', link: '/account' }), '/account')
     assert.equal(notificationHref({ type: 'host', link: '/verify-id' }), '/verify-id')
-    assert.equal(notificationHref({ type: 'service_confirmed', link: '/subscriptions' }), '/account/subscriptions')
     assert.equal(notificationHref({ type: 'favorite', link: '/explore/abc' }), '/explore/abc')
+  })
+
+  test('links from the removed Services feature land on the browse page', () => {
+    assert.equal(notificationHref({ type: 'service_confirmed', link: '/subscriptions' }), '/explore')
+    assert.equal(notificationHref({ type: 'service_request', link: '/host/services' }), '/explore')
+    assert.equal(notificationHref({ type: 'info', link: '/services' }), '/explore')
+    assert.equal(notificationHref({ type: 'info', link: '/services/abc' }), '/explore')
+    assert.equal(notificationHref({ type: 'info', link: '/host/services?tab=requests' }), '/explore')
+    assert.equal(notificationHref({ type: 'info', link: '/servicesx' }), null)
   })
 
   test('staff, unknown and nested paths route nowhere', () => {

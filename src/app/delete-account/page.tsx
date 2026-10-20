@@ -50,8 +50,8 @@ export default function DeleteAccountPage() {
   return (
     <main style={{ minHeight: '100vh', background: C.cream, color: C.ink, fontFamily: FONT, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px' }}>
       <div style={{ width: '100%', maxWidth: 520, background: '#fff', borderRadius: 24, border: '1px solid rgba(42,34,32,0.07)', boxShadow: '0 12px 40px rgba(42,34,32,0.10)', padding: '36px 32px' }}>
-        <img src="/logo.png" alt="QuickIn" style={{ height: 44, display: 'block', margin: '0 auto 18px' }} />
-        <h1 style={{ fontSize: 22, textAlign: 'center', margin: '0 0 6px' }}>Delete your QuickIn account</h1>
+        <img src="/logo.png" alt="Quick In" style={{ height: 44, display: 'block', margin: '0 auto 18px' }} />
+        <h1 style={{ fontSize: 22, textAlign: 'center', margin: '0 0 6px' }}>Delete your Quick In account</h1>
         <p style={{ fontSize: 14, color: C.muted, textAlign: 'center', margin: '0 0 22px' }}>
           This permanently removes your account and associated data.
         </p>
@@ -98,7 +98,7 @@ export default function DeleteAccountPage() {
         ) : (
           <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6 }}>
             <p style={{ margin: '0 0 12px' }}>To delete your account, <a href="/login?redirect=/delete-account" style={{ color: C.burgundy, fontWeight: 600 }}>sign in</a> and return to this page — your account will be deleted in one tap.</p>
-            <p style={{ margin: 0, color: C.muted }}>Can&apos;t sign in? Email <a href={`mailto:${SUPPORT_EMAIL}?subject=Delete my QuickIn account`} style={{ color: C.burgundy, fontWeight: 600 }}>{SUPPORT_EMAIL}</a> from your account email and we&apos;ll delete it within 30 days.</p>
+            <p style={{ margin: 0, color: C.muted }}>Can&apos;t sign in? Email <a href={`mailto:${SUPPORT_EMAIL}?subject=Delete my Quick In account`} style={{ color: C.burgundy, fontWeight: 600 }}>{SUPPORT_EMAIL}</a> from your account email and we&apos;ll delete it within 30 days.</p>
           </div>
         )}
       </div>

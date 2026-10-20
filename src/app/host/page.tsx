@@ -106,7 +106,7 @@ function Header({ backLabel }: { backLabel: string }) {
         <a href="/explore" style={{ display: 'inline-flex', alignItems: 'center' }}>
           <img
             src="/logo.png"
-            alt="QuickIn"
+            alt="Quick In"
             height={40}
             style={{ height: 40, width: 'auto', display: 'block' }}
           />
@@ -533,12 +533,6 @@ async function HostDashboard({ userId, firstName, t }: { userId: string; firstNa
             label: t('dashboard.quickActions.earnings.label'),
             hint: t('dashboard.quickActions.earnings.hint'),
           },
-          {
-            href: '/host/services',
-            glyph: '❖',
-            label: t('dashboard.quickActions.services.label'),
-            hint: t('dashboard.quickActions.services.hint'),
-          },
         ]}
       />
 
@@ -813,7 +807,7 @@ function ListingCard({
         <OwnershipDocAction listingId={listing.id} hasDoc={listing.has_ownership_doc === true} />
       )}
 
-      {/* Take the listing off the market, or put it back. QuickIn has no
+      {/* Take the listing off the market, or put it back. Quick In has no
           host-facing delete — this IS "remove my listing", and it keeps every
           booking, review and payment record intact. Offered on every state the
           host controls; withheld only on 'blocked', which is not theirs to undo. */}

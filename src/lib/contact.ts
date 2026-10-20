@@ -1,5 +1,5 @@
 /**
- * QuickIn's public contact details — one number and one inbox, in one place.
+ * Quick In's public contact details — one number and one inbox, in one place.
  *
  * The floating WhatsApp button, the Contact Us page and the explore footer all
  * read from here, so changing how we can be reached is a single edit. The phone

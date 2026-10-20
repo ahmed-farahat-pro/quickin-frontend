@@ -160,7 +160,7 @@ export default async function HostProfilePage({
         <div style={{ maxWidth: 1040, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
           <a href="/explore" style={{ display: 'inline-flex', alignItems: 'center' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="QuickIn" height={40} style={{ height: 40, width: 'auto', display: 'block' }} />
+            <img src="/logo.png" alt="Quick In" height={40} style={{ height: 40, width: 'auto', display: 'block' }} />
           </a>
           <a href="/explore" style={{ color: COLORS.burgundy, textDecoration: 'none', fontWeight: 600, fontSize: 14 }}>
             ← {t('backToExplore')}

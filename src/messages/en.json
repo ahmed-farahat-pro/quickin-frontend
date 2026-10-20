@@ -1,6 +1,6 @@
 {
   "common": {
-    "brand": "QuickIn",
+    "brand": "Quick In",
     "loading": "Loading...",
     "retry": "Retry",
     "search": "Search",
@@ -15,7 +15,6 @@
   "nav": {
     "anywhere": "Anywhere",
     "listings": "Listings",
-    "servicesManagement": "Services Management",
     "becomeHost": "Become a Host",
     "rent": "Rent",
     "dashboard": "Dashboard",
@@ -35,10 +34,10 @@
   "footer": {
     "tagline": "Find it. Book it. Live it.",
     "description": "Curated stays for slow travelers. Handpicked homes designed for comfort, beauty, and calm.",
-    "legalCompanyName": "QuickIn, Inc.",
+    "legalCompanyName": "Quick In, Inc.",
     "support": "Support",
     "hosting": "Hosting",
-    "company": "QuickIn",
+    "company": "Quick In",
     "terms": "Terms",
     "sitemap": "Sitemap",
     "privacy": "Privacy",
@@ -70,7 +69,7 @@
   "auth": {
     "loginTitle": "Log in",
     "signupTitle": "Sign up",
-    "loginDescription": "Welcome back to QuickIn",
+    "loginDescription": "Welcome back to Quick In",
     "signupDescription": "Create an account to start booking",
     "resetTitle": "Reset your password",
     "resetDescription": "Enter your email and we'll send you a reset link",
@@ -101,7 +100,7 @@
     "unexpectedError": "An unexpected error occurred",
     "failedProvider": "Failed to connect to provider",
     "welcomeBack": "Welcome back!",
-    "verificationSuccess": "Email verified successfully! You're now ready to use QuickIn.",
+    "verificationSuccess": "Email verified successfully! You're now ready to use Quick In.",
     "signupSuccess": "Account created! Check your email to confirm.",
     "pleaseEnterEmail": "Please enter your email address",
     "continueGoogle": "Continue with Google",
@@ -120,14 +119,14 @@
     "resetLinkSentTo": "We sent a password reset link to {email}"
   },
   "loginPage": {
-    "title": "Log in to QuickIn",
+    "title": "Log in to Quick In",
     "subtitle": "Welcome back! Please sign in to continue.",
     "instruction": "Use the menu in the top right corner to log in or sign up.",
     "goHome": "Go to homepage"
   },
   "chat": {
     "poweredBy": "Powered by Gemini",
-    "welcome": "Hi! I'm your QuickIn assistant. I can help you find the perfect place to stay, answer questions about listings, or give travel recommendations. How can I help you today?",
+    "welcome": "Hi! I'm your Quick In assistant. I can help you find the perfect place to stay, answer questions about listings, or give travel recommendations. How can I help you today?",
     "suggested": {
       "beach": "Find beachfront properties",
       "included": "What's included in this listing?",
@@ -399,9 +398,9 @@
     },
     "guestFavorite": {
       "title": "Guest favorite",
-      "subtitle": "One of the most loved homes on QuickIn based on reviews"
+      "subtitle": "One of the most loved homes on Quick In based on reviews"
     },
-    "brandName": "Quick-In",
+    "brandName": "Quick In",
     "hostedBy": "Hosted by {host}",
     "hostFallback": "Host",
     "host": {
@@ -463,7 +462,7 @@
   },
   "ai": {
     "system": {
-      "assistantRole": "You are a helpful travel assistant for QuickIn, an Airbnb-like vacation rental platform.",
+      "assistantRole": "You are a helpful travel assistant for Quick In, an Airbnb-like vacation rental platform.",
       "languageInstructionEn": "Respond in clear English.",
       "languageInstructionAr": "Respond in Arabic."
     }
@@ -809,7 +808,7 @@
     "listsCount": "{count, plural, =1 {1 list} other {# lists}} available",
     "empty": {
       "title": "Create your first wishlist",
-      "description": "As you search, click the heart icon to save your favorite places and experiences to a wishlist.",
+      "description": "As you search, click the heart icon to save your favorite places to stay to a wishlist.",
       "button": "Start exploring"
     },
     "detailEmptyTitle": "This wishlist is empty",
@@ -948,8 +947,6 @@
       "question": "First, what kind of place are you listing?",
       "homeTitle": "Home",
       "homeDesc": "A space like a house, apartment, or room.",
-      "serviceTitle": "Service",
-      "serviceDesc": "An experience, yacht, or event space.",
       "describeQuestion": "Which of these best describes your {type}?"
     },
     "stepVibe": {
@@ -1370,10 +1367,10 @@
     "meta": {
       "title": "Explore boutique stays",
       "description": "Browse a curated collection of hand-picked homes — from lakeside villas to desert hideaways. Search by location, dates, and guests.",
-      "ogTitle": "Explore boutique stays | QuickIn",
+      "ogTitle": "Explore boutique stays | Quick In",
       "ogDescription": "Browse a curated collection of hand-picked homes — from lakeside villas to desert hideaways."
     },
-    "logoAlt": "QuickIn",
+    "logoAlt": "Quick In",
     "nav": {
       "becomeHost": "Become a host",
       "hosting": "Hosting",
@@ -1434,7 +1431,7 @@
       "verifiedHost": "Verified host"
     },
     "footer": {
-      "tagline": "QuickIn — boutique stays for travelers who love the details.",
+      "tagline": "Quick In — boutique stays for travelers who love the details.",
       "support": {
         "title": "Support",
         "helpCenter": "Help center",
@@ -1452,7 +1449,7 @@
         "title": "About",
         "ourStory": "Our story"
       },
-      "copyright": "© 2026 QuickIn. Crafted for the curious traveler.",
+      "copyright": "© 2026 Quick In. Crafted for the curious traveler.",
       "legal": {
         "terms": "Terms",
         "privacy": "Privacy",
@@ -1479,9 +1476,9 @@
   "listingPage": {
     "meta": {
       "notFoundTitle": "Stay not found",
-      "notFoundDescription": "This boutique stay could not be found. Browse other curated homes on QuickIn.",
-      "descriptionWithPlace": "A boutique stay in {place} from {price} / night on QuickIn.",
-      "description": "A boutique stay from {price} / night on QuickIn."
+      "notFoundDescription": "This boutique stay could not be found. Browse other curated homes on Quick In.",
+      "descriptionWithPlace": "A boutique stay in {place} from {price} / night on Quick In.",
+      "description": "A boutique stay from {price} / night on Quick In."
     },
     "backToExplore": "Back to Explore",
     "photoAlt": "{title} photo {index}",
@@ -1577,7 +1574,7 @@
     "signedOut": "Your session has ended. Sign in again to continue.",
     "hostLabel": "Host",
     "you": "You",
-    "guest": "QuickIn guest",
+    "guest": "Quick In guest",
     "reply": "Reply",
     "editReply": "Edit reply",
     "deleteReply": "Delete reply",
@@ -1590,14 +1587,14 @@
     "confirmDeleteReply": "Delete your reply?",
     "genericError": "Something went wrong. Please try again.",
     "loadFailed": "We couldn’t load the questions. Reload the page to try again.",
-    "warningTitle": "A note from QuickIn",
+    "warningTitle": "A note from Quick In",
     "warningAck": "I understand",
     "warningAckFailed": "Couldn’t save that. Please try again."
   },
   "loginLocal": {
     "subtitle": "Welcome back — sign in to continue",
     "exitToBrowsing": "Keep browsing without an account",
-    "logoAlt": "QuickIn",
+    "logoAlt": "Quick In",
     "emailLabel": "Email",
     "passwordLabel": "Password",
     "forgotPassword": "Forgot password?",
@@ -1618,7 +1615,9 @@
       "resendIn": "Resend in {seconds}s",
       "resendCode": "Resend code",
       "newCodeSent": "A new code is on its way.",
-      "codeSentTo": "We sent a 6-digit code to {email}."
+      "codeSentTo": "We sent a 6-digit code to {email}.",
+      "spamTitle": "Check your Spam folder",
+      "spamBody": "The code can take a minute to arrive and sometimes lands in Spam or Junk."
     },
     "forgot": {
       "title": "Reset your password",
@@ -1648,16 +1647,16 @@
     },
     "meta": {
       "title": "Log in",
-      "ogTitle": "Log in | QuickIn",
-      "description": "Sign in to your QuickIn account to manage reservations and book boutique stays.",
-      "siteName": "QuickIn",
-      "imageAlt": "QuickIn"
+      "ogTitle": "Log in | Quick In",
+      "description": "Sign in to your Quick In account to manage reservations and book boutique stays.",
+      "siteName": "Quick In",
+      "imageAlt": "Quick In"
     }
   },
   "planPage": {
     "meta": {
-      "title": "Launch Plan | QuickIn",
-      "description": "Step-by-step readiness plan for shipping QuickIn across Web, iOS and Android."
+      "title": "Launch Plan | Quick In",
+      "description": "Step-by-step readiness plan for shipping Quick In across Web, iOS and Android."
     },
     "status": {
       "done": "✓ Done",
@@ -1666,7 +1665,7 @@
     },
     "header": {
       "title": "Launch Plan",
-      "subtitle": "Ship QuickIn across Web · iOS · Android — four parallel tracks."
+      "subtitle": "Ship Quick In across Web · iOS · Android — four parallel tracks."
     },
     "legend": {
       "note": "· no Supabase · local PostgreSQL → Vercel/Neon for production"
@@ -1784,9 +1783,9 @@
   "reservationsLocal": {
     "meta": {
       "title": "My trips",
-      "description": "View and manage your upcoming QuickIn stays. Your boutique-rental bookings, all in one place.",
-      "ogTitle": "My reservations | QuickIn",
-      "ogDescription": "View and manage your upcoming QuickIn stays."
+      "description": "View and manage your upcoming Quick In stays. Your boutique-rental bookings, all in one place.",
+      "ogTitle": "My reservations | Quick In",
+      "ogDescription": "View and manage your upcoming Quick In stays."
     },
     "backToExplore": "Back to Explore",
     "backToAccount": "Back to account",
@@ -1882,7 +1881,9 @@
       "resendCode": "Resend code",
       "newCodeSent": "A new code is on its way.",
       "codeSentTo": "We sent a 6-digit code to {email}.",
-      "back": "Back to sign up"
+      "back": "Back to sign up",
+      "spamTitle": "Check your Spam folder",
+      "spamBody": "The code can take a minute to arrive and sometimes lands in Spam or Junk."
     },
     "fields": {
       "fullName": "Full name",
@@ -1907,14 +1908,14 @@
     },
     "meta": {
       "title": "Create your account",
-      "description": "Join QuickIn to discover and book a curated collection of boutique vacation rentals.",
-      "ogTitle": "Create your account | QuickIn"
+      "description": "Join Quick In to discover and book a curated collection of boutique vacation rentals.",
+      "ogTitle": "Create your account | Quick In"
     }
   },
   "verifyIdPage": {
     "meta": {
       "title": "Verify your identity",
-      "description": "Upload your National ID to verify your QuickIn account."
+      "description": "Upload your National ID to verify your Quick In account."
     },
     "heading": "Verify your identity",
     "subtitle": "Boutique stays need a verified guest — it only takes a minute.",
@@ -1922,8 +1923,8 @@
   },
   "accountPage": {
     "meta": {
-      "title": "Your account · QuickIn",
-      "description": "Manage your QuickIn profile, identity verification and password."
+      "title": "Your account · Quick In",
+      "description": "Manage your Quick In profile, identity verification and password."
     },
     "backToExplore": "Back to explore",
     "title": "Account",
@@ -1965,9 +1966,9 @@
     },
     "preferences": {
       "title": "Preferences",
-      "subtitle": "How QuickIn shows prices and text to you.",
+      "subtitle": "How Quick In shows prices and text to you.",
       "currencyLabel": "Currency",
-      "currencyHelp": "Prices across QuickIn are shown in this currency. Bookings are still charged in the listing's own currency.",
+      "currencyHelp": "Prices across Quick In are shown in this currency. Bookings are still charged in the listing's own currency.",
       "languageLabel": "Language"
     },
     "links": {
@@ -1976,12 +1977,9 @@
       "verification": "Identity verification",
       "hosting": "Hosting",
       "guestQuestions": "Guest questions",
-      "services": "Services",
-      "subscriptions": "My service requests",
       "earnings": "Earnings & payouts",
       "analytics": "Analytics",
-      "reviewGuests": "Review your guests",
-      "hostServices": "Your services"
+      "reviewGuests": "Review your guests"
     },
     "logout": "Log out",
     "profile": {
@@ -2040,8 +2038,8 @@
   },
   "savedPage": {
     "meta": {
-      "title": "My Favorites · QuickIn",
-      "description": "Your saved boutique stays on QuickIn."
+      "title": "My Favorites · Quick In",
+      "description": "Your saved boutique stays on Quick In."
     },
     "backToExplore": "Back to Explore",
     "backToAccount": "Back to account",
@@ -2055,14 +2053,14 @@
   },
   "hostPage": {
     "meta": {
-      "title": "Host dashboard — QuickIn",
-      "description": "Manage your QuickIn listings and respond to reservation requests."
+      "title": "Host dashboard — Quick In",
+      "description": "Manage your Quick In listings and respond to reservation requests."
     },
     "backToExplore": "Back to explore",
     "perNight": "/ night",
     "become": {
       "eyebrow": "Become a host",
-      "title": "Share your space, host on QuickIn",
+      "title": "Share your space, host on Quick In",
       "subtitle": "List your home in minutes, set your own nightly rate, and approve every guest yourself. You stay in control of who stays, when, and at what price.",
       "feature1Title": "You set the price",
       "feature1Desc": "Per night, in your currency.",
@@ -2144,10 +2142,6 @@
         "earnings": {
           "label": "Earnings",
           "hint": "What you’ve earned and what’s pending"
-        },
-        "services": {
-          "label": "Services",
-          "hint": "Experiences you offer, and requests"
         }
       }
     },
@@ -2201,8 +2195,8 @@
     },
     "create": {
       "meta": {
-        "title": "Create a listing — QuickIn",
-        "description": "List your space on QuickIn."
+        "title": "Create a listing — Quick In",
+        "description": "List your space on Quick In."
       },
       "backToHosting": "Back to hosting",
       "title": "Create a listing",
@@ -2375,7 +2369,7 @@
       "resortOtherHint": "We'll show what you type to guests, and our team will add it to the list.",
       "commission": {
         "guestsSee": "Guests will see {price}",
-        "note": "includes QuickIn's {percent}% commission — you receive the price you entered"
+        "note": "includes Quick In's {percent}% commission — you receive the price you entered"
       },
       "cancellationPolicies": {
         "flexible": "Flexible",
@@ -2390,7 +2384,7 @@
     },
     "edit": {
       "meta": {
-        "title": "Edit listing — QuickIn"
+        "title": "Edit listing — Quick In"
       },
       "backToHost": "Back to hosting",
       "viewListing": "View listing",
@@ -2441,7 +2435,7 @@
     },
     "calendar": {
       "meta": {
-        "title": "Calendar · QuickIn"
+        "title": "Calendar · Quick In"
       },
       "backToHost": "Back to hosting",
       "editListing": "Edit listing",
@@ -2519,8 +2513,8 @@
   },
   "hostApply": {
     "meta": {
-      "title": "Apply to host — QuickIn",
-      "description": "Apply to become a host on QuickIn. Our team reviews every application."
+      "title": "Apply to host — Quick In",
+      "description": "Apply to become a host on Quick In. Our team reviews every application."
     },
     "backToAccount": "Back to account",
     "title": "Apply to host",
@@ -2617,8 +2611,8 @@
   },
   "hostProfile": {
     "meta": {
-      "title": "{name} · Host · QuickIn",
-      "fallback": "Host · QuickIn"
+      "title": "{name} · Host · Quick In",
+      "fallback": "Host · Quick In"
     },
     "backToExplore": "Back to explore",
     "hostedBy": "Host",
@@ -2634,7 +2628,7 @@
     "viewProfile": "View profile"
   },
   "appBanner": {
-    "title": "Get the QuickIn app",
+    "title": "Get the Quick In app",
     "subtitle": "Faster booking on your phone",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -2645,7 +2639,7 @@
   "stayPass": {
     "meta": {
       "title": "Stay pass",
-      "description": "Your QuickIn stay pass — the dates, the place, and everything your host left for you."
+      "description": "Your Quick In stay pass — the dates, the place, and everything your host left for you."
     },
     "backToExplore": "Back to Explore",
     "heading": "Stay pass",
@@ -2687,7 +2681,7 @@
     },
     "missingCode": {
       "title": "This link is missing a reservation code",
-      "body": "Open your reservation in the QuickIn app and scan its QR code again — it takes you straight to your stay pass.",
+      "body": "Open your reservation in the Quick In app and scan its QR code again — it takes you straight to your stay pass.",
       "cta": "Go to my trips"
     },
     "guest": {
@@ -2750,8 +2744,8 @@
   },
   "linksPage": {
     "meta": {
-      "title": "QuickIn — All our links",
-      "description": "Follow QuickIn, get the app, and book your next stay in Egypt."
+      "title": "Quick In — All our links",
+      "description": "Follow Quick In, get the app, and book your next stay in Egypt."
     },
     "tagline": "Curated stays across Egypt — booked in a few taps.",
     "book": "Book your stay",
@@ -2768,21 +2762,14 @@
   },
   "payoutMethod": {
     "title": "Payment information",
-    "subtitleEmpty": "Add a payout method so QuickIn can send you your earnings.",
-    "subtitleSet": "This is where QuickIn sends your earnings.",
+    "subtitleEmpty": "Add a payout method so Quick In can send you your earnings.",
+    "subtitleSet": "This is where Quick In sends your earnings.",
     "chooseMethod": "How you want to be paid",
     "badgeAdded": "Added",
     "methods": {
       "bank_account": "Bank account",
       "instapay": "InstaPay",
       "wallet": "Wallet"
-    },
-    "walletProviders": {
-      "vodafone_cash": "Vodafone Cash",
-      "etisalat_cash": "Etisalat Cash",
-      "orange_money": "Orange Money",
-      "we_pay": "WE Pay",
-      "other": "Other wallet"
     },
     "fields": {
       "accountName": "Name on the account",
@@ -2794,8 +2781,6 @@
       "branch": "Branch",
       "branchOptional": "Branch (optional)",
       "instapayAddress": "InstaPay address",
-      "walletProvider": "Wallet",
-      "walletNumber": "Wallet number",
       "updated": "Last updated"
     },
     "placeholders": {
@@ -2805,8 +2790,7 @@
       "accountNumber": "Your bank account number",
       "swift": "e.g. NBEGEGCX",
       "branch": "e.g. Zamalek",
-      "instapayAddress": "name@instapay",
-      "walletNumber": "01XXXXXXXXX"
+      "instapayAddress": "name@instapay"
     },
     "bankHint": "Enter your IBAN or your account number — either one is enough, and both is better.",
     "instapayHint": "Your InstaPay address, for example name@instapay or name@banquemisr.",
@@ -2819,8 +2803,9 @@
     "remove": "Remove",
     "removing": "Removing…",
     "removed": "Your payout method has been removed.",
-    "removeConfirm": "Remove this payout method? QuickIn will have nowhere to send your earnings until you add another one.",
-    "error": "Couldn't save your payout method. Please try again."
+    "removeConfirm": "Remove this payout method? Quick In will have nowhere to send your earnings until you add another one.",
+    "error": "Couldn't save your payout method. Please try again.",
+    "retiredNotice": "Wallet payouts are no longer offered. Switch to a bank account or InstaPay so we can keep paying you."
   },
   "passwordPolicy": {
     "rules": {
@@ -2892,8 +2877,8 @@
   },
   "hostEarnings": {
     "meta": {
-      "title": "Earnings & payouts · QuickIn",
-      "description": "What you have earned hosting on QuickIn."
+      "title": "Earnings & payouts · Quick In",
+      "description": "What you have earned hosting on Quick In."
     },
     "title": "Earnings & payouts",
     "backToDashboard": "Back to dashboard",
@@ -2905,7 +2890,7 @@
     "pending": "Pending",
     "commission": {
       "title": "Guests pay {rate}% above your price",
-      "body": "Guests were charged {guestPaid} in total, of which {commission} was QuickIn’s commission. Nothing above is deducted from your earnings — the commission sits on top of the price you set."
+      "body": "Guests were charged {guestPaid} in total, of which {commission} was Quick In’s commission. Nothing above is deducted from your earnings — the commission sits on top of the price you set."
     },
     "recent": {
       "title": "Recent payouts",
@@ -2928,8 +2913,8 @@
   },
   "hostAnalytics": {
     "meta": {
-      "title": "Analytics · QuickIn",
-      "description": "How your places are performing on QuickIn."
+      "title": "Analytics · Quick In",
+      "description": "How your places are performing on Quick In."
     },
     "title": "Analytics",
     "subtitle": "Bookings, revenue, rating and trends across your places.",
@@ -2963,7 +2948,7 @@
   },
   "hostReviews": {
     "meta": {
-      "title": "Review your guests · QuickIn",
+      "title": "Review your guests · Quick In",
       "description": "Rate the guests who have stayed with you."
     },
     "title": "Review your guests",
@@ -2992,7 +2977,7 @@
   },
   "hostQuestions": {
     "meta": {
-      "title": "Guest questions · QuickIn",
+      "title": "Guest questions · Quick In",
       "description": "Answer the questions guests ask on your listings."
     },
     "title": "Guest questions",
@@ -3006,164 +2991,6 @@
     "empty": {
       "title": "No questions yet",
       "hint": "When a guest asks about one of your listings, it shows up here."
-    }
-  },
-  "hostServices": {
-    "meta": {
-      "title": "Your services · QuickIn",
-      "description": "Manage the experiences you offer alongside your places."
-    },
-    "title": "Your services",
-    "subtitle": "Experiences you offer alongside your places — and who has asked for them.",
-    "backToDashboard": "Back to dashboard",
-    "backToBrowse": "Browse all services",
-    "loadFailed": "We couldn’t load your services. Reload the page to try again.",
-    "tabsLabel": "Your services, requests and new service",
-    "tabs": {
-      "services": "Your services",
-      "requests": "Requests",
-      "new": "Add a service"
-    },
-    "services": {
-      "emptyTitle": "No services yet",
-      "emptyHint": "Add a boat trip, a diving session or an airport transfer that guests can request.",
-      "emptyCta": "Add a service",
-      "yourPrice": "your price",
-      "guestsPay": "Guests pay {price}",
-      "listedOn": "Listed {date}",
-      "pendingRequests": "{count, plural, one {# request waiting} other {# requests waiting}}",
-      "blockedBody": "This service was taken down by QuickIn, so you can’t put it back yourself. Contact support if you think that’s a mistake.",
-      "saving": "Saving…",
-      "deactivate": "Take it down",
-      "deactivateWithPending": "{count, plural, one {Take it down (declines # request)} other {Take it down (declines # requests)}}",
-      "reactivate": "Put it back",
-      "toggleFailed": "We couldn’t change that. Try again.",
-      "state": {
-        "live": "Live",
-        "deactivated": "Taken down",
-        "blocked": "Blocked"
-      }
-    },
-    "requests": {
-      "emptyTitle": "No requests yet",
-      "emptyHint": "When a guest asks for one of your services, it appears here for you to confirm.",
-      "filterLabel": "Filter requests by status",
-      "filter": {
-        "all": "All",
-        "pending": "Waiting",
-        "confirmed": "Confirmed",
-        "rejected": "Declined"
-      },
-      "emptyFiltered": "No requests in this state.",
-      "showAll": "Show all requests",
-      "deletedGuest": "Guest",
-      "preferred": "Preferred date: {date}",
-      "code": "Code {code}",
-      "status": {
-        "pending": "Waiting",
-        "confirmed": "Confirmed",
-        "rejected": "Declined"
-      },
-      "confirm": "Confirm",
-      "confirming": "Confirming…",
-      "reject": "Decline",
-      "rejecting": "Declining…",
-      "actionFailed": "We couldn’t update that request. Try again."
-    },
-    "new": {
-      "titleLabel": "Service name",
-      "titlePlaceholder": "Sunset boat trip",
-      "priceLabel": "Your price",
-      "priceHint": "What you want to be paid. Guests are quoted this plus QuickIn’s commission.",
-      "categoryLabel": "Category",
-      "categoryPlaceholder": "Water sports, transfers, tours…",
-      "locationLabel": "Where",
-      "locationPlaceholder": "El Gouna",
-      "imageLabel": "Photo link",
-      "imageHint": "A link to one photo. Optional.",
-      "descriptionLabel": "Description",
-      "descriptionPlaceholder": "What’s included, how long it lasts, what to bring…",
-      "problem": {
-        "title_required": "Give the service a name.",
-        "title_long": "That name is too long.",
-        "price_required": "Enter a price — use 0 if it’s free.",
-        "price_negative": "A price can’t be negative.",
-        "description_long": "That description is too long."
-      },
-      "post": "Post service",
-      "posting": "Posting…",
-      "failed": "We couldn’t post that service. Try again."
-    }
-  },
-  "servicesPage": {
-    "meta": {
-      "title": "Services · QuickIn",
-      "description": "Boat trips, diving, transfers and more from QuickIn hosts."
-    },
-    "title": "Services",
-    "backToExplore": "Back to Explore",
-    "manageYours": "Your services",
-    "noneYet": "No services are on offer just yet.",
-    "count": "{count, plural, one {# service on offer.} other {# services on offer.}}",
-    "empty": {
-      "title": "Nothing on offer yet",
-      "hint": "Hosts add boat trips, diving and transfers here. Check back soon.",
-      "cta": "Browse stays"
-    }
-  },
-  "serviceDetail": {
-    "meta": {
-      "notFound": "Service not found · QuickIn",
-      "fallbackDescription": "An experience offered by a QuickIn host."
-    },
-    "backToServices": "Back to services",
-    "backToExplore": "Back to Explore",
-    "about": "About this service",
-    "offeredBy": "Offered by {host}",
-    "price": "Price",
-    "chargedIn": "You’ll be charged in {currency}.",
-    "requestTitle": "Request this service",
-    "preferredDate": "Preferred date",
-    "note": "Note for the host",
-    "notePlaceholder": "How many of you, and anything they should know.",
-    "request": "Send request",
-    "sending": "Sending…",
-    "failed": "We couldn’t send that request. Try again.",
-    "noChargeYet": "Nothing is charged now — the host confirms first.",
-    "signInToRequest": "Sign in to request this service.",
-    "signIn": "Sign in",
-    "ownService": "This is your own service.",
-    "manageService": "Manage your services",
-    "sent": {
-      "title": "Request sent",
-      "body": "The host will confirm or decline it. You’ll find it under your requests either way.",
-      "code": "Your code: {code}",
-      "viewRequests": "View my requests"
-    }
-  },
-  "mySubscriptions": {
-    "meta": {
-      "title": "My service requests · QuickIn",
-      "description": "The services you have asked QuickIn hosts for."
-    },
-    "title": "My service requests",
-    "backToAccount": "Back to account",
-    "backToServices": "Browse services",
-    "noneYet": "You haven’t requested a service yet.",
-    "count": "{count, plural, one {# request.} other {# requests.}}",
-    "empty": {
-      "title": "No requests yet",
-      "hint": "Boat trips, diving and transfers offered by hosts show up under Services.",
-      "cta": "Browse services"
-    },
-    "byHost": "By {host}",
-    "byDeletedHost": "Host unavailable",
-    "preferred": "Preferred date: {date}",
-    "code": "Your code: {code}",
-    "status": {
-      "pending": "Waiting on the host",
-      "confirmed": "Confirmed",
-      "rejected": "Declined"
     }
   }
 }

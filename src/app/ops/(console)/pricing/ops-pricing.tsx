@@ -63,7 +63,8 @@ export interface CommissionView {
   percent: number
   updated_at: string | null
   updated_by: string | null
-  impact: { listings: number; services: number }
+  /** The backend may still send a `services` count here; it is ignored. */
+  impact: { listings: number }
 }
 
 const egp = (n: number) => `EGP ${Math.round(n).toLocaleString('en-US')}`
@@ -106,7 +107,7 @@ export function OpsPricing({ initial }: { initial: CommissionView }) {
       }
       setSaved(data as CommissionView)
       setPercent(String((data as CommissionView).percent))
-      setNote('Saved — every listing and service is now priced at this rate.')
+      setNote('Saved — every listing is now priced at this rate.')
     } catch {
       setError('Could not reach the server')
     } finally {
@@ -217,11 +218,7 @@ export function OpsPricing({ initial }: { initial: CommissionView }) {
         <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14, color: C.muted, lineHeight: 1.75 }}>
           <li>
             It reprices <strong>{saved.impact.listings.toLocaleString('en-US')} published listing
-            {saved.impact.listings === 1 ? '' : 's'}</strong>
-            {saved.impact.services > 0 ? (
-              <> and <strong>{saved.impact.services.toLocaleString('en-US')} service
-              {saved.impact.services === 1 ? '' : 's'}</strong></>
-            ) : null}{' '}
+            {saved.impact.listings === 1 ? '' : 's'}</strong>{' '}
             the moment you save — on the website and in both mobile apps.
           </li>
           <li>

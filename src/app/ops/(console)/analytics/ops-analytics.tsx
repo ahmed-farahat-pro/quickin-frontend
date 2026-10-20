@@ -275,7 +275,7 @@ function RevenueView({ data }: { data: { totals: Record<string, number>; trend: 
       <div style={section}>
         <StatGrid>
           <Stat label="Guests paid" value={money(t.gross)} hint={`${t.paidCount} paid bookings`} />
-          <Stat label="Commission earned" value={money(t.commission)} hint="QuickIn's markup" />
+          <Stat label="Commission earned" value={money(t.commission)} hint="Quick In's markup" />
           <Stat label="Host payouts" value={money(t.hostPayouts)} hint="their price, in full" />
           <Stat label="Refunded" value={money(t.refunded)} hint={`${t.refundedCount} refunded`} />
           <Stat label="Pending payout" value={money(t.pendingPayout)} hint="Estimate — stays not ended" />

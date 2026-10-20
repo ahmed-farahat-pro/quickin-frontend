@@ -1,4 +1,4 @@
-// The QuickIn "Q" that draws itself — the one place a logo spinner still earns its
+// The Quick In "Q" that draws itself — the one place a logo spinner still earns its
 // keep, now that route transitions are handled by <RouteProgress /> and skeletons.
 //
 // Use it for waits where there is genuinely nothing to skeleton yet: a cold app

@@ -1,5 +1,5 @@
 // =============================================================================
-// /plan — the QuickIn launch plan rendered as a styled HTML page (no Supabase).
+// /plan — the Quick In launch plan rendered as a styled HTML page (no Supabase).
 // Mirrors LAUNCH-PLAN.md so the roadmap is viewable in the browser.
 // =============================================================================
 import type { Metadata } from 'next'
@@ -98,7 +98,7 @@ export default async function PlanPage() {
       <div className="plan-wrap">
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 6 }}>
-          <img src="/logo.png" alt="QuickIn" style={{ height: 44 }} />
+          <img src="/logo.png" alt="Quick In" style={{ height: 44 }} />
           <div>
             <h1 style={{ margin: 0, fontSize: 30, color: C.burgundy }}>{t('header.title')}</h1>
             <p style={{ margin: '2px 0 0', color: C.muted, fontSize: 14 }}>{t('header.subtitle')}</p>

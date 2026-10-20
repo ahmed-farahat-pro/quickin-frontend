@@ -11,7 +11,7 @@ import { StaffLoginForm } from './login-form'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Admin sign in — QuickIn',
+  title: 'Admin sign in — Quick In',
   robots: { index: false, follow: false },
 }
 

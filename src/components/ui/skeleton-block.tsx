@@ -3,7 +3,7 @@
 // These are pure server-renderable markup (no 'use client') used by the
 // per-route loading.tsx skeletons so that, instead of the dark global
 // "Loading amazing stays" overlay, each route shows a tasteful placeholder
-// in the QuickIn palette that mirrors the real page layout.
+// in the Quick In palette that mirrors the real page layout.
 //
 // The shimmer is a single CSS sweep keyframe in the boutique tan/cream tones.
 // Drop <ShimmerStyles /> once near the top of a loading tree; every

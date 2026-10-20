@@ -81,7 +81,7 @@ function Header({ backLabel }: { backLabel: string }) {
         <a href="/explore" style={{ display: 'inline-flex', alignItems: 'center' }}>
           <img
             src="/logo.png"
-            alt="QuickIn"
+            alt="Quick In"
             height={40}
             style={{ height: 40, width: 'auto', display: 'block' }}
           />
@@ -112,7 +112,7 @@ export default async function AccountPage() {
   const verification = await backendFetchOr<Verification>('/api/local/verification', {
     status: 'unverified', id_number: null, verified_at: null, doc_type: null, notes: null,
   })
-  // Only a host is paid by QuickIn, so only a host has a payout method to show.
+  // Only a host is paid by Quick In, so only a host has a payout method to show.
   // Read it server-side so an already-added method renders with the page rather
   // than flashing the empty form first.
   const payoutMethod: PayoutMethodView | null =
@@ -354,7 +354,7 @@ export default async function AccountPage() {
           </div>
         )}
 
-        {/* Payment information — where QuickIn sends this host's earnings. */}
+        {/* Payment information — where Quick In sends this host's earnings. */}
         {user.host_status === 'approved' && <PayoutMethodCard initial={payoutMethod} />}
 
         {/* Profile + password forms (client) */}
@@ -380,11 +380,9 @@ export default async function AccountPage() {
         >
           <AccountLink href="/reservations" label={t('links.reservations')} />
           <AccountLink href="/saved" label={t('links.saved')} />
-          <AccountLink href="/services" label={t('links.services')} />
-          <AccountLink href="/account/subscriptions" label={t('links.subscriptions')} />
           <AccountLink href="/verify-id" label={t('links.verification')} />
           {/* The host block. The dashboard is the hub — earnings, analytics,
-              guest reviews and services all hang off it too — but a host who
+              guest reviews all hang off it too — but a host who
               lands here looking for their money should not have to know that. */}
           {user.is_host && (
             <>
@@ -393,7 +391,6 @@ export default async function AccountPage() {
               <AccountLink href="/host/earnings" label={t('links.earnings')} />
               <AccountLink href="/host/analytics" label={t('links.analytics')} />
               <AccountLink href="/host/reviews" label={t('links.reviewGuests')} />
-              <AccountLink href="/host/services" label={t('links.hostServices')} />
             </>
           )}
         </div>

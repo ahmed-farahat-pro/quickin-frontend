@@ -30,8 +30,8 @@ export async function generateMetadata(): Promise<Metadata> {
       description: t('meta.ogDescription'),
       url: '/reservations',
       type: 'website',
-      siteName: 'QuickIn',
-      images: [{ url: '/logo.png', width: 700, height: 454, alt: 'QuickIn' }],
+      siteName: 'Quick In',
+      images: [{ url: '/logo.png', width: 700, height: 454, alt: 'Quick In' }],
     },
   }
 }
@@ -97,7 +97,7 @@ function Header({
         <a href="/explore" style={{ display: 'inline-flex', alignItems: 'center' }}>
           <img
             src="/logo.png"
-            alt="QuickIn"
+            alt="Quick In"
             height={40}
             style={{ height: 40, width: 'auto', display: 'block' }}
           />

@@ -70,7 +70,7 @@ function Header({ backLabel }: { backLabel: string }) {
         <a href="/explore" style={{ display: 'inline-flex', alignItems: 'center' }}>
           <img
             src="/logo.png"
-            alt="QuickIn"
+            alt="Quick In"
             height={40}
             style={{ height: 40, width: 'auto', display: 'block' }}
           />

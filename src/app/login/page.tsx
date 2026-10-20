@@ -437,7 +437,7 @@ export default function LoginPage() {
           padding: '40px 36px 36px',
         }}
       >
-        {/* Signing in is optional on QuickIn — most of the site is browsable without
+        {/* Signing in is optional on Quick In — most of the site is browsable without
             an account — so the way out stays on screen in every view of the flow,
             including the OTP and reset steps a guest can be dropped into. */}
         <AuthExitLink label={t('exitToBrowsing')} />
@@ -493,6 +493,24 @@ export default function LoginPage() {
 
         {view === 'otp' ? (
           <form onSubmit={verifyOtp}>
+            <div
+              role="status"
+              style={{
+                background: COLORS.burgundy + '0d',
+                border: `1px solid ${COLORS.burgundy}33`,
+                color: COLORS.ink,
+                fontSize: 13.5,
+                lineHeight: 1.45,
+                padding: '12px 14px',
+                borderRadius: 12,
+                marginBottom: 16,
+              }}
+            >
+              <strong style={{ display: 'block', color: COLORS.burgundy, marginBottom: 2 }}>
+                {t('otp.spamTitle')}
+              </strong>
+              {t('otp.spamBody')}
+            </div>
             {devCode && (
               <div style={{
                 background: COLORS.burgundy + '12',

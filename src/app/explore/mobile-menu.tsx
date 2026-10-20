@@ -38,7 +38,7 @@ export function MobileMenu({ firstName, isHost }: { firstName: string | null; is
       </SheetTrigger>
       <SheetContent side="right" className="w-[82%] max-w-xs border-l border-[#5B0F16]/10 bg-[#F6F1E6]">
         <SheetHeader>
-          <SheetTitle className="text-left text-[#5B0F16]">QuickIn</SheetTitle>
+          <SheetTitle className="text-left text-[#5B0F16]">Quick In</SheetTitle>
         </SheetHeader>
         <nav className="mt-6 flex flex-col gap-1 px-2 text-[15px]">
           {isHost ? (

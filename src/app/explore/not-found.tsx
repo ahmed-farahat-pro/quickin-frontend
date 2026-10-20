@@ -31,7 +31,7 @@ export default function ExploreNotFound() {
       <div style={{ maxWidth: 460 }}>
         <img
           src="/logo.png"
-          alt="QuickIn"
+          alt="Quick In"
           style={{ height: 46, width: 'auto', margin: '0 auto 28px', display: 'block' }}
         />
         <p

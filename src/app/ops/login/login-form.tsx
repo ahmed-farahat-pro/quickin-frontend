@@ -60,7 +60,7 @@ export function StaffLoginForm({ notice }: { notice: string | null }) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo.png"
-            alt="QuickIn"
+            alt="Quick In"
             height={44}
             style={{ height: 44, width: 'auto', display: 'inline-block' }}
           />
@@ -80,7 +80,7 @@ export function StaffLoginForm({ notice }: { notice: string | null }) {
             Admin sign in
           </h1>
           <p style={{ margin: '0 0 22px', fontSize: 14, color: COLORS.muted }}>
-            QuickIn operations console.
+            Quick In operations console.
           </p>
 
           {notice && (

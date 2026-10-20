@@ -414,9 +414,9 @@ export function OpsShell({ children }: { children: React.ReactNode }) {
 
         {/* The logo is home. It was previously inert, which is the one thing every
             operator tries first when they want to get back to the dashboard. */}
-        <Link href="/ops" aria-label="QuickIn operations — dashboard" style={{ display: 'flex', alignItems: 'center' }}>
+        <Link href="/ops" aria-label="Quick In operations — dashboard" style={{ display: 'flex', alignItems: 'center' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="QuickIn" height={34} style={{ height: 34, width: 'auto', display: 'block' }} />
+          <img src="/logo.png" alt="Quick In" height={34} style={{ height: 34, width: 'auto', display: 'block' }} />
         </Link>
 
         <div style={{ flex: 1 }} />

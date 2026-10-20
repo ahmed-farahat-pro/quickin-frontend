@@ -274,7 +274,7 @@ export function HostReservations() {
   }
 
   // Accept/Decline the RESERVATION. Hosts no longer decide payments — a transfer is
-  // confirmed by QuickIn in /ops. The old code routed a host's Decline into
+  // confirmed by Quick In in /ops. The old code routed a host's Decline into
   // reviewPayment, which cancelled the whole booking over an unreadable screenshot;
   // now a rejected payment just asks the guest for a better photo.
   function approve(b: HostBooking) {
@@ -434,7 +434,7 @@ export function HostReservations() {
             </div>
 
             {/* The transfer screenshot is no longer shown to hosts. The money goes to
-                QuickIn's Instapay account, not theirs, and confirming a transfer is now
+                Quick In's Instapay account, not theirs, and confirming a transfer is now
                 an admin decision — so a host has no use for the guest's bank
                 screenshot. The payment chip above still says where it stands. */}
 

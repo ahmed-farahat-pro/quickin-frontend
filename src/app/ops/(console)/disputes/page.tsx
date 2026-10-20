@@ -12,7 +12,7 @@ import { OpsDisputes } from './ops-disputes'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Guest disputes — QuickIn Ops',
+  title: 'Guest disputes — Quick In Ops',
   robots: { index: false, follow: false },
 }
 

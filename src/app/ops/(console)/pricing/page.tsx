@@ -1,4 +1,4 @@
-// QuickIn — pricing ops (World 1, no Supabase).
+// Quick In — pricing ops (World 1, no Supabase).
 // Server component: the (console) layout has already established the staff session;
 // this adds the per-module check, so only a super admin or a moderator holding the
 // 'pricing' module sees the panel. The API route behind it re-checks the same
@@ -15,7 +15,7 @@ import { OpsPricing } from './ops-pricing'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Pricing & commission — QuickIn Ops',
+  title: 'Pricing & commission — Quick In Ops',
   robots: { index: false, follow: false },
 }
 
@@ -58,7 +58,7 @@ export default async function OpsPricingPage() {
           Pricing &amp; commission
         </h1>
         <p style={{ margin: '0 0 28px', fontSize: 15, color: COLORS.muted }}>
-          Set the commission QuickIn adds on top of every host&rsquo;s price.
+          Set the commission Quick In adds on top of every host&rsquo;s price.
         </p>
 
         {!allowed || !settings ? (

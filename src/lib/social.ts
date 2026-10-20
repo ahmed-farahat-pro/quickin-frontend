@@ -1,5 +1,5 @@
 /**
- * QuickIn's public social accounts — one profile per platform, in one place.
+ * Quick In's public social accounts — one profile per platform, in one place.
  *
  * The /links bio page reads from here, so moving an account is a single edit.
  * Deliberately NOT here: the web app's own address (that is `getBaseUrl()` in

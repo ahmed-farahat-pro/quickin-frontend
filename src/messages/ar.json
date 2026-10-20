@@ -15,7 +15,6 @@
   "nav": {
     "anywhere": "أي مكان",
     "listings": "العروض",
-    "servicesManagement": "إدارة الخدمات",
     "becomeHost": "أصبح مضيفًا",
     "rent": "اعرض عقارك",
     "dashboard": "لوحة التحكم",
@@ -809,7 +808,7 @@
     "listsCount": "{count, plural, zero {لا توجد قوائم} one {قائمة واحدة} two {قائمتان} few {# قوائم} many {# قائمة} other {# قائمة}} متاحة",
     "empty": {
       "title": "أنشئ قائمتك الأولى",
-      "description": "أثناء البحث، انقر على أيقونة القلب لحفظ الأماكن والتجارب المفضلة لديك في القائمة.",
+      "description": "أثناء البحث، انقر على أيقونة القلب لحفظ أماكن الإقامة المفضلة لديك في القائمة.",
       "button": "ابدأ الاستكشاف"
     },
     "detailEmptyTitle": "قائمة الأمنيات هذه فارغة",
@@ -948,8 +947,6 @@
       "question": "أولاً، ما هو نوع المكان الذي تعرضه؟",
       "homeTitle": "منزل",
       "homeDesc": "مساحة مثل منزل، شقة، أو غرفة.",
-      "serviceTitle": "خدمة",
-      "serviceDesc": "تجربة، يخت، أو مساحة للفعاليات.",
       "describeQuestion": "أي من هذه الخيارات يصف الـ {type} الخاص بك بشكل أفضل؟"
     },
     "stepVibe": {
@@ -1370,10 +1367,10 @@
     "meta": {
       "title": "اكتشف إقامات بوتيك",
       "description": "تصفح مجموعة منسقة من المنازل المنتقاة بعناية — من فلل على ضفاف البحيرات إلى ملاذات صحراوية. ابحث حسب الموقع والتواريخ وعدد الضيوف.",
-      "ogTitle": "اكتشف إقامات بوتيك | QuickIn",
+      "ogTitle": "اكتشف إقامات بوتيك | Quick In",
       "ogDescription": "تصفح مجموعة منسقة من المنازل المنتقاة بعناية — من فلل على ضفاف البحيرات إلى ملاذات صحراوية."
     },
-    "logoAlt": "QuickIn",
+    "logoAlt": "Quick In",
     "nav": {
       "becomeHost": "كن مضيفًا",
       "hosting": "الاستضافة",
@@ -1434,7 +1431,7 @@
       "verifiedHost": "مضيف موثّق"
     },
     "footer": {
-      "tagline": "QuickIn — إقامات بوتيك للمسافرين الذين يعشقون التفاصيل.",
+      "tagline": "Quick In — إقامات بوتيك للمسافرين الذين يعشقون التفاصيل.",
       "support": {
         "title": "الدعم",
         "helpCenter": "مركز المساعدة",
@@ -1452,7 +1449,7 @@
         "title": "نبذة عنا",
         "ourStory": "قصتنا"
       },
-      "copyright": "© 2026 QuickIn. صُمم للمسافر الفضولي.",
+      "copyright": "© 2026 Quick In. صُمم للمسافر الفضولي.",
       "legal": {
         "terms": "الشروط",
         "privacy": "الخصوصية",
@@ -1479,9 +1476,9 @@
   "listingPage": {
     "meta": {
       "notFoundTitle": "لم يتم العثور على الإقامة",
-      "notFoundDescription": "تعذّر العثور على هذه الإقامة المميّزة. تصفّح بيوتًا منتقاة أخرى على QuickIn.",
-      "descriptionWithPlace": "إقامة مميّزة في {place} بدءًا من {price} / الليلة على QuickIn.",
-      "description": "إقامة مميّزة بدءًا من {price} / الليلة على QuickIn."
+      "notFoundDescription": "تعذّر العثور على هذه الإقامة المميّزة. تصفّح بيوتًا منتقاة أخرى على Quick In.",
+      "descriptionWithPlace": "إقامة مميّزة في {place} بدءًا من {price} / الليلة على Quick In.",
+      "description": "إقامة مميّزة بدءًا من {price} / الليلة على Quick In."
     },
     "backToExplore": "العودة إلى الاستكشاف",
     "photoAlt": "صورة {title} رقم {index}",
@@ -1597,7 +1594,7 @@
   "loginLocal": {
     "subtitle": "أهلاً بعودتك — سجّل الدخول للمتابعة",
     "exitToBrowsing": "تابع التصفح بدون حساب",
-    "logoAlt": "QuickIn",
+    "logoAlt": "Quick In",
     "emailLabel": "البريد الإلكتروني",
     "passwordLabel": "كلمة المرور",
     "forgotPassword": "نسيت كلمة المرور؟",
@@ -1618,7 +1615,9 @@
       "resendIn": "إعادة الإرسال خلال {seconds} ث",
       "resendCode": "إعادة إرسال الرمز",
       "newCodeSent": "رمز جديد في طريقه إليك.",
-      "codeSentTo": "أرسلنا رمزًا من 6 أرقام إلى {email}."
+      "codeSentTo": "أرسلنا رمزًا من 6 أرقام إلى {email}.",
+      "spamTitle": "تحقق من مجلد البريد العشوائي",
+      "spamBody": "قد يستغرق وصول الرمز دقيقة، وأحيانًا يصل إلى مجلد البريد العشوائي (Spam) أو غير المرغوب فيه."
     },
     "forgot": {
       "title": "إعادة تعيين كلمة المرور",
@@ -1648,10 +1647,10 @@
     },
     "meta": {
       "title": "تسجيل الدخول",
-      "ogTitle": "تسجيل الدخول | QuickIn",
-      "description": "سجّل الدخول إلى حسابك على QuickIn لإدارة الحجوزات وحجز إقامات بوتيك مميزة.",
-      "siteName": "QuickIn",
-      "imageAlt": "QuickIn"
+      "ogTitle": "تسجيل الدخول | Quick In",
+      "description": "سجّل الدخول إلى حسابك على Quick In لإدارة الحجوزات وحجز إقامات بوتيك مميزة.",
+      "siteName": "Quick In",
+      "imageAlt": "Quick In"
     }
   },
   "signupLocal": {
@@ -1677,7 +1676,9 @@
       "resendCode": "إعادة إرسال الرمز",
       "newCodeSent": "رمز جديد في طريقه إليك.",
       "codeSentTo": "أرسلنا رمزًا من 6 أرقام إلى {email}.",
-      "back": "العودة إلى إنشاء الحساب"
+      "back": "العودة إلى إنشاء الحساب",
+      "spamTitle": "تحقق من مجلد البريد العشوائي",
+      "spamBody": "قد يستغرق وصول الرمز دقيقة، وأحيانًا يصل إلى مجلد البريد العشوائي (Spam) أو غير المرغوب فيه."
     },
     "fields": {
       "fullName": "الاسم الكامل",
@@ -1702,8 +1703,8 @@
     },
     "meta": {
       "title": "أنشئ حسابك",
-      "description": "انضم إلى QuickIn لاكتشاف وحجز مجموعة منتقاة من بيوت العطلات البوتيكية.",
-      "ogTitle": "أنشئ حسابك | QuickIn"
+      "description": "انضم إلى Quick In لاكتشاف وحجز مجموعة منتقاة من بيوت العطلات البوتيكية.",
+      "ogTitle": "أنشئ حسابك | Quick In"
     }
   },
   "instapay": {
@@ -1729,9 +1730,9 @@
   "reservationsLocal": {
     "meta": {
       "title": "رحلاتي",
-      "description": "اعرض حجوزات إقامتك القادمة على QuickIn وأدِرها. كل حجوزات الإقامات البوتيكية في مكان واحد.",
-      "ogTitle": "حجوزاتي | QuickIn",
-      "ogDescription": "اعرض حجوزات إقامتك القادمة على QuickIn وأدِرها."
+      "description": "اعرض حجوزات إقامتك القادمة على Quick In وأدِرها. كل حجوزات الإقامات البوتيكية في مكان واحد.",
+      "ogTitle": "حجوزاتي | Quick In",
+      "ogDescription": "اعرض حجوزات إقامتك القادمة على Quick In وأدِرها."
     },
     "backToExplore": "العودة إلى الاستكشاف",
     "backToAccount": "العودة إلى الحساب",
@@ -1807,7 +1808,7 @@
   "verifyIdPage": {
     "meta": {
       "title": "تأكيد هويتك",
-      "description": "ارفع بطاقة الرقم القومي لتأكيد حسابك على QuickIn."
+      "description": "ارفع بطاقة الرقم القومي لتأكيد حسابك على Quick In."
     },
     "heading": "تأكيد هويتك",
     "subtitle": "إقامات البوتيك بتحتاج ضيف موثّق — مش هياخد منك غير دقيقة.",
@@ -1815,8 +1816,8 @@
   },
   "planPage": {
     "meta": {
-      "title": "خطة الإطلاق | QuickIn",
-      "description": "خطة جاهزية خطوة بخطوة لإطلاق QuickIn عبر الويب و iOS و Android."
+      "title": "خطة الإطلاق | Quick In",
+      "description": "خطة جاهزية خطوة بخطوة لإطلاق Quick In عبر الويب و iOS و Android."
     },
     "status": {
       "done": "✓ مكتمل",
@@ -1825,7 +1826,7 @@
     },
     "header": {
       "title": "خطة الإطلاق",
-      "subtitle": "أطلِق QuickIn عبر الويب · iOS · Android — أربعة مسارات متوازية."
+      "subtitle": "أطلِق Quick In عبر الويب · iOS · Android — أربعة مسارات متوازية."
     },
     "legend": {
       "note": "· بدون Supabase · PostgreSQL محلي → Vercel/Neon للإنتاج"
@@ -1922,8 +1923,8 @@
   },
   "accountPage": {
     "meta": {
-      "title": "حسابك · QuickIn",
-      "description": "أدِر ملفك الشخصي والتحقق من الهوية وكلمة المرور على QuickIn."
+      "title": "حسابك · Quick In",
+      "description": "أدِر ملفك الشخصي والتحقق من الهوية وكلمة المرور على Quick In."
     },
     "backToExplore": "العودة إلى الاستكشاف",
     "title": "الحساب",
@@ -1965,9 +1966,9 @@
     },
     "preferences": {
       "title": "التفضيلات",
-      "subtitle": "طريقة عرض QuickIn للأسعار والنصوص.",
+      "subtitle": "طريقة عرض Quick In للأسعار والنصوص.",
       "currencyLabel": "العملة",
-      "currencyHelp": "تُعرض الأسعار في QuickIn بهذه العملة، ويظل التحصيل بعملة الإعلان نفسها.",
+      "currencyHelp": "تُعرض الأسعار في Quick In بهذه العملة، ويظل التحصيل بعملة الإعلان نفسها.",
       "languageLabel": "اللغة"
     },
     "links": {
@@ -1976,12 +1977,9 @@
       "verification": "التحقق من الهوية",
       "hosting": "الاستضافة",
       "guestQuestions": "أسئلة الضيوف",
-      "services": "الخدمات",
-      "subscriptions": "طلبات الخدمات",
       "earnings": "الأرباح والتحويلات",
       "analytics": "التحليلات",
-      "reviewGuests": "قيّم ضيوفك",
-      "hostServices": "خدماتك"
+      "reviewGuests": "قيّم ضيوفك"
     },
     "logout": "تسجيل الخروج",
     "profile": {
@@ -2040,8 +2038,8 @@
   },
   "savedPage": {
     "meta": {
-      "title": "مفضّلاتي · QuickIn",
-      "description": "إقاماتك البوتيكية المحفوظة على QuickIn."
+      "title": "مفضّلاتي · Quick In",
+      "description": "إقاماتك البوتيكية المحفوظة على Quick In."
     },
     "backToExplore": "العودة إلى الاستكشاف",
     "backToAccount": "العودة إلى الحساب",
@@ -2055,14 +2053,14 @@
   },
   "hostPage": {
     "meta": {
-      "title": "لوحة المضيف — QuickIn",
-      "description": "أدِر قوائمك على QuickIn وردّ على طلبات الحجز."
+      "title": "لوحة المضيف — Quick In",
+      "description": "أدِر قوائمك على Quick In وردّ على طلبات الحجز."
     },
     "backToExplore": "العودة إلى الاستكشاف",
     "perNight": "/ الليلة",
     "become": {
       "eyebrow": "كن مضيفًا",
-      "title": "شارك مساحتك واستضِف على QuickIn",
+      "title": "شارك مساحتك واستضِف على Quick In",
       "subtitle": "أدرج منزلك في دقائق، وحدّد سعر الليلة بنفسك، ووافق على كل ضيف بنفسك. تبقى متحكمًا في من يقيم ومتى وبأي سعر.",
       "feature1Title": "أنت تحدّد السعر",
       "feature1Desc": "لكل ليلة، بعملتك.",
@@ -2144,10 +2142,6 @@
         "earnings": {
           "label": "الأرباح",
           "hint": "ما حققته وما هو قيد الانتظار"
-        },
-        "services": {
-          "label": "الخدمات",
-          "hint": "التجارب التي تقدمها، والطلبات"
         }
       }
     },
@@ -2201,8 +2195,8 @@
     },
     "create": {
       "meta": {
-        "title": "إنشاء قائمة — QuickIn",
-        "description": "أدرج مساحتك على QuickIn."
+        "title": "إنشاء قائمة — Quick In",
+        "description": "أدرج مساحتك على Quick In."
       },
       "backToHosting": "العودة إلى الاستضافة",
       "title": "إنشاء قائمة",
@@ -2390,7 +2384,7 @@
     },
     "edit": {
       "meta": {
-        "title": "تعديل الإعلان — QuickIn"
+        "title": "تعديل الإعلان — Quick In"
       },
       "backToHost": "العودة إلى الاستضافة",
       "viewListing": "عرض الإعلان",
@@ -2441,7 +2435,7 @@
     },
     "calendar": {
       "meta": {
-        "title": "التقويم · QuickIn"
+        "title": "التقويم · Quick In"
       },
       "backToHost": "العودة إلى الاستضافة",
       "editListing": "تعديل الوحدة",
@@ -2519,8 +2513,8 @@
   },
   "hostApply": {
     "meta": {
-      "title": "قدّم طلب استضافة — QuickIn",
-      "description": "قدّم طلبًا لتصبح مضيفًا على QuickIn. يراجع فريقنا كل طلب."
+      "title": "قدّم طلب استضافة — Quick In",
+      "description": "قدّم طلبًا لتصبح مضيفًا على Quick In. يراجع فريقنا كل طلب."
     },
     "backToAccount": "العودة إلى الحساب",
     "title": "قدّم طلب استضافة",
@@ -2617,8 +2611,8 @@
   },
   "hostProfile": {
     "meta": {
-      "title": "{name} · مضيف · QuickIn",
-      "fallback": "مضيف · QuickIn"
+      "title": "{name} · مضيف · Quick In",
+      "fallback": "مضيف · Quick In"
     },
     "backToExplore": "العودة إلى الاستكشاف",
     "hostedBy": "المضيف",
@@ -2634,7 +2628,7 @@
     "viewProfile": "عرض الملف"
   },
   "appBanner": {
-    "title": "حمّل تطبيق QuickIn",
+    "title": "حمّل تطبيق Quick In",
     "subtitle": "حجز أسرع من هاتفك",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -2645,7 +2639,7 @@
   "stayPass": {
     "meta": {
       "title": "تصريح الإقامة",
-      "description": "تصريح إقامتك في QuickIn — المواعيد والمكان وكل ما تركه لك المضيف."
+      "description": "تصريح إقامتك في Quick In — المواعيد والمكان وكل ما تركه لك المضيف."
     },
     "backToExplore": "العودة إلى الاستكشاف",
     "heading": "تصريح الإقامة",
@@ -2687,7 +2681,7 @@
     },
     "missingCode": {
       "title": "هذا الرابط لا يحتوي على رمز حجز",
-      "body": "افتح حجزك في تطبيق QuickIn وامسح رمز QR مرة أخرى — سينقلك مباشرة إلى تصريح إقامتك.",
+      "body": "افتح حجزك في تطبيق Quick In وامسح رمز QR مرة أخرى — سينقلك مباشرة إلى تصريح إقامتك.",
       "cta": "الذهاب إلى رحلاتي"
     },
     "guest": {
@@ -2750,8 +2744,8 @@
   },
   "linksPage": {
     "meta": {
-      "title": "QuickIn — كل روابطنا",
-      "description": "تابع QuickIn، حمّل التطبيق، واحجز إقامتك القادمة في مصر."
+      "title": "Quick In — كل روابطنا",
+      "description": "تابع Quick In، حمّل التطبيق، واحجز إقامتك القادمة في مصر."
     },
     "tagline": "إقامات مختارة بعناية في مصر — احجزها في دقائق.",
     "book": "احجز إقامتك",
@@ -2768,21 +2762,14 @@
   },
   "payoutMethod": {
     "title": "معلومات الدفع",
-    "subtitleEmpty": "أضِف وسيلة استلام الأرباح ليتمكّن QuickIn من إرسال أرباحك إليك.",
-    "subtitleSet": "هنا يُرسل QuickIn أرباحك.",
+    "subtitleEmpty": "أضِف وسيلة استلام الأرباح ليتمكّن Quick In من إرسال أرباحك إليك.",
+    "subtitleSet": "هنا يُرسل Quick In أرباحك.",
     "chooseMethod": "كيف تريد أن تستلم أموالك",
     "badgeAdded": "تمت الإضافة",
     "methods": {
       "bank_account": "حساب بنكي",
       "instapay": "إنستاباي",
       "wallet": "محفظة"
-    },
-    "walletProviders": {
-      "vodafone_cash": "فودافون كاش",
-      "etisalat_cash": "اتصالات كاش",
-      "orange_money": "أورنج موني",
-      "we_pay": "WE Pay",
-      "other": "محفظة أخرى"
     },
     "fields": {
       "accountName": "الاسم على الحساب",
@@ -2794,8 +2781,6 @@
       "branch": "الفرع",
       "branchOptional": "الفرع (اختياري)",
       "instapayAddress": "عنوان إنستاباي",
-      "walletProvider": "المحفظة",
-      "walletNumber": "رقم المحفظة",
       "updated": "آخر تحديث"
     },
     "placeholders": {
@@ -2805,8 +2790,7 @@
       "accountNumber": "رقم حسابك البنكي",
       "swift": "مثال: NBEGEGCX",
       "branch": "مثال: الزمالك",
-      "instapayAddress": "name@instapay",
-      "walletNumber": "01XXXXXXXXX"
+      "instapayAddress": "name@instapay"
     },
     "bankHint": "أدخل رقم الآيبان أو رقم الحساب — أحدهما يكفي، وكلاهما أفضل.",
     "instapayHint": "عنوانك على إنستاباي، مثل name@instapay أو name@banquemisr.",
@@ -2819,8 +2803,9 @@
     "remove": "حذف",
     "removing": "جارٍ الحذف…",
     "removed": "تم حذف وسيلة استلام الأرباح.",
-    "removeConfirm": "هل تريد حذف وسيلة الاستلام هذه؟ لن يجد QuickIn مكانًا لإرسال أرباحك حتى تضيف واحدة أخرى.",
-    "error": "تعذّر حفظ وسيلة الاستلام. حاول مرة أخرى."
+    "removeConfirm": "هل تريد حذف وسيلة الاستلام هذه؟ لن يجد Quick In مكانًا لإرسال أرباحك حتى تضيف واحدة أخرى.",
+    "error": "تعذّر حفظ وسيلة الاستلام. حاول مرة أخرى.",
+    "retiredNotice": "لم يعد الدفع عبر المحفظة متاحًا. يرجى التحويل إلى حساب بنكي أو إنستاباي لنتمكن من مواصلة الدفع لك."
   },
   "passwordPolicy": {
     "rules": {
@@ -2892,8 +2877,8 @@
   },
   "hostEarnings": {
     "meta": {
-      "title": "الأرباح والتحويلات · QuickIn",
-      "description": "ما حققته من الاستضافة على QuickIn."
+      "title": "الأرباح والتحويلات · Quick In",
+      "description": "ما حققته من الاستضافة على Quick In."
     },
     "title": "الأرباح والتحويلات",
     "backToDashboard": "العودة إلى لوحة المضيف",
@@ -2905,7 +2890,7 @@
     "pending": "قيد الانتظار",
     "commission": {
       "title": "يدفع الضيوف {rate}% فوق سعرك",
-      "body": "دفع الضيوف {guestPaid} إجمالًا، منها {commission} عمولة QuickIn. لا يُخصم أي شيء مما سبق من أرباحك — العمولة تُضاف فوق السعر الذي حددته."
+      "body": "دفع الضيوف {guestPaid} إجمالًا، منها {commission} عمولة Quick In. لا يُخصم أي شيء مما سبق من أرباحك — العمولة تُضاف فوق السعر الذي حددته."
     },
     "recent": {
       "title": "أحدث التحويلات",
@@ -2928,8 +2913,8 @@
   },
   "hostAnalytics": {
     "meta": {
-      "title": "التحليلات · QuickIn",
-      "description": "أداء أماكنك على QuickIn."
+      "title": "التحليلات · Quick In",
+      "description": "أداء أماكنك على Quick In."
     },
     "title": "التحليلات",
     "subtitle": "الحجوزات والإيرادات والتقييم والاتجاهات عبر أماكنك.",
@@ -2963,7 +2948,7 @@
   },
   "hostReviews": {
     "meta": {
-      "title": "قيّم ضيوفك · QuickIn",
+      "title": "قيّم ضيوفك · Quick In",
       "description": "قيّم الضيوف الذين أقاموا عندك."
     },
     "title": "قيّم ضيوفك",
@@ -3006,164 +2991,6 @@
     "empty": {
       "title": "لا توجد أسئلة بعد",
       "hint": "عندما يسأل ضيف عن أحد إعلاناتك، سيظهر السؤال هنا."
-    }
-  },
-  "hostServices": {
-    "meta": {
-      "title": "خدماتك · QuickIn",
-      "description": "أدر التجارب التي تقدمها بجانب أماكنك."
-    },
-    "title": "خدماتك",
-    "subtitle": "تجارب تقدمها بجانب أماكنك — ومن طلبها.",
-    "backToDashboard": "العودة إلى لوحة المضيف",
-    "backToBrowse": "تصفّح كل الخدمات",
-    "loadFailed": "تعذّر تحميل خدماتك. أعد تحميل الصفحة للمحاولة مرة أخرى.",
-    "tabsLabel": "خدماتك والطلبات وإضافة خدمة",
-    "tabs": {
-      "services": "خدماتك",
-      "requests": "الطلبات",
-      "new": "أضف خدمة"
-    },
-    "services": {
-      "emptyTitle": "لا خدمات بعد",
-      "emptyHint": "أضف رحلة بحرية أو جلسة غوص أو توصيلة من المطار يمكن للضيوف طلبها.",
-      "emptyCta": "أضف خدمة",
-      "yourPrice": "سعرك",
-      "guestsPay": "يدفع الضيوف {price}",
-      "listedOn": "أُضيفت في {date}",
-      "pendingRequests": "{count, plural, zero {لا طلبات بانتظارك} one {طلب واحد بانتظارك} two {طلبان بانتظارك} few {# طلبات بانتظارك} many {# طلبًا بانتظارك} other {# طلب بانتظارك}}",
-      "blockedBody": "أوقفت QuickIn هذه الخدمة، لذا لا يمكنك إعادتها بنفسك. تواصل مع الدعم إن كنت ترى أن هذا خطأ.",
-      "saving": "جارٍ الحفظ…",
-      "deactivate": "أوقفها",
-      "deactivateWithPending": "{count, plural, zero {أوقفها} one {أوقفها (سيُرفض طلب واحد)} two {أوقفها (سيُرفض طلبان)} few {أوقفها (سيُرفض # طلبات)} many {أوقفها (سيُرفض # طلبًا)} other {أوقفها (سيُرفض # طلب)}}",
-      "reactivate": "أعدها",
-      "toggleFailed": "تعذّر تغيير ذلك. حاول مرة أخرى.",
-      "state": {
-        "live": "نشطة",
-        "deactivated": "موقوفة",
-        "blocked": "محظورة"
-      }
-    },
-    "requests": {
-      "emptyTitle": "لا طلبات بعد",
-      "emptyHint": "عندما يطلب ضيف إحدى خدماتك، سيظهر الطلب هنا لتأكيده.",
-      "filterLabel": "تصفية الطلبات حسب الحالة",
-      "filter": {
-        "all": "الكل",
-        "pending": "بالانتظار",
-        "confirmed": "مؤكدة",
-        "rejected": "مرفوضة"
-      },
-      "emptyFiltered": "لا طلبات في هذه الحالة.",
-      "showAll": "اعرض كل الطلبات",
-      "deletedGuest": "ضيف",
-      "preferred": "التاريخ المفضّل: {date}",
-      "code": "الرمز {code}",
-      "status": {
-        "pending": "بالانتظار",
-        "confirmed": "مؤكد",
-        "rejected": "مرفوض"
-      },
-      "confirm": "تأكيد",
-      "confirming": "جارٍ التأكيد…",
-      "reject": "رفض",
-      "rejecting": "جارٍ الرفض…",
-      "actionFailed": "تعذّر تحديث الطلب. حاول مرة أخرى."
-    },
-    "new": {
-      "titleLabel": "اسم الخدمة",
-      "titlePlaceholder": "رحلة بحرية عند الغروب",
-      "priceLabel": "سعرك",
-      "priceHint": "ما تريد أن تتقاضاه. يُعرض على الضيوف هذا السعر مضافًا إليه عمولة QuickIn.",
-      "categoryLabel": "الفئة",
-      "categoryPlaceholder": "رياضات مائية، توصيل، جولات…",
-      "locationLabel": "المكان",
-      "locationPlaceholder": "الجونة",
-      "imageLabel": "رابط الصورة",
-      "imageHint": "رابط لصورة واحدة. اختياري.",
-      "descriptionLabel": "الوصف",
-      "descriptionPlaceholder": "ما الذي يشمله، وكم يستغرق، وما الذي يجب إحضاره…",
-      "problem": {
-        "title_required": "اكتب اسمًا للخدمة.",
-        "title_long": "هذا الاسم طويل جدًا.",
-        "price_required": "أدخل سعرًا — استخدم 0 إن كانت مجانية.",
-        "price_negative": "لا يمكن أن يكون السعر بالسالب.",
-        "description_long": "هذا الوصف طويل جدًا."
-      },
-      "post": "انشر الخدمة",
-      "posting": "جارٍ النشر…",
-      "failed": "تعذّر نشر الخدمة. حاول مرة أخرى."
-    }
-  },
-  "servicesPage": {
-    "meta": {
-      "title": "الخدمات · QuickIn",
-      "description": "رحلات بحرية وغوص وتوصيل والمزيد من مضيفي QuickIn."
-    },
-    "title": "الخدمات",
-    "backToExplore": "العودة إلى الاستكشاف",
-    "manageYours": "خدماتك",
-    "noneYet": "لا توجد خدمات معروضة بعد.",
-    "count": "{count, plural, zero {لا خدمات معروضة.} one {خدمة واحدة معروضة.} two {خدمتان معروضتان.} few {# خدمات معروضة.} many {# خدمة معروضة.} other {# خدمة معروضة.}}",
-    "empty": {
-      "title": "لا شيء معروض بعد",
-      "hint": "يضيف المضيفون هنا الرحلات البحرية والغوص والتوصيل. عد قريبًا.",
-      "cta": "تصفّح الإقامات"
-    }
-  },
-  "serviceDetail": {
-    "meta": {
-      "notFound": "الخدمة غير موجودة · QuickIn",
-      "fallbackDescription": "تجربة يقدمها أحد مضيفي QuickIn."
-    },
-    "backToServices": "العودة إلى الخدمات",
-    "backToExplore": "العودة إلى الاستكشاف",
-    "about": "عن هذه الخدمة",
-    "offeredBy": "يقدمها {host}",
-    "price": "السعر",
-    "chargedIn": "ستُحاسب بعملة {currency}.",
-    "requestTitle": "اطلب هذه الخدمة",
-    "preferredDate": "التاريخ المفضّل",
-    "note": "ملاحظة للمضيف",
-    "notePlaceholder": "كم عددكم، وأي شيء يجب أن يعرفه.",
-    "request": "أرسل الطلب",
-    "sending": "جارٍ الإرسال…",
-    "failed": "تعذّر إرسال الطلب. حاول مرة أخرى.",
-    "noChargeYet": "لن يُخصم شيء الآن — يؤكد المضيف أولًا.",
-    "signInToRequest": "سجّل الدخول لطلب هذه الخدمة.",
-    "signIn": "تسجيل الدخول",
-    "ownService": "هذه خدمتك أنت.",
-    "manageService": "أدر خدماتك",
-    "sent": {
-      "title": "تم إرسال الطلب",
-      "body": "سيؤكده المضيف أو يرفضه. ستجده ضمن طلباتك في الحالتين.",
-      "code": "رمزك: {code}",
-      "viewRequests": "اعرض طلباتي"
-    }
-  },
-  "mySubscriptions": {
-    "meta": {
-      "title": "طلبات الخدمات · QuickIn",
-      "description": "الخدمات التي طلبتها من مضيفي QuickIn."
-    },
-    "title": "طلبات الخدمات",
-    "backToAccount": "العودة إلى الحساب",
-    "backToServices": "تصفّح الخدمات",
-    "noneYet": "لم تطلب أي خدمة بعد.",
-    "count": "{count, plural, zero {لا طلبات.} one {طلب واحد.} two {طلبان.} few {# طلبات.} many {# طلبًا.} other {# طلب.}}",
-    "empty": {
-      "title": "لا طلبات بعد",
-      "hint": "الرحلات البحرية والغوص والتوصيل التي يقدمها المضيفون تظهر ضمن الخدمات.",
-      "cta": "تصفّح الخدمات"
-    },
-    "byHost": "من {host}",
-    "byDeletedHost": "المضيف غير متاح",
-    "preferred": "التاريخ المفضّل: {date}",
-    "code": "رمزك: {code}",
-    "status": {
-      "pending": "بانتظار المضيف",
-      "confirmed": "مؤكد",
-      "rejected": "مرفوض"
     }
   }
 }

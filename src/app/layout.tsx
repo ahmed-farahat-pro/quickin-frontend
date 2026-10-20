@@ -57,8 +57,8 @@ const baseUrl = getBaseUrl();
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
   title: {
-    default: "QuickIn - Find It. Book It. Live It.",
-    template: "%s | QuickIn",
+    default: "Quick In - Find It. Book It. Live It.",
+    template: "%s | Quick In",
   },
   description: "Curated stays for slow travelers. Handpicked homes designed for comfort, beauty, and calm.",
   keywords: ["vacation rentals", "boutique stays", "travel", "accommodation", "curated homes", "Egypt"],
@@ -66,21 +66,21 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     url: baseUrl,
-    title: "QuickIn - Find It. Book It. Live It.",
+    title: "Quick In - Find It. Book It. Live It.",
     description: "Curated stays for slow travelers. Handpicked homes designed for comfort, beauty, and calm.",
-    siteName: "QuickIn",
+    siteName: "Quick In",
     images: [
       {
         url: "/logo-icon.png",
         width: 800,
         height: 600,
-        alt: "QuickIn Logo",
+        alt: "Quick In Logo",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "QuickIn - Find It. Book It. Live It.",
+    title: "Quick In - Find It. Book It. Live It.",
     description: "Curated stays for slow travelers. Handpicked homes designed for comfort, beauty, and calm.",
     images: ["/logo-icon.png"],
   },

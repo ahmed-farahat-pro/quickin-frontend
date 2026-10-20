@@ -1,4 +1,4 @@
-// QuickIn — payments ops (World 1, no Supabase).
+// Quick In — payments ops (World 1, no Supabase).
 // Server component: the (console) layout has already established the staff session;
 // this adds the per-module check, so only a super admin or a moderator holding the
 // 'payments' module sees the panels. The API routes behind them re-check the same
@@ -15,7 +15,7 @@ import { OpsPayments } from './ops-payments'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Payments — QuickIn Ops',
+  title: 'Payments — Quick In Ops',
   robots: { index: false, follow: false },
 }
 
