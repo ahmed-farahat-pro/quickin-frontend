@@ -27,12 +27,14 @@ export const CONTACT_PHONE_E164 = (process.env.NEXT_PUBLIC_WHATSAPP || '20101301
 )
 
 /**
- * The phone lines printed on the Contact Us page, in international format. These
- * are call lines, separate from the WhatsApp number above, which stays as is.
+ * The phone lines printed on the Contact Us page. These are call lines, separate
+ * from the WhatsApp number above, which stays as is. `display` is grouped the way
+ * the number is read aloud (Cairo landline: 2 + 8 digits; mobile: 10 + 8 digits).
  */
-export const CONTACT_PHONES: { display: string; href: string }[] = ['+20238895888', '+201044448477'].map(
-  (n) => ({ display: n, href: `tel:${n}` }),
-)
+export const CONTACT_PHONES: { kind: 'landline' | 'mobile'; display: string; href: string }[] = [
+  { kind: 'landline', display: '+20 2 3889 5888', href: 'tel:+20238895888' },
+  { kind: 'mobile', display: '+20 10 4444 8477', href: 'tel:+201044448477' },
+]
 
 export const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'quick.in.egy@gmail.com'
 

@@ -1,6 +1,14 @@
 import type { Metadata } from 'next'
+import {
+  IconBrandFacebook,
+  IconBrandInstagram,
+  IconBrandTiktok,
+  IconDeviceMobile,
+  IconMail,
+  IconPhone,
+} from '@tabler/icons-react'
 import { CONTACT_EMAIL, CONTACT_EMAIL_HREF, CONTACT_PHONES } from '@/lib/contact'
-import { SOCIAL_LINKS } from '@/lib/social'
+import { SOCIAL_LINKS, type SocialPlatform } from '@/lib/social'
 import { ContactForm } from './contact-form'
 
 // Public Contact Us page. The explore footer, the mobile menu and the Profile
@@ -25,6 +33,62 @@ function Label({ en, ar }: { en: string; ar: string }) {
 }
 
 const link: React.CSSProperties = { color: C.burgundy, fontWeight: 600, textDecoration: 'none', wordBreak: 'break-all' }
+
+const SOCIAL_ICONS: Record<SocialPlatform, typeof IconBrandInstagram> = {
+  instagram: IconBrandInstagram,
+  tiktok: IconBrandTiktok,
+  facebook: IconBrandFacebook,
+}
+
+const PHONE_KINDS = {
+  landline: { Icon: IconPhone, en: 'Landline', ar: 'أرضي' },
+  mobile: { Icon: IconDeviceMobile, en: 'Mobile', ar: 'موبايل' },
+} as const
+
+/** One tappable contact line: a burgundy icon chip, the value, and an optional muted note. */
+function Row({
+  href,
+  icon,
+  children,
+  note,
+  external,
+}: {
+  href: string
+  icon: React.ReactNode
+  children: React.ReactNode
+  note?: React.ReactNode
+  external?: boolean
+}) {
+  return (
+    <a
+      href={href}
+      {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+      style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none' }}
+    >
+      <span
+        style={{
+          width: 36,
+          height: 36,
+          flexShrink: 0,
+          borderRadius: 10,
+          background: '#fff',
+          color: C.burgundy,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {icon}
+      </span>
+      <span style={{ minWidth: 0 }}>
+        <span style={{ ...link, display: 'block' }}>{children}</span>
+        {note && <span style={{ display: 'block', fontSize: 12.5, color: C.muted, marginTop: 1 }}>{note}</span>}
+      </span>
+    </a>
+  )
+}
+
+const iconProps = { size: 20, stroke: 1.8 } as const
 
 export default function ContactPage() {
   return (
@@ -63,25 +127,32 @@ export default function ContactPage() {
           <div style={{ display: 'grid', gap: 12 }}>
             <div style={{ background: C.cream, borderRadius: 16, padding: '14px 16px' }}>
               <Label en="Email" ar="البريد الإلكتروني" />
-              <a href={CONTACT_EMAIL_HREF} style={link}>{CONTACT_EMAIL}</a>
+              <Row href={CONTACT_EMAIL_HREF} icon={<IconMail {...iconProps} />}>{CONTACT_EMAIL}</Row>
             </div>
             <div style={{ background: C.cream, borderRadius: 16, padding: '14px 16px' }}>
               <Label en="Phone Number" ar="رقم الموبايل" />
-              <div style={{ display: 'grid', gap: 4 }}>
-                {CONTACT_PHONES.map((p) => (
-                  <a key={p.href} href={p.href} dir="ltr" style={link}>{p.display}</a>
-                ))}
+              <div style={{ display: 'grid', gap: 12 }}>
+                {CONTACT_PHONES.map((p) => {
+                  const { Icon, en, ar } = PHONE_KINDS[p.kind]
+                  return (
+                    <Row key={p.href} href={p.href} icon={<Icon {...iconProps} />} note={<>{en} · <span dir="rtl">{ar}</span></>}>
+                      <span dir="ltr">{p.display}</span>
+                    </Row>
+                  )
+                })}
               </div>
             </div>
             <div style={{ background: C.cream, borderRadius: 16, padding: '14px 16px' }}>
               <Label en="Social Media" ar="السوشيال ميديا" />
-              <div style={{ display: 'grid', gap: 4 }}>
-                {SOCIAL_LINKS.map((s) => (
-                  <a key={s.platform} href={s.url} target="_blank" rel="noopener noreferrer" style={link}>
-                    {s.label}
-                    {s.handle && <span style={{ color: C.muted, fontWeight: 400 }}> · {s.handle}</span>}
-                  </a>
-                ))}
+              <div style={{ display: 'grid', gap: 12 }}>
+                {SOCIAL_LINKS.map((s) => {
+                  const Icon = SOCIAL_ICONS[s.platform]
+                  return (
+                    <Row key={s.platform} href={s.url} external icon={<Icon {...iconProps} />} note={s.handle}>
+                      {s.label}
+                    </Row>
+                  )
+                })}
               </div>
             </div>
           </div>
