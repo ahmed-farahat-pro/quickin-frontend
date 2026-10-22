@@ -26,6 +26,14 @@ export const CONTACT_PHONE_E164 = (process.env.NEXT_PUBLIC_WHATSAPP || '20101301
   '',
 )
 
+/**
+ * The phone lines printed on the Contact Us page, in international format. These
+ * are call lines, separate from the WhatsApp number above, which stays as is.
+ */
+export const CONTACT_PHONES: { display: string; href: string }[] = ['+20238895888', '+201044448477'].map(
+  (n) => ({ display: n, href: `tel:${n}` }),
+)
+
 export const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'quick.in.egy@gmail.com'
 
 export const CONTACT_EMAIL_HREF = `mailto:${CONTACT_EMAIL}`
