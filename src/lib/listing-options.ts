@@ -37,12 +37,21 @@ export interface AmenityOption extends ListingOption {
   Icon: LucideIcon
 }
 
-/** Curated browse areas. Same four the search chips and the mobile apps offer. */
+/** Curated browse areas, in explore-rail order. Must match the backend's
+ *  REGION_VALUES (resort-core.ts) — the API rejects any other value. */
 export const REGIONS: ListingOption[] = [
   { value: 'North Coast', key: 'northCoast' },
   { value: 'Ain Sokhna', key: 'ainSokhna' },
-  { value: 'El Gouna', key: 'elGouna' },
+  { value: 'Ras Sudr', key: 'rasSudr' },
   { value: 'Cairo', key: 'cairo' },
+  { value: 'New Cairo', key: 'newCairo' },
+  { value: 'Giza', key: 'giza' },
+  { value: 'Alexandria', key: 'alexandria' },
+  { value: 'Marsa Matrouh', key: 'marsaMatrouh' },
+  { value: 'Hurghada', key: 'hurghada' },
+  { value: 'El Gouna', key: 'elGouna' },
+  { value: 'Sharm El Sheikh', key: 'sharmElSheikh' },
+  { value: 'Dahab', key: 'dahab' },
 ]
 
 /** The amenity chips, in display order (identical order to iOS + Android). */

@@ -1,13 +1,18 @@
 'use client'
 
 // Client-side browse experience: a polished search bar, an Airbnb-style
-// property-type category filter (icons), a List/Map toggle and a lively results
-// grid. The server component (page.tsx) renders header/footer and passes the
+// destinations rail (region icons, then that region's sub-area chips — two
+// levels, never more), a Filters panel for property type, a List/Map toggle and
+// a lively results grid. The server component (page.tsx) renders header/footer and passes the
 // first page of listings as `initialListings` so the first paint is instant.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { useTranslations } from 'next-intl'
-import { MapPin, Users, Search as SearchIcon, Sparkles, Star } from 'lucide-react'
+import { useLocale, useTranslations } from 'next-intl'
+import {
+  MapPin, Users, Search as SearchIcon, Sparkles, Star, SlidersHorizontal,
+  Waves, Sunrise, Wind, Landmark, Building2, Pyramid, Anchor, Umbrella, Fish, Sailboat, Shell, Mountain,
+  type LucideIcon,
+} from 'lucide-react'
 import type { Listing } from '@/lib/types'
 import { formatDisplayPrice } from '@/lib/currency/display'
 import { useDisplayCurrency } from '@/components/providers/display-currency-provider'
@@ -115,18 +120,50 @@ const SORT_OPTIONS = [
 
 type View = 'list' | 'map'
 
+/** GET /api/local/destinations — see the backend's destinations-core.ts. */
+export interface DestinationSubArea {
+  id: string
+  slug: string
+  name: string
+  name_ar: string | null
+  km_marker: number | null
+  location_note: string | null
+  count: number
+}
+export interface DestinationRegion {
+  name: string
+  slug: string
+  name_ar: string
+  icon: string
+  count: number
+  sub_areas: DestinationSubArea[]
+}
+
+// The backend sends a semantic icon key per region so no client hardcodes the
+// region list; unknown keys fall back to a pin.
+const REGION_ICONS: Record<string, LucideIcon> = {
+  waves: Waves, sunrise: Sunrise, wind: Wind, landmark: Landmark, building: Building2,
+  pyramid: Pyramid, anchor: Anchor, umbrella: Umbrella, fish: Fish, sailboat: Sailboat,
+  shell: Shell, mountain: Mountain,
+}
+
 interface Filters {
   location: string
   checkIn: string
   checkOut: string
   guests: string
   type: string
+  /** Region chip — the stored name ('North Coast'); '' = every region. */
+  region: string
+  /** Sub-area chip — a resort slug inside `region`; '' = the whole region. */
+  area: string
   sort: string
 }
 
 interface Props {
   initialListings: Listing[]
   initialFilters: Omit<Filters, 'sort'>
+  destinations: DestinationRegion[]
   // Listing ids the signed-in user has already saved (seeds the heart state).
   savedIds?: string[]
 }
@@ -137,16 +174,24 @@ function buildQuery(f: Filters): string {
   if (f.checkIn) params.set('checkIn', f.checkIn)
   if (f.checkOut) params.set('checkOut', f.checkOut)
   if (f.guests.trim()) params.set('guests', f.guests.trim())
-  if (f.type.trim()) params.set('type', f.type.trim())
+  // The API's name for it is propertyType; `type` is only the page URL's.
+  if (f.type.trim()) params.set('propertyType', f.type.trim())
+  if (f.region) params.set('region', f.region)
+  if (f.region && f.area) params.set('area', f.area)
   if (f.sort && f.sort !== 'recommended') params.set('sort', f.sort)
   return params.toString()
 }
 
-const EMPTY: Filters = { location: '', checkIn: '', checkOut: '', guests: '', type: '', sort: 'recommended' }
+const EMPTY: Filters = {
+  location: '', checkIn: '', checkOut: '', guests: '', type: '', region: '', area: '', sort: 'recommended',
+}
 
-export default function ExploreClient({ initialListings, initialFilters, savedIds }: Props) {
+export default function ExploreClient({ initialListings, initialFilters, destinations, savedIds }: Props) {
   const t = useTranslations('explorePage')
   const tp = useTranslations('hostPage.create.propertyTypes')
+  const isArabic = useLocale() === 'ar'
+  const placeName = (p: { name: string; name_ar: string | null }) => (isArabic && p.name_ar) || p.name
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const savedSet = useMemo(() => new Set(savedIds ?? []), [savedIds])
   const [filters, setFilters] = useState<Filters>({ ...initialFilters, sort: 'recommended' })
   const [listings, setListings] = useState<Listing[]>(initialListings)
@@ -308,7 +353,26 @@ export default function ExploreClient({ initialListings, initialFilters, savedId
     }
   }, [placeOpen, placeSuggestions, placeHighlight, openPlaces, choosePlace, closePlaces, submitSearch])
 
-  // Category chips filter instantly (like Airbnb's category bar).
+  // Region and sub-area chips filter instantly (like Airbnb's category bar).
+  // Picking a region always resets the sub-area to "All".
+  const selectRegion = useCallback((region: string) => {
+    setFilters((prev) => {
+      const next = { ...prev, region, area: '' }
+      runSearch(next)
+      return next
+    })
+  }, [runSearch])
+
+  const selectArea = useCallback((area: string) => {
+    setFilters((prev) => {
+      const next = { ...prev, area }
+      runSearch(next)
+      return next
+    })
+  }, [runSearch])
+
+  const activeRegion = destinations.find((d) => d.name === filters.region) ?? null
+
   const selectType = useCallback((type: string) => {
     setFilters((prev) => {
       const next = { ...prev, type }
@@ -608,33 +672,72 @@ export default function ExploreClient({ initialListings, initialFilters, savedId
             </button>
           </div>
 
-          {/* Property-type category bar */}
-          <div
-            className="qk-cats"
-            style={{
-              display: 'flex',
-              gap: 26,
-              overflowX: 'auto',
-              padding: '16px 2px 6px',
-              marginTop: 6,
-            }}
-          >
-            <CategoryChip
-              label={t('categories.all')}
-              Icon={Sparkles}
-              active={!filters.type}
-              onClick={() => selectType('')}
-            />
-            {PROPERTY_TYPES.map((p) => (
+          {/* Destinations rail: regions (icons). Hidden when the backend has no
+              tree to give (old backend / outage) rather than showing a stub. */}
+          {destinations.length > 0 && (
+            <div
+              className="qk-cats"
+              role="toolbar"
+              aria-label={t('destinations.rail')}
+              style={{
+                display: 'flex',
+                gap: 26,
+                overflowX: 'auto',
+                padding: '16px 2px 6px',
+                marginTop: 6,
+              }}
+            >
               <CategoryChip
-                key={p.value}
-                label={tp(p.key)}
-                Icon={p.Icon}
-                active={filters.type.toLowerCase() === p.value.toLowerCase()}
-                onClick={() => selectType(p.value)}
+                label={t('categories.all')}
+                Icon={Sparkles}
+                active={!filters.region}
+                onClick={() => selectRegion('')}
               />
-            ))}
-          </div>
+              {destinations.map((d) => (
+                <CategoryChip
+                  key={d.slug}
+                  label={placeName(d)}
+                  Icon={REGION_ICONS[d.icon] ?? MapPin}
+                  active={filters.region === d.name}
+                  onClick={() => selectRegion(d.name)}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Sub-area chips for the chosen region. Regions without sub-areas
+              (Dahab, Alexandria, …) simply have no second row. */}
+          {activeRegion && activeRegion.sub_areas.length > 0 && (
+            <div
+              className="qk-pillrow"
+              role="toolbar"
+              aria-label={t('destinations.areas', { region: placeName(activeRegion) })}
+              style={{
+                display: 'flex',
+                gap: 8,
+                overflowX: 'auto',
+                padding: '12px 2px 4px',
+                borderTop: '1px solid rgba(42,34,32,0.08)',
+              }}
+            >
+              <ToggleButton
+                variant="pill"
+                label={t('destinations.allAreas', { count: activeRegion.sub_areas.length })}
+                active={!filters.area}
+                onClick={() => selectArea('')}
+              />
+              {activeRegion.sub_areas.map((s) => (
+                <ToggleButton
+                  key={s.slug}
+                  variant="pill"
+                  label={placeName(s)}
+                  hint={s.km_marker != null ? t('destinations.km', { km: s.km_marker }) : undefined}
+                  active={filters.area === s.slug}
+                  onClick={() => selectArea(s.slug)}
+                />
+              ))}
+            </div>
+          )}
 
           {/* Status row: result count + searching + List/Map toggle */}
           <div
@@ -659,6 +762,16 @@ export default function ExploreClient({ initialListings, initialFilters, savedId
               className="qk-status-controls"
               style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', justifyContent: 'flex-end', minWidth: 0 }}
             >
+              {/* Property type lives behind Filters (as on iOS/Android); the
+                  bar above belongs to destinations. */}
+              <ToggleButton
+                variant="pill"
+                label={filters.type ? `${t('destinations.filters')} · 1` : t('destinations.filters')}
+                Icon={SlidersHorizontal}
+                active={filtersOpen || !!filters.type}
+                expanded={filtersOpen}
+                onClick={() => setFiltersOpen((o) => !o)}
+              />
               {/* Sort — rounded pills (matches the mobile app), not a native
                   <select>. Shrinks and scrolls sideways when space is tight. */}
               <div
@@ -706,6 +819,39 @@ export default function ExploreClient({ initialListings, initialFilters, savedId
               </div>
             </div>
           </div>
+
+          {filtersOpen && (
+            <div
+              role="group"
+              aria-label={t('destinations.type')}
+              style={{
+                marginTop: 12,
+                background: '#fff',
+                border: '1px solid rgba(42,34,32,0.10)',
+                borderRadius: 18,
+                padding: '12px 16px 4px',
+              }}
+            >
+              <div style={{ ...labelStyle, marginBottom: 2 }}>{t('destinations.type')}</div>
+              <div className="qk-cats" style={{ display: 'flex', gap: 22, overflowX: 'auto', padding: '8px 2px 0' }}>
+                <CategoryChip
+                  label={t('destinations.anyType')}
+                  Icon={Sparkles}
+                  active={!filters.type}
+                  onClick={() => selectType('')}
+                />
+                {PROPERTY_TYPES.map((p) => (
+                  <CategoryChip
+                    key={p.value}
+                    label={tp(p.key)}
+                    Icon={p.Icon}
+                    active={filters.type.toLowerCase() === p.value.toLowerCase()}
+                    onClick={() => selectType(p.value)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
           {searchError && (
             <div
@@ -934,19 +1080,26 @@ function ListingCard({
 //   'segment' — sits inside the tan segmented track (List/Map), no border.
 //   'pill'    — standalone pill: white fill + tan border when unselected.
 function ToggleButton({
-  label, active, onClick, variant = 'segment',
+  label, active, onClick, variant = 'segment', hint, Icon, expanded,
 }: {
   label: string
   active: boolean
   onClick: () => void
   variant?: 'segment' | 'pill'
+  /** Secondary text after the label (a sub-area's km marker). */
+  hint?: string
+  Icon?: LucideIcon
+  /** Set when the pill opens a panel (Filters) — announces aria-expanded. */
+  expanded?: boolean
 }) {
   const isPill = variant === 'pill'
   // A lone pill is a toggle button, not a tab — `role="tab"` is only valid
   // inside the List/Map tablist.
-  const a11y: React.ButtonHTMLAttributes<HTMLButtonElement> = isPill
-    ? { 'aria-pressed': active }
-    : { role: 'tab', 'aria-selected': active }
+  const a11y: React.ButtonHTMLAttributes<HTMLButtonElement> = !isPill
+    ? { role: 'tab', 'aria-selected': active }
+    : expanded !== undefined
+      ? { 'aria-expanded': expanded }
+      : { 'aria-pressed': active }
   return (
     <button
       type="button"
@@ -965,6 +1118,7 @@ function ToggleButton({
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
+        gap: 6,
         boxSizing: 'border-box',
         flex: '0 0 auto',
         height: isPill ? PILL_HEIGHT : PILL_HEIGHT - 8,
@@ -975,7 +1129,11 @@ function ToggleButton({
         transition: 'background 0.15s ease, color 0.15s ease, border-color 0.15s ease',
       }}
     >
+      {Icon && <Icon size={16} strokeWidth={1.9} />}
       {label}
+      {hint && (
+        <span style={{ fontSize: 12, fontWeight: 500, opacity: active ? 0.75 : 0.6 }}>{hint}</span>
+      )}
     </button>
   )
 }

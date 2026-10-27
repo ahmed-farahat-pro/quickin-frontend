@@ -1471,6 +1471,15 @@
       "priceLow": "Price ↑",
       "priceHigh": "Price ↓",
       "newest": "Newest"
+    },
+    "destinations": {
+      "rail": "Destinations",
+      "areas": "Areas in {region}",
+      "allAreas": "All · {count}",
+      "filters": "Filters",
+      "type": "Property type",
+      "anyType": "Any type",
+      "km": "km {km}"
     }
   },
   "listingPage": {
@@ -2337,8 +2346,16 @@
       "regions": {
         "northCoast": "North Coast",
         "ainSokhna": "Ain Sokhna",
+        "rasSudr": "Ras Sudr",
+        "cairo": "Cairo",
+        "newCairo": "New Cairo",
+        "giza": "Giza",
+        "alexandria": "Alexandria",
+        "marsaMatrouh": "Marsa Matrouh",
+        "hurghada": "Hurghada",
         "elGouna": "El Gouna",
-        "cairo": "Cairo"
+        "sharmElSheikh": "Sharm El Sheikh",
+        "dahab": "Dahab"
       },
       "amenities": {
         "wifi": "WiFi",

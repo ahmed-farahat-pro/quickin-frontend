@@ -1471,6 +1471,15 @@
       "priceLow": "السعر ↑",
       "priceHigh": "السعر ↓",
       "newest": "الأحدث"
+    },
+    "destinations": {
+      "rail": "الوجهات",
+      "areas": "مناطق {region}",
+      "allAreas": "الكل · {count}",
+      "filters": "الفلاتر",
+      "type": "نوع العقار",
+      "anyType": "أي نوع",
+      "km": "كم {km}"
     }
   },
   "listingPage": {
@@ -2337,8 +2346,16 @@
       "regions": {
         "northCoast": "الساحل الشمالي",
         "ainSokhna": "العين السخنة",
+        "rasSudr": "رأس سدر",
+        "cairo": "القاهرة",
+        "newCairo": "القاهرة الجديدة",
+        "giza": "الجيزة",
+        "alexandria": "الإسكندرية",
+        "marsaMatrouh": "مطروح",
+        "hurghada": "الغردقة",
         "elGouna": "الجونة",
-        "cairo": "القاهرة"
+        "sharmElSheikh": "شرم الشيخ",
+        "dahab": "دهب"
       },
       "amenities": {
         "wifi": "واي فاي",

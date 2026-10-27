@@ -1471,6 +1471,15 @@
       "priceLow": "Prix ↑",
       "priceHigh": "Prix ↓",
       "newest": "Plus récent"
+    },
+    "destinations": {
+      "rail": "Destinations",
+      "areas": "Quartiers de {region}",
+      "allAreas": "Tous · {count}",
+      "filters": "Filtres",
+      "type": "Type de logement",
+      "anyType": "Tous les types",
+      "km": "km {km}"
     }
   },
   "listingPage": {
@@ -2337,8 +2346,16 @@
       "regions": {
         "northCoast": "Côte Nord",
         "ainSokhna": "Ain Sokhna",
+        "rasSudr": "Ras Sudr",
+        "cairo": "Le Caire",
+        "newCairo": "Nouveau Caire",
+        "giza": "Gizeh",
+        "alexandria": "Alexandrie",
+        "marsaMatrouh": "Marsa Matrouh",
+        "hurghada": "Hurghada",
         "elGouna": "El Gouna",
-        "cairo": "Le Caire"
+        "sharmElSheikh": "Charm el-Cheikh",
+        "dahab": "Dahab"
       },
       "amenities": {
         "wifi": "Wi-Fi",

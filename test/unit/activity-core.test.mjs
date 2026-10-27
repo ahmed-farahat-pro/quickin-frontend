@@ -191,12 +191,20 @@ describe('alertsFor — the permission boundary', () => {
     flagged_users: 9,
     open_disputes: 5,
     pending_id_changes: 2,
+    stale_booking_requests: 8,
   }
 
   test('a super admin sees every non-zero queue', () => {
     const a = alertsFor(COUNTS, { modules: [], isSuperAdmin: true })
     assert.equal(a.length, ALERT_SOURCES.length)
-    assert.equal(alertTotal(a), 44)
+    assert.equal(alertTotal(a), 52)
+  })
+
+  test('unanswered booking requests reach whoever holds bookings, and only them', () => {
+    const a = alertsFor(COUNTS, { modules: ['bookings'] })
+    assert.deepEqual(a.map((x) => x.key), ['stale_booking_requests'])
+    assert.equal(a[0].href, '/ops/host-response')
+    assert.equal(alertTotal(a), 8)
   })
 
   test('an operator NEVER sees an alert for a module they do not hold', () => {

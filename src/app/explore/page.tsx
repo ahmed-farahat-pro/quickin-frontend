@@ -11,7 +11,7 @@ import { NotificationsBell } from './notifications-bell'
 import { MobileMenu } from './mobile-menu'
 import { getTranslations, getLocale } from 'next-intl/server'
 import { Heart, MessageCircleQuestion } from 'lucide-react'
-import ExploreClient from './explore-client'
+import ExploreClient, { type DestinationRegion } from './explore-client'
 import AddListingFab from './add-listing-fab'
 import { whatsappHref } from '@/lib/contact'
 import { SOCIAL_LINKS } from '@/lib/social'
@@ -80,6 +80,8 @@ export default async function ExplorePage({
     checkOut?: string
     guests?: string
     type?: string
+    region?: string
+    area?: string
   }>
 }) {
   const t = await getTranslations('explorePage')
@@ -93,6 +95,8 @@ export default async function ExplorePage({
   const checkOut = sp.checkOut?.trim() || ''
   const guestsRaw = sp.guests?.trim() || ''
   const type = sp.type?.trim() || ''
+  const region = sp.region?.trim() || ''
+  const area = region ? sp.area?.trim().toLowerCase() || '' : ''
   const guests = guestsRaw ? Number(guestsRaw) : undefined
 
   const query = new URLSearchParams()
@@ -100,9 +104,13 @@ export default async function ExplorePage({
   if (checkIn) query.set('checkIn', checkIn)
   if (checkOut) query.set('checkOut', checkOut)
   if (guests && Number.isFinite(guests)) query.set('guests', String(guests))
-  if (type) query.set('type', type)
-  const [listings, currentUser] = await Promise.all([
+  if (type) query.set('propertyType', type)
+  if (region) query.set('region', region)
+  if (area) query.set('area', area)
+  const [listings, destinations, currentUser] = await Promise.all([
     backendFetchOr<Listing[]>(`/api/local/listings?${query}`, []),
+    // The region rail. [] (backend down / old backend) just hides the rail.
+    backendFetchOr<DestinationRegion[]>('/api/local/destinations', []),
     viewerChrome(),
   ])
   const { firstName, initials, avatarUrl, savedIds, isHost } = currentUser
@@ -310,7 +318,8 @@ export default async function ExplorePage({
           re-fetches /api/local/listings live as the user types/filters. */}
       <ExploreClient
         initialListings={listings}
-        initialFilters={{ location, checkIn, checkOut, guests: guestsRaw, type }}
+        initialFilters={{ location, checkIn, checkOut, guests: guestsRaw, type, region, area }}
+        destinations={destinations}
         savedIds={savedIds}
       />
 
