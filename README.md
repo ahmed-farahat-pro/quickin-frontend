@@ -102,7 +102,7 @@ The live values are the defaults in [`src/lib/contact.ts`](src/lib/contact.ts) a
 they exist to point a single environment somewhere else.
 
 **WhatsApp.** There are two WhatsApp lines, `WHATSAPP_NUMBERS` in `src/lib/contact.ts`: the
-WhatsApp-only `0103 711 6711`, and the Contact Us mobile line (derived from `CONTACT_PHONES`,
+WhatsApp-only `+20 10 3711 6711`, and the Contact Us mobile line (derived from `CONTACT_PHONES`,
 so the two can't drift). Every WhatsApp button — the floating button, the explore footer
 pill, the `/links` row — is a `WhatsAppPicker` (`src/components/whatsapp-picker.tsx`): it
 opens a small dialog listing both numbers, and picking one opens `wa.me` in a new tab.

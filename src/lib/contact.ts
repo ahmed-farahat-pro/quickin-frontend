@@ -36,7 +36,7 @@ export const CONTACT_EMAIL_HREF = `mailto:${CONTACT_EMAIL}`
 const CONTACT_MOBILE = CONTACT_PHONES.find((p) => p.kind === 'mobile')!
 
 export const WHATSAPP_NUMBERS: { display: string; e164: string }[] = [
-  { display: '0103 711 6711', e164: '201037116711' },
+  { display: '+20 10 3711 6711', e164: '201037116711' },
   { display: CONTACT_MOBILE.display, e164: CONTACT_MOBILE.href.replace(/\D/g, '') },
 ]
 

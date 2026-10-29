@@ -56,6 +56,11 @@ describe('WhatsApp numbers', () => {
     }
   })
 
+  test('every line is printed in the same +20 10 XXXX XXXX form', () => {
+    // Mixing a local 0103… beside +20 10… in the picker reads as two kinds of number.
+    for (const n of WHATSAPP_NUMBERS) assert.match(n.display, /^\+20 1\d \d{4} \d{4}$/)
+  })
+
   test('the second line is the Contact Us mobile number', () => {
     const mobile = CONTACT_PHONES.find((p) => p.kind === 'mobile')
     assert.equal(WHATSAPP_NUMBERS[1].display, mobile.display)
