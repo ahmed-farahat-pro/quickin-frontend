@@ -8,6 +8,10 @@
 // 'amouge' becomes 'Amouage' — and every listing carrying that text is relinked in
 // one go. The submitted spelling is kept as an alias, so the next host to type it
 // auto-links instead of queueing the same thing again.
+//
+// Since 2026-10-29 none of this is REQUIRED: an unmapped name already shows under
+// its region's "Other" chip in explore, so the queue is a tool for the few names
+// worth a chip of their own, not a backlog to clear.
 import { useCallback, useMemo, useState } from 'react'
 import type { Review } from '@/lib/types'
 import { COLORS, SERIF } from '../../ops-theme'
@@ -145,17 +149,18 @@ export function OpsResorts({
 
         {/* ---- Pending queue ---- */}
         <div style={panelStyle}>
-          <h2 style={h2}>Pending submissions {subs.length > 0 && <span style={{ color: COLORS.red }}>({subs.length})</span>}</h2>
+          <h2 style={h2}>Typed under Other {subs.length > 0 && <span style={{ color: COLORS.muted }}>({subs.length})</span>}</h2>
           <p style={sub}>
-            Names hosts typed that aren&apos;t in the catalog. Their listings are live and show the
-            typed name to guests — approving just tidies the data.
+            Names hosts typed that aren&apos;t in the catalog. Their listings are live, show the typed
+            name to guests and sit under the region&apos;s <strong>Other</strong> chip — that&apos;s the
+            default. Map one only if it&apos;s a misspelling of a catalog resort or deserves its own chip.
           </p>
           {subs.length === 0 ? (
             <Empty
               inset
               tone="clear"
-              title="No submissions to review"
-              body="Resort names hosts typed themselves land here for approval. Every one has been handled."
+              title="Nothing typed under Other"
+              body="Resort names hosts type themselves show here. Mapping them is optional."
             />
           ) : (
             <div style={{ overflowX: 'auto' }}>

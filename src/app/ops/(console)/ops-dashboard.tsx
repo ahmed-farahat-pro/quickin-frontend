@@ -339,9 +339,10 @@ export function OpsDashboard({
   }, [section])
 
   const [busyId, setBusyId] = useState<string | null>(null)
-  // Resort review: set while approving a listing whose resort is free text.
-  // `mode` mirrors the API — add it to the catalog, match an existing one, or keep
-  // the host's wording. `name` starts as what the host typed so a typo can simply
+  // Optional resort mapping for a listing whose resort is free text. Unmapped,
+  // it simply shows under its region's "Other" chip (2026-10-29), so approving
+  // never waits on this. `mode` mirrors the API — add it to the catalog, match an
+  // existing one, or keep the host's wording. `name` starts as what the host typed so a typo can simply
   // be corrected in place.
   const [resortReview, setResortReview] = useState<
     { listing: AdminListing; mode: 'new' | 'match' | 'keep'; name: string; region: string; matchId: string } | null
@@ -549,21 +550,25 @@ export function OpsDashboard({
 
   // ---- listing approval ----
 
-  /** Approve a listing. If its resort is free text, review that first. */
+  /** Optional: map a free-text resort into the catalog while approving. Only
+   *  worth it for a host who missed a resort that IS in the list, or a place
+   *  that deserves its own chip — otherwise plain Approve leaves it under Other. */
+  const openResortMapping = async (l: AdminListing) => {
+    if (!l.resort_name) return
+    const cat = await adminGet<{ resorts: Array<{ id: string; name: string; region: string }> }>('resorts')
+    if (cat && cat !== 'forbidden') setResortCatalog(cat.resorts ?? [])
+    setResortReview({
+      listing: l,
+      mode: 'match',
+      // Prefilled with the host's spelling — the admin corrects it or accepts it.
+      name: l.resort_name,
+      region: l.region ?? '',
+      matchId: '',
+    })
+  }
+
+  /** Approve a listing. A free-text resort is fine as it is — it shows under Other. */
   const approveListing = async (l: AdminListing) => {
-    if (l.resort_name) {
-      const cat = await adminGet<{ resorts: Array<{ id: string; name: string; region: string }> }>('resorts')
-      if (cat && cat !== 'forbidden') setResortCatalog(cat.resorts ?? [])
-      setResortReview({
-        listing: l,
-        mode: 'new',
-        // Prefilled with the host's spelling — the admin corrects it or accepts it.
-        name: l.resort_name,
-        region: l.region ?? '',
-        matchId: '',
-      })
-      return
-    }
     setBusyId(l.id)
     const ok = await post('listings', { id: l.id, action: 'approve' })
     setBusyId(null)
@@ -1153,8 +1158,8 @@ export function OpsDashboard({
                             : l.unpublished_by_host
                               ? badge('Hidden by host', TAN, MUTED)
                               : badge('Hidden', TAN, MUTED)}
-                      {/* Free text needs a decision before this listing can go live. */}
-                      {l.resort_name ? badge('Resort: review needed', '#F6E0E2', BURGUNDY) : null}
+                      {/* Free text is filed under the region's Other chip; no decision needed. */}
+                      {l.resort_name ? badge('Resort: Other', TAN, MUTED) : null}
                       {/* The host was warned about this pin and chose to submit anyway
                           (the check never blocks) — so the decision lands here. */}
                       {listingPinBadgeLabel(l) ? (
@@ -1209,6 +1214,16 @@ export function OpsDashboard({
                         >
                           {busyId === l.id ? 'Working…' : 'Approve'}
                         </button>
+                        {l.resort_name ? (
+                          <button
+                            style={outlineBtn}
+                            disabled={busyId === l.id}
+                            title="Optional — unmapped, it shows under the region's Other chip"
+                            onClick={() => openResortMapping(l)}
+                          >
+                            Map resort…
+                          </button>
+                        ) : null}
                         <button
                           style={outlineBtn}
                           disabled={busyId === l.id}
@@ -1928,12 +1943,12 @@ export function OpsDashboard({
         ) : null}
       </div>
 
-      {/* ---- Resort review, shown while approving a listing whose resort is free text ---- */}
+      {/* ---- Optional resort mapping for a listing whose resort is free text ---- */}
       {resortReview && (
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Review resort before approving"
+          aria-label="Map resort and approve"
           style={{
             position: 'fixed', inset: 0, background: 'rgba(42,34,32,0.45)',
             display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
@@ -1943,20 +1958,22 @@ export function OpsDashboard({
         >
           <div style={{ ...cardStyle, width: '100%', maxWidth: 520 }}>
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: BURGUNDY }}>
-              This listing&apos;s resort needs review
+              Map this resort (optional)
             </h2>
             <p style={{ margin: '6px 0 14px', fontSize: 13, color: MUTED, lineHeight: 1.6 }}>
               The host chose <strong>Other</strong> and typed{' '}
               <strong style={{ color: INK }}>&ldquo;{resortReview.listing.resort_name}&rdquo;</strong>, which
-              isn&apos;t in the catalog. Decide what it means before approving.
+              isn&apos;t in the catalog. Left alone it shows under the region&apos;s{' '}
+              <strong>Other</strong> chip — map it only if the host missed an existing resort, or it
+              deserves a chip of its own.
             </p>
 
             {/* Three ways out, as radio-style choices. */}
             <div style={{ display: 'grid', gap: 8 }}>
               {([
-                ['new', 'Add it as a new resort'],
                 ['match', 'Match an existing resort'],
-                ['keep', 'Keep the host\u2019s wording for now'],
+                ['new', 'Add it as a new resort'],
+                ['keep', 'Leave it under Other'],
               ] as const).map(([mode, label]) => (
                 <label
                   key={mode}
@@ -2033,7 +2050,7 @@ export function OpsDashboard({
 
             <p style={{ margin: '12px 0 0', fontSize: 12, color: MUTED, lineHeight: 1.6 }}>
               {resortReview.mode === 'keep'
-                ? 'The typed name stays on the listing and stays in the Resorts queue.'
+                ? 'Guests still see the name the host typed; explore lists it under Other.'
                 : 'Only this listing is relinked. Other listings using the same wording stay in the Resorts queue — but the spelling is remembered, so future hosts typing it link automatically.'}
             </p>
 
@@ -2055,7 +2072,7 @@ export function OpsDashboard({
                       ? 0.5 : 1,
                 }}
               >
-                {busyId === resortReview.listing.id ? 'Approving…' : 'Save & approve'}
+                {busyId === resortReview.listing.id ? 'Approving…' : 'Approve'}
               </button>
             </div>
           </div>

@@ -187,7 +187,6 @@ describe('alertsFor — the permission boundary', () => {
     pending_payments: 7,
     disputed_payments: 5,
     open_reports: 4,
-    pending_resort_submissions: 6,
     flagged_users: 9,
     open_disputes: 5,
     pending_id_changes: 2,
@@ -197,7 +196,12 @@ describe('alertsFor — the permission boundary', () => {
   test('a super admin sees every non-zero queue', () => {
     const a = alertsFor(COUNTS, { modules: [], isSuperAdmin: true })
     assert.equal(a.length, ALERT_SOURCES.length)
-    assert.equal(alertTotal(a), 52)
+    assert.equal(alertTotal(a), 46)
+  })
+
+  test('resort submissions never raise an alert — mapping them is optional', () => {
+    const a = alertsFor({ ...COUNTS, pending_resort_submissions: 6 }, { modules: ['resorts'] })
+    assert.deepEqual(a, [])
   })
 
   test('unanswered booking requests reach whoever holds bookings, and only them', () => {
