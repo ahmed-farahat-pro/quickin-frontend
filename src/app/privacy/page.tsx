@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { CONTACT_EMAIL, CONTACT_EMAIL_HREF, CONTACT_PHONE_DISPLAY } from '@/lib/contact'
+import { CONTACT_EMAIL, CONTACT_EMAIL_HREF, CONTACT_PHONES } from '@/lib/contact'
 
 // Public privacy policy. The explore footer has always linked here (and the app
 // stores require a reachable policy URL), but the route did not exist, so
@@ -182,7 +182,7 @@ export default function PrivacyPolicyPage() {
           <p style={{ margin: 0 }}>
             Questions about this policy or your data:{' '}
             <a href={CONTACT_EMAIL_HREF} style={{ color: C.burgundy, fontWeight: 600 }}>{CONTACT_EMAIL}</a>
-            {' '}· {CONTACT_PHONE_DISPLAY}
+            {' '}· <span dir="ltr">{CONTACT_PHONES.find((p) => p.kind === 'mobile')!.display}</span>
           </p>
         </Section>
 

@@ -91,8 +91,6 @@ This app is configured with a single public environment variable:
 | ------------------------------- | ------------------------------------------------------------ |
 | `NEXT_PUBLIC_GOOGLE_CLIENT_ID`  | If set, enables the Google Identity Services sign-in button. |
 | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | If set, the Explore map upgrades from Leaflet to Google Maps. |
-| `NEXT_PUBLIC_WHATSAPP`          | Overrides the support number in international digits, e.g. `201013010119` — what `wa.me`/`tel:` need. |
-| `NEXT_PUBLIC_CONTACT_PHONE`     | Overrides how that number is *printed*, e.g. `01013010119`.   |
 | `NEXT_PUBLIC_CONTACT_EMAIL`     | Overrides the support inbox.                                  |
 | `NEXT_PUBLIC_SOCIAL_INSTAGRAM`  | Overrides the Instagram profile linked from `/links`.         |
 | `NEXT_PUBLIC_SOCIAL_TIKTOK`     | Overrides the TikTok profile linked from `/links`.            |
@@ -101,9 +99,16 @@ This app is configured with a single public environment variable:
 
 The live values are the defaults in [`src/lib/contact.ts`](src/lib/contact.ts) and
 [`src/lib/social.ts`](src/lib/social.ts), so none of these need to be set in production —
-they exist to point a single environment somewhere else. The phone line and the WhatsApp
-account are the same number, which is why the Contact page shows one "Phone / WhatsApp"
-row rather than two.
+they exist to point a single environment somewhere else.
+
+**WhatsApp.** There are two WhatsApp lines, `WHATSAPP_NUMBERS` in `src/lib/contact.ts`: the
+WhatsApp-only `0103 711 6711`, and the Contact Us mobile line (derived from `CONTACT_PHONES`,
+so the two can't drift). Every WhatsApp button — the floating button, the explore footer
+pill, the `/links` row — is a `WhatsAppPicker` (`src/components/whatsapp-picker.tsx`): it
+opens a small dialog listing both numbers, and picking one opens `wa.me` in a new tab.
+The numbers are not env-overridable; `NEXT_PUBLIC_WHATSAPP` and `NEXT_PUBLIC_CONTACT_PHONE`
+were retired with the old single line. The office address is `CONTACT_ADDRESS` (English +
+Arabic), printed on `/contact`.
 
 Strip share tracking from any social URL before setting one of these: `igsh` (Instagram),
 `_r`/`_t` (TikTok) and `mibextid` (Facebook) are per-share session tokens that identify
@@ -407,7 +412,7 @@ Where each row comes from — all existing sources, nothing duplicated:
 | Book your stay       | `getBaseUrl()` in `src/lib/utils.ts`                                    |
 | App Store / Google Play | `getAppLinks()` → the `app_ios_url` / `app_android_url` rows set in **/ops → App links** |
 | Instagram / TikTok / Facebook | `src/lib/social.ts` (env-overridable, see Environment above)    |
-| WhatsApp             | `whatsappHref()` in `src/lib/contact.ts`                                |
+| WhatsApp             | `WhatsAppPicker` over `WHATSAPP_NUMBERS` in `src/lib/contact.ts`         |
 | Email us             | `CONTACT_EMAIL` / `CONTACT_EMAIL_HREF` in `src/lib/contact.ts`           |
 
 The two app rows render as a dashed **"coming soon"** row until the matching link is set in

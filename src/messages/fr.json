@@ -1434,16 +1434,11 @@
       "tagline": "Quick In — des séjours de charme pour les voyageurs qui aiment les détails.",
       "support": {
         "title": "Assistance",
-        "helpCenter": "Centre d'aide",
-        "cancellation": "Options d'annulation",
-        "safetyInfo": "Informations de sécurité",
         "contact": "Contactez-nous"
       },
       "hosting": {
         "title": "Hébergement",
-        "becomeHost": "Devenir hôte",
-        "hostResources": "Ressources pour les hôtes",
-        "communityForum": "Forum de la communauté"
+        "becomeHost": "Devenir hôte"
       },
       "about": {
         "title": "À propos",
@@ -2624,7 +2619,11 @@
     }
   },
   "contact": {
-    "whatsappAria": "Contactez-nous sur WhatsApp"
+    "whatsappAria": "Contactez-nous sur WhatsApp",
+    "whatsappPickerTitle": "Discutez avec nous sur WhatsApp",
+    "whatsappPickerBody": "Choisissez un numéro et nous ouvrirons la conversation dans WhatsApp.",
+    "whatsappLine": "Ligne {n}",
+    "close": "Fermer"
   },
   "hostProfile": {
     "meta": {

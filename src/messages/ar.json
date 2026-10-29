@@ -1434,16 +1434,11 @@
       "tagline": "Quick In — إقامات بوتيك للمسافرين الذين يعشقون التفاصيل.",
       "support": {
         "title": "الدعم",
-        "helpCenter": "مركز المساعدة",
-        "cancellation": "خيارات الإلغاء",
-        "safetyInfo": "معلومات السلامة",
         "contact": "اتصل بنا"
       },
       "hosting": {
         "title": "الاستضافة",
-        "becomeHost": "كن مضيفًا",
-        "hostResources": "موارد المضيفين",
-        "communityForum": "منتدى المجتمع"
+        "becomeHost": "كن مضيفًا"
       },
       "about": {
         "title": "نبذة عنا",
@@ -2624,7 +2619,11 @@
     }
   },
   "contact": {
-    "whatsappAria": "تواصل معنا عبر واتساب"
+    "whatsappAria": "تواصل معنا عبر واتساب",
+    "whatsappPickerTitle": "كلمنا على واتساب",
+    "whatsappPickerBody": "اختار رقم وهنفتحلك المحادثة على واتساب.",
+    "whatsappLine": "خط {n}",
+    "close": "إغلاق"
   },
   "hostProfile": {
     "meta": {

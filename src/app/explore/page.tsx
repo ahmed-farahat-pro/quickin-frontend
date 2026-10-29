@@ -13,7 +13,7 @@ import { getTranslations, getLocale } from 'next-intl/server'
 import { Heart, MessageCircleQuestion } from 'lucide-react'
 import ExploreClient, { type DestinationRegion } from './explore-client'
 import AddListingFab from './add-listing-fab'
-import { whatsappHref } from '@/lib/contact'
+import WhatsAppPicker, { WhatsAppGlyph } from '@/components/whatsapp-picker'
 import { SOCIAL_LINKS } from '@/lib/social'
 import { IconBrandInstagram, IconBrandTiktok, IconBrandFacebook } from '@tabler/icons-react'
 
@@ -370,9 +370,6 @@ export default async function ExplorePage({
           <FooterColumn
             title={t('footer.support.title')}
             links={[
-              { label: t('footer.support.helpCenter'), href: loc('/help') },
-              { label: t('footer.support.cancellation'), href: loc('/cancellation') },
-              { label: t('footer.support.safetyInfo'), href: loc('/safety') },
               { label: t('footer.support.contact'), href: loc('/contact') },
             ]}
           />
@@ -380,8 +377,6 @@ export default async function ExplorePage({
             title={t('footer.hosting.title')}
             links={[
               { label: t('footer.hosting.becomeHost'), href: loc('/host') },
-              { label: t('footer.hosting.hostResources'), href: loc('/resources') },
-              { label: t('footer.hosting.communityForum'), href: loc('/community') },
             ]}
           />
           <FooterColumn
@@ -447,22 +442,18 @@ export default async function ExplorePage({
                 )
               })}
             </span>
-            <a
-              href={whatsappHref()}
-              target="_blank"
-              rel="noopener noreferrer"
+            <WhatsAppPicker
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 7,
                 color: COLORS.burgundy, background: COLORS.cream,
                 fontWeight: 700, textDecoration: 'none',
                 padding: '7px 14px', borderRadius: 999, marginInlineStart: 4,
+                border: 'none', fontSize: 'inherit', fontFamily: 'inherit',
               }}
             >
-              <svg viewBox="0 0 32 32" width="15" height="15" fill="currentColor" aria-hidden="true">
-                <path d="M16.004 3C9.383 3 4 8.383 4 15.004c0 2.117.555 4.184 1.61 6.008L4 29l8.184-1.57a11.94 11.94 0 0 0 3.82.63C22.625 28.06 28 22.676 28 16.055 28 8.43 22.625 3 16.004 3zm5.46 14.44c-.3-.15-1.77-.873-2.043-.973-.273-.1-.473-.15-.673.15-.2.297-.772.97-.947 1.17-.173.198-.35.223-.648.075-.3-.15-1.263-.466-2.406-1.485-.888-.792-1.487-1.77-1.662-2.07-.173-.297-.018-.458.13-.606.134-.133.3-.347.448-.52.15-.174.2-.298.3-.497.099-.2.05-.372-.025-.52-.075-.15-.672-1.62-.922-2.22-.243-.583-.49-.504-.672-.513l-.573-.01c-.2 0-.522.074-.796.372-.273.297-1.045 1.02-1.045 2.49 0 1.47 1.07 2.89 1.22 3.09.15.198 2.105 3.213 5.1 4.505.714.308 1.27.492 1.704.63.716.228 1.368.196 1.883.12.574-.086 1.77-.723 2.02-1.42.248-.698.248-1.296.173-1.42-.074-.124-.273-.198-.573-.347z"/>
-              </svg>
+              <WhatsAppGlyph size={15} />
               {t('footer.whatsapp')}
-            </a>
+            </WhatsAppPicker>
           </div>
         </div>
       </footer>

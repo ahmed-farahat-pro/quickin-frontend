@@ -7,11 +7,11 @@
 // competing with the links themselves — the convention every link-in-bio page
 // follows.
 //
-// Sources, none of them new: socials from @/lib/social, the WhatsApp line from
-// @/lib/contact, the site's own address from getBaseUrl(), and the two store
-// links from the same /ops-managed rows the top app bar uses. Set those in /ops
-// → App links and the two app rows here light up on their own; until then they
-// render as "coming soon" rather than vanishing, because a linktree that
+// Sources, none of them new: socials from @/lib/social, the WhatsApp lines from
+// @/lib/contact (via the picker), the site's own address from getBaseUrl(), and
+// the two store links from the same /ops-managed rows the top app bar uses. Set
+// those in /ops → App links and the two app rows here light up on their own;
+// until then they render as "coming soon" rather than vanishing, because a linktree that
 // silently drops the apps looks broken rather than early.
 // =============================================================================
 import type { Metadata } from 'next'
@@ -30,7 +30,8 @@ import {
   IconChevronRight,
 } from '@tabler/icons-react'
 import { SOCIAL_LINKS, type SocialPlatform } from '@/lib/social'
-import { whatsappHref, CONTACT_EMAIL, CONTACT_EMAIL_HREF } from '@/lib/contact'
+import { CONTACT_EMAIL, CONTACT_EMAIL_HREF } from '@/lib/contact'
+import WhatsAppPicker from '@/components/whatsapp-picker'
 import { getBaseUrl } from '@/lib/utils'
 
 // Cached HTML, refreshed every 5 minutes. This page is hit straight off social
@@ -68,36 +69,33 @@ function prettyDomain(url: string): string {
 
 function Row({
   href,
+  whatsappMessage,
   icon,
   label,
   sub,
   primary = false,
 }: {
-  href: string
   icon: React.ReactNode
   label: string
   sub?: string | null
   primary?: boolean
-}) {
-  // mailto: hands off to the mail client, so target="_blank" would leave the
-  // visitor staring at a blank tab. Only the http(s) rows open a new tab.
-  const opensTab = href.startsWith('http')
-  return (
-    <a
-      href={href}
-      target={opensTab ? '_blank' : undefined}
-      rel={opensTab ? 'noopener noreferrer' : undefined}
-      className={[
-        // min-h keeps every row the same height whether or not it has a sub
-        // line — the Facebook row has no handle to print.
-        'group flex min-h-[74px] items-center gap-4 rounded-button border px-5 py-4 transition-all',
-        'hover:-translate-y-0.5 focus-visible:-translate-y-0.5 focus-visible:outline-none',
-        'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-        primary
-          ? 'border-primary bg-primary text-primary-foreground shadow-[0_10px_30px_rgba(91,15,22,0.25)] hover:shadow-[0_14px_34px_rgba(91,15,22,0.32)]'
-          : 'border-border bg-card text-foreground card-shadow hover:border-primary/30 hover:shadow-[0_14px_34px_rgba(0,0,0,0.09)]',
-      ].join(' ')}
-    >
+} & (
+  | { href: string; whatsappMessage?: never }
+  // The WhatsApp row has no single href: it opens the two-number picker.
+  | { href?: never; whatsappMessage: string }
+)) {
+  const className = [
+    // min-h keeps every row the same height whether or not it has a sub
+    // line — the Facebook row has no handle to print.
+    'group flex min-h-[74px] items-center gap-4 rounded-button border px-5 py-4 transition-all',
+    'hover:-translate-y-0.5 focus-visible:-translate-y-0.5 focus-visible:outline-none',
+    'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+    primary
+      ? 'border-primary bg-primary text-primary-foreground shadow-[0_10px_30px_rgba(91,15,22,0.25)] hover:shadow-[0_14px_34px_rgba(91,15,22,0.32)]'
+      : 'border-border bg-card text-foreground card-shadow hover:border-primary/30 hover:shadow-[0_14px_34px_rgba(0,0,0,0.09)]',
+  ].join(' ')
+  const content = (
+    <>
       <span className={primary ? 'text-primary-foreground' : 'text-primary'}>{icon}</span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[15px] font-semibold leading-tight">{label}</span>
@@ -126,6 +124,26 @@ function Row({
         ].join(' ')}
         stroke={2}
       />
+    </>
+  )
+  if (whatsappMessage !== undefined) {
+    return (
+      <WhatsAppPicker message={whatsappMessage} className={`w-full text-start ${className}`}>
+        {content}
+      </WhatsAppPicker>
+    )
+  }
+  // mailto: hands off to the mail client, so target="_blank" would leave the
+  // visitor staring at a blank tab. Only the http(s) rows open a new tab.
+  const opensTab = href.startsWith('http')
+  return (
+    <a
+      href={href}
+      target={opensTab ? '_blank' : undefined}
+      rel={opensTab ? 'noopener noreferrer' : undefined}
+      className={className}
+    >
+      {content}
     </a>
   )
 }
@@ -238,7 +256,7 @@ export default async function LinksPage() {
           })}
 
           <Row
-            href={whatsappHref('Hello Quick In 👋')}
+            whatsappMessage="Hello Quick In 👋"
             icon={<IconBrandWhatsapp {...iconProps} />}
             label={t('whatsapp')}
             sub={t('whatsappSub')}

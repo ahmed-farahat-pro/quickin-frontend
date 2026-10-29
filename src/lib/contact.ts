@@ -1,34 +1,18 @@
 /**
- * Quick In's public contact details — one number and one inbox, in one place.
+ * Quick In's public contact details — phone lines, WhatsApp lines, inbox and
+ * address, in one place.
  *
- * The floating WhatsApp button, the Contact Us page and the explore footer all
- * read from here, so changing how we can be reached is a single edit. The phone
- * line and the WhatsApp account are the same number, which is why there is one
- * constant for both rather than a separate `phone` and `whatsapp`.
+ * The floating WhatsApp button, the Contact Us page, /links and the explore
+ * footer all read from here, so changing how we can be reached is a single edit.
  *
- * Each value can still be overridden per environment (staging, a temporary
- * campaign number) by setting the matching NEXT_PUBLIC_* var in Vercel. The
- * `process.env` reads are written out in full on purpose: Next inlines these
- * literals at build time, and a computed lookup would come back undefined in
- * the client bundle.
+ * The inbox can still be overridden per environment (staging) by setting
+ * NEXT_PUBLIC_CONTACT_EMAIL in Vercel. The `process.env` read is written out in
+ * full on purpose: Next inlines these literals at build time, and a computed
+ * lookup would come back undefined in the client bundle.
  */
 
-/** The number as we print it for guests — local Egyptian format. */
-export const CONTACT_PHONE_DISPLAY = process.env.NEXT_PUBLIC_CONTACT_PHONE || '01013010119'
-
 /**
- * The same line in international digits (Egypt +20, leading 0 dropped) — the
- * form wa.me and tel: require, and the form that works when a guest calls from
- * outside Egypt.
- */
-export const CONTACT_PHONE_E164 = (process.env.NEXT_PUBLIC_WHATSAPP || '201013010119').replace(
-  /\D/g,
-  '',
-)
-
-/**
- * The phone lines printed on the Contact Us page. These are call lines, separate
- * from the WhatsApp number above, which stays as is. `display` is grouped the way
+ * The phone lines printed on the Contact Us page. `display` is grouped the way
  * the number is read aloud (Cairo landline: 2 + 8 digits; mobile: 10 + 8 digits).
  */
 export const CONTACT_PHONES: { kind: 'landline' | 'mobile'; display: string; href: string }[] = [
@@ -40,8 +24,30 @@ export const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'quick.in.
 
 export const CONTACT_EMAIL_HREF = `mailto:${CONTACT_EMAIL}`
 
-/** Opens a WhatsApp chat with us, optionally pre-filled with `text`. */
-export function whatsappHref(text?: string): string {
-  const base = `https://wa.me/${CONTACT_PHONE_E164}`
+/**
+ * The two WhatsApp lines a guest can pick between. Every WhatsApp button on the
+ * site opens the picker in @/components/whatsapp-picker rather than linking to
+ * one number. `e164` is the international digits (Egypt +20, leading 0 dropped)
+ * that wa.me requires; `display` is how the number is printed.
+ *
+ * The second line is the Contact Us mobile number, not a copy of it, so the two
+ * can never drift apart.
+ */
+const CONTACT_MOBILE = CONTACT_PHONES.find((p) => p.kind === 'mobile')!
+
+export const WHATSAPP_NUMBERS: { display: string; e164: string }[] = [
+  { display: '0103 711 6711', e164: '201037116711' },
+  { display: CONTACT_MOBILE.display, e164: CONTACT_MOBILE.href.replace(/\D/g, '') },
+]
+
+/** Opens a WhatsApp chat with `e164`, optionally pre-filled with `text`. */
+export function whatsappHref(e164: string, text?: string): string {
+  const base = `https://wa.me/${e164}`
   return text ? `${base}?text=${encodeURIComponent(text)}` : base
+}
+
+/** Our office address, as printed on the Contact Us page. */
+export const CONTACT_ADDRESS = {
+  en: 'Unit No. 1474, located in the 8th Neighborhood, First District, 6th of October City, Giza Governorate, Egypt, ground floor.',
+  ar: 'وحدة رقم 1474، المجاورة الثامنة، الحي الأول، مدينة السادس من أكتوبر، محافظة الجيزة، مصر، الدور الأرضي.',
 }

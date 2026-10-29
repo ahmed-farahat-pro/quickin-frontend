@@ -1434,16 +1434,11 @@
       "tagline": "Quick In — alojamientos boutique para viajeros que aman los detalles.",
       "support": {
         "title": "Ayuda",
-        "helpCenter": "Centro de ayuda",
-        "cancellation": "Opciones de cancelación",
-        "safetyInfo": "Información de seguridad",
         "contact": "Contáctanos"
       },
       "hosting": {
         "title": "Anfitriones",
-        "becomeHost": "Conviértete en anfitrión",
-        "hostResources": "Recursos para anfitriones",
-        "communityForum": "Foro de la comunidad"
+        "becomeHost": "Conviértete en anfitrión"
       },
       "about": {
         "title": "Acerca de",
@@ -2624,7 +2619,11 @@
     }
   },
   "contact": {
-    "whatsappAria": "Contáctanos por WhatsApp"
+    "whatsappAria": "Contáctanos por WhatsApp",
+    "whatsappPickerTitle": "Chatea con nosotros por WhatsApp",
+    "whatsappPickerBody": "Elige un número y abriremos el chat en WhatsApp.",
+    "whatsappLine": "Línea {n}",
+    "close": "Cerrar"
   },
   "hostProfile": {
     "meta": {

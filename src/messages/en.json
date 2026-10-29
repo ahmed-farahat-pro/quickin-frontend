@@ -1434,16 +1434,11 @@
       "tagline": "Quick In — boutique stays for travelers who love the details.",
       "support": {
         "title": "Support",
-        "helpCenter": "Help center",
-        "cancellation": "Cancellation options",
-        "safetyInfo": "Safety info",
         "contact": "Contact us"
       },
       "hosting": {
         "title": "Hosting",
-        "becomeHost": "Become a host",
-        "hostResources": "Host resources",
-        "communityForum": "Community forum"
+        "becomeHost": "Become a host"
       },
       "about": {
         "title": "About",
@@ -2624,7 +2619,11 @@
     }
   },
   "contact": {
-    "whatsappAria": "Contact us on WhatsApp"
+    "whatsappAria": "Contact us on WhatsApp",
+    "whatsappPickerTitle": "Chat with us on WhatsApp",
+    "whatsappPickerBody": "Pick a number and we'll open the chat in WhatsApp.",
+    "whatsappLine": "Line {n}",
+    "close": "Close"
   },
   "hostProfile": {
     "meta": {

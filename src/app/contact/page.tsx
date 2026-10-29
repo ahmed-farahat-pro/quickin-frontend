@@ -3,11 +3,20 @@ import {
   IconBrandFacebook,
   IconBrandInstagram,
   IconBrandTiktok,
+  IconBrandWhatsapp,
   IconDeviceMobile,
   IconMail,
+  IconMapPin,
   IconPhone,
 } from '@tabler/icons-react'
-import { CONTACT_EMAIL, CONTACT_EMAIL_HREF, CONTACT_PHONES } from '@/lib/contact'
+import {
+  CONTACT_ADDRESS,
+  CONTACT_EMAIL,
+  CONTACT_EMAIL_HREF,
+  CONTACT_PHONES,
+  WHATSAPP_NUMBERS,
+  whatsappHref,
+} from '@/lib/contact'
 import { SOCIAL_LINKS, type SocialPlatform } from '@/lib/social'
 import { ContactForm } from './contact-form'
 
@@ -21,7 +30,7 @@ const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
 
 export const metadata: Metadata = {
   title: 'Contact Us | تواصل معانا',
-  description: 'Have a question? Reach Quick In by email, phone or social media, or send us a message.',
+  description: 'Have a question? Reach Quick In by email, phone, WhatsApp or social media, or send us a message.',
 }
 
 function Label({ en, ar }: { en: string; ar: string }) {
@@ -90,6 +99,10 @@ function Row({
 
 const iconProps = { size: 20, stroke: 1.8 } as const
 
+// Only the new line gets its own row here: the other WhatsApp number is the
+// mobile line already listed just above it.
+const WHATSAPP_ONLY = WHATSAPP_NUMBERS.filter((w) => !CONTACT_PHONES.some((p) => p.href.endsWith(w.e164)))
+
 export default function ContactPage() {
   return (
     <main style={{ minHeight: '100vh', background: C.cream, color: C.ink, fontFamily: FONT, padding: '40px 20px 64px' }}>
@@ -140,6 +153,41 @@ export default function ContactPage() {
                     </Row>
                   )
                 })}
+                {WHATSAPP_ONLY.map((w) => (
+                  <Row
+                    key={w.e164}
+                    href={whatsappHref(w.e164)}
+                    external
+                    icon={<IconBrandWhatsapp {...iconProps} />}
+                    note={<>WhatsApp · <span dir="rtl">واتساب</span></>}
+                  >
+                    <span dir="ltr">{w.display}</span>
+                  </Row>
+                ))}
+              </div>
+            </div>
+            <div style={{ background: C.cream, borderRadius: 16, padding: '14px 16px' }}>
+              <Label en="Address" ar="العنوان" />
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <span
+                  style={{
+                    width: 36,
+                    height: 36,
+                    flexShrink: 0,
+                    borderRadius: 10,
+                    background: '#fff',
+                    color: C.burgundy,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <IconMapPin {...iconProps} />
+                </span>
+                <address style={{ fontStyle: 'normal', fontSize: 14.5, lineHeight: 1.6, minWidth: 0 }}>
+                  <span dir="ltr" style={{ display: 'block', fontWeight: 600 }}>{CONTACT_ADDRESS.en}</span>
+                  <span dir="rtl" style={{ display: 'block', color: C.muted, marginTop: 4 }}>{CONTACT_ADDRESS.ar}</span>
+                </address>
               </div>
             </div>
             <div style={{ background: C.cream, borderRadius: 16, padding: '14px 16px' }}>
