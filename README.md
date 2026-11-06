@@ -179,6 +179,22 @@ never-verified user would reset their password only to be bounced to the OTP scr
 - `/links` — the bio linktree. See below.
 - `/plan` — static launch-plan page.
 
+### The reserve calendar shows each night's price
+
+On `/explore/[id]` the check-in / check-out picker prints the guest's nightly price under
+every date, read from the public `GET /api/local/listings/:id/calendar` one month at a time
+(the visible months plus the next, cached for the page). Prices are coloured against the
+listing's base rate — green below it, burgundy above it (weekends, seasons, pinned days),
+muted at it — and booked or host-blocked days are greyed out and can't be picked or crossed
+(`excludeDisabled`). The request is sent **without** credentials so a host previewing their
+own listing sees guest prices, not their raw rates.
+
+The cells are a preview; the total below the picker still comes from `/quote`, which sums
+the same per-night prices and then applies the length-of-stay discount no single night
+can know about. The rules (tone, number format, month windows) live in
+`src/lib/local/booking-calendar-core.ts`, mirrored by iOS `BookingCalendarRules.swift` and
+Android `BookingCalendarRules.kt`, each with its own tests.
+
 ### The host area beyond listings — earnings, analytics, guest reviews
 
 These routes were the web's half of a cross-platform parity gap. iOS has listed

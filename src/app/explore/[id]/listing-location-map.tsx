@@ -14,7 +14,9 @@ export default function ListingLocationMap({ lat, lng }: { lat: number; lng: num
       center={[c.lat, c.lng]}
       zoom={13}
       scrollWheelZoom={false}
-      style={{ height: 280, width: '100%', borderRadius: 18 }}
+      // `isolate` keeps Leaflet's z-index 400 panes inside the map, so the
+      // reserve calendar popover can open over it.
+      style={{ height: 280, width: '100%', borderRadius: 18, isolation: 'isolate' }}
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'

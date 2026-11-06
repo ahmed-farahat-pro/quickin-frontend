@@ -1,9 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { formatPrice } from '@/lib/utils'
-import { formatDisplayPrice, isConverted } from '@/lib/currency/display'
+import { formatDisplayPrice, fxRates, isConverted } from '@/lib/currency/display'
+import { displayPrice } from '@/lib/local/currency-core'
+import { formatDayPrice } from '@/lib/local/booking-calendar-core'
 import { useDisplayCurrency } from '@/components/providers/display-currency-provider'
 import { stayQuote } from '@/lib/geo'
 import { nightsOfStay, stayDiscountPercent } from '@/lib/local/date-pricing-core'
@@ -75,6 +77,11 @@ export default function ReservePanel({
   // created and charged in the listing's own currency, so say which that is.
   const converted = isConverted(currency, displayCurrency)
   const price = (amount: number) => formatDisplayPrice(amount, currency, displayCurrency)
+  // A calendar cell has room for the number only; the legend names the currency.
+  const nightPrice = useCallback(
+    (amount: number) => formatDayPrice(displayPrice(amount, currency, displayCurrency, fxRates).amount),
+    [currency, displayCurrency]
+  )
   const [checkIn, setCheckIn] = useState('')
   const [checkOut, setCheckOut] = useState('')
   const [adults, setAdults] = useState(1)
@@ -256,6 +263,11 @@ export default function ReservePanel({
         checkInLabel={t('checkIn')}
         checkOutLabel={t('checkOut')}
         nightsLabel={(n) => t('nightsCount', { nights: n })}
+        listingId={listingId}
+        formatNightPrice={nightPrice}
+        priceLegend={t('calendarPrices', { currency: displayPrice(1, currency, displayCurrency, fxRates).currency })}
+        lowerLabel={t('cheaperNight')}
+        higherLabel={t('pricierNight')}
         onChange={(ci, co) => {
           setCheckIn(ci)
           setCheckOut(co)
