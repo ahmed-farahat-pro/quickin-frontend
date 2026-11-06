@@ -18,7 +18,7 @@
     "becomeHost": "Conviértete en anfitrión",
     "rent": "Alquilar",
     "dashboard": "Panel",
-    "trips": "Viajes",
+    "trips": "Reservas",
     "wishlists": "Favoritos",
     "manageListings": "Gestionar anuncios",
     "bookings": "Reservas",
@@ -158,7 +158,7 @@
     "agreeConditions": "Acepta todas las condiciones del anfitrión antes de reservar",
     "retry": "Reintentar",
     "success": "¡Solicitud de reserva enviada! El anfitrión revisará tu solicitud.",
-    "viewTrips": "Ver viajes",
+    "viewTrips": "Ver reservas",
     "failed": "No se pudo enviar la solicitud de reserva",
     "sending": "Enviando solicitud...",
     "requestToBook": "Solicitar reserva",
@@ -436,7 +436,7 @@
       "clearDates": "Borrar fechas",
       "existingBookingTitle": "Ya tienes una solicitud de reserva para este anuncio",
       "existingBookingPrefix": "Consulta tu página de",
-      "tripsLink": "Viajes",
+      "tripsLink": "Reservas",
       "existingBookingSuffix": "para ver el estado",
       "activeBookingTitle": "Actualmente te alojas en este alojamiento",
       "activeBookingPrefix": "Consulta tu página de",
@@ -487,7 +487,7 @@
     "items": {
       "overview": "Resumen",
       "personalInfo": "Información personal",
-      "trips": "Viajes",
+      "trips": "Reservas",
       "wishlists": "Listas de deseos",
       "myListings": "Mis alojamientos",
       "allListings": "Todos los alojamientos",
@@ -508,9 +508,9 @@
         "activeCount": "{count, plural, =1 {1 anuncio activo} other {# anuncios activos}}"
       },
       "myTrips": {
-        "title": "Mis viajes",
+        "title": "Mis reservas",
         "description": "Consulta tus reservas",
-        "upcomingCount": "{count, plural, =1 {1 viaje próximo} other {# viajes próximos}}"
+        "upcomingCount": "{count, plural, =1 {1 reserva próxima} other {# reservas próximas}}"
       },
       "wishlists": {
         "title": "Listas de deseos",
@@ -737,7 +737,7 @@
     "description": "— Descubre ofertas seleccionadas en alojamientos elegidos a mano"
   },
   "dashboardTrips": {
-    "title": "Viajes",
+    "title": "Reservas",
     "description": "Tus solicitudes de reserva y reservas.",
     "searchPlaceholder": "Buscar por código de reserva...",
     "tabs": {
@@ -756,10 +756,10 @@
     "empty": {
       "pendingTitle": "No hay solicitudes pendientes",
       "pendingDesc": "Tus solicitudes de reserva en espera de aprobación del anfitrión aparecerán aquí",
-      "upcomingTitle": "No hay viajes próximos",
+      "upcomingTitle": "No hay reservas próximas",
       "upcomingDesc": "Es hora de planear tu próxima aventura",
-      "historyTitle": "No hay viajes anteriores",
-      "historyDesc": "Tus viajes completados y cancelados aparecerán aquí",
+      "historyTitle": "No hay reservas anteriores",
+      "historyDesc": "Tus reservas completadas y canceladas aparecerán aquí",
       "browse": "Explorar alojamientos",
       "startSearching": "Empezar a buscar"
     },
@@ -1383,7 +1383,7 @@
       "menu": "Menú",
       "markAllRead": "Marcar todo como leído",
       "noNotifications": "Sin notificaciones",
-      "trips": "Viajes",
+      "trips": "Reservas",
       "guestQuestions": "Preguntas de huéspedes",
       "saved": "Mis favoritos",
       "account": "Cuenta",
@@ -1733,7 +1733,7 @@
   },
   "reservationsLocal": {
     "meta": {
-      "title": "Mis viajes",
+      "title": "Mis reservas",
       "description": "Consulta y gestiona tus próximas estancias en Quick In. Todas tus reservas de alojamientos boutique en un solo lugar.",
       "ogTitle": "Mis reservas | Quick In",
       "ogDescription": "Consulta y gestiona tus próximas estancias en Quick In."
@@ -1745,7 +1745,7 @@
       "subtitle": "Tus próximas estancias aparecerán aquí cuando inicies sesión.",
       "logIn": "Iniciar sesión"
     },
-    "listTitle": "Mis viajes",
+    "listTitle": "Mis reservas",
     "noneYet": "Aún no hay reservas.",
     "countBooked": "{count, plural, one {# estancia reservada.} other {# estancias reservadas.}}",
     "emptyState": "Todavía no has reservado ninguna estancia.",
@@ -1976,7 +1976,7 @@
       "languageLabel": "Idioma"
     },
     "links": {
-      "reservations": "Mis viajes",
+      "reservations": "Mis reservas",
       "saved": "Mis favoritos",
       "verification": "Verificación de identidad",
       "hosting": "Alojamiento",
@@ -2693,12 +2693,12 @@
     "notFound": {
       "title": "No encontramos esa reserva",
       "body": "Puede que el enlace haya caducado o que el código esté mal escrito. Comprueba el código de tu reserva e inténtalo de nuevo.",
-      "cta": "Ir a mis viajes"
+      "cta": "Ir a mis reservas"
     },
     "missingCode": {
       "title": "A este enlace le falta el código de reserva",
       "body": "Abre tu reserva en la app de Quick In y vuelve a escanear su código QR: te lleva directo a tu pase de estancia.",
-      "cta": "Ir a mis viajes"
+      "cta": "Ir a mis reservas"
     },
     "guest": {
       "heading": "Tu pase de estancia",

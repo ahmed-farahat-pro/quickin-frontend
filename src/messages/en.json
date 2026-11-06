@@ -18,7 +18,7 @@
     "becomeHost": "Become a Host",
     "rent": "Rent",
     "dashboard": "Dashboard",
-    "trips": "Trips",
+    "trips": "Bookings",
     "wishlists": "Wishlists",
     "manageListings": "Manage listings",
     "bookings": "Bookings",
@@ -158,7 +158,7 @@
     "agreeConditions": "Please agree to all host conditions before booking",
     "retry": "Retry",
     "success": "Booking request sent! The host will review your request.",
-    "viewTrips": "View Trips",
+    "viewTrips": "View Bookings",
     "failed": "Failed to submit booking request",
     "sending": "Sending Request...",
     "requestToBook": "Request to Book",
@@ -436,7 +436,7 @@
       "clearDates": "Clear dates",
       "existingBookingTitle": "You already have a booking request for this listing",
       "existingBookingPrefix": "Check your",
-      "tripsLink": "Trips",
+      "tripsLink": "Bookings",
       "existingBookingSuffix": "page for status",
       "activeBookingTitle": "You are currently staying at this listing",
       "activeBookingPrefix": "Check your",
@@ -487,7 +487,7 @@
     "items": {
       "overview": "Overview",
       "personalInfo": "Personal Info",
-      "trips": "Trips",
+      "trips": "Bookings",
       "wishlists": "Wishlists",
       "myListings": "My Listings",
       "allListings": "All Listings",
@@ -508,9 +508,9 @@
         "activeCount": "{count, plural, =1 {1 active listing} other {# active listings}}"
       },
       "myTrips": {
-        "title": "My Trips",
+        "title": "My Bookings",
         "description": "View your reservations",
-        "upcomingCount": "{count, plural, =1 {1 upcoming trip} other {# upcoming trips}}"
+        "upcomingCount": "{count, plural, =1 {1 upcoming booking} other {# upcoming bookings}}"
       },
       "wishlists": {
         "title": "Wishlists",
@@ -737,7 +737,7 @@
     "description": "— Explore curated deals on handpicked stays"
   },
   "dashboardTrips": {
-    "title": "Trips",
+    "title": "Bookings",
     "description": "Your booking requests and reservations.",
     "searchPlaceholder": "Find by reservation code...",
     "tabs": {
@@ -756,10 +756,10 @@
     "empty": {
       "pendingTitle": "No pending requests",
       "pendingDesc": "Your booking requests that are awaiting host approval will appear here",
-      "upcomingTitle": "No upcoming trips",
+      "upcomingTitle": "No upcoming bookings",
       "upcomingDesc": "Time to plan your next adventure",
-      "historyTitle": "No past trips",
-      "historyDesc": "Your completed and cancelled trips will appear here",
+      "historyTitle": "No past bookings",
+      "historyDesc": "Your completed and cancelled bookings will appear here",
       "browse": "Browse listings",
       "startSearching": "Start searching"
     },
@@ -1383,7 +1383,7 @@
       "menu": "Menu",
       "markAllRead": "Mark all read",
       "noNotifications": "No notifications yet",
-      "trips": "Trips",
+      "trips": "Bookings",
       "guestQuestions": "Guest questions",
       "saved": "My Favorites",
       "account": "Account",
@@ -1786,7 +1786,7 @@
   },
   "reservationsLocal": {
     "meta": {
-      "title": "My trips",
+      "title": "My Bookings",
       "description": "View and manage your upcoming Quick In stays. Your boutique-rental bookings, all in one place.",
       "ogTitle": "My reservations | Quick In",
       "ogDescription": "View and manage your upcoming Quick In stays."
@@ -1798,7 +1798,7 @@
       "subtitle": "Your upcoming stays will appear here once you log in.",
       "logIn": "Log in"
     },
-    "listTitle": "My trips",
+    "listTitle": "My Bookings",
     "noneYet": "No reservations yet.",
     "countBooked": "{count, plural, one {# stay booked.} other {# stays booked.}}",
     "emptyState": "You haven't booked any stays yet.",
@@ -1976,7 +1976,7 @@
       "languageLabel": "Language"
     },
     "links": {
-      "reservations": "My trips",
+      "reservations": "My Bookings",
       "saved": "My favorites",
       "verification": "Identity verification",
       "hosting": "Hosting",
@@ -2693,12 +2693,12 @@
     "notFound": {
       "title": "We couldn't find that reservation",
       "body": "This link may have expired, or the code was mistyped. Check the code on your reservation and try again.",
-      "cta": "Go to my trips"
+      "cta": "Go to my bookings"
     },
     "missingCode": {
       "title": "This link is missing a reservation code",
       "body": "Open your reservation in the Quick In app and scan its QR code again — it takes you straight to your stay pass.",
-      "cta": "Go to my trips"
+      "cta": "Go to my bookings"
     },
     "guest": {
       "heading": "Your stay pass",

@@ -18,7 +18,7 @@
     "becomeHost": "Devenir hôte",
     "rent": "Louer",
     "dashboard": "Tableau de bord",
-    "trips": "Voyages",
+    "trips": "Réservations",
     "wishlists": "Favoris",
     "manageListings": "Gérer les annonces",
     "bookings": "Réservations",
@@ -158,7 +158,7 @@
     "agreeConditions": "Veuillez accepter toutes les conditions de l'hôte avant de réserver",
     "retry": "Réessayer",
     "success": "Demande de réservation envoyée ! L'hôte examinera votre demande.",
-    "viewTrips": "Voir les voyages",
+    "viewTrips": "Voir les réservations",
     "failed": "Échec de l'envoi de la demande de réservation",
     "sending": "Envoi de la demande...",
     "requestToBook": "Demander à réserver",
@@ -436,7 +436,7 @@
       "clearDates": "Effacer les dates",
       "existingBookingTitle": "Vous avez déjà une demande de réservation pour cette annonce",
       "existingBookingPrefix": "Consultez votre page",
-      "tripsLink": "Voyages",
+      "tripsLink": "Réservations",
       "existingBookingSuffix": "pour connaître le statut",
       "activeBookingTitle": "Vous séjournez actuellement dans ce logement",
       "activeBookingPrefix": "Consultez votre page",
@@ -487,7 +487,7 @@
     "items": {
       "overview": "Aperçu",
       "personalInfo": "Informations personnelles",
-      "trips": "Voyages",
+      "trips": "Réservations",
       "wishlists": "Listes de souhaits",
       "myListings": "Mes annonces",
       "allListings": "Toutes les annonces",
@@ -508,9 +508,9 @@
         "activeCount": "{count, plural, =1 {1 annonce active} other {# annonces actives}}"
       },
       "myTrips": {
-        "title": "Mes voyages",
+        "title": "Mes réservations",
         "description": "Consultez vos réservations",
-        "upcomingCount": "{count, plural, =1 {1 voyage à venir} other {# voyages à venir}}"
+        "upcomingCount": "{count, plural, =1 {1 réservation à venir} other {# réservations à venir}}"
       },
       "wishlists": {
         "title": "Listes de souhaits",
@@ -737,7 +737,7 @@
     "description": "— Découvrez une sélection d'offres sur des séjours triés sur le volet"
   },
   "dashboardTrips": {
-    "title": "Voyages",
+    "title": "Réservations",
     "description": "Vos demandes de réservation et vos réservations.",
     "searchPlaceholder": "Rechercher par code de réservation...",
     "tabs": {
@@ -756,10 +756,10 @@
     "empty": {
       "pendingTitle": "Aucune demande en attente",
       "pendingDesc": "Vos demandes de réservation en attente d'approbation de l'hôte apparaîtront ici",
-      "upcomingTitle": "Aucun voyage à venir",
+      "upcomingTitle": "Aucune réservation à venir",
       "upcomingDesc": "Il est temps de planifier votre prochaine aventure",
-      "historyTitle": "Aucun voyage passé",
-      "historyDesc": "Vos voyages terminés et annulés apparaîtront ici",
+      "historyTitle": "Aucune réservation passée",
+      "historyDesc": "Vos réservations terminées et annulées apparaîtront ici",
       "browse": "Parcourir les annonces",
       "startSearching": "Commencer la recherche"
     },
@@ -1383,7 +1383,7 @@
       "menu": "Menu",
       "markAllRead": "Tout marquer comme lu",
       "noNotifications": "Aucune notification",
-      "trips": "Voyages",
+      "trips": "Réservations",
       "guestQuestions": "Questions des voyageurs",
       "saved": "Mes favoris",
       "account": "Compte",
@@ -1733,7 +1733,7 @@
   },
   "reservationsLocal": {
     "meta": {
-      "title": "Mes voyages",
+      "title": "Mes réservations",
       "description": "Consultez et gérez vos prochains séjours Quick In. Toutes vos réservations de logements de charme au même endroit.",
       "ogTitle": "Mes réservations | Quick In",
       "ogDescription": "Consultez et gérez vos prochains séjours Quick In."
@@ -1745,7 +1745,7 @@
       "subtitle": "Vos prochains séjours s'afficheront ici une fois connecté.",
       "logIn": "Se connecter"
     },
-    "listTitle": "Mes voyages",
+    "listTitle": "Mes réservations",
     "noneYet": "Aucune réservation pour le moment.",
     "countBooked": "{count, plural, one {# séjour réservé.} other {# séjours réservés.}}",
     "emptyState": "Vous n'avez encore réservé aucun séjour.",
@@ -1976,7 +1976,7 @@
       "languageLabel": "Langue"
     },
     "links": {
-      "reservations": "Mes voyages",
+      "reservations": "Mes réservations",
       "saved": "Mes favoris",
       "verification": "Vérification d’identité",
       "hosting": "Hébergement",
@@ -2693,12 +2693,12 @@
     "notFound": {
       "title": "Nous n'avons pas trouvé cette réservation",
       "body": "Ce lien a peut-être expiré ou le code est incorrect. Vérifiez le code de votre réservation et réessayez.",
-      "cta": "Voir mes voyages"
+      "cta": "Voir mes réservations"
     },
     "missingCode": {
       "title": "Ce lien ne contient pas de code de réservation",
       "body": "Ouvrez votre réservation dans l'application Quick In et scannez à nouveau son QR code — il vous amène directement à votre pass.",
-      "cta": "Voir mes voyages"
+      "cta": "Voir mes réservations"
     },
     "guest": {
       "heading": "Votre pass de séjour",
