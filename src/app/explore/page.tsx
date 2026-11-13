@@ -408,8 +408,6 @@ export default async function ExplorePage({
             <a href={loc('/terms')} style={{ color: 'rgba(246,241,230,0.85)', textDecoration: 'none' }}>{t('footer.legal.terms')}</a>
             <span aria-hidden>·</span>
             <a href={loc('/privacy')} style={{ color: 'rgba(246,241,230,0.85)', textDecoration: 'none' }}>{t('footer.legal.privacy')}</a>
-            <span aria-hidden>·</span>
-            <a href={loc('/sitemap')} style={{ color: 'rgba(246,241,230,0.85)', textDecoration: 'none' }}>{t('footer.legal.sitemap')}</a>
             {/* The same three accounts /links and the (main) footer list, from
                 @/lib/social. Rendered inline rather than via the CMS-driven
                 Footer component because this page ships its own footer. */}
