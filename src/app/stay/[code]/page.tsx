@@ -1,8 +1,8 @@
-// PUBLIC stay pass — the page every Quick In QR code points at.
+// PUBLIC stay pass — the page every Quick In stay-pass link points at.
 //
 // Reached as /stay/<code> and, through the app's locale routing, as
 // /en|ar|fr|es/stay/<code> (proxy.ts strips the prefix and rewrites here).
-// No auth: anyone holding the code — Wallet pass, in-app QR, a printed card —
+// No auth: anyone holding the code — Wallet pass, the in-app link, a printed card —
 // must be able to open it, so the query returns display fields only (no booking
 // id, no guest email/phone, no prices).
 //
@@ -15,10 +15,9 @@
 import type { Metadata } from 'next'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { backendFetch } from '@/lib/backend'
-import { normalizeReservationCode, stayPassPath } from '@/lib/stay-code'
+import { normalizeReservationCode } from '@/lib/stay-code'
 import type { StayGuideItem, StayPass } from '@/lib/types'
 import { localeToBcp47, type Locale } from '@/i18n/config'
-import { getRequestOrigin } from '@/lib/site-origin'
 import { StayQr } from '../stay-qr'
 import { StayNotice } from '../stay-notice'
 
@@ -185,15 +184,11 @@ async function Pass({ pass }: { pass: StayPass }) {
     : pass.status
   // `is_live` is the server's own verdict from `isLiveStayPass` — confirmed AND
   // PAID, or completed. Host approval alone mints the reservation code but leaves
-  // the stay unpaid, so a scan of that QR must land on the "not yet" notice
+  // the stay unpaid, so opening that link must land on the "not yet" notice
   // rather than a working pass. The backend also withholds `guide` when this is
   // false, so the sections below cannot leak the host's gate codes either.
   const isLive = pass.is_live
   const place = [pass.location, pass.country].filter(Boolean).join(', ')
-  // stayPassPath() is the only place a stay URL is built; it returns null for a
-  // missing/"null" code, so the QR below simply doesn't render in that case.
-  const passPath = stayPassPath(pass.reservation_code, locale)
-  const passUrl = passPath ? `${await getRequestOrigin()}${passPath}` : null
 
   const info = pass.guide.filter((i) => i.kind === 'info')
   const photos = pass.guide.filter((i) => i.kind === 'photo')
@@ -315,7 +310,7 @@ async function Pass({ pass }: { pass: StayPass }) {
             {pass.host_name && <span>{t('hostedBy', { name: pass.host_name })}</span>}
           </div>
 
-          {/* The pass QR + code. Gated on the booking still being confirmed —
+          {/* The pass code. Gated on the booking still being confirmed —
               a cancelled reservation keeps its code but is not a valid pass. */}
           {isLive && (
             <div
@@ -329,7 +324,6 @@ async function Pass({ pass }: { pass: StayPass }) {
                 borderTop: '1px solid rgba(42,34,32,0.08)',
               }}
             >
-              <StayQr value={passUrl} size={120} title={pass.reservation_code} />
               <div style={{ minWidth: 0 }}>
                 <p style={{ margin: 0, fontSize: 12.5, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: C.muted }}>
                   {t('codeLabel')}
@@ -354,7 +348,7 @@ async function Pass({ pass }: { pass: StayPass }) {
       </article>
 
       {/* The host's free-text note has always lived on the booking — keep it, but
-          behind the SAME gate as the QR and the guide. A cancelled reservation
+          behind the SAME gate as the code and the guide. A cancelled reservation
           keeps its code forever, and this field is where door codes, lockbox
           combinations and key-location directions get written: leaving it public
           hands the place to anyone holding an old link. */}

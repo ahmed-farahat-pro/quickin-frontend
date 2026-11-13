@@ -12,6 +12,14 @@ import { nightsOfStay, stayDiscountPercent } from '@/lib/local/date-pricing-core
 import type { PriceSource } from '@/lib/local/date-pricing-core'
 import { roundUpToStep } from '@/lib/local/commission-core'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
+import { useMe } from '@/components/features/auth/identity-gate'
+import { IdentityRejectedNotice } from '@/components/features/auth/identity-rejected-notice'
+import {
+  COMPLETE_ACCOUNT_PATH,
+  bookingIdentityBlock,
+  isIdentityRejected,
+  readIdentityState,
+} from '@/lib/local/signup-identity-ui-core'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -38,6 +46,10 @@ type Status =
   | { kind: 'loading' }
   | { kind: 'needsLogin' }
   | { kind: 'error'; message: string }
+  // Refused for the account's identity (403 + code): no phone/ID yet, or the ID
+  // was rejected. Each has its own way forward, so neither is a plain error.
+  | { kind: 'identityIncomplete' }
+  | { kind: 'identityRejected'; message: string }
   | { kind: 'success'; nights: number; total: number }
 
 /** What `GET /api/local/listings/:id/quote` answers — the authoritative price for
@@ -72,7 +84,12 @@ export default function ReservePanel({
 }) {
   const t = useTranslations('listingPage')
   const tc = useTranslations('currency')
+  const ti = useTranslations('signupIdentity')
   const { currency: displayCurrency } = useDisplayCurrency()
+  // A rejected ID blocks booking until it is replaced — say so before the guest
+  // picks dates rather than after they press Reserve.
+  const me = useMe()
+  const idRejected = isIdentityRejected(me)
   // A quote shown in the guest's currency is an estimate; the booking is
   // created and charged in the listing's own currency, so say which that is.
   const converted = isConverted(currency, displayCurrency)
@@ -217,6 +234,17 @@ export default function ReservePanel({
 
       const data = await res.json().catch(() => ({}))
 
+      // Switch on the code, never the message.
+      const block = bookingIdentityBlock(res.status, data)
+      if (block?.kind === 'incomplete') {
+        setStatus({ kind: 'identityIncomplete' })
+        return
+      }
+      if (block?.kind === 'rejected') {
+        setStatus({ kind: 'identityRejected', message: block.message })
+        return
+      }
+
       if (res.status === 201) {
         setStatus({
           kind: 'success',
@@ -240,7 +268,7 @@ export default function ReservePanel({
   }
 
   const canReserve =
-    nights > 0 && guests >= 1 && status.kind !== 'loading'
+    nights > 0 && guests >= 1 && status.kind !== 'loading' && !idRejected
 
   return (
     <div>
@@ -385,6 +413,13 @@ export default function ReservePanel({
         )}
       </div>
 
+      {idRejected && status.kind !== 'identityRejected' && (
+        <IdentityRejectedNotice
+          note={readIdentityState(me).verification_note}
+          style={{ marginTop: 18 }}
+        />
+      )}
+
       <button
         type="button"
         onClick={handleReserve}
@@ -457,6 +492,31 @@ export default function ReservePanel({
         >
           {status.message}
         </div>
+      )}
+
+      {status.kind === 'identityIncomplete' && (
+        <div
+          style={{
+            marginTop: 14,
+            padding: '12px 14px',
+            borderRadius: 12,
+            background: COLORS.tan,
+            fontSize: 14,
+            color: COLORS.ink,
+          }}
+        >
+          {ti('booking.incomplete')}{' '}
+          <a
+            href={COMPLETE_ACCOUNT_PATH}
+            style={{ color: COLORS.burgundy, fontWeight: 700, textDecoration: 'none' }}
+          >
+            {ti('booking.completeCta')}
+          </a>
+        </div>
+      )}
+
+      {status.kind === 'identityRejected' && (
+        <IdentityRejectedNotice message={status.message} style={{ marginTop: 14 }} />
       )}
 
       {status.kind === 'success' && (

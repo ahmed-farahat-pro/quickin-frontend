@@ -7,6 +7,7 @@ import { checkPassword, isStrongPassword, MIN_PASSWORD_LENGTH, type PasswordProb
 import { checkEmail, type EmailProblem } from '@/lib/local/email-core'
 import PasswordChecklist from '@/components/features/auth/password-checklist'
 import AuthExitLink, { useAuthReturnHref } from '@/components/features/auth/auth-exit-link'
+import { postAuthPath } from '@/lib/local/signup-identity-ui-core'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -132,7 +133,7 @@ export default function LoginPage() {
         setLoading(false)
         return
       }
-      window.location.href = '/explore'
+      window.location.href = postAuthPath(data?.user)
     } catch {
       setError(t('errors.network'))
       setLoading(false)
@@ -295,7 +296,7 @@ export default function LoginPage() {
         return
       }
       // The reset signs the user in, so land them where a sign-in would.
-      window.location.href = '/explore'
+      window.location.href = postAuthPath(data?.user)
     } catch {
       setError(t('errors.network'))
       setLoading(false)
@@ -321,7 +322,7 @@ export default function LoginPage() {
         setLoading(false)
         return
       }
-      window.location.href = '/explore'
+      window.location.href = postAuthPath(data?.user)
     } catch {
       setError(t('errors.network'))
       setLoading(false)
@@ -390,7 +391,7 @@ export default function LoginPage() {
         setLoading(false)
         return
       }
-      window.location.href = '/explore'
+      window.location.href = postAuthPath(data?.user)
     } catch {
       setError(t('errors.network'))
       setLoading(false)

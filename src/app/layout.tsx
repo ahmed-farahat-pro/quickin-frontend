@@ -14,6 +14,7 @@ import { AppDirectionProvider } from '@/components/providers/app-direction-provi
 import { DisplayCurrencyProvider } from '@/components/providers/display-currency-provider'
 import { getRequestCurrency } from '@/lib/currency/request-currency'
 import { AuthNotification } from '@/components/features/auth/auth-notification'
+import { IdentityGate } from '@/components/features/auth/identity-gate'
 import WhatsAppFab from "@/components/whatsapp-fab";
 import AppStoreBar from "@/components/app-store-bar";
 import { getBaseUrl } from "@/lib/utils";
@@ -139,6 +140,8 @@ async function RootLayoutInner({
               <RouteProgressBar />
               <GlobalLoadingBar />
               <AuthNotification />
+              {/* New Google accounts owe a phone + ID before using the app. */}
+              <IdentityGate />
               {/* Site-wide "Get the app" bar — sits above the header on every page. */}
               <AppStoreBar />
               {children}

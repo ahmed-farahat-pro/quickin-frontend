@@ -8,6 +8,15 @@ import { checkPassword, MIN_PASSWORD_LENGTH, type PasswordProblem } from '@/lib/
 import { checkName, type NameProblem } from '@/lib/local/name-policy'
 import PasswordChecklist from '@/components/features/auth/password-checklist'
 import AuthExitLink, { useAuthReturnHref } from '@/components/features/auth/auth-exit-link'
+import {
+  EMPTY_IDENTITY,
+  IdentityFields,
+  identityPayload,
+  useIdentityValidation,
+  type IdentityErrors,
+  type IdentityValues,
+} from '@/components/features/auth/identity-fields'
+import { postAuthPath } from '@/lib/local/signup-identity-ui-core'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -89,6 +98,11 @@ export default function SignupPage() {
   const [nameError, setNameError] = useState<string | null>(null)
   const [emailError, setEmailError] = useState<string | null>(null)
   const [passwordError, setPasswordError] = useState<string | null>(null)
+  // Phone + identity document — required of every new account, collected here so
+  // the document is on file before the OTP step (see identity-fields.tsx).
+  const [identity, setIdentity] = useState<IdentityValues>(EMPTY_IDENTITY)
+  const [identityErrors, setIdentityErrors] = useState<IdentityErrors>({})
+  const identityCheck = useIdentityValidation()
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -125,7 +139,7 @@ export default function SignupPage() {
         setLoading(false)
         return
       }
-      window.location.href = '/explore'
+      window.location.href = postAuthPath(data?.user)
     } catch {
       setError(t('errors.network'))
       setLoading(false)
@@ -184,7 +198,8 @@ export default function SignupPage() {
         setLoading(false)
         return
       }
-      window.location.href = '/explore'
+      // A first Google sign-in has no phone or ID yet → the completion page.
+      window.location.href = postAuthPath(data?.user)
     } catch {
       setError(t('errors.network'))
       setLoading(false)
@@ -283,22 +298,33 @@ export default function SignupPage() {
     const nameOk = validateNameField()
     const emailOk = validateEmail()
     const passwordOk = validatePasswordField()
-    if (!nameOk || !emailOk || !passwordOk) return
+    const idErrors = identityCheck.validate(identity)
+    setIdentityErrors(idErrors)
+    if (!nameOk || !emailOk || !passwordOk || Object.keys(idErrors).length) return
     setLoading(true)
     try {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, full_name: fullName }),
+        body: JSON.stringify({ email, password, full_name: fullName, ...identityPayload(identity) }),
       })
+      if (res.status === 413) {
+        // The platform refused the body before the route ran — the photos.
+        setError(t('errors.tooLarge'))
+        setLoading(false)
+        return
+      }
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
+        // Phone / document problems come back keyed like the request body.
+        const serverIdErrors = identityCheck.fromServer(data?.fields, identity)
+        if (Object.keys(serverIdErrors).length) setIdentityErrors(serverIdErrors)
         // The server re-checks the address and can reject one this build's TLD
         // snapshot still accepts. Show that under the field, in this locale.
         if (data?.nameProblem) setNameError(nameMessage(data.nameProblem))
         else if (data?.emailProblem) setEmailError(emailMessage(data.emailProblem))
         else if (data?.passwordProblem) setPasswordError(passwordMessage(data.passwordProblem))
-        else setError(data?.error || t('errors.createFailed'))
+        else if (!Object.keys(serverIdErrors).length) setError(data?.error || t('errors.createFailed'))
         setLoading(false)
         return
       }
@@ -311,7 +337,7 @@ export default function SignupPage() {
         setLoading(false)
         return
       }
-      window.location.href = '/explore'
+      window.location.href = postAuthPath(data?.user)
     } catch {
       setError(t('errors.network'))
       setLoading(false)
@@ -634,6 +660,17 @@ export default function SignupPage() {
             )}
             <PasswordChecklist id="signup-password-rules" password={password} />
           </label>
+
+          <div style={{ borderTop: '1px solid rgba(42,34,32,0.10)', paddingTop: 18, marginBottom: 6 }}>
+            <IdentityFields
+              idPrefix="signup"
+              value={identity}
+              onChange={setIdentity}
+              errors={identityErrors}
+              onClearError={(f) => setIdentityErrors((e) => ({ ...e, [f]: undefined }))}
+              disabled={loading}
+            />
+          </div>
 
           <button type="submit" disabled={loading} style={primaryButtonStyle(loading)}>
             {loading ? t('submit.creating') : t('submit.createAccount')}

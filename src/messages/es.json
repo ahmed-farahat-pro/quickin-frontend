@@ -1671,7 +1671,8 @@
       "emailInvalid": "Introduce una dirección de correo válida.",
       "emailBadTld": "«.{tld}» no es una extensión de dominio válida.",
       "emailDidYouMean": "¿Querías decir {suggestion}?",
-      "emailDisposable": "No se admiten direcciones de correo temporales o desechables. Usa un correo personal o de trabajo permanente."
+      "emailDisposable": "No se admiten direcciones de correo temporales o desechables. Usa un correo personal o de trabajo permanente.",
+      "tooLarge": "Tus fotos del documento son demasiado grandes para enviarlas. Vuelve a tomarlas o elige otras más pequeñas."
     },
     "otp": {
       "label": "Código de verificación",
@@ -2703,15 +2704,15 @@
     },
     "missingCode": {
       "title": "A este enlace le falta el código de reserva",
-      "body": "Abre tu reserva en la app de Quick In y vuelve a escanear su código QR: te lleva directo a tu pase de estancia.",
+      "body": "Abre tu reserva en la app de Quick In y vuelve a tocar «Abrir el pase»: te lleva directo a tu pase de estancia.",
       "cta": "Ir a mis reservas"
     },
     "guest": {
       "heading": "Tu pase de estancia",
-      "scanHint": "Muestra este código QR al llegar.",
-      "pendingTitle": "Tu código QR aparecerá aquí en cuanto se confirme tu reserva.",
+      "scanHint": "Muestra este código al llegar.",
+      "pendingTitle": "Tu pase de estancia aparecerá aquí en cuanto se confirme tu reserva.",
       "pendingBody": "Lo creamos cuando tu anfitrión apruebe la solicitud y se confirme tu pago.",
-      "unpaidTitle": "Tu código QR se abrirá en cuanto se confirme tu pago.",
+      "unpaidTitle": "Tu pase de estancia se abrirá en cuanto se confirme tu pago.",
       "unpaidBody": "Tu anfitrión ha aprobado la estancia. Envía la transferencia y desbloquearemos tu pase en cuanto la comprobemos.",
       "openPass": "Abrir el pase",
       "copyLink": "Copiar enlace",
@@ -2719,7 +2720,7 @@
     },
     "host": {
       "heading": "Guía de estancia",
-      "intro": "Añade lo que tu huésped necesita: información de la casa, fotos, enlaces a lugares cercanos y documentos. Lo verá todo al escanear su código QR.",
+      "intro": "Añade lo que tu huésped necesita: información de la casa, fotos, enlaces a lugares cercanos y documentos. Lo verá todo al abrir su pase de estancia.",
       "locked": "La guía de estancia se abre cuando apruebes esta reserva.",
       "manage": "Gestionar la guía",
       "hide": "Ocultar la guía",
@@ -3013,6 +3014,72 @@
     "empty": {
       "title": "Todavía no hay preguntas",
       "hint": "Cuando un huésped pregunte por uno de tus anuncios, aparecerá aquí."
+    }
+  },
+  "signupIdentity": {
+    "sectionTitle": "Teléfono y documento",
+    "sectionHint": "Todas las cuentas de Quick In se verifican. Nuestro equipo revisa tu documento; puedes seguir explorando y reservando mientras tanto.",
+    "fields": {
+      "phone": "Número de teléfono",
+      "phonePlaceholder": "010 1234 5678",
+      "docType": "Tipo de documento",
+      "idNumber": "Número del documento",
+      "idNumberPlaceholderNational": "Número nacional de 14 dígitos",
+      "idNumberPlaceholderOther": "Tal como aparece en tu documento",
+      "photos": "Fotos de tu documento",
+      "idFront": "Anverso",
+      "idBack": "Reverso"
+    },
+    "docTypes": {
+      "national_id": "Documento nacional de identidad",
+      "passport": "Pasaporte",
+      "residence_permit": "Permiso de residencia"
+    },
+    "photo": {
+      "add": "Añadir foto",
+      "processing": "Preparando la foto…",
+      "remove": "Quitar foto",
+      "hint": "Toma o elige fotos nítidas en las que se vean las cuatro esquinas."
+    },
+    "errors": {
+      "phoneRequired": "Introduce tu número de teléfono.",
+      "phoneInvalid": "Eso no parece un número de teléfono. Prueba con 010 1234 5678 o +20 10 1234 5678.",
+      "phoneTaken": "Este número de teléfono ya lo usa otra cuenta.",
+      "docTypeRequired": "Elige qué documento estás subiendo.",
+      "idNumber": {
+        "required": "Introduce el número que aparece en tu documento.",
+        "nationalIdDigits": "Un número nacional solo contiene dígitos.",
+        "nationalIdLength": "Un número nacional tiene 14 dígitos.",
+        "documentChars": "Un número de documento solo puede contener letras y números.",
+        "documentLength": "Un número de documento tiene entre 5 y 24 caracteres."
+      },
+      "frontRequired": "Añade una foto del anverso.",
+      "backRequired": "Añade una foto del reverso.",
+      "photoUnreadable": "No pudimos leer esa foto. Prueba con otra.",
+      "photoTooLarge": "La foto es demasiado grande incluso comprimida. Prueba con una más pequeña.",
+      "tooLarge": "Tus fotos del documento son demasiado grandes para enviarlas. Vuelve a tomarlas o elige otras más pequeñas.",
+      "network": "Error de red. Inténtalo de nuevo."
+    },
+    "complete": {
+      "metaTitle": "Completa tu cuenta",
+      "title": "Completa tu cuenta",
+      "subtitle": "Añade tu número de teléfono y un documento de identidad para terminar de configurar tu cuenta.",
+      "signedInAs": "Has iniciado sesión como {email}",
+      "loading": "Cargando…",
+      "submit": "Terminar",
+      "submitting": "Guardando…",
+      "failed": "No pudimos guardar tus datos. Inténtalo de nuevo.",
+      "signOut": "Cerrar sesión"
+    },
+    "rejected": {
+      "title": "Tu documento no fue aprobado",
+      "reason": "Motivo",
+      "body": "Sube una nueva foto de tu documento para volver a reservar.",
+      "cta": "Volver a subir tu documento"
+    },
+    "booking": {
+      "incomplete": "Añade tu teléfono y tu documento para terminar de configurar tu cuenta antes de reservar.",
+      "completeCta": "Completa tu cuenta"
     }
   }
 }

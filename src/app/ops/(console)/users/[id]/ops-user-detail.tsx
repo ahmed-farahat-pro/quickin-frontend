@@ -17,6 +17,7 @@ import { COLORS, SERIF } from '../../../ops-theme'
 import { Empty, EmptyRow, adminGet, adminSend, ghostBtn, money, numTd, pageStyle, panelStyle, solidBtn, td, th, Stat, StatGrid } from '../../ops-ui'
 import { normalizeStatus, statusLabel, type AccountStatus, type UserStatusAction } from '@/lib/local/user-admin-core'
 import { StatusPill, actorLabel, fmtDay, fmtMoment, pill } from '../user-bits'
+import { GuestIdentityPanel, type GuestIdentity } from './guest-identity-panel'
 
 type Detail = {
   user: {
@@ -34,6 +35,9 @@ type Detail = {
   conversations: Array<{ id: string; listing_title: string | null; counterparty_name: string | null; counterparty_email: string | null; message_count: number; last_message_at: string | null; viewer_role: 'guest' | 'host' }>
   documents: Array<{ kind: 'id_verification' | 'host_application'; id: string; status: string; submitted_at: string | null; reviewed_at: string | null; notes: string | null; has_document: boolean }>
   stats: { gross_paid: number; nights_booked: number; mobile_message_count: number; report_count: number }
+  /** Masked phone + ID number and the guest's uploaded files. Null only if the
+   *  backend predates it. */
+  identity?: GuestIdentity | null
 }
 
 type ThreadMessage = { id: string; sender_id: string; sender_name: string | null; body: string; created_at: string }
@@ -235,8 +239,9 @@ export function OpsUserDetail({ initial, isSuperAdmin }: { initial: Detail; isSu
           <h2 style={h2}>Details</h2>
           <dl style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, margin: 0, fontSize: 13 }}>
             {([
-              ['Phone', u.phone], ['Country', u.country], ['Sign-in', u.provider],
-              ['ID verification', u.verification_status], ['Host type', u.host_type],
+              // Phone and ID live in the Identity panel below, masked behind an
+              // audited Reveal.
+              ['Country', u.country], ['Sign-in', u.provider], ['Host type', u.host_type],
               ['Company', u.company], ['Referral code', u.referral_code],
             ] as Array<[string, string | null]>).map(([k, v]) => (
               <div key={k}>
@@ -247,6 +252,9 @@ export function OpsUserDetail({ initial, isSuperAdmin }: { initial: Detail; isSu
           </dl>
           {u.bio && <p style={{ margin: '12px 0 0', fontSize: 13, color: COLORS.muted, lineHeight: 1.6 }}>{u.bio}</p>}
         </div>
+
+        {/* ---- Identity & documents ---- */}
+        <GuestIdentityPanel userId={u.id} identity={data.identity ?? null} />
 
         {/* ---- Listings ---- */}
         <div style={section}>
@@ -361,8 +369,8 @@ export function OpsUserDetail({ initial, isSuperAdmin }: { initial: Detail; isSu
 
         {/* ---- Documents ---- */}
         <div style={section}>
-          <h2 style={h2}>Documents ({data.documents.length})</h2>
-          <p style={sub}>ID verifications and host applications. Review the images themselves on the Verifications and Applications screens.</p>
+          <h2 style={h2}>Review history ({data.documents.length})</h2>
+          <p style={sub}>Every ID verification and host application this account filed, and how each was decided. The files themselves open from Identity &amp; documents above.</p>
           <Table
             head={['Kind', 'Status', 'Document', 'Submitted', 'Reviewed', 'Notes']}
             empty={{ title: 'Nothing submitted', body: 'No ID verification or host application on file for this account.' }}

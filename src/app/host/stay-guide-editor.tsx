@@ -11,9 +11,9 @@
 // component only decides what to *show*.
 //
 // It is mounted on confirmed reservations (see host-reservations) so the host can
-// prepare the guide while the guest pays. The GUEST LINK AND ITS QR are gated
+// prepare the guide while the guest pays. The GUEST LINK is gated
 // separately, on `isLiveStayPass` — a confirmed booking already has a code, but
-// the pass only opens once the payment is approved, and rendering the QR here is
+// the pass only opens once the payment is approved, and rendering the link here is
 // what let a host hold a working pass for a stay nobody had paid for.
 // `stayPassPath` still refuses a null/"null" code on top of that.
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -22,7 +22,6 @@ import { ShimmerStyles, SkeletonBlock } from '@/components/ui/skeleton-block'
 import { fileToCompressedDataUrl, MAX_OWNERSHIP_DOC_CHARS } from '@/lib/image'
 import { stayPassPath } from '@/lib/stay-code'
 import { isLiveStayPass } from '@/lib/local/payment-flow-core'
-import { StayQr } from '@/app/stay/stay-qr'
 
 const C = {
   burgundy: '#5B0F16',
@@ -143,7 +142,7 @@ export function StayGuideEditor({
   /** The confirmed booking's code — used for the guest-link preview only. */
   reservationCode: string | null
   /** The four columns `isLiveStayPass` reads, to decide whether the guest-link
-   *  preview (and its QR) may be shown at all. */
+   *  preview may be shown at all. */
   status: string
   paymentState?: string | null
   proofStatus?: string | null
@@ -271,7 +270,7 @@ export function StayGuideEditor({
     }
   }
 
-  // The guest link + QR are the PASS, not the guide: they wait for the payment,
+  // The guest link is the PASS, not the guide: they wait for the payment,
   // even though the editor below is open from approval onward so the host can
   // write their check-in notes in the meantime.
   const passIsLive = isLiveStayPass({
@@ -281,11 +280,6 @@ export function StayGuideEditor({
     paid_at: paidAt,
   })
   const guestPath = passIsLive ? stayPassPath(reservationCode, locale) : null
-  // Absolute for the QR (a relative path is unscannable), relative for the link.
-  // Safe to read `window` here: the panel only renders after the host opens it,
-  // long after hydration — the closed state is just the button below.
-  const guestUrl =
-    guestPath && typeof window !== 'undefined' ? `${window.location.origin}${guestPath}` : guestPath
 
   if (!open) {
     return (
@@ -322,8 +316,7 @@ export function StayGuideEditor({
       )}
 
       {guestPath && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '12px 0 0' }}>
-          <StayQr value={guestUrl} size={72} title={reservationCode ?? undefined} />
+        <div style={{ margin: '12px 0 0' }}>
           <div style={{ minWidth: 0 }}>
             <p style={{ margin: 0, fontSize: 12.5, fontWeight: 700, color: C.ink }}>{t('guestLink')}</p>
             <a

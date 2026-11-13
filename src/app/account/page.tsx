@@ -12,6 +12,8 @@ import { AccountForms, BecomeHostButton } from './account-forms'
 import { AvatarPicker } from './avatar-picker'
 import { PayoutMethodCard } from './payout-method-card'
 import { PreferencesCard } from './preferences-card'
+import { IdentityRejectedNotice } from '@/components/features/auth/identity-rejected-notice'
+import { isIdentityRejected } from '@/lib/local/signup-identity-ui-core'
 
 export const dynamic = 'force-dynamic'
 
@@ -226,6 +228,10 @@ export default async function AccountPage() {
             </div>
           </AvatarPicker>
         </div>
+
+        {/* Signed up under the identity requirement and the document was refused:
+            bookings are blocked until a new one is uploaded, so say why, up top. */}
+        {isIdentityRejected(user) && <IdentityRejectedNotice note={user.verification_note} />}
 
         {/* Unified account: one person, one login. Becoming a host is an
             admin-reviewed application, so this renders all four host_status

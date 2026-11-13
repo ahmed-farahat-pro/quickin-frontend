@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { loadMe, useMe } from '@/components/features/auth/identity-gate'
+import { selfieRequiredForIdUpload } from '@/lib/local/signup-identity-ui-core'
 import { ShieldCheck, Clock, ShieldAlert, XCircle, UploadCloud, Loader2, X } from 'lucide-react'
 
 type Status = 'loading' | 'guest' | 'unverified' | 'pending' | 'verified' | 'rejected'
@@ -34,6 +36,9 @@ export function IdVerificationPanel() {
   const [docType, setDocType] = useState<string>(DOC_TYPES[0].key)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Accounts from the signup identity rule re-upload front + back only.
+  const needsSelfie = selfieRequiredForIdUpload(useMe())
+  const photosReady = !!front && !!back && (!needsSelfie || !!selfie)
 
   async function load() {
     try {
@@ -81,8 +86,10 @@ export function IdVerificationPanel() {
   }
 
   async function submit() {
-    if (!front || !back || !selfie) {
-      setError('Please add the front and back of your ID and a personal photo.')
+    if (!photosReady) {
+      setError(needsSelfie
+        ? 'Please add the front and back of your ID and a personal photo.'
+        : 'Please add the front and back of your ID.')
       return
     }
     setSubmitting(true); setError(null)
@@ -91,7 +98,7 @@ export function IdVerificationPanel() {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ front, back, selfie, doc_type: docType, id_number: idNumber.trim() || undefined }),
+        body: JSON.stringify({ front, back, selfie: needsSelfie ? selfie : undefined, doc_type: docType, id_number: idNumber.trim() || undefined }),
       })
       if (res.status === 401) { setError('Please sign in to submit your ID.'); return }
       if (!res.ok) {
@@ -99,7 +106,8 @@ export function IdVerificationPanel() {
         throw new Error(e.error || 'Upload failed. Please try again.')
       }
       setFront(null); setBack(null); setSelfie(null); setIdNumber('')
-      await load()
+      // The rejected-ID notices read /api/auth/me — refresh it so they clear.
+      await Promise.all([load(), loadMe(true)])
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Upload failed. Please try again.')
     } finally {
@@ -163,7 +171,9 @@ export function IdVerificationPanel() {
               <IdPhotoInput side="front" label="Front of ID" value={front} onPick={onPick} onClear={() => setFront(null)} disabled={submitting} />
               <IdPhotoInput side="back" label="Back of ID" value={back} onPick={onPick} onClear={() => setBack(null)} disabled={submitting} />
             </div>
-            <IdPhotoInput side="selfie" label="Personal photo (selfie)" value={selfie} capture="user" onPick={onPick} onClear={() => setSelfie(null)} disabled={submitting} />
+            {needsSelfie && (
+              <IdPhotoInput side="selfie" label="Personal photo (selfie)" value={selfie} capture="user" onPick={onPick} onClear={() => setSelfie(null)} disabled={submitting} />
+            )}
 
             <div className="space-y-1">
               <label htmlFor="doc-type" className="text-xs font-medium text-muted-foreground">Document type</label>
@@ -196,7 +206,7 @@ export function IdVerificationPanel() {
 
             {error && <p className="text-sm text-red-600">{error}</p>}
 
-            <Button onClick={submit} disabled={!front || !back || !selfie || submitting} className="w-full">
+            <Button onClick={submit} disabled={!photosReady || submitting} className="w-full">
               {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting…</> : 'Submit for verification'}
             </Button>
           </div>

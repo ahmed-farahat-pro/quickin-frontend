@@ -1,8 +1,9 @@
 'use client'
 
-// The guest's QR, on their own reservation card.
+// The guest's stay pass (code + link), on their own reservation card. No QR —
+// it was removed; the code and the pass link are the whole pass.
 //
-// THE RULE (same on the backend, web, iOS and Android): no QR, no pass link and
+// THE RULE (same on the backend, web, iOS and Android): no code, no pass link and
 // no wallet affordance until the reservation is confirmed AND PAID. Two
 // independent gates, because the two halves fail differently:
 //   1. isLiveStayPass() — confirmed AND the payment approved, or completed
@@ -10,12 +11,11 @@
 //
 // `confirmed` on its own is NOT the gate. It means the host accepted the request;
 // the reservation code is minted right there and the guest pays afterwards. Keying
-// the QR off status alone showed a live pass for a stay nobody had paid for.
+// the pass off status alone showed a live pass for a stay nobody had paid for.
 import { useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { stayPassPath } from '@/lib/stay-code'
 import { isLiveStayPass } from '@/lib/local/payment-flow-core'
-import { StayQr } from '@/app/stay/stay-qr'
 
 const C = { burgundy: '#5B0F16', cream: '#F6F1E6', ink: '#2A2220', muted: '#6B6055' }
 
@@ -30,7 +30,7 @@ export function StayPassCard({
   status: string
   /** NULL until the host approves — never coerce this to a string. */
   reservationCode: string | null
-  /** Resolved server-side so the QR encodes an absolute URL on this very
+  /** Resolved server-side so the copied link is an absolute URL on this very
    *  deployment, and server and client render the same markup. */
   origin: string
   /** Raw bookings.payment_status. */
@@ -56,7 +56,7 @@ export function StayPassCard({
   const path = isLive ? stayPassPath(reservationCode, locale) : null
 
   // Approved by the host but the money isn't in yet: say what's outstanding
-  // rather than showing a QR the stay hasn't earned.
+  // rather than showing a pass the stay hasn't earned.
   if (!isLive && status === 'confirmed') {
     return (
       <div
@@ -110,10 +110,6 @@ export function StayPassCard({
   return (
     <div
       style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        gap: 14,
         marginTop: 14,
         padding: '13px 15px',
         background: C.cream,
@@ -121,8 +117,7 @@ export function StayPassCard({
         borderRadius: 14,
       }}
     >
-      <StayQr value={url} size={92} title={reservationCode ?? undefined} />
-      <div style={{ minWidth: 0, flex: '1 1 180px' }}>
+      <div style={{ minWidth: 0 }}>
         <p style={{ margin: 0, fontSize: 13.5, fontWeight: 700, color: C.ink }}>{t('guest.heading')}</p>
         <p
           style={{

@@ -143,6 +143,10 @@ type AdminBooking = {
   check_out: string
   guest_name: string | null
   guest_email: string | null
+  guest_id?: string | null
+  /** Masked by the API — the full number is behind the profile's audited Reveal. */
+  guest_phone?: string | null
+  guest_verification_status?: string
   listing_title: string | null
   created_at: string
 }
@@ -198,6 +202,23 @@ type Verification = {
   reviewed_at?: string | null
   reviewed_by?: string | null
   notes?: string | null
+  /** Where the document was filed from: 'manual' (the /verify-id upload),
+   *  'host_application' (with a become-a-host application) or 'signup' (with a
+   *  new account — email signup or the Google "Complete your account" step). */
+  source?: string | null
+}
+
+/** Reviewer-facing label for id_verifications.source; the raw value for anything new. */
+const VERIFICATION_SOURCE_LABELS: Record<string, string> = {
+  manual: 'ID upload',
+  host_application: 'Host application',
+  signup: 'Signup',
+}
+
+function verificationSourceLabel(source: string | null | undefined): string | null {
+  const s = String(source ?? '').trim()
+  if (!s) return null
+  return VERIFICATION_SOURCE_LABELS[s] ?? s
 }
 
 /** A request to change the ID number already stored on an account. Shares this
@@ -1339,6 +1360,33 @@ export function OpsDashboard({
                           {b.guest_email ? (
                             <div style={{ color: MUTED, fontSize: 12 }}>{b.guest_email}</div>
                           ) : null}
+                          {/* The guest summary: masked phone and ID state here, the full
+                              details and documents one click away on their profile. */}
+                          {b.guest_phone ? (
+                            <div style={{ color: MUTED, fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>{b.guest_phone}</div>
+                          ) : null}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+                            {b.guest_verification_status ? (
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  borderRadius: 999,
+                                  padding: '2px 8px',
+                                  whiteSpace: 'nowrap',
+                                  background: b.guest_verification_status === 'verified' ? '#E4F3EC' : b.guest_verification_status === 'rejected' ? '#FBE4E2' : TAN,
+                                  color: b.guest_verification_status === 'verified' ? GREEN : b.guest_verification_status === 'rejected' ? '#B3261E' : MUTED,
+                                }}
+                              >
+                                ID {b.guest_verification_status}
+                              </span>
+                            ) : null}
+                            {b.guest_id && can('users') ? (
+                              <Link href={`/ops/users/${b.guest_id}`} style={{ fontSize: 12, fontWeight: 600, color: BURGUNDY }}>
+                                View guest →
+                              </Link>
+                            ) : null}
+                          </div>
                         </td>
                         <td style={tdStyle}>{b.listing_title || '—'}</td>
                         <td style={{ ...tdStyle, whiteSpace: 'nowrap', color: MUTED }}>
@@ -1811,7 +1859,7 @@ export function OpsDashboard({
                 <Empty
                   tone="blank"
                   title="No verifications yet"
-                  body="IDs appear here as soon as hosts submit them."
+                  body="IDs appear here as soon as hosts and new members submit them."
                 />
               ) : (
                 <Empty
@@ -1855,6 +1903,12 @@ export function OpsDashboard({
                       <div>
                         <div style={labelStyle}>ID number</div>
                         <div style={{ fontSize: 14 }}>{v.id_number}</div>
+                      </div>
+                    ) : null}
+                    {verificationSourceLabel(v.source) ? (
+                      <div>
+                        <div style={labelStyle}>Source</div>
+                        <div style={{ fontSize: 14 }}>{verificationSourceLabel(v.source)}</div>
                       </div>
                     ) : null}
                   </div>

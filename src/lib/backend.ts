@@ -95,6 +95,12 @@ export interface Viewer {
   host_type: string | null
   host_status: string
   host_review_note: string | null
+  /** Signup identity (signup-identity-ui-core). Optional: absent on an older
+   *  backend, which reads as "nothing owed". */
+  identity_required?: boolean
+  identity_complete?: boolean
+  verification_status?: 'unverified' | 'pending' | 'verified' | 'rejected'
+  verification_note?: string | null
 }
 
 /**

@@ -1877,7 +1877,8 @@
       "emailInvalid": "Please enter a valid email address.",
       "emailBadTld": "“.{tld}” isn't a valid domain extension.",
       "emailDidYouMean": "Did you mean {suggestion}?",
-      "emailDisposable": "Temporary or disposable email addresses are not allowed. Please use a permanent personal or work email."
+      "emailDisposable": "Temporary or disposable email addresses are not allowed. Please use a permanent personal or work email.",
+      "tooLarge": "Your ID photos are too large to send. Please retake them or choose smaller ones."
     },
     "otp": {
       "label": "Verification code",
@@ -2703,15 +2704,15 @@
     },
     "missingCode": {
       "title": "This link is missing a reservation code",
-      "body": "Open your reservation in the Quick In app and scan its QR code again — it takes you straight to your stay pass.",
+      "body": "Open your reservation in the Quick In app and tap Open stay pass again — it takes you straight to your stay pass.",
       "cta": "Go to my bookings"
     },
     "guest": {
       "heading": "Your stay pass",
-      "scanHint": "Show this QR code at check-in.",
-      "pendingTitle": "Your QR code will appear here once your reservation is confirmed.",
+      "scanHint": "Show this code at check-in.",
+      "pendingTitle": "Your stay pass will appear here once your reservation is confirmed.",
       "pendingBody": "We create it once your host approves the request and your payment is confirmed.",
-      "unpaidTitle": "Your QR code opens once your payment is confirmed.",
+      "unpaidTitle": "Your stay pass opens once your payment is confirmed.",
       "unpaidBody": "Your host has approved the stay. Send the transfer and we'll unlock your pass as soon as we've checked it.",
       "openPass": "Open stay pass",
       "copyLink": "Copy link",
@@ -2719,7 +2720,7 @@
     },
     "host": {
       "heading": "Stay guide",
-      "intro": "Add what your guest needs: house info, photos, links to places nearby and documents. They see it all when they scan their QR code.",
+      "intro": "Add what your guest needs: house info, photos, links to places nearby and documents. They see it all when they open their stay pass.",
       "locked": "The stay guide opens once you approve this reservation.",
       "manage": "Manage stay guide",
       "hide": "Hide stay guide",
@@ -3013,6 +3014,72 @@
     "empty": {
       "title": "No questions yet",
       "hint": "When a guest asks about one of your listings, it shows up here."
+    }
+  },
+  "signupIdentity": {
+    "sectionTitle": "Phone & ID",
+    "sectionHint": "Every Quick In account is verified. Our team reviews your document — you can keep exploring and booking while it is checked.",
+    "fields": {
+      "phone": "Phone number",
+      "phonePlaceholder": "010 1234 5678",
+      "docType": "Document type",
+      "idNumber": "Document number",
+      "idNumberPlaceholderNational": "14-digit national ID number",
+      "idNumberPlaceholderOther": "As printed on your document",
+      "photos": "Photos of your document",
+      "idFront": "Front",
+      "idBack": "Back"
+    },
+    "docTypes": {
+      "national_id": "National ID",
+      "passport": "Passport",
+      "residence_permit": "Residence permit"
+    },
+    "photo": {
+      "add": "Add photo",
+      "processing": "Preparing photo…",
+      "remove": "Remove photo",
+      "hint": "Take or choose clear photos with all four corners visible."
+    },
+    "errors": {
+      "phoneRequired": "Please enter your phone number.",
+      "phoneInvalid": "That doesn’t look like a phone number. Try 010 1234 5678 or +20 10 1234 5678.",
+      "phoneTaken": "This phone number is already used by another account.",
+      "docTypeRequired": "Please choose which document you are uploading.",
+      "idNumber": {
+        "required": "Please enter the number on your document.",
+        "nationalIdDigits": "A national ID number is digits only.",
+        "nationalIdLength": "A national ID number is 14 digits.",
+        "documentChars": "A document number can only contain letters and numbers.",
+        "documentLength": "A document number is between 5 and 24 characters."
+      },
+      "frontRequired": "Please add a photo of the front.",
+      "backRequired": "Please add a photo of the back.",
+      "photoUnreadable": "We couldn’t read that photo. Please try another one.",
+      "photoTooLarge": "That photo is too large even after compression. Please try a smaller one.",
+      "tooLarge": "Your ID photos are too large to send. Please retake them or choose smaller ones.",
+      "network": "Network error. Please try again."
+    },
+    "complete": {
+      "metaTitle": "Complete your account",
+      "title": "Complete your account",
+      "subtitle": "Add your phone number and an identity document to finish setting up your account.",
+      "signedInAs": "Signed in as {email}",
+      "loading": "Loading…",
+      "submit": "Finish setup",
+      "submitting": "Saving…",
+      "failed": "We couldn’t save your details. Please try again.",
+      "signOut": "Sign out"
+    },
+    "rejected": {
+      "title": "Your ID was not approved",
+      "reason": "Reason",
+      "body": "Upload a new photo of your document to book stays again.",
+      "cta": "Upload your ID again"
+    },
+    "booking": {
+      "incomplete": "Add your phone number and ID to finish setting up your account before booking.",
+      "completeCta": "Complete your account"
     }
   }
 }

@@ -1671,7 +1671,8 @@
       "emailInvalid": "Veuillez saisir une adresse e-mail valide.",
       "emailBadTld": "« .{tld} » n'est pas une extension de domaine valide.",
       "emailDidYouMean": "Vouliez-vous dire {suggestion} ?",
-      "emailDisposable": "Les adresses e-mail temporaires ou jetables ne sont pas autorisées. Veuillez utiliser une adresse personnelle ou professionnelle permanente."
+      "emailDisposable": "Les adresses e-mail temporaires ou jetables ne sont pas autorisées. Veuillez utiliser une adresse personnelle ou professionnelle permanente.",
+      "tooLarge": "Vos photos d’identité sont trop lourdes pour être envoyées. Reprenez-les ou choisissez-en de plus petites."
     },
     "otp": {
       "label": "Code de vérification",
@@ -2703,15 +2704,15 @@
     },
     "missingCode": {
       "title": "Ce lien ne contient pas de code de réservation",
-      "body": "Ouvrez votre réservation dans l'application Quick In et scannez à nouveau son QR code — il vous amène directement à votre pass.",
+      "body": "Ouvrez votre réservation dans l'application Quick In et touchez à nouveau « Ouvrir le pass » — il vous amène directement à votre pass.",
       "cta": "Voir mes réservations"
     },
     "guest": {
       "heading": "Votre pass de séjour",
-      "scanHint": "Présentez ce QR code à l'arrivée.",
-      "pendingTitle": "Votre QR code apparaîtra ici dès que votre réservation sera confirmée.",
+      "scanHint": "Présentez ce code à l'arrivée.",
+      "pendingTitle": "Votre pass de séjour apparaîtra ici dès que votre réservation sera confirmée.",
       "pendingBody": "Nous le créons une fois la demande acceptée par votre hôte et votre paiement confirmé.",
-      "unpaidTitle": "Votre QR code s'ouvrira dès que votre paiement sera confirmé.",
+      "unpaidTitle": "Votre pass de séjour s'ouvrira dès que votre paiement sera confirmé.",
       "unpaidBody": "Votre hôte a accepté le séjour. Envoyez le virement et nous débloquerons votre pass dès sa vérification.",
       "openPass": "Ouvrir le pass",
       "copyLink": "Copier le lien",
@@ -2719,7 +2720,7 @@
     },
     "host": {
       "heading": "Guide de séjour",
-      "intro": "Ajoutez ce dont votre voyageur a besoin : infos pratiques, photos, liens vers des adresses et documents. Il verra tout en scannant son QR code.",
+      "intro": "Ajoutez ce dont votre voyageur a besoin : infos pratiques, photos, liens vers des adresses et documents. Il verra tout en ouvrant son pass de séjour.",
       "locked": "Le guide de séjour s'ouvre une fois cette réservation acceptée.",
       "manage": "Gérer le guide de séjour",
       "hide": "Masquer le guide",
@@ -3013,6 +3014,72 @@
     "empty": {
       "title": "Aucune question pour l’instant",
       "hint": "Quand un voyageur pose une question sur l’une de vos annonces, elle apparaît ici."
+    }
+  },
+  "signupIdentity": {
+    "sectionTitle": "Téléphone et pièce d’identité",
+    "sectionHint": "Chaque compte Quick In est vérifié. Notre équipe examine votre document — vous pouvez continuer à explorer et réserver pendant la vérification.",
+    "fields": {
+      "phone": "Numéro de téléphone",
+      "phonePlaceholder": "010 1234 5678",
+      "docType": "Type de document",
+      "idNumber": "Numéro du document",
+      "idNumberPlaceholderNational": "Numéro national à 14 chiffres",
+      "idNumberPlaceholderOther": "Tel qu’imprimé sur votre document",
+      "photos": "Photos de votre document",
+      "idFront": "Recto",
+      "idBack": "Verso"
+    },
+    "docTypes": {
+      "national_id": "Carte d’identité nationale",
+      "passport": "Passeport",
+      "residence_permit": "Titre de séjour"
+    },
+    "photo": {
+      "add": "Ajouter une photo",
+      "processing": "Préparation de la photo…",
+      "remove": "Supprimer la photo",
+      "hint": "Prenez ou choisissez des photos nettes où les quatre coins sont visibles."
+    },
+    "errors": {
+      "phoneRequired": "Veuillez saisir votre numéro de téléphone.",
+      "phoneInvalid": "Cela ne ressemble pas à un numéro de téléphone. Essayez 010 1234 5678 ou +20 10 1234 5678.",
+      "phoneTaken": "Ce numéro de téléphone est déjà utilisé par un autre compte.",
+      "docTypeRequired": "Veuillez choisir le document que vous envoyez.",
+      "idNumber": {
+        "required": "Veuillez saisir le numéro figurant sur votre document.",
+        "nationalIdDigits": "Un numéro national ne contient que des chiffres.",
+        "nationalIdLength": "Un numéro national comporte 14 chiffres.",
+        "documentChars": "Un numéro de document ne contient que des lettres et des chiffres.",
+        "documentLength": "Un numéro de document comporte entre 5 et 24 caractères."
+      },
+      "frontRequired": "Veuillez ajouter une photo du recto.",
+      "backRequired": "Veuillez ajouter une photo du verso.",
+      "photoUnreadable": "Impossible de lire cette photo. Veuillez en essayer une autre.",
+      "photoTooLarge": "Cette photo est trop lourde, même compressée. Veuillez en essayer une plus petite.",
+      "tooLarge": "Vos photos d’identité sont trop lourdes pour être envoyées. Reprenez-les ou choisissez-en de plus petites.",
+      "network": "Erreur réseau. Veuillez réessayer."
+    },
+    "complete": {
+      "metaTitle": "Finalisez votre compte",
+      "title": "Finalisez votre compte",
+      "subtitle": "Ajoutez votre numéro de téléphone et une pièce d’identité pour terminer la création de votre compte.",
+      "signedInAs": "Connecté en tant que {email}",
+      "loading": "Chargement…",
+      "submit": "Terminer",
+      "submitting": "Enregistrement…",
+      "failed": "Impossible d’enregistrer vos informations. Veuillez réessayer.",
+      "signOut": "Se déconnecter"
+    },
+    "rejected": {
+      "title": "Votre pièce d’identité n’a pas été approuvée",
+      "reason": "Motif",
+      "body": "Envoyez une nouvelle photo de votre document pour pouvoir réserver à nouveau.",
+      "cta": "Renvoyer votre pièce d’identité"
+    },
+    "booking": {
+      "incomplete": "Ajoutez votre téléphone et votre pièce d’identité pour finaliser votre compte avant de réserver.",
+      "completeCta": "Finaliser votre compte"
     }
   }
 }
