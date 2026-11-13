@@ -167,6 +167,249 @@ function PreviewRow({ label, value }: { label: string; value: string }) {
   )
 }
 
+/** What the payout form holds — the same body PUT /api/local/host/payout-method
+ *  and POST /api/local/host/apply (`payout`) take. */
+export interface PayoutDraft {
+  method: ChoosablePayoutMethod
+  account_name: string
+  bank_name: string
+  iban: string
+  account_number: string
+  swift_bic: string
+  branch: string
+  instapay_address: string
+}
+
+/** A form seeded from what is saved (or empty). A retired method (a wallet saved
+ *  before it was withdrawn) can't be picked again, so editing one starts the
+ *  host on a bank account instead. */
+export function draftFromView(v: PayoutMethodView | null): PayoutDraft {
+  const isBank = v?.method === 'bank_account'
+  return {
+    method: v && !isRetiredPayoutMethod(v.method) ? (v.method as ChoosablePayoutMethod) : 'bank_account',
+    account_name: v?.account_name ?? '',
+    bank_name: isBank ? v.bank_name : '',
+    iban: isBank ? formatIban(v.iban) : '',
+    account_number: isBank ? v.account_number : '',
+    swift_bic: isBank ? v.swift_bic : '',
+    branch: isBank ? v.branch : '',
+    instapay_address: v?.method === 'instapay' ? v.account_ref : '',
+  }
+}
+
+/** The saved method, read back in full. Shared by /account and the host application. */
+export function PayoutSummary({ saved }: { saved: PayoutMethodView }) {
+  const t = useTranslations('payoutMethod')
+  return (
+    <div
+      style={{
+        background: C.cream,
+        borderRadius: 16,
+        border: '1px solid rgba(42,34,32,0.08)',
+        padding: '18px 20px',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase', color: C.burgundy }}>
+          {t(`methods.${saved.method}`)}
+        </span>
+        <span
+          style={{
+            display: 'inline-block',
+            background: '#e7f5ec',
+            color: '#177245',
+            fontSize: 12,
+            fontWeight: 700,
+            padding: '4px 12px',
+            borderRadius: 999,
+          }}
+        >
+          {t('badgeAdded')}
+        </span>
+      </div>
+
+      <div style={{ margin: '10px 0 14px', fontSize: 20, fontWeight: 700, color: C.ink, wordBreak: 'break-word' }}>
+        {saved.display}
+      </div>
+
+      <PreviewRow label={t('fields.accountName')} value={saved.account_name} />
+      {saved.method === 'bank_account' && saved.bank_name && (
+        <PreviewRow label={t('fields.bank')} value={saved.bank_name} />
+      )}
+      {saved.method === 'bank_account' && saved.iban_formatted && (
+        <PreviewRow label={t('fields.iban')} value={saved.iban_formatted} />
+      )}
+      {saved.method === 'bank_account' && saved.account_number && (
+        <PreviewRow label={t('fields.accountNumber')} value={saved.account_number} />
+      )}
+      {saved.method === 'bank_account' && saved.swift_bic && (
+        <PreviewRow label={t('fields.swift')} value={saved.swift_bic} />
+      )}
+      {saved.method === 'bank_account' && saved.branch && (
+        <PreviewRow label={t('fields.branch')} value={saved.branch} />
+      )}
+      {saved.updated_at && (
+        <PreviewRow
+          label={t('fields.updated')}
+          value={new Date(saved.updated_at).toLocaleDateString(undefined, {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          })}
+        />
+      )}
+    </div>
+  )
+}
+
+/** The method picker + that method's inputs, controlled. No <form> of its own,
+ *  so it can sit inside another form (the host application). */
+export function PayoutFields({
+  value,
+  onChange,
+}: {
+  value: PayoutDraft
+  onChange: (next: PayoutDraft) => void
+}) {
+  const t = useTranslations('payoutMethod')
+  const set = (k: keyof PayoutDraft) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    onChange({ ...value, [k]: e.target.value })
+  return (
+    <>
+      <MethodPicker
+        value={value.method}
+        onChange={(m) => onChange({ ...value, method: m })}
+        label={t('chooseMethod')}
+        labelFor={(m: PayoutMethod) => t(`methods.${m}`)}
+      />
+
+      <div style={{ marginBottom: 16 }}>
+        <label htmlFor="payout-name" style={labelStyle}>
+          {t('fields.accountName')}
+        </label>
+        <input
+          id="payout-name"
+          type="text"
+          value={value.account_name}
+          onChange={set('account_name')}
+          placeholder={t('placeholders.accountName')}
+          autoComplete="name"
+          style={inputStyle}
+        />
+      </div>
+
+      {value.method === 'bank_account' && (
+        <>
+          <div style={{ marginBottom: 16 }}>
+            <label htmlFor="payout-bank" style={labelStyle}>
+              {t('fields.bank')}
+            </label>
+            <input
+              id="payout-bank"
+              type="text"
+              value={value.bank_name}
+              onChange={set('bank_name')}
+              placeholder={t('placeholders.bank')}
+              style={inputStyle}
+            />
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <label htmlFor="payout-iban" style={labelStyle}>
+              {t('fields.iban')}
+            </label>
+            <input
+              id="payout-iban"
+              type="text"
+              value={value.iban}
+              onChange={set('iban')}
+              placeholder={t('placeholders.iban')}
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
+              style={inputStyle}
+            />
+            <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>
+              {t('bankHint')}
+            </p>
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <label htmlFor="payout-account-number" style={labelStyle}>
+              {t('fields.accountNumber')}
+            </label>
+            <input
+              id="payout-account-number"
+              type="text"
+              value={value.account_number}
+              onChange={set('account_number')}
+              placeholder={t('placeholders.accountNumber')}
+              inputMode="numeric"
+              autoCorrect="off"
+              spellCheck={false}
+              style={inputStyle}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+            <div style={{ flex: '1 1 160px' }}>
+              <label htmlFor="payout-swift" style={labelStyle}>
+                {t('fields.swiftOptional')}
+              </label>
+              <input
+                id="payout-swift"
+                type="text"
+                value={value.swift_bic}
+                onChange={set('swift_bic')}
+                placeholder={t('placeholders.swift')}
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+                style={inputStyle}
+              />
+            </div>
+            <div style={{ flex: '1 1 160px' }}>
+              <label htmlFor="payout-branch" style={labelStyle}>
+                {t('fields.branchOptional')}
+              </label>
+              <input
+                id="payout-branch"
+                type="text"
+                value={value.branch}
+                onChange={set('branch')}
+                placeholder={t('placeholders.branch')}
+                style={inputStyle}
+              />
+            </div>
+          </div>
+        </>
+      )}
+
+      {value.method === 'instapay' && (
+        <div style={{ marginBottom: 16 }}>
+          <label htmlFor="payout-instapay" style={labelStyle}>
+            {t('fields.instapayAddress')}
+          </label>
+          <input
+            id="payout-instapay"
+            type="text"
+            value={value.instapay_address}
+            onChange={set('instapay_address')}
+            placeholder={t('placeholders.instapayAddress')}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            style={inputStyle}
+          />
+          <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>
+            {t('instapayHint')}
+          </p>
+        </div>
+      )}
+    </>
+  )
+}
+
 export function PayoutMethodCard({ initial }: { initial: PayoutMethodView | null }) {
   const router = useRouter()
   const t = useTranslations('payoutMethod')
@@ -174,23 +417,9 @@ export function PayoutMethodCard({ initial }: { initial: PayoutMethodView | null
   const [saved, setSaved] = useState<PayoutMethodView | null>(initial)
   // A host with nothing saved has nothing to preview, so open on the form.
   const [editing, setEditing] = useState(initial === null)
-  // A retired method (a wallet saved before it was withdrawn) can't be picked
-  // again, so editing one starts the host on a bank account instead.
-  const [method, setMethod] = useState<ChoosablePayoutMethod>(
-    initial && !isRetiredPayoutMethod(initial.method) ? (initial.method as ChoosablePayoutMethod) : 'bank_account'
-  )
-  const [accountName, setAccountName] = useState(initial?.account_name ?? '')
-  const isBank = initial?.method === 'bank_account'
-  const [bankName, setBankName] = useState(isBank ? initial.bank_name : '')
-  const [iban, setIban] = useState(isBank ? formatIban(initial.iban) : '')
-  const [accountNumber, setAccountNumber] = useState(isBank ? initial.account_number : '')
-  const [swiftBic, setSwiftBic] = useState(isBank ? initial.swift_bic : '')
-  const [branch, setBranch] = useState(isBank ? initial.branch : '')
-  const [instapayAddress, setInstapayAddress] = useState(initial?.method === 'instapay' ? initial.account_ref : '')
+  const [draft, setDraft] = useState<PayoutDraft>(() => draftFromView(initial))
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
-
-  const methodLabel = (m: PayoutMethod) => t(`methods.${m}`)
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
@@ -201,16 +430,7 @@ export function PayoutMethodCard({ initial }: { initial: PayoutMethodView | null
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
-        body: JSON.stringify({
-          method,
-          account_name: accountName,
-          bank_name: bankName,
-          iban,
-          account_number: accountNumber,
-          swift_bic: swiftBic,
-          branch,
-          instapay_address: instapayAddress,
-        }),
+        body: JSON.stringify(draft),
       })
       if (res.status === 401) {
         router.push('/login')
@@ -222,7 +442,7 @@ export function PayoutMethodCard({ initial }: { initial: PayoutMethodView | null
       setSaved(next)
       // Show the stored, normalised values rather than whatever was typed — an
       // IBAN entered without spaces should read back grouped.
-      if (next?.method === 'bank_account') setIban(next.iban_formatted)
+      if (next?.method === 'bank_account') setDraft((d) => ({ ...d, iban: next.iban_formatted }))
       setEditing(false)
       setMsg({ kind: 'ok', text: t('saved') })
       router.refresh()
@@ -276,64 +496,7 @@ export function PayoutMethodCard({ initial }: { initial: PayoutMethodView | null
       <section style={cardStyle}>
         {heading}
 
-        <div
-          style={{
-            background: C.cream,
-            borderRadius: 16,
-            border: '1px solid rgba(42,34,32,0.08)',
-            padding: '18px 20px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase', color: C.burgundy }}>
-              {methodLabel(saved.method)}
-            </span>
-            <span
-              style={{
-                display: 'inline-block',
-                background: '#e7f5ec',
-                color: '#177245',
-                fontSize: 12,
-                fontWeight: 700,
-                padding: '4px 12px',
-                borderRadius: 999,
-              }}
-            >
-              {t('badgeAdded')}
-            </span>
-          </div>
-
-          <div style={{ margin: '10px 0 14px', fontSize: 20, fontWeight: 700, color: C.ink, wordBreak: 'break-word' }}>
-            {saved.display}
-          </div>
-
-          <PreviewRow label={t('fields.accountName')} value={saved.account_name} />
-          {saved.method === 'bank_account' && saved.bank_name && (
-            <PreviewRow label={t('fields.bank')} value={saved.bank_name} />
-          )}
-          {saved.method === 'bank_account' && saved.iban_formatted && (
-            <PreviewRow label={t('fields.iban')} value={saved.iban_formatted} />
-          )}
-          {saved.method === 'bank_account' && saved.account_number && (
-            <PreviewRow label={t('fields.accountNumber')} value={saved.account_number} />
-          )}
-          {saved.method === 'bank_account' && saved.swift_bic && (
-            <PreviewRow label={t('fields.swift')} value={saved.swift_bic} />
-          )}
-          {saved.method === 'bank_account' && saved.branch && (
-            <PreviewRow label={t('fields.branch')} value={saved.branch} />
-          )}
-          {saved.updated_at && (
-            <PreviewRow
-              label={t('fields.updated')}
-              value={new Date(saved.updated_at).toLocaleDateString(undefined, {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-              })}
-            />
-          )}
-        </div>
+        <PayoutSummary saved={saved} />
 
         {isRetiredPayoutMethod(saved.method) && <Notice kind="error" text={t('retiredNotice')} />}
 
@@ -356,131 +519,7 @@ export function PayoutMethodCard({ initial }: { initial: PayoutMethodView | null
     <form style={cardStyle} onSubmit={save}>
       {heading}
 
-      <MethodPicker value={method} onChange={setMethod} label={t('chooseMethod')} labelFor={methodLabel} />
-
-      <div style={{ marginBottom: 16 }}>
-        <label htmlFor="payout-name" style={labelStyle}>
-          {t('fields.accountName')}
-        </label>
-        <input
-          id="payout-name"
-          type="text"
-          value={accountName}
-          onChange={(e) => setAccountName(e.target.value)}
-          placeholder={t('placeholders.accountName')}
-          autoComplete="name"
-          style={inputStyle}
-        />
-      </div>
-
-      {method === 'bank_account' && (
-        <>
-          <div style={{ marginBottom: 16 }}>
-            <label htmlFor="payout-bank" style={labelStyle}>
-              {t('fields.bank')}
-            </label>
-            <input
-              id="payout-bank"
-              type="text"
-              value={bankName}
-              onChange={(e) => setBankName(e.target.value)}
-              placeholder={t('placeholders.bank')}
-              style={inputStyle}
-            />
-          </div>
-
-          <div style={{ marginBottom: 16 }}>
-            <label htmlFor="payout-iban" style={labelStyle}>
-              {t('fields.iban')}
-            </label>
-            <input
-              id="payout-iban"
-              type="text"
-              value={iban}
-              onChange={(e) => setIban(e.target.value)}
-              placeholder={t('placeholders.iban')}
-              autoCapitalize="characters"
-              autoCorrect="off"
-              spellCheck={false}
-              style={inputStyle}
-            />
-            <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>
-              {t('bankHint')}
-            </p>
-          </div>
-
-          <div style={{ marginBottom: 16 }}>
-            <label htmlFor="payout-account-number" style={labelStyle}>
-              {t('fields.accountNumber')}
-            </label>
-            <input
-              id="payout-account-number"
-              type="text"
-              value={accountNumber}
-              onChange={(e) => setAccountNumber(e.target.value)}
-              placeholder={t('placeholders.accountNumber')}
-              inputMode="numeric"
-              autoCorrect="off"
-              spellCheck={false}
-              style={inputStyle}
-            />
-          </div>
-
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-            <div style={{ flex: '1 1 160px' }}>
-              <label htmlFor="payout-swift" style={labelStyle}>
-                {t('fields.swiftOptional')}
-              </label>
-              <input
-                id="payout-swift"
-                type="text"
-                value={swiftBic}
-                onChange={(e) => setSwiftBic(e.target.value)}
-                placeholder={t('placeholders.swift')}
-                autoCapitalize="characters"
-                autoCorrect="off"
-                spellCheck={false}
-                style={inputStyle}
-              />
-            </div>
-            <div style={{ flex: '1 1 160px' }}>
-              <label htmlFor="payout-branch" style={labelStyle}>
-                {t('fields.branchOptional')}
-              </label>
-              <input
-                id="payout-branch"
-                type="text"
-                value={branch}
-                onChange={(e) => setBranch(e.target.value)}
-                placeholder={t('placeholders.branch')}
-                style={inputStyle}
-              />
-            </div>
-          </div>
-        </>
-      )}
-
-      {method === 'instapay' && (
-        <div style={{ marginBottom: 16 }}>
-          <label htmlFor="payout-instapay" style={labelStyle}>
-            {t('fields.instapayAddress')}
-          </label>
-          <input
-            id="payout-instapay"
-            type="text"
-            value={instapayAddress}
-            onChange={(e) => setInstapayAddress(e.target.value)}
-            placeholder={t('placeholders.instapayAddress')}
-            autoCapitalize="none"
-            autoCorrect="off"
-            spellCheck={false}
-            style={inputStyle}
-          />
-          <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>
-            {t('instapayHint')}
-          </p>
-        </div>
-      )}
+      <PayoutFields value={draft} onChange={setDraft} />
 
       <div style={{ marginTop: 18, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
         <button type="submit" disabled={busy} style={buttonStyle(busy)}>

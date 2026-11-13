@@ -2577,7 +2577,10 @@
       "fullNameRequired": "Veuillez saisir votre nom complet.",
       "hostTypeInvalid": "Veuillez choisir particulier, entreprise ou agence.",
       "checkFields": "Veuillez vérifier les champs en surbrillance.",
-      "conflict": "Votre statut d’hôte a déjà changé. Nous avons actualisé cette page."
+      "conflict": "Votre statut d’hôte a déjà changé. Nous avons actualisé cette page.",
+      "termsRequired": "Veuillez accepter les conditions des hôtes pour postuler.",
+      "payoutRequired": "Veuillez ajouter un compte bancaire ou InstaPay pour que nous puissions vous payer.",
+      "payoutInvalid": "Veuillez vérifier vos informations de versement."
     },
     "pending": {
       "subtitle": "Votre candidature est en cours d’examen par notre équipe.",
@@ -2623,6 +2626,24 @@
       "reason": "Motif",
       "view": "Voir ma vérification d'identité",
       "nationalIdLocked": "Repris de la pièce d'identité déjà vérifiée."
+    },
+    "profile": {
+      "title": "Depuis votre profil",
+      "body": "Ces informations viennent de votre compte : rien à ressaisir. Notre équipe examine cette demande à partir d’elles.",
+      "edit": "Modifier dans le profil",
+      "idNumber": "Numéro de pièce d’identité",
+      "missingNote": "Il manque quelques informations à votre profil. Ajoutez-les ci-dessous — elles ne sont demandées qu’une fois."
+    },
+    "payout": {
+      "title": "Où devons-nous verser vos revenus ?",
+      "subtitle": "Ajoutez un compte bancaire ou InstaPay. Aucun versement n’a lieu avant votre approbation et vos premières réservations.",
+      "subtitleOnFile": "Nous avons déjà un moyen de versement pour vous.",
+      "onFileNote": "Une fois approuvé, vous pourrez le modifier depuis la page de votre compte.",
+      "replace": "En utiliser un autre",
+      "keep": "Garder celui enregistré"
+    },
+    "terms": {
+      "label": "J’accepte les <link>conditions des hôtes</link>."
     }
   },
   "contact": {
@@ -3081,5 +3102,147 @@
       "incomplete": "Ajoutez votre téléphone et votre pièce d’identité pour finaliser votre compte avant de réserver.",
       "completeCta": "Finaliser votre compte"
     }
+  },
+  "appGuide": {
+    "entry": {
+      "title": "Guide de l'application",
+      "subtitle": "Revoir la visite ou découvrir comment devenir hôte",
+      "takeTour": "Faire la visite de l'application",
+      "howToHost": "Comment devenir hôte",
+      "cancel": "Annuler"
+    },
+    "buttons": {
+      "next": "Suivant",
+      "back": "Retour",
+      "skip": "Passer",
+      "done": "Terminé",
+      "showMeHow": "Montrez-moi",
+      "applyNow": "Postuler maintenant",
+      "signIn": "Se connecter",
+      "close": "Fermer le guide"
+    },
+    "stepOf": "{current} sur {total}",
+    "stepLabel": "Étape {current} sur {total}",
+    "steps": {
+      "welcome": {
+        "title": "Bienvenue sur QuickIn",
+        "body": "Voici une visite rapide de l'essentiel. Elle prend moins d'une minute."
+      },
+      "search": {
+        "title": "Trouvez votre séjour",
+        "body": "Recherchez une destination, puis choisissez vos dates et le nombre de voyageurs."
+      },
+      "regions": {
+        "title": "Parcourir par région",
+        "body": "Choisissez une région, puis un complexe, pour affiner les séjours."
+      },
+      "filters": {
+        "title": "Filtrer et trier",
+        "body": "Affinez les résultats par prix, type de logement et plus encore."
+      },
+      "wishlist": {
+        "title": "Enregistrez vos favoris",
+        "body": "Touchez le cœur sur n'importe quel séjour pour le retrouver ici plus tard."
+      },
+      "trips": {
+        "title": "Vos voyages",
+        "body": "Vos réservations, paiements et reçus sont tous ici."
+      },
+      "profile": {
+        "title": "Votre profil",
+        "body": "Modifiez vos informations, changez de langue et de devise, obtenez de l'aide — et devenez hôte."
+      },
+      "profileSignedOut": {
+        "title": "Connectez-vous pour aller plus loin",
+        "body": "Connectez-vous ou créez un compte pour réserver, enregistrer des séjours et accueillir."
+      },
+      "finish": {
+        "title": "Tout est prêt",
+        "body": "Envie de gagner de l'argent avec votre logement ? Nous pouvons vous montrer comment devenir hôte."
+      },
+      "finishHost": {
+        "title": "Tout est prêt",
+        "body": "Gérez vos annonces à tout moment depuis votre profil."
+      },
+      "hostIntro": {
+        "title": "Devenir hôte",
+        "body": "Proposez votre logement sur QuickIn en trois étapes : postulez, faites-vous approuver, publiez."
+      },
+      "hostProfileTab": {
+        "title": "Commencez par votre profil",
+        "body": "Tout ce qui concerne l'accueil commence sur votre profil."
+      },
+      "hostBecomeHost": {
+        "title": "Postuler comme hôte",
+        "body": "Touchez ici pour ouvrir la candidature d'hôte."
+      },
+      "hostSignInFirst": {
+        "title": "Connectez-vous d'abord",
+        "body": "Il vous faut un compte QuickIn avant de pouvoir postuler comme hôte."
+      },
+      "hostPending": {
+        "title": "Candidature en cours d'examen",
+        "body": "Nous avons bien reçu votre candidature. Vous serez averti dès que notre équipe aura décidé."
+      },
+      "hostAlreadyHost": {
+        "title": "Vous êtes déjà hôte",
+        "body": "Ouvrez votre tableau de bord d'hôte pour gérer annonces, prix et réservations."
+      },
+      "hostRequirements": {
+        "title": "Ce qu'il vous faut",
+        "body": ""
+      },
+      "hostReview": {
+        "title": "Examen et approbation",
+        "body": "Notre équipe vérifie vos informations et votre pièce d'identité, généralement sous un ou deux jours. Vous recevrez une notification une fois approuvé."
+      },
+      "hostAfterApproval": {
+        "title": "Après l'approbation",
+        "body": "Ouvrez le tableau de bord d'hôte depuis votre profil pour ajouter une annonce, fixer vos prix et ajouter un moyen de versement pour être payé."
+      }
+    },
+    "requirements": {
+      "hostType": "Type d'hôte — particulier, société ou agence",
+      "nameAndId": "Nom complet et numéro d'identité nationale",
+      "phone": "Un numéro de mobile égyptien",
+      "address": "Votre adresse",
+      "idPhotos": "Photos du recto et du verso de votre pièce d'identité (carte nationale, passeport ou titre de séjour)"
+    }
+  },
+  "signupRole": {
+    "chooseTitle": "Comment utiliserez-vous Quick In ?",
+    "chooseHint": "Vous pourrez changer plus tard : un voyageur peut devenir hôte depuis son compte.",
+    "roles": {
+      "guest": {
+        "title": "Je suis voyageur",
+        "body": "Trouvez et réservez des séjours."
+      },
+      "host": {
+        "title": "Je suis hôte",
+        "body": "Publiez votre logement et soyez payé. Une page de plus pour l'hébergement et le versement."
+      }
+    },
+    "stepOf": "Étape {current} sur {total}",
+    "steps": {
+      "account": "Compte",
+      "identity": "Téléphone et pièce d'identité",
+      "refund": "Remboursement",
+      "hosting": "Hébergement",
+      "payout": "Versement"
+    },
+    "next": "Suivant",
+    "back": "Retour",
+    "skip": "Passer pour l'instant",
+    "createAccount": "Créer le compte",
+    "submitApplication": "Créer le compte et postuler",
+    "completeGuest": "Terminer",
+    "completeHost": "Terminer et postuler",
+    "refundTitle": "Où envoyer vos remboursements ?",
+    "refundHint": "Facultatif. Si un séjour payé est annulé, nous vous remboursons ici. Vous pourrez l'ajouter ou le modifier plus tard depuis votre compte.",
+    "payoutTitle": "Où envoyer vos revenus ?",
+    "payoutHint": "Obligatoire pour les hôtes. Vous pourrez le modifier plus tard depuis votre compte.",
+    "hostingTitle": "Parlez-nous de votre hébergement",
+    "hostingHint": "Votre demande part en vérification dès que vous terminez. Vous pouvez explorer pendant ce temps.",
+    "hostPending": "Votre demande d'hôte est en cours d'examen."
   }
 }

@@ -2577,7 +2577,10 @@
       "fullNameRequired": "Please enter your full name.",
       "hostTypeInvalid": "Please choose individual, company or brokerage.",
       "checkFields": "Please check the highlighted fields.",
-      "conflict": "Your host status has already changed. We refreshed this page."
+      "conflict": "Your host status has already changed. We refreshed this page.",
+      "termsRequired": "Please accept the host terms to apply.",
+      "payoutRequired": "Please add a bank account or InstaPay so we can pay you.",
+      "payoutInvalid": "Please check your payout details."
     },
     "pending": {
       "subtitle": "Your application is being reviewed by our team.",
@@ -2623,6 +2626,24 @@
       "reason": "Reason",
       "view": "View my identity verification",
       "nationalIdLocked": "Taken from the ID we already verified."
+    },
+    "profile": {
+      "title": "From your profile",
+      "body": "These come from your account, so there is nothing to type again. Our team reviews this application against them.",
+      "edit": "Edit in profile",
+      "idNumber": "ID number",
+      "missingNote": "Your profile is missing a few details. Add them below — they are only asked for once."
+    },
+    "payout": {
+      "title": "Where should we send your earnings?",
+      "subtitle": "Add a bank account or InstaPay. Nothing is paid out until you are approved and have bookings.",
+      "subtitleOnFile": "We already have a payout method for you.",
+      "onFileNote": "Once you are approved, you can change it from your account page.",
+      "replace": "Use a different one",
+      "keep": "Keep the one on file"
+    },
+    "terms": {
+      "label": "I agree to the <link>host terms</link>."
     }
   },
   "contact": {
@@ -3081,5 +3102,147 @@
       "incomplete": "Add your phone number and ID to finish setting up your account before booking.",
       "completeCta": "Complete your account"
     }
+  },
+  "appGuide": {
+    "entry": {
+      "title": "App guide",
+      "subtitle": "Replay the tour or learn how to host",
+      "takeTour": "Take the app tour",
+      "howToHost": "How to become a host",
+      "cancel": "Cancel"
+    },
+    "buttons": {
+      "next": "Next",
+      "back": "Back",
+      "skip": "Skip",
+      "done": "Done",
+      "showMeHow": "Show me how",
+      "applyNow": "Apply now",
+      "signIn": "Sign in",
+      "close": "Close guide"
+    },
+    "stepOf": "{current} of {total}",
+    "stepLabel": "Step {current} of {total}",
+    "steps": {
+      "welcome": {
+        "title": "Welcome to QuickIn",
+        "body": "Here's a quick tour of the essentials. It takes under a minute."
+      },
+      "search": {
+        "title": "Find your stay",
+        "body": "Search by destination, then pick your dates and number of guests."
+      },
+      "regions": {
+        "title": "Browse by region",
+        "body": "Pick a region, then a resort, to narrow down the stays."
+      },
+      "filters": {
+        "title": "Filter and sort",
+        "body": "Narrow results by price, property type and more."
+      },
+      "wishlist": {
+        "title": "Save your favourites",
+        "body": "Tap the heart on any stay to keep it here for later."
+      },
+      "trips": {
+        "title": "Your trips",
+        "body": "Your bookings, payments and receipts all live here."
+      },
+      "profile": {
+        "title": "Your profile",
+        "body": "Edit your details, change language and currency, get help — and become a host."
+      },
+      "profileSignedOut": {
+        "title": "Sign in to do more",
+        "body": "Sign in or create an account to book, save stays and host."
+      },
+      "finish": {
+        "title": "You're all set",
+        "body": "Want to earn from your place? We can show you how to become a host."
+      },
+      "finishHost": {
+        "title": "You're all set",
+        "body": "Manage your listings anytime from your profile."
+      },
+      "hostIntro": {
+        "title": "Become a host",
+        "body": "List your place on QuickIn in three steps: apply, get approved, publish."
+      },
+      "hostProfileTab": {
+        "title": "Start from your profile",
+        "body": "Everything about hosting starts on your profile."
+      },
+      "hostBecomeHost": {
+        "title": "Apply to host",
+        "body": "Tap here to open the host application."
+      },
+      "hostSignInFirst": {
+        "title": "Sign in first",
+        "body": "You need a QuickIn account before you can apply to host."
+      },
+      "hostPending": {
+        "title": "Application under review",
+        "body": "We've got your application. You'll be notified as soon as our team decides."
+      },
+      "hostAlreadyHost": {
+        "title": "You're already a host",
+        "body": "Open your host dashboard to manage listings, prices and bookings."
+      },
+      "hostRequirements": {
+        "title": "What you'll need",
+        "body": ""
+      },
+      "hostReview": {
+        "title": "Review and approval",
+        "body": "Our team checks your details and ID, usually within a day or two. You'll get a notification when you're approved."
+      },
+      "hostAfterApproval": {
+        "title": "After you're approved",
+        "body": "Open the host dashboard from your profile to add a listing, set your prices and add a payout method to get paid."
+      }
+    },
+    "requirements": {
+      "hostType": "Host type — individual, company or brokerage",
+      "nameAndId": "Full name and national ID number",
+      "phone": "An Egyptian mobile number",
+      "address": "Your address",
+      "idPhotos": "Photos of the front and back of your ID (national ID, passport or residence permit)"
+    }
+  },
+  "signupRole": {
+    "chooseTitle": "How will you use Quick In?",
+    "chooseHint": "You can change this later — guests can apply to host from their account.",
+    "roles": {
+      "guest": {
+        "title": "I'm a guest",
+        "body": "Find and book stays."
+      },
+      "host": {
+        "title": "I'm a host",
+        "body": "List your place and get paid. One extra page for hosting and payout details."
+      }
+    },
+    "stepOf": "Step {current} of {total}",
+    "steps": {
+      "account": "Account",
+      "identity": "Phone & ID",
+      "refund": "Refund details",
+      "hosting": "Hosting details",
+      "payout": "Payout"
+    },
+    "next": "Next",
+    "back": "Back",
+    "skip": "Skip for now",
+    "createAccount": "Create account",
+    "submitApplication": "Create account & apply",
+    "completeGuest": "Finish",
+    "completeHost": "Finish & apply",
+    "refundTitle": "Where should we send refunds?",
+    "refundHint": "Optional. If a paid stay is cancelled, we send your refund here. You can add or change it later on your account.",
+    "payoutTitle": "Where should we send your earnings?",
+    "payoutHint": "Required for hosts. You can change it later on your account.",
+    "hostingTitle": "Tell us about your hosting",
+    "hostingHint": "Your application goes to our team for review as soon as you finish. You can explore while it's reviewed.",
+    "hostPending": "Your host application is under review."
   }
 }

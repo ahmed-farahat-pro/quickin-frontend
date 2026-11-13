@@ -13,6 +13,8 @@ import { getTranslations, getLocale } from 'next-intl/server'
 import { Heart, MessageCircleQuestion } from 'lucide-react'
 import ExploreClient, { type DestinationRegion } from './explore-client'
 import AddListingFab from './add-listing-fab'
+import { AppGuide } from '@/components/features/app-guide/app-guide'
+import { AppGuideIconButton } from '@/components/features/app-guide/app-guide-button'
 import WhatsAppPicker, { WhatsAppGlyph } from '@/components/whatsapp-picker'
 import { SOCIAL_LINKS } from '@/lib/social'
 import { IconBrandInstagram, IconBrandTiktok, IconBrandFacebook } from '@tabler/icons-react'
@@ -185,6 +187,7 @@ export default async function ExplorePage({
             <NotificationsBell />
             <LocaleSwitcher className="font-semibold text-[color:var(--qk-ink,#3a2a23)]" />
             <CurrencySwitcher className="font-semibold text-[color:var(--qk-ink,#3a2a23)]" />
+            <AppGuideIconButton />
             {isHost && (
               // Guest questions — where the Messages inbox used to sit. Host ⇄ guest
               // messaging was replaced by public questions on each listing, so the
@@ -232,12 +235,14 @@ export default async function ExplorePage({
               <>
                 <a
                   href="/reservations"
+                  data-guide="trips"
                   style={{ color: COLORS.ink, textDecoration: 'none', fontWeight: 600 }}
                 >
                   {t('nav.trips')}
                 </a>
                 <a
                   href="/saved"
+                  data-guide="saved"
                   style={{ color: COLORS.ink, textDecoration: 'none', fontWeight: 600 }}
                 >
                   {t('nav.saved')}
@@ -260,6 +265,7 @@ export default async function ExplorePage({
               <>
                 <a
                   href="/login"
+                  data-guide="account signIn"
                   style={{
                     color: COLORS.ink,
                     textDecoration: 'none',
@@ -291,6 +297,7 @@ export default async function ExplorePage({
             {firstName && (
               <a
                 href="/saved"
+                data-guide="saved"
                 aria-label={t('nav.saved')}
                 className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#2A2220] transition-colors hover:bg-black/5"
               >
@@ -460,6 +467,10 @@ export default async function ExplorePage({
           (the WhatsApp FAB sits on the bottom-start corner). Same host gate the
           top-nav pill used to have. */}
       {isHost && <AddListingFab href="/host/new" label={t('nav.addListing')} />}
+
+      {/* App guide: auto-starts the main tour on a first visit; also resumes a
+          tour in progress and answers the "App guide" entries in the header. */}
+      <AppGuide signedIn={Boolean(firstName)} isHost={isHost} hostPending={false} autoStart />
     </main>
   )
 }
@@ -485,6 +496,7 @@ function ProfileAvatar({
       href="/account"
       title={label}
       aria-label={label}
+      data-guide="account"
       style={{
         display: 'inline-flex',
         flex: '0 0 auto',

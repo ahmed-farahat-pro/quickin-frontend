@@ -214,6 +214,15 @@ interface RefundRow {
   check_out: string
   refunded_at: string | null
   refund_reference: string | null
+  /** The bank account / InstaPay the guest gave for refunds (signup or profile).
+   *  Absent on an older backend; null when the guest gave none. */
+  guest_refund_method?: {
+    method: string
+    method_label: string
+    account_name: string
+    display: string
+    swift_bic?: string
+  } | null
 }
 
 /**
@@ -326,6 +335,16 @@ function RefundsQueue({ initial }: { initial: { due: RefundRow[]; settled: Refun
                 <div style={{ fontSize: 13, color: C.ink, marginTop: 4 }}>
                   {r.guest_phone || r.guest_email || <span style={{ color: '#b3261e' }}>No contact on file</span>}
                 </div>
+                {/* The destination the guest chose, when they gave one — the IBAN or
+                    InstaPay address is shown whole so it can be copied into a transfer. */}
+                {r.guest_refund_method && (
+                  <div style={{ fontSize: 13, color: C.ink, marginTop: 4 }}>
+                    <span style={{ color: C.muted }}>Refund to {r.guest_refund_method.method_label}:</span>{' '}
+                    <span style={{ fontWeight: 600, userSelect: 'all' }}>{r.guest_refund_method.display}</span>
+                    {' · '}{r.guest_refund_method.account_name}
+                    {r.guest_refund_method.swift_bic ? ` · SWIFT ${r.guest_refund_method.swift_bic}` : ''}
+                  </div>
+                )}
                 <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
                   {r.refund_percent}% of {fmtMoney(r.total_price)}
                   {r.cancelled_at ? ` · cancelled ${new Date(r.cancelled_at).toLocaleDateString()}` : ''}

@@ -5,8 +5,13 @@
 // document, both of which every new account owes; until they are on file the
 // IdentityGate in the root layout keeps sending the user back here.
 //
-//   POST /api/local/account/identity { phone, doc_type, id_number, id_front, id_back }
-//     → 200 the new identity state | 400 { error, fields } | 409 nothing owed
+//   POST /api/local/account/identity { phone, doc_type, id_number, id_front, id_back,
+//        role, …role pages }
+//     → 200 the new identity + host state | 400 { error, fields } | 409 nothing owed
+//
+// It walks the same role pages as /signup minus the account one (Google made the
+// account): Guest / Host cards (Guest preselected, or the card picked on /signup
+// before the Google button), then Phone & ID → refund (optional) | hosting → payout.
 import { useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import {
@@ -19,6 +24,16 @@ import {
 } from '@/components/features/auth/identity-fields'
 import { loadMe } from '@/components/features/auth/identity-gate'
 import { needsAccountCompletion } from '@/lib/local/signup-identity-ui-core'
+import {
+  DestinationStep,
+  HostingFields,
+  RoleCards,
+  StepIndicator,
+  StepNav,
+  storedSignupRole,
+  useSignupRoleFlow,
+} from '@/components/features/auth/signup-role-steps'
+import { firstStepWithError } from '@/lib/local/signup-role-ui-core'
 
 const C = {
   burgundy: '#5B0F16',
@@ -31,7 +46,9 @@ const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
 
 export default function CompleteAccountPage() {
   const t = useTranslations('signupIdentity')
+  const tr = useTranslations('signupRole')
   const check = useIdentityValidation()
+  const flow = useSignupRoleFlow(false)
   const [email, setEmail] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
   const [identity, setIdentity] = useState<IdentityValues>(EMPTY_IDENTITY)
@@ -54,24 +71,41 @@ export default function CompleteAccountPage() {
         return
       }
       setEmail(typeof me.email === 'string' ? me.email : null)
+      // The card picked on /signup before the Google button, if any.
+      flow.setRole(storedSignupRole())
       setReady(true)
     })
     return () => { live = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function submit(e: React.FormEvent) {
+  /** Next on every page but the last; the last one posts everything. */
+  function handleStep(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    const found = check.validate(identity)
-    setErrors(found)
-    if (Object.keys(found).length) return
+    if (flow.current === 'identity') {
+      const found = check.validate(identity)
+      setErrors(found)
+      if (Object.keys(found).length) return
+    } else if (!flow.validateCurrent()) {
+      return
+    }
+    if (!flow.isLast) {
+      flow.goTo(flow.step + 1)
+      return
+    }
+    void submit(false)
+  }
+
+  async function submit(refundSkipped: boolean) {
+    setError(null)
     setLoading(true)
     try {
       const res = await fetch('/api/local/account/identity', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(identityPayload(identity)),
+        body: JSON.stringify({ ...identityPayload(identity), ...flow.body(refundSkipped) }),
       })
       if (res.status === 401) {
         window.location.href = '/login'
@@ -85,12 +119,16 @@ export default function CompleteAccountPage() {
       }
       if (res.status === 413) {
         setError(t('errors.tooLarge'))
+        flow.goTo(flow.steps.indexOf('identity'))
         setLoading(false)
         return
       }
       const data = await res.json().catch(() => ({}))
       const fromServer = check.fromServer(data?.fields, identity)
       if (Object.keys(fromServer).length) setErrors(fromServer)
+      flow.applyServerFields(data?.fields)
+      const at = firstStepWithError(flow.steps, Object.keys(data?.fields ?? {}))
+      if (at !== -1) flow.goTo(at)
       else setError(data?.error || t('complete.failed'))
       setLoading(false)
     } catch {
@@ -167,36 +205,74 @@ export default function CompleteAccountPage() {
         {!ready ? (
           <p style={{ textAlign: 'center', fontSize: 14, color: C.muted }}>{t('complete.loading')}</p>
         ) : (
-          <form onSubmit={submit} noValidate>
-            <IdentityFields
-              idPrefix="complete"
-              value={identity}
-              onChange={setIdentity}
-              errors={errors}
-              onClearError={(f) => setErrors((e) => ({ ...e, [f]: undefined }))}
+          !flow.started ? (
+            <div>
+              <h2 style={{ margin: '0 0 14px', fontSize: 18, fontWeight: 700, color: C.ink, textAlign: 'center' }}>
+                {tr('chooseTitle')}
+              </h2>
+              <RoleCards value={flow.role} onChange={flow.setRole} />
+              <StepNav
+                primaryType="button"
+                primaryLabel={tr('next')}
+                backLabel={tr('back')}
+                onPrimary={() => {
+                  flow.setStarted(true)
+                  flow.goTo(0)
+                }}
+              />
+            </div>
+          ) : (
+          <form onSubmit={handleStep} noValidate>
+            <StepIndicator steps={flow.steps} current={flow.step} />
+            {flow.current === 'identity' && (
+              <IdentityFields
+                idPrefix="complete"
+                value={identity}
+                onChange={setIdentity}
+                errors={errors}
+                onClearError={(f) => setErrors((e) => ({ ...e, [f]: undefined }))}
+                disabled={loading}
+              />
+            )}
+            {flow.current === 'hosting' && (
+              <HostingFields idPrefix="complete-hosting" value={flow.hosting} onChange={flow.setHosting} errors={flow.hostingErrors} />
+            )}
+            {(flow.current === 'refund' || flow.current === 'payout') && (
+              <DestinationStep
+                kind={flow.current}
+                value={flow.destination}
+                onChange={flow.setDestination}
+                error={flow.destinationError}
+              />
+            )}
+            <StepNav
+              backLabel={tr('back')}
+              onBack={() => (flow.step === 0 ? flow.setStarted(false) : flow.goTo(flow.step - 1))}
               disabled={loading}
+              primaryLabel={
+                loading
+                  ? t('complete.submitting')
+                  : !flow.isLast
+                    ? tr('next')
+                    : flow.role === 'host'
+                      ? tr('completeHost')
+                      : tr('completeGuest')
+              }
             />
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                width: '100%',
-                marginTop: 6,
-                fontFamily: FONT,
-                fontSize: 16,
-                fontWeight: 600,
-                color: '#fff',
-                background: C.burgundy,
-                border: 'none',
-                borderRadius: 20,
-                padding: '13px 16px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.7 : 1,
-              }}
-            >
-              {loading ? t('complete.submitting') : t('complete.submit')}
-            </button>
+            {flow.current === 'refund' && (
+              <p style={{ margin: '14px 0 0', textAlign: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => void submit(true)}
+                  disabled={loading}
+                  style={{ background: 'none', border: 'none', padding: 0, color: C.burgundy, fontFamily: FONT, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  {tr('skip')}
+                </button>
+              </p>
+            )}
           </form>
+          )
         )}
 
         <p style={{ margin: '20px 0 0', textAlign: 'center', fontSize: 14 }}>

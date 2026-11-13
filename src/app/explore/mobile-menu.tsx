@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/sheet'
 import { LocaleSwitcher } from '@/components/layout/locale-switcher'
 import { CurrencySwitcher } from '@/components/layout/currency-switcher'
+import { AppGuideMenuRow } from '@/components/features/app-guide/app-guide-button'
 
 // Nav row: icon + label, with padding so text never sits against the edge.
 const ROW =
@@ -31,6 +32,9 @@ export function MobileMenu({ firstName, isHost }: { firstName: string | null; is
         <button
           type="button"
           aria-label={t('nav.menu')}
+          // App guide anchor on narrow screens, where Saved / Reservations /
+          // the account entry collapse into this menu.
+          data-guide="saved trips account signIn"
           className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#2A2220] transition-colors hover:bg-black/5"
         >
           <Menu className="h-6 w-6" />
@@ -102,6 +106,8 @@ export function MobileMenu({ firstName, isHost }: { firstName: string | null; is
               </a>
             </>
           )}
+          {/* App guide — here for signed-in and signed-out visitors alike. */}
+          <AppGuideMenuRow className={ROW} onBeforeOpen={close} />
           <div className="mt-4 flex flex-col gap-3 border-t border-[#5B0F16]/10 px-2 pt-4">
             <LocaleSwitcher className="font-semibold text-[#2A2220]" />
             <CurrencySwitcher className="font-semibold text-[#2A2220]" />

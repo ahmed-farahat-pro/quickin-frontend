@@ -9,6 +9,12 @@
 // The signed-in user's identity verification is resolved here too and handed to
 // the form, which drops its ID-upload step for anyone already verified or under
 // review. See needsIdentityDocuments in host-verification-core.
+//
+// Same account, no re-typing (2026-11-13): the application GET also returns the
+// applicant's `profile` (name, phone, ID number + which of them are `missing`)
+// and any `payout_method` on file. The form shows the profile read-only, asks
+// only for what is missing, and asks for a payout destination only when none is
+// on file. See lib/local/host-apply-core.
 import type { Metadata } from 'next'
 import type { HostStatus, HostApplication, Verification } from '@/lib/types'
 import { viewer, backendFetchOr } from '@/lib/backend'
@@ -16,6 +22,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
 import { normalizeVerificationStatus } from '@/lib/local/host-verification-core'
+import type { PayoutMethodView } from '@/lib/local/payout-method-core'
 import { ApplyForm } from './apply-form'
 
 export const dynamic = 'force-dynamic'
@@ -39,6 +46,22 @@ const COLORS = {
 }
 
 const FONT = '"DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif'
+
+/** GET /api/local/host/application. Everything but `application` is optional
+ *  so an older backend (or the fallback below) still renders a working form. */
+interface ApplicationResponse {
+  application: HostApplication | null
+  profile?: {
+    full_name: string | null
+    phone: string | null
+    national_id: string | null
+    doc_type: string | null
+    verification_status: string | null
+    missing: string[]
+  } | null
+  payout_method?: PayoutMethodView | null
+  terms_version?: string
+}
 
 interface ApplyUser {
   id: string
@@ -108,8 +131,8 @@ export default async function HostApplyPage() {
   // row, not users.verification_status) so the form asks for exactly what the
   // server will require — an already-verified applicant is never sent back to
   // photograph the same ID a second time.
-  const [{ application }, verification] = await Promise.all([
-    backendFetchOr<{ application: HostApplication | null }>('/api/local/host/application', { application: null }),
+  const [{ application, profile = null, payout_method: payoutMethod = null }, verification] = await Promise.all([
+    backendFetchOr<ApplicationResponse>('/api/local/host/application', { application: null }),
     backendFetchOr<Verification | null>('/api/local/verification', null),
   ])
   const pending = user.host_status === 'pending'
@@ -247,6 +270,8 @@ export default async function HostApplyPage() {
         ) : (
           <ApplyForm
             initialName={application?.full_name || user.full_name || ''}
+            profile={profile}
+            payoutOnFile={payoutMethod}
             reapply={rejected}
             identity={{
               status: normalizeVerificationStatus(verification?.status ?? null),

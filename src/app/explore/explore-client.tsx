@@ -521,6 +521,7 @@ export default function ExploreClient({ initialListings, initialFilters, destina
           <div
             role="search"
             className="qk-search-grid"
+            data-guide="search"
             style={{
               background: '#fff',
               borderRadius: 22,
@@ -679,6 +680,7 @@ export default function ExploreClient({ initialListings, initialFilters, destina
               className="qk-cats"
               role="toolbar"
               aria-label={t('destinations.rail')}
+              data-guide="regions"
               style={{
                 display: 'flex',
                 gap: 26,
@@ -760,6 +762,7 @@ export default function ExploreClient({ initialListings, initialFilters, destina
 
             <div
               className="qk-status-controls"
+              data-guide="filters"
               style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', justifyContent: 'flex-end', minWidth: 0 }}
             >
               {/* Property type lives behind Filters (as on iOS/Android); the

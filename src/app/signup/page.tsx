@@ -17,6 +17,15 @@ import {
   type IdentityValues,
 } from '@/components/features/auth/identity-fields'
 import { postAuthPath } from '@/lib/local/signup-identity-ui-core'
+import {
+  DestinationStep,
+  HostingFields,
+  RoleCards,
+  StepIndicator,
+  StepNav,
+  useSignupRoleFlow,
+} from '@/components/features/auth/signup-role-steps'
+import { firstStepWithError } from '@/lib/local/signup-role-ui-core'
 
 const COLORS = {
   burgundy: '#5B0F16',
@@ -89,6 +98,9 @@ export default function SignupPage() {
   const t = useTranslations('signupLocal')
   const tp = useTranslations('passwordPolicy')
   const tn = useTranslations('namePolicy')
+  const tr = useTranslations('signupRole')
+  // Guest / Host cards, then the stepped pages (signup-role-ui-core).
+  const flow = useSignupRoleFlow(true)
   // Shared with the exit link above the card so the logo is a second door out.
   const returnHref = useAuthReturnHref()
   const [fullName, setFullName] = useState('')
@@ -289,49 +301,89 @@ export default function SignupPage() {
     return !problem
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  /** Local checks for the page on screen; true when it may move on. */
+  function validateStep(): boolean {
+    if (flow.current === 'account') {
+      // Every gate runs before any of them returns, so a page with three
+      // problems shows all three rather than one at a time.
+      const nameOk = validateNameField()
+      const emailOk = validateEmail()
+      const passwordOk = validatePasswordField()
+      return nameOk && emailOk && passwordOk
+    }
+    if (flow.current === 'identity') {
+      const idErrors = identityCheck.validate(identity)
+      setIdentityErrors(idErrors)
+      return !Object.keys(idErrors).length
+    }
+    return flow.validateCurrent()
+  }
+
+  /** Next on every page but the last; the last one creates the account. */
+  function handleStep(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     setNotice(null)
-    // Every gate runs before any of them returns, so a form with three problems
-    // shows all three rather than one at a time.
-    const nameOk = validateNameField()
-    const emailOk = validateEmail()
-    const passwordOk = validatePasswordField()
-    const idErrors = identityCheck.validate(identity)
-    setIdentityErrors(idErrors)
-    if (!nameOk || !emailOk || !passwordOk || Object.keys(idErrors).length) return
+    if (!validateStep()) return
+    if (!flow.isLast) {
+      flow.goTo(flow.step + 1)
+      return
+    }
+    void createAccount(false)
+  }
+
+  /** One request with every page's fields. `refundSkipped` is the guest's Skip. */
+  async function createAccount(refundSkipped: boolean) {
+    setError(null)
+    setNotice(null)
     setLoading(true)
     try {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, full_name: fullName, ...identityPayload(identity) }),
+        body: JSON.stringify({
+          email,
+          password,
+          full_name: fullName,
+          ...identityPayload(identity),
+          ...flow.body(refundSkipped),
+        }),
       })
       if (res.status === 413) {
         // The platform refused the body before the route ran — the photos.
         setError(t('errors.tooLarge'))
+        flow.goTo(flow.steps.indexOf('identity'))
         setLoading(false)
         return
       }
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        // Phone / document problems come back keyed like the request body.
+        // Every page's problems come back together, keyed like the body.
         const serverIdErrors = identityCheck.fromServer(data?.fields, identity)
         if (Object.keys(serverIdErrors).length) setIdentityErrors(serverIdErrors)
+        flow.applyServerFields(data?.fields)
+        const keys = Object.keys(data?.fields ?? {})
         // The server re-checks the address and can reject one this build's TLD
         // snapshot still accepts. Show that under the field, in this locale.
         if (data?.nameProblem) setNameError(nameMessage(data.nameProblem))
         else if (data?.emailProblem) setEmailError(emailMessage(data.emailProblem))
         else if (data?.passwordProblem) setPasswordError(passwordMessage(data.passwordProblem))
-        else if (!Object.keys(serverIdErrors).length) setError(data?.error || t('errors.createFailed'))
+        else if (!keys.length) setError(data?.error || t('errors.createFailed'))
+        if (data?.nameProblem || data?.emailProblem || data?.passwordProblem) keys.push('account')
+        // Back to the earliest page that has something to fix.
+        const at = firstStepWithError(flow.steps, keys)
+        if (at !== -1) flow.goTo(at)
         setLoading(false)
         return
       }
       if (data?.pending) {
         // Email verification required — switch to the OTP step.
         setPendingEmail(data.email || email)
-        setNotice(t('otp.codeSentTo', { email: data.email || email }))
+        setNotice(
+          data.host_status === 'pending'
+            ? `${t('otp.codeSentTo', { email: data.email || email })} ${tr('hostPending')}`
+            : t('otp.codeSentTo', { email: data.email || email })
+        )
         setDevCode(data.devCode || null)
         setResendCooldown(30)
         setLoading(false)
@@ -512,156 +564,182 @@ export default function SignupPage() {
           </form>
         ) : (
           <>
-        <form onSubmit={handleSubmit}>
-          <label style={{ display: 'block', marginBottom: 16 }}>
-            <span
-              style={{
-                display: 'block',
-                fontSize: 13,
-                fontWeight: 600,
-                color: COLORS.ink,
-                marginBottom: 6,
+        {!flow.started ? (
+          <div>
+            <h2 style={{ margin: '0 0 14px', fontSize: 18, fontWeight: 700, color: COLORS.ink, textAlign: 'center' }}>
+              {tr('chooseTitle')}
+            </h2>
+            <RoleCards value={flow.role} onChange={flow.setRole} />
+            <StepNav
+              primaryType="button"
+              primaryLabel={tr('next')}
+              backLabel={tr('back')}
+              onPrimary={() => {
+                // Guest is preselected: Next with no choice made is a guest signup.
+                flow.setRole(flow.role)
+                flow.setStarted(true)
+                flow.goTo(0)
               }}
-            >
-              {t('fields.fullName')}
-            </span>
-            <input
-              type="text"
-              required
-              autoComplete="name"
-              value={fullName}
-              onChange={(e) => {
-                setFullName(e.target.value)
-                if (nameError) setNameError(null)
-              }}
-              onBlur={validateNameField}
-              aria-invalid={nameError ? true : undefined}
-              aria-describedby={nameError ? 'signup-name-error' : undefined}
-              placeholder="Layla Hassan"
-              // The whole `border` shorthand, not just borderColor — React warns
-              // when a shorthand and its longhand are mixed across renders.
-              style={nameError ? { ...inputStyle, border: `1px solid ${COLORS.burgundy}` } : inputStyle}
             />
-            {nameError && (
+          </div>
+        ) : (
+        <form onSubmit={handleStep}>
+          <StepIndicator steps={flow.steps} current={flow.step} />
+
+          {flow.current === 'account' && (
+            <>
+            <label style={{ display: 'block', marginBottom: 16 }}>
               <span
-                id="signup-name-error"
-                role="alert"
                 style={{
                   display: 'block',
-                  marginTop: 6,
                   fontSize: 13,
-                  lineHeight: 1.4,
-                  color: COLORS.burgundy,
+                  fontWeight: 600,
+                  color: COLORS.ink,
+                  marginBottom: 6,
                 }}
               >
-                {nameError}
+                {t('fields.fullName')}
               </span>
-            )}
-          </label>
-
-          <label style={{ display: 'block', marginBottom: 16 }}>
-            <span
-              style={{
-                display: 'block',
-                fontSize: 13,
-                fontWeight: 600,
-                color: COLORS.ink,
-                marginBottom: 6,
-              }}
-            >
-              {t('fields.email')}
-            </span>
-            <input
-              type="email"
-              required
-              autoComplete="email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value)
-                if (emailError) setEmailError(null)
-              }}
-              onBlur={validateEmail}
-              aria-invalid={emailError ? true : undefined}
-              aria-describedby={emailError ? 'signup-email-error' : undefined}
-              placeholder="layla@email.com"
-              // The whole `border` shorthand, not just borderColor — React warns
-              // when a shorthand and its longhand are mixed across renders.
-              style={emailError ? { ...inputStyle, border: `1px solid ${COLORS.burgundy}` } : inputStyle}
-            />
-            {emailError && (
-              <span
-                id="signup-email-error"
-                role="alert"
-                style={{
-                  display: 'block',
-                  marginTop: 6,
-                  fontSize: 13,
-                  lineHeight: 1.4,
-                  color: COLORS.burgundy,
-                }}
-              >
-                {emailError}
-              </span>
-            )}
-          </label>
-
-          <label style={{ display: 'block', marginBottom: 22 }}>
-            <span
-              style={{
-                display: 'block',
-                fontSize: 13,
-                fontWeight: 600,
-                color: COLORS.ink,
-                marginBottom: 6,
-              }}
-            >
-              {t('fields.password')}
-            </span>
-            <div style={{ position: 'relative' }}>
               <input
-                type={showPassword ? 'text' : 'password'}
+                type="text"
                 required
-                minLength={MIN_PASSWORD_LENGTH}
-                autoComplete="new-password"
-                value={password}
+                autoComplete="name"
+                value={fullName}
                 onChange={(e) => {
-                  setPassword(e.target.value)
-                  if (passwordError) setPasswordError(null)
+                  setFullName(e.target.value)
+                  if (nameError) setNameError(null)
                 }}
-                onBlur={() => { if (password) validatePasswordField() }}
-                aria-invalid={passwordError ? true : undefined}
-                aria-describedby={passwordError ? 'signup-password-error signup-password-rules' : 'signup-password-rules'}
-                placeholder={t('fields.passwordPlaceholder')}
-                style={passwordError ? { ...inputStyle, paddingInlineEnd: 46, border: `1px solid ${COLORS.burgundy}` } : { ...inputStyle, paddingInlineEnd: 46 }}
+                onBlur={validateNameField}
+                aria-invalid={nameError ? true : undefined}
+                aria-describedby={nameError ? 'signup-name-error' : undefined}
+                placeholder="Layla Hassan"
+                // The whole `border` shorthand, not just borderColor — React warns
+                // when a shorthand and its longhand are mixed across renders.
+                style={nameError ? { ...inputStyle, border: `1px solid ${COLORS.burgundy}` } : inputStyle}
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword((s) => !s)}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-                style={eyeButtonStyle}
-              >
-                <EyeIcon off={showPassword} />
-              </button>
-            </div>
-            {passwordError && (
+              {nameError && (
+                <span
+                  id="signup-name-error"
+                  role="alert"
+                  style={{
+                    display: 'block',
+                    marginTop: 6,
+                    fontSize: 13,
+                    lineHeight: 1.4,
+                    color: COLORS.burgundy,
+                  }}
+                >
+                  {nameError}
+                </span>
+              )}
+            </label>
+
+            <label style={{ display: 'block', marginBottom: 16 }}>
               <span
-                id="signup-password-error"
-                role="alert"
                 style={{
                   display: 'block',
-                  marginTop: 6,
                   fontSize: 13,
-                  lineHeight: 1.4,
-                  color: COLORS.burgundy,
+                  fontWeight: 600,
+                  color: COLORS.ink,
+                  marginBottom: 6,
                 }}
               >
-                {passwordError}
+                {t('fields.email')}
               </span>
-            )}
-            <PasswordChecklist id="signup-password-rules" password={password} />
-          </label>
+              <input
+                type="email"
+                required
+                autoComplete="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value)
+                  if (emailError) setEmailError(null)
+                }}
+                onBlur={validateEmail}
+                aria-invalid={emailError ? true : undefined}
+                aria-describedby={emailError ? 'signup-email-error' : undefined}
+                placeholder="layla@email.com"
+                // The whole `border` shorthand, not just borderColor — React warns
+                // when a shorthand and its longhand are mixed across renders.
+                style={emailError ? { ...inputStyle, border: `1px solid ${COLORS.burgundy}` } : inputStyle}
+              />
+              {emailError && (
+                <span
+                  id="signup-email-error"
+                  role="alert"
+                  style={{
+                    display: 'block',
+                    marginTop: 6,
+                    fontSize: 13,
+                    lineHeight: 1.4,
+                    color: COLORS.burgundy,
+                  }}
+                >
+                  {emailError}
+                </span>
+              )}
+            </label>
 
-          <div style={{ borderTop: '1px solid rgba(42,34,32,0.10)', paddingTop: 18, marginBottom: 6 }}>
+            <label style={{ display: 'block', marginBottom: 22 }}>
+              <span
+                style={{
+                  display: 'block',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: COLORS.ink,
+                  marginBottom: 6,
+                }}
+              >
+                {t('fields.password')}
+              </span>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  minLength={MIN_PASSWORD_LENGTH}
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value)
+                    if (passwordError) setPasswordError(null)
+                  }}
+                  onBlur={() => { if (password) validatePasswordField() }}
+                  aria-invalid={passwordError ? true : undefined}
+                  aria-describedby={passwordError ? 'signup-password-error signup-password-rules' : 'signup-password-rules'}
+                  placeholder={t('fields.passwordPlaceholder')}
+                  style={passwordError ? { ...inputStyle, paddingInlineEnd: 46, border: `1px solid ${COLORS.burgundy}` } : { ...inputStyle, paddingInlineEnd: 46 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  style={eyeButtonStyle}
+                >
+                  <EyeIcon off={showPassword} />
+                </button>
+              </div>
+              {passwordError && (
+                <span
+                  id="signup-password-error"
+                  role="alert"
+                  style={{
+                    display: 'block',
+                    marginTop: 6,
+                    fontSize: 13,
+                    lineHeight: 1.4,
+                    color: COLORS.burgundy,
+                  }}
+                >
+                  {passwordError}
+                </span>
+              )}
+              <PasswordChecklist id="signup-password-rules" password={password} />
+            </label>
+
+            </>
+          )}
+
+          {flow.current === 'identity' && (
             <IdentityFields
               idPrefix="signup"
               value={identity}
@@ -670,13 +748,47 @@ export default function SignupPage() {
               onClearError={(f) => setIdentityErrors((e) => ({ ...e, [f]: undefined }))}
               disabled={loading}
             />
-          </div>
+          )}
 
-          <button type="submit" disabled={loading} style={primaryButtonStyle(loading)}>
-            {loading ? t('submit.creating') : t('submit.createAccount')}
-          </button>
+          {flow.current === 'hosting' && (
+            <HostingFields idPrefix="signup-hosting" value={flow.hosting} onChange={flow.setHosting} errors={flow.hostingErrors} />
+          )}
+
+          {(flow.current === 'refund' || flow.current === 'payout') && (
+            <DestinationStep
+              kind={flow.current}
+              value={flow.destination}
+              onChange={flow.setDestination}
+              error={flow.destinationError}
+            />
+          )}
+
+          <StepNav
+            backLabel={tr('back')}
+            onBack={() => (flow.step === 0 ? flow.setStarted(false) : flow.goTo(flow.step - 1))}
+            disabled={loading}
+            primaryLabel={
+              loading
+                ? t('submit.creating')
+                : !flow.isLast
+                  ? tr('next')
+                  : flow.role === 'host'
+                    ? tr('submitApplication')
+                    : tr('createAccount')
+            }
+          />
+          {flow.current === 'refund' && (
+            <p style={{ margin: '14px 0 0', textAlign: 'center' }}>
+              <button type="button" onClick={() => void createAccount(true)} disabled={loading} style={linkButtonStyle}>
+                {tr('skip')}
+              </button>
+            </p>
+          )}
         </form>
+        )}
 
+        {!flow.started && (
+          <>
         <div
           style={{
             display: 'flex',
@@ -736,6 +848,8 @@ export default function SignupPage() {
             >
               {t('google.enableHint')}
             </p>
+          </>
+        )}
           </>
         )}
           </>

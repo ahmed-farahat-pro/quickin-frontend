@@ -2577,7 +2577,10 @@
       "fullNameRequired": "Introduce tu nombre completo.",
       "hostTypeInvalid": "Elige particular, empresa o agencia.",
       "checkFields": "Revisa los campos marcados.",
-      "conflict": "Tu estado de anfitrión ya ha cambiado. Hemos actualizado esta página."
+      "conflict": "Tu estado de anfitrión ya ha cambiado. Hemos actualizado esta página.",
+      "termsRequired": "Acepta los términos para anfitriones para enviar la solicitud.",
+      "payoutRequired": "Añade una cuenta bancaria o InstaPay para que podamos pagarte.",
+      "payoutInvalid": "Revisa los datos de cobro."
     },
     "pending": {
       "subtitle": "Nuestro equipo está revisando tu solicitud.",
@@ -2623,6 +2626,24 @@
       "reason": "Motivo",
       "view": "Ver mi verificación de identidad",
       "nationalIdLocked": "Tomado de la identificación que ya verificamos."
+    },
+    "profile": {
+      "title": "De tu perfil",
+      "body": "Estos datos vienen de tu cuenta, así que no tienes que volver a escribirlos. Nuestro equipo revisa esta solicitud con ellos.",
+      "edit": "Editar en el perfil",
+      "idNumber": "Número de documento",
+      "missingNote": "A tu perfil le faltan algunos datos. Añádelos abajo — solo se piden una vez."
+    },
+    "payout": {
+      "title": "¿Dónde te enviamos tus ganancias?",
+      "subtitle": "Añade una cuenta bancaria o InstaPay. No se paga nada hasta que te aprueben y tengas reservas.",
+      "subtitleOnFile": "Ya tenemos un método de cobro para ti.",
+      "onFileNote": "Cuando te aprueben, podrás cambiarlo desde la página de tu cuenta.",
+      "replace": "Usar otro",
+      "keep": "Mantener el guardado"
+    },
+    "terms": {
+      "label": "Acepto los <link>términos para anfitriones</link>."
     }
   },
   "contact": {
@@ -3081,5 +3102,147 @@
       "incomplete": "Añade tu teléfono y tu documento para terminar de configurar tu cuenta antes de reservar.",
       "completeCta": "Completa tu cuenta"
     }
+  },
+  "appGuide": {
+    "entry": {
+      "title": "Guía de la app",
+      "subtitle": "Repite el recorrido o aprende a ser anfitrión",
+      "takeTour": "Hacer el recorrido por la app",
+      "howToHost": "Cómo ser anfitrión",
+      "cancel": "Cancelar"
+    },
+    "buttons": {
+      "next": "Siguiente",
+      "back": "Atrás",
+      "skip": "Omitir",
+      "done": "Listo",
+      "showMeHow": "Muéstrame cómo",
+      "applyNow": "Solicitar ahora",
+      "signIn": "Iniciar sesión",
+      "close": "Cerrar guía"
+    },
+    "stepOf": "{current} de {total}",
+    "stepLabel": "Paso {current} de {total}",
+    "steps": {
+      "welcome": {
+        "title": "Te damos la bienvenida a QuickIn",
+        "body": "Este es un recorrido rápido por lo esencial. Dura menos de un minuto."
+      },
+      "search": {
+        "title": "Encuentra tu estancia",
+        "body": "Busca por destino y luego elige tus fechas y el número de huéspedes."
+      },
+      "regions": {
+        "title": "Explora por región",
+        "body": "Elige una región y luego un complejo para acotar los alojamientos."
+      },
+      "filters": {
+        "title": "Filtrar y ordenar",
+        "body": "Acota los resultados por precio, tipo de propiedad y más."
+      },
+      "wishlist": {
+        "title": "Guarda tus favoritos",
+        "body": "Toca el corazón en cualquier alojamiento para guardarlo aquí para más tarde."
+      },
+      "trips": {
+        "title": "Tus viajes",
+        "body": "Tus reservas, pagos y recibos están todos aquí."
+      },
+      "profile": {
+        "title": "Tu perfil",
+        "body": "Edita tus datos, cambia el idioma y la moneda, obtén ayuda — y hazte anfitrión."
+      },
+      "profileSignedOut": {
+        "title": "Inicia sesión para hacer más",
+        "body": "Inicia sesión o crea una cuenta para reservar, guardar alojamientos y ser anfitrión."
+      },
+      "finish": {
+        "title": "Todo listo",
+        "body": "¿Quieres ganar dinero con tu alojamiento? Te mostramos cómo ser anfitrión."
+      },
+      "finishHost": {
+        "title": "Todo listo",
+        "body": "Gestiona tus anuncios cuando quieras desde tu perfil."
+      },
+      "hostIntro": {
+        "title": "Hazte anfitrión",
+        "body": "Publica tu alojamiento en QuickIn en tres pasos: solicita, obtén la aprobación y publica."
+      },
+      "hostProfileTab": {
+        "title": "Empieza desde tu perfil",
+        "body": "Todo lo relacionado con ser anfitrión empieza en tu perfil."
+      },
+      "hostBecomeHost": {
+        "title": "Solicita ser anfitrión",
+        "body": "Toca aquí para abrir la solicitud de anfitrión."
+      },
+      "hostSignInFirst": {
+        "title": "Primero inicia sesión",
+        "body": "Necesitas una cuenta de QuickIn para poder solicitar ser anfitrión."
+      },
+      "hostPending": {
+        "title": "Solicitud en revisión",
+        "body": "Hemos recibido tu solicitud. Te avisaremos en cuanto nuestro equipo decida."
+      },
+      "hostAlreadyHost": {
+        "title": "Ya eres anfitrión",
+        "body": "Abre tu panel de anfitrión para gestionar anuncios, precios y reservas."
+      },
+      "hostRequirements": {
+        "title": "Lo que necesitarás",
+        "body": ""
+      },
+      "hostReview": {
+        "title": "Revisión y aprobación",
+        "body": "Nuestro equipo revisa tus datos y tu documento de identidad, normalmente en uno o dos días. Recibirás una notificación cuando te aprueben."
+      },
+      "hostAfterApproval": {
+        "title": "Después de la aprobación",
+        "body": "Abre el panel de anfitrión desde tu perfil para añadir un anuncio, fijar tus precios y añadir un método de cobro para recibir tus pagos."
+      }
+    },
+    "requirements": {
+      "hostType": "Tipo de anfitrión — particular, empresa o agencia",
+      "nameAndId": "Nombre completo y número de documento nacional",
+      "phone": "Un número de móvil egipcio",
+      "address": "Tu dirección",
+      "idPhotos": "Fotos del anverso y reverso de tu documento (DNI nacional, pasaporte o permiso de residencia)"
+    }
+  },
+  "signupRole": {
+    "chooseTitle": "¿Cómo usarás Quick In?",
+    "chooseHint": "Puedes cambiarlo más tarde: los huéspedes pueden solicitar ser anfitriones desde su cuenta.",
+    "roles": {
+      "guest": {
+        "title": "Soy huésped",
+        "body": "Encuentra y reserva estancias."
+      },
+      "host": {
+        "title": "Soy anfitrión",
+        "body": "Publica tu alojamiento y cobra. Una página extra para los datos de anfitrión y de cobro."
+      }
+    },
+    "stepOf": "Paso {current} de {total}",
+    "steps": {
+      "account": "Cuenta",
+      "identity": "Teléfono e ID",
+      "refund": "Datos de reembolso",
+      "hosting": "Datos de anfitrión",
+      "payout": "Cobro"
+    },
+    "next": "Siguiente",
+    "back": "Atrás",
+    "skip": "Omitir por ahora",
+    "createAccount": "Crear cuenta",
+    "submitApplication": "Crear cuenta y solicitar",
+    "completeGuest": "Terminar",
+    "completeHost": "Terminar y solicitar",
+    "refundTitle": "¿Dónde enviamos los reembolsos?",
+    "refundHint": "Opcional. Si se cancela una estancia pagada, te enviamos el reembolso aquí. Puedes añadirlo o cambiarlo más tarde en tu cuenta.",
+    "payoutTitle": "¿Dónde enviamos tus ganancias?",
+    "payoutHint": "Obligatorio para anfitriones. Puedes cambiarlo más tarde en tu cuenta.",
+    "hostingTitle": "Cuéntanos sobre tu alojamiento",
+    "hostingHint": "Tu solicitud llega a nuestro equipo en cuanto termines. Puedes explorar mientras se revisa.",
+    "hostPending": "Tu solicitud de anfitrión está en revisión."
   }
 }

@@ -14,6 +14,8 @@ import { PayoutMethodCard } from './payout-method-card'
 import { PreferencesCard } from './preferences-card'
 import { IdentityRejectedNotice } from '@/components/features/auth/identity-rejected-notice'
 import { isIdentityRejected } from '@/lib/local/signup-identity-ui-core'
+import { AppGuide } from '@/components/features/app-guide/app-guide'
+import { AppGuideAccountRow } from '@/components/features/app-guide/app-guide-button'
 
 export const dynamic = 'force-dynamic'
 
@@ -240,6 +242,7 @@ export default async function AccountPage() {
         {user.host_status === 'approved' ? (
           <a
             href="/host"
+            data-guide="host.becomeHost"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -275,6 +278,7 @@ export default async function AccountPage() {
           </a>
         ) : user.host_status === 'pending' ? (
           <div
+            data-guide="host.becomeHost"
             style={{
               background: '#fff',
               borderRadius: 22,
@@ -306,6 +310,7 @@ export default async function AccountPage() {
           </div>
         ) : user.host_status === 'rejected' ? (
           <div
+            data-guide="host.becomeHost"
             style={{
               background: '#fff',
               borderRadius: 22,
@@ -342,6 +347,7 @@ export default async function AccountPage() {
           </div>
         ) : (
           <div
+            data-guide="host.becomeHost"
             style={{
               background: `linear-gradient(180deg, ${COLORS.tan} 0%, #fff 100%)`,
               borderRadius: 22,
@@ -401,6 +407,8 @@ export default async function AccountPage() {
               <AccountLink href="/host/reviews" label={t('links.reviewGuests')} />
             </>
           )}
+          {/* Help: replay the app tour or learn how to host (opens a chooser). */}
+          <AppGuideAccountRow />
         </div>
 
         {/* Logout */}
@@ -423,6 +431,14 @@ export default async function AccountPage() {
           </a>
         </div>
       </section>
+
+      {/* Runs the chooser, and resumes a tour whose step lives on this page
+          (the host tour's "Apply to host" card). */}
+      <AppGuide
+        signedIn
+        isHost={user.host_status === 'approved' || user.is_host}
+        hostPending={user.host_status === 'pending'}
+      />
     </main>
   )
 }
