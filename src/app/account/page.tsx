@@ -363,6 +363,8 @@ export default async function AccountPage() {
           initialAge={profile.age === null ? '' : String(profile.age)}
           initialPhone={profile.phone ?? ''}
           initialBio={profile.bio ?? ''}
+          // Hosts can't clear their phone — the backend says so via this flag.
+          phoneRequired={profile.phone_required === true}
         />
 
         {/* Display currency + language */}

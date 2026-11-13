@@ -1807,6 +1807,7 @@
     "emptyState": "You haven't booked any stays yet.",
     "browseStays": "Find a stay",
     "guestsCount": "{count, plural, one {# guest} other {# guests}}",
+    "hostPhone": "Host phone",
     "total": "total",
     "status": {
       "pending": "Pending approval",
@@ -1999,6 +2000,7 @@
       "phone": "Phone number",
       "phonePlaceholder": "010 1234 5678",
       "phoneHelp": "Only you and our team can see this. Hosts and guests never do.",
+      "phoneHelpHost": "Required for hosts. Guests see it only once their stay is confirmed and paid, so they can reach you.",
       "bio": "About you",
       "bioPlaceholder": "A line or two about yourself — where you're from, what you love about travelling.",
       "bioCount": "{count} / {max} characters",
@@ -2010,6 +2012,7 @@
           "tooOld": "Enter an age of at most {max}."
         },
         "phoneInvalid": "That doesn't look like a phone number. Try 010 1234 5678 or +20 10 1234 5678.",
+        "phoneRequired": "Hosts need a phone number. Enter one so guests can reach you once a stay is confirmed.",
         "bioTooLong": "Keep this to {max} characters or fewer."
       },
       "avatarUrl": "Avatar URL",

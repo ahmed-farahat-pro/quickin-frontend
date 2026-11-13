@@ -506,6 +506,32 @@ async function ReservationsList({
                 >
                   {t('guestsCount', { count: b.guests })}
                 </p>
+                {/* The host's number, so the guest can call about arrival. The
+                    backend only fills it once the stay is confirmed AND paid —
+                    render it when present, never re-derive that rule here. */}
+                {b.host_phone && (
+                  <p
+                    style={{
+                      margin: '4px 0 0',
+                      fontSize: 14,
+                      color: COLORS.muted,
+                    }}
+                  >
+                    {t('hostPhone')}:{' '}
+                    <a
+                      href={`tel:${b.host_phone.replace(/[^\d+]/g, '')}`}
+                      dir="ltr"
+                      style={{
+                        color: COLORS.burgundy,
+                        fontWeight: 700,
+                        textDecoration: 'none',
+                        unicodeBidi: 'isolate',
+                      }}
+                    >
+                      {b.host_phone}
+                    </a>
+                  </p>
+                )}
                 <ReservationActions
                   bookingId={b.id}
                   status={b.status}

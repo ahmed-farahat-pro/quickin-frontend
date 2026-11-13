@@ -168,11 +168,15 @@ export function AccountForms({
   initialAge,
   initialPhone,
   initialBio,
+  phoneRequired = false,
 }: {
   initialName: string
   initialAge: string
   initialPhone: string
   initialBio: string
+  /** From GET /api/local/profile — true for hosts, whose phone the PATCH refuses
+   *  to clear (`code: 'phone_required'`). Defaults to the old optional field. */
+  phoneRequired?: boolean
 }) {
   const router = useRouter()
   const t = useTranslations('accountPage')
@@ -213,8 +217,11 @@ export function AccountForms({
       invalid.age = t(`profile.errors.age.${ageProblem.code}`, { min: MIN_AGE, max: MAX_AGE })
     }
     // Blank is not an error — every one of these is optional, and clearing one
-    // is how it gets removed.
-    if (!isBlankField(phone) && !isValidPhone(phone)) invalid.phone = t('profile.errors.phoneInvalid')
+    // is how it gets removed. Except a host's phone: guests call it once a stay
+    // is paid, so the API refuses a blank one and this says so before sending.
+    if (isBlankField(phone)) {
+      if (phoneRequired) invalid.phone = t('profile.errors.phoneRequired')
+    } else if (!isValidPhone(phone)) invalid.phone = t('profile.errors.phoneInvalid')
     if (checkBio(bio)) invalid.bio = t('profile.errors.bioTooLong', { max: MAX_BIO_LENGTH })
     return invalid
   }
@@ -258,8 +265,12 @@ export function AccountForms({
         // bio without naming one). Put the reason under that input as well as in
         // the notice, so it is next to the thing to change.
         const field = data.field as ProfileField | undefined
-        if (field && data.error) setFieldErrors({ [field]: String(data.error) })
-        throw new Error(data.error || t('profile.error'))
+        // A host's blank phone has a known code, so it reads in the guest's own
+        // language rather than the server's English sentence.
+        const message =
+          data.code === 'phone_required' ? t('profile.errors.phoneRequired') : data.error
+        if (field && message) setFieldErrors({ [field]: String(message) })
+        throw new Error(message || t('profile.error'))
       }
       setFieldErrors({})
       setProfileMsg({ kind: 'ok', text: t('profile.saved') })
@@ -387,7 +398,13 @@ export function AccountForms({
 
         <div style={{ marginBottom: 16 }}>
           <label htmlFor="acct-phone" style={labelStyle}>
-            {t('profile.phone')} <span style={optionalStyle}>{t('profile.optional')}</span>
+            {t('profile.phone')}{' '}
+            {/* Same burgundy star /host/apply marks its required fields with. */}
+            {phoneRequired ? (
+              <span style={{ color: C.burgundy }}>*</span>
+            ) : (
+              <span style={optionalStyle}>{t('profile.optional')}</span>
+            )}
           </label>
           <input
             id="acct-phone"
@@ -400,12 +417,15 @@ export function AccountForms({
             placeholder={t('profile.phonePlaceholder')}
             autoComplete="tel"
             maxLength={MAX_PHONE_CHARS}
+            aria-required={phoneRequired || undefined}
             aria-describedby="acct-phone-help"
             style={inputStyle}
           />
           <FieldError text={fieldErrors.phone} />
           <p id="acct-phone-help" style={{ margin: '6px 0 0', fontSize: 12.5, color: C.muted }}>
-            {t('profile.phoneHelp')}
+            {/* The guest-facing help ("hosts and guests never see this") stops
+                being true for a host: paid guests get the number. */}
+            {phoneRequired ? t('profile.phoneHelpHost') : t('profile.phoneHelp')}
           </p>
         </div>
 

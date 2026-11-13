@@ -201,6 +201,10 @@ export interface Booking {
    *  pass itself waits for payment (`isLiveStayPass`). */
   reservation_code: string | null
   host_notes: string | null
+  /** The host's phone. The BACKEND decides when the guest may see it — non-null
+   *  only once the stay is confirmed/completed AND paid — so render it when
+   *  present and never re-derive the rule here. Optional: older payloads lack it. */
+  host_phone?: string | null
 }
 
 export interface HostApplication {
@@ -319,6 +323,10 @@ export interface OwnProfileFields {
   age: number | null
   phone: string | null
   bio: string | null
+  /** True for hosts: the backend refuses to clear their phone
+   *  (`400 {field:'phone', code:'phone_required'}`). Optional so an older
+   *  backend that never sends it reads as "not required". */
+  phone_required?: boolean
 }
 
 /** Aliases matching how the pages name these payloads. */

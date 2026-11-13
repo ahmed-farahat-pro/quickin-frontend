@@ -1754,6 +1754,7 @@
     "emptyState": "Vous n'avez encore réservé aucun séjour.",
     "browseStays": "Trouver un logement",
     "guestsCount": "{count, plural, one {# voyageur} other {# voyageurs}}",
+    "hostPhone": "Téléphone de l’hôte",
     "total": "total",
     "status": {
       "pending": "En attente d'approbation",
@@ -1999,6 +2000,7 @@
       "phone": "Numéro de téléphone",
       "phonePlaceholder": "010 1234 5678",
       "phoneHelp": "Visible seulement par vous et notre équipe. Jamais par les hôtes ni les voyageurs.",
+      "phoneHelpHost": "Obligatoire pour les hôtes. Les voyageurs ne le voient qu’une fois leur séjour confirmé et payé, pour pouvoir vous joindre.",
       "bio": "À propos de vous",
       "bioPlaceholder": "Une ligne ou deux sur vous — d’où vous venez, ce que vous aimez dans les voyages.",
       "bioCount": "{count} / {max} caractères",
@@ -2010,6 +2012,7 @@
           "tooOld": "Saisissez un âge d’au plus {max}."
         },
         "phoneInvalid": "Cela ne ressemble pas à un numéro de téléphone. Essayez 010 1234 5678 ou +20 10 1234 5678.",
+        "phoneRequired": "Les hôtes doivent indiquer un numéro de téléphone. Saisissez-en un pour que les voyageurs puissent vous joindre une fois le séjour confirmé.",
         "bioTooLong": "Limitez ce texte à {max} caractères."
       },
       "avatarUrl": "URL de l’avatar",

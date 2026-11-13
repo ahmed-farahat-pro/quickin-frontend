@@ -1754,6 +1754,7 @@
     "emptyState": "Todavía no has reservado ninguna estancia.",
     "browseStays": "Buscar alojamiento",
     "guestsCount": "{count, plural, one {# huésped} other {# huéspedes}}",
+    "hostPhone": "Teléfono del anfitrión",
     "total": "total",
     "status": {
       "pending": "Pendiente de aprobación",
@@ -1999,6 +2000,7 @@
       "phone": "Número de teléfono",
       "phonePlaceholder": "010 1234 5678",
       "phoneHelp": "Solo lo vemos tú y nuestro equipo. Los anfitriones y los huéspedes nunca lo ven.",
+      "phoneHelpHost": "Obligatorio para anfitriones. Los huéspedes solo lo ven cuando su estancia está confirmada y pagada, para poder contactarte.",
       "bio": "Sobre ti",
       "bioPlaceholder": "Una o dos líneas sobre ti: de dónde eres y qué te gusta de viajar.",
       "bioCount": "{count} / {max} caracteres",
@@ -2010,6 +2012,7 @@
           "tooOld": "Escribe una edad de como máximo {max}."
         },
         "phoneInvalid": "Esto no parece un número de teléfono. Prueba 010 1234 5678 o +20 10 1234 5678.",
+        "phoneRequired": "Los anfitriones necesitan un número de teléfono. Escribe uno para que los huéspedes puedan contactarte cuando se confirme una estancia.",
         "bioTooLong": "Limita este texto a {max} caracteres o menos."
       },
       "avatarUrl": "URL del avatar",
