@@ -6,7 +6,11 @@
 // A ban is the ordinary account block (the Moderation 'suspend' action), so it is
 // lifted from /ops → Users like any other. While it lasts, every comment that author
 // wrote is hidden from the listings — the "Hidden" tab — and they come back if the ban
-// is lifted. Removing a comment is final and tells the author it happened.
+// is lifted. Removing a comment tells the author it happened; staff can Restore it
+// if that was a mistake (the author is not told twice).
+//
+// "To review" is every live comment no staff member has looked at yet. Comments go
+// live as soon as they are posted; Keep just takes one off the queue.
 import { useEffect, useState } from 'react'
 import { COLORS, SERIF } from '../../ops-theme'
 import { EmptyRow, adminGet, adminSend, btnBase, controlStyle, ghostBtn, pageStyle, panelStyle, td, th } from '../ops-ui'
@@ -33,13 +37,16 @@ export type AdminComment = {
   deleted_at: string | null
   deleted_by: string | null
   delete_reason: string | null
+  reviewed_at?: string | null
+  reviewed_by?: string | null
   state: 'visible' | 'hidden' | 'removed_by_author' | 'removed_by_staff'
 }
 
-const SCOPES = ['visible', 'hidden', 'removed', 'all'] as const
+const SCOPES = ['review', 'visible', 'hidden', 'removed', 'all'] as const
 type Scope = (typeof SCOPES)[number]
 
 const SCOPE_LABEL: Record<Scope, string> = {
+  review: 'To review',
   visible: 'Live',
   hidden: 'Hidden (author banned)',
   removed: 'Removed',
@@ -61,13 +68,23 @@ function stateTone(state: AdminComment['state']): string {
 
 const smallBtn: React.CSSProperties = { ...ghostBtn, padding: '6px 12px', fontSize: 12 }
 const dangerBtn: React.CSSProperties = { ...smallBtn, color: COLORS.red, borderColor: COLORS.red }
+const keepBtn: React.CSSProperties = { ...smallBtn, color: COLORS.green, borderColor: COLORS.green }
 
-export function OpsComments({ initial }: { initial: AdminComment[] }) {
+export function OpsComments({
+  initial,
+  initialReviewCount,
+  initialError,
+}: {
+  initial: AdminComment[]
+  initialReviewCount: number
+  initialError: string | null
+}) {
   const [comments, setComments] = useState<AdminComment[]>(initial)
-  const [scope, setScope] = useState<Scope>('visible')
+  const [reviewCount, setReviewCount] = useState(initialReviewCount)
+  const [scope, setScope] = useState<Scope>('review')
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(initialError)
   const [flash, setFlash] = useState<string | null>(null)
   const [now, setNow] = useState(0)
 
@@ -82,11 +99,12 @@ export function OpsComments({ initial }: { initial: AdminComment[] }) {
   const load = async (nextScope: Scope, nextQ: string) => {
     const params = new URLSearchParams({ scope: nextScope })
     if (nextQ.trim()) params.set('q', nextQ.trim())
-    const res = await adminGet<{ comments: AdminComment[] }>(`comments?${params}`)
+    const res = await adminGet<{ comments: AdminComment[]; review_count?: number }>(`comments?${params}`)
     if (res === 'forbidden') { setError('Your account does not have the Moderation module.'); return }
     if (!res) { setError('Could not load comments. Please retry.'); return }
     setError(null)
     setComments(res.comments ?? [])
+    if (typeof res.review_count === 'number') setReviewCount(res.review_count)
   }
 
   const changeScope = (next: Scope) => {
@@ -114,6 +132,22 @@ export function OpsComments({ initial }: { initial: AdminComment[] }) {
     if (!res.ok) { setError((res.data as { error?: string })?.error ?? 'That did not work'); return }
     await load(scope, q)
     say('Comment removed and the author notified')
+  }
+
+  const patch = async (c: AdminComment, action: 'keep' | 'restore', done: string) => {
+    setBusy(c.id); setError(null)
+    const res = await adminSend<{ error?: string }>(`comments/${c.id}`, 'PATCH', { action })
+    setBusy(null)
+    if (!res.ok) { setError((res.data as { error?: string })?.error ?? 'That did not work'); return }
+    await load(scope, q)
+    say(done)
+  }
+
+  const keep = (c: AdminComment) => patch(c, 'keep', 'Kept — the comment stays up')
+
+  const restore = (c: AdminComment) => {
+    if (!confirm(`Put this comment back on “${c.listing_title ?? 'the listing'}”?\n\n“${c.body.slice(0, 160)}”`)) return
+    return patch(c, 'restore', 'Comment restored to the listing')
   }
 
   const removeReply = async (c: AdminComment) => {
@@ -169,6 +203,15 @@ export function OpsComments({ initial }: { initial: AdminComment[] }) {
               }}
             >
               {SCOPE_LABEL[s]}
+              {s === 'review' && reviewCount > 0 && (
+                <span style={{
+                  marginLeft: 6, padding: '1px 7px', borderRadius: 999, fontSize: 11, fontWeight: 700,
+                  background: scope === s ? COLORS.cream : COLORS.burgundy,
+                  color: scope === s ? COLORS.burgundy : COLORS.cream,
+                }}>
+                  {reviewCount}
+                </span>
+              )}
             </button>
           ))}
           <form
@@ -236,9 +279,24 @@ export function OpsComments({ initial }: { initial: AdminComment[] }) {
                       </td>
                       <td style={{ ...td, whiteSpace: 'nowrap' }}>
                         <span style={{ color: stateTone(c.state), fontWeight: 700 }}>{STATE_LABEL[c.state]}</span>
+                        {live && (
+                          <div style={{ color: COLORS.muted, fontSize: 11.5, marginTop: 2 }}>
+                            {c.reviewed_at ? `Kept${c.reviewed_by ? ` by ${c.reviewed_by}` : ''}` : 'Not reviewed yet'}
+                          </div>
+                        )}
                       </td>
                       <td style={{ ...td, whiteSpace: 'nowrap' }}>
                         <div style={{ display: 'grid', gap: 6 }}>
+                          {live && !c.reviewed_at && (
+                            <button type="button" disabled={busy === c.id} onClick={() => keep(c)} style={keepBtn}>
+                              Keep
+                            </button>
+                          )}
+                          {c.state === 'removed_by_staff' && (
+                            <button type="button" disabled={busy === c.id} onClick={() => restore(c)} style={smallBtn}>
+                              Restore
+                            </button>
+                          )}
                           {live && (
                             <button type="button" disabled={busy === c.id} onClick={() => removeComment(c)} style={dangerBtn}>
                               Remove comment
@@ -267,11 +325,13 @@ export function OpsComments({ initial }: { initial: AdminComment[] }) {
                   <EmptyRow
                     colSpan={6}
                     tone={q.trim() ? 'filtered' : 'blank'}
-                    title={q.trim() ? 'No comments match' : 'No comments here'}
+                    title={q.trim() ? 'No comments match' : scope === 'review' ? 'All caught up' : 'No comments here'}
                     body={
                       q.trim()
                         ? 'Try a different search, or switch tabs.'
-                        : scope === 'hidden'
+                        : scope === 'review'
+                          ? 'Every live comment has been reviewed. New ones land here.'
+                          : scope === 'hidden'
                           ? 'No banned user has comments on a listing.'
                           : scope === 'removed'
                             ? 'Nothing has been removed yet.'
