@@ -51,3 +51,18 @@ export const CONTACT_ADDRESS = {
   en: 'Unit No. 1474, located in the 8th Neighborhood, First District, 6th of October City, Giza Governorate, Egypt, ground floor.',
   ar: 'وحدة رقم 1474، المجاورة الثامنة، الحي الأول، مدينة السادس من أكتوبر، محافظة الجيزة، مصر، الدور الأرضي.',
 }
+
+/**
+ * The office pin on Google Maps. `placeUrl` opens Quick In's own place card
+ * (reviews, directions); `embedUrl` is the keyless embed the Contact Us page
+ * frames, centred on the same coordinates so the two never point at
+ * different spots.
+ */
+const OFFICE_LAT = 29.9641875
+const OFFICE_LNG = 30.9604375
+
+export const CONTACT_MAP = {
+  placeUrl:
+    'https://www.google.com/maps/place/quick+in/@29.9641875,30.9604375,17z/data=!3m1!4b1!4m6!3m5!1s0x1458573e67b31df9:0x77834d9ae47355cb!8m2!3d29.9641875!4d30.9604375!16s%2Fg%2F11z_h2pwzw',
+  embedUrl: `https://maps.google.com/maps?q=${OFFICE_LAT},${OFFICE_LNG}&z=17&output=embed`,
+}

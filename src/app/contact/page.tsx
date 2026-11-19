@@ -13,6 +13,7 @@ import {
   CONTACT_ADDRESS,
   CONTACT_EMAIL,
   CONTACT_EMAIL_HREF,
+  CONTACT_MAP,
   CONTACT_PHONES,
   WHATSAPP_NUMBERS,
   whatsappHref,
@@ -189,6 +190,34 @@ export default function ContactPage() {
                   <span dir="rtl" style={{ display: 'block', color: C.muted, marginTop: 4 }}>{CONTACT_ADDRESS.ar}</span>
                 </address>
               </div>
+              <iframe
+                src={CONTACT_MAP.embedUrl}
+                title="Quick In on Google Maps"
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                style={{ display: 'block', width: '100%', height: 260, border: 0, borderRadius: 12, marginTop: 14, background: C.tan }}
+              />
+              <a
+                href={CONTACT_MAP.placeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  marginTop: 12,
+                  padding: '10px 16px',
+                  borderRadius: 999,
+                  background: C.burgundy,
+                  color: '#fff',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                }}
+              >
+                <IconMapPin size={18} stroke={1.8} />
+                Open in Google Maps <span style={{ opacity: 0.6 }}>|</span> <span dir="rtl">افتح على خرائط جوجل</span>
+              </a>
             </div>
             <div style={{ background: C.cream, borderRadius: 16, padding: '14px 16px' }}>
               <Label en="Social Media" ar="السوشيال ميديا" />
