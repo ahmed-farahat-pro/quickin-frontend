@@ -2479,12 +2479,30 @@
         "available": "Default price",
         "custom": "Custom price",
         "blocked": "Blocked",
-        "booked": "Booked"
+        "booked": "Booked",
+        "selected": "Selected"
       },
       "errors": {
         "saveFailed": "Could not save those dates. Please try again.",
-        "priceRequired": "Enter a nightly price first."
-      }
+        "priceRequired": "Enter a nightly price first.",
+        "tooLong": "That range is longer than {max} days. Pick a closer end date."
+      },
+      "prevMonth": "Previous month",
+      "nextMonth": "Next month",
+      "today": "Today",
+      "jumpToMonth": "Jump to a month",
+      "unselectMonth": "Unselect month",
+      "emptyTitle": "Set nightly prices",
+      "howTo": {
+        "start": "Tap the first night.",
+        "end": "Tap the last night — every day in between is selected.",
+        "price": "Type a price per night and press Set price.",
+        "desktop": "Tap a selected day to remove it. On a laptop you can also click and drag, or ⌘/Ctrl-click single days."
+      },
+      "moreRanges": "+{count} more",
+      "currently": "Currently {amount} {currency}",
+      "currentlyRange": "Currently {min} – {max} {currency}",
+      "pendingHint": "Now tap the last night of the range — or tap {date} again to keep just that day."
     },
     "ownershipDoc": {
       "label": "Ownership document",

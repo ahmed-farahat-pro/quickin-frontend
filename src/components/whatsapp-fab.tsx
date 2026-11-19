@@ -18,7 +18,10 @@ export default function WhatsAppFab() {
   const path = pathname.replace(/^\/(en|ar|fr|es)(?=\/|$)/, '') || '/'
   const hidden =
     HIDDEN_PREFIXES.some((p) => path === p || path.startsWith(p + '/')) ||
-    /checkout|\/pay(\/|$)/.test(path)
+    /checkout|\/pay(\/|$)/.test(path) ||
+    // The host pricing calendar opens a bottom sheet on phones; a floating
+    // button in the same corner would sit on top of its price field.
+    /^\/host\/[^/]+\/calendar(\/|$)/.test(path)
   if (hidden) return null
 
   return (

@@ -2479,12 +2479,30 @@
         "available": "Precio base",
         "custom": "Precio personalizado",
         "blocked": "Bloqueado",
-        "booked": "Reservado"
+        "booked": "Reservado",
+        "selected": "Seleccionado"
       },
       "errors": {
         "saveFailed": "No se pudieron guardar esas fechas. Inténtalo de nuevo.",
-        "priceRequired": "Introduce primero un precio por noche."
-      }
+        "priceRequired": "Introduce primero un precio por noche.",
+        "tooLong": "Ese rango supera los {max} días. Elige una fecha final más cercana."
+      },
+      "prevMonth": "Mes anterior",
+      "nextMonth": "Mes siguiente",
+      "today": "Hoy",
+      "jumpToMonth": "Ir a un mes",
+      "unselectMonth": "Deseleccionar mes",
+      "emptyTitle": "Fija precios por noche",
+      "howTo": {
+        "start": "Toca la primera noche.",
+        "end": "Toca la última noche: se seleccionan todos los días intermedios.",
+        "price": "Escribe un precio por noche y pulsa Fijar precio.",
+        "desktop": "Toca un día seleccionado para quitarlo. En un portátil también puedes hacer clic y arrastrar, o ⌘/Ctrl-clic para días sueltos."
+      },
+      "moreRanges": "+{count} más",
+      "currently": "Ahora {amount} {currency}",
+      "currentlyRange": "Ahora {min} – {max} {currency}",
+      "pendingHint": "Ahora toca la última noche del rango, o vuelve a tocar {date} para quedarte solo con ese día."
     },
     "ownershipDoc": {
       "label": "Documento de propiedad",

@@ -64,7 +64,7 @@ export default async function HostCalendarPage({ params }: { params: Promise<{ i
   let initial: ListingCalendar | null = null
   try {
     initial = await backendFetch<ListingCalendar>(
-      `/api/local/listings/${id}/calendar?from=${today}&to=${addDays(today, PREFETCH_DAYS)}&asHost=1`,
+      `/api/local/listings/${id}/calendar?start=${today}&end=${addDays(today, PREFETCH_DAYS)}`,
     )
   } catch (err) {
     console.error('host/calendar prefetch:', err)
@@ -79,10 +79,10 @@ export default async function HostCalendarPage({ params }: { params: Promise<{ i
         style={{
           background: `linear-gradient(180deg, ${COLORS.tan} 0%, ${COLORS.cream} 100%)`,
           borderBottom: '1px solid rgba(91,15,22,0.10)',
-          padding: '20px 24px',
+          padding: '16px clamp(16px, 4vw, 24px)',
         }}
       >
-        <div style={{ maxWidth: 760, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+        <div style={{ maxWidth: 1180, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
           <a href="/host" style={{ color: COLORS.burgundy, textDecoration: 'none', fontWeight: 600, fontSize: 14 }}>
             ← {t('backToHost')}
           </a>
@@ -92,7 +92,7 @@ export default async function HostCalendarPage({ params }: { params: Promise<{ i
         </div>
       </header>
 
-      <section style={{ maxWidth: 760, margin: '0 auto', padding: '32px 24px 72px' }}>
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(20px, 4vw, 32px) clamp(16px, 4vw, 24px) 72px' }}>
         <h1
           style={{
             margin: '0 0 6px',
