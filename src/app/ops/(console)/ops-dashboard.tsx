@@ -31,6 +31,7 @@ import { Empty, adminGetQuiet, money } from './ops-ui'
 import { OverviewMetrics } from './overview-trend'
 import type { TrendPayload } from '@/lib/local/overview-trends-core'
 import { OpsSectionSkeleton } from './ops-skeleton'
+import { ListingPhotoViewer } from './listing-photo-viewer'
 import { alertsFor, alertTotal, waitingLabel } from '@/lib/local/activity-core'
 import { docTypeLabel } from '@/lib/local/host-verification-core'
 import { checkListingPin, listingPinBadgeLabel, listingPinProblemMessage } from '@/lib/local/listing-geo-policy'
@@ -120,6 +121,9 @@ type AdminListing = {
   created_at: string
   booking_count: number
   image: string | null
+  /** Total photos — the full gallery opens in ListingPhotoViewer. Absent from an
+   *  older backend, in which case a photo still opens the viewer. */
+  image_count?: number
   /** Whether the host attached proof of ownership. The document itself is opened
    *  through the audited endpoint — see openDocument. */
   has_ownership_doc?: boolean
@@ -305,6 +309,7 @@ export function OpsDashboard({
   // Per-section data.
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [listings, setListings] = useState<AdminListing[]>([])
+  const [photoViewer, setPhotoViewer] = useState<{ id: string; title: string } | null>(null)
   const [bookings, setBookings] = useState<AdminBooking[]>([])
   const [pendingBookings, setPendingBookings] = useState<AdminPendingBooking[]>([])
   const [apps, setApps] = useState<HostApplication[]>([])
@@ -1125,19 +1130,51 @@ export function OpsDashboard({
                   }}
                 >
                   {l.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={l.image}
-                      alt={l.title}
+                    <button
+                      type="button"
+                      onClick={() => setPhotoViewer({ id: l.id, title: l.title })}
+                      title="View all photos"
+                      aria-label={`View photos of ${l.title}`}
                       style={{
-                        width: 120,
-                        height: 90,
-                        objectFit: 'cover',
-                        borderRadius: 12,
-                        border: `1px solid ${TAN}`,
+                        position: 'relative',
+                        padding: 0,
+                        border: 'none',
+                        background: 'transparent',
+                        cursor: 'zoom-in',
                         flexShrink: 0,
                       }}
-                    />
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={l.image}
+                        alt={l.title}
+                        style={{
+                          width: 120,
+                          height: 90,
+                          objectFit: 'cover',
+                          borderRadius: 12,
+                          border: `1px solid ${TAN}`,
+                          display: 'block',
+                        }}
+                      />
+                      {(l.image_count ?? 0) > 1 ? (
+                        <span
+                          style={{
+                            position: 'absolute',
+                            right: 6,
+                            bottom: 6,
+                            background: 'rgba(20,16,15,0.75)',
+                            color: '#fff',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            borderRadius: 8,
+                            padding: '2px 6px',
+                          }}
+                        >
+                          {l.image_count} photos
+                        </span>
+                      ) : null}
+                    </button>
                   ) : (
                     <div
                       style={{
@@ -1213,6 +1250,14 @@ export function OpsDashboard({
                       alignItems: 'center',
                     }}
                   >
+                    {l.image ? (
+                      <button
+                        style={outlineBtn}
+                        onClick={() => setPhotoViewer({ id: l.id, title: l.title })}
+                      >
+                        {(l.image_count ?? 0) > 0 ? `Photos (${l.image_count})` : 'Photos'}
+                      </button>
+                    ) : null}
                     {l.approval_status === 'pending' ? (
                       <>
                         {/* Approving is a judgement about a document, so the document
@@ -1996,6 +2041,15 @@ export function OpsDashboard({
           </>
         ) : null}
       </div>
+
+      {photoViewer ? (
+        <ListingPhotoViewer
+          key={photoViewer.id}
+          listingId={photoViewer.id}
+          title={photoViewer.title}
+          onClose={() => setPhotoViewer(null)}
+        />
+      ) : null}
 
       {/* ---- Optional resort mapping for a listing whose resort is free text ---- */}
       {resortReview && (
